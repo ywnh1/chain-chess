@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>连锁棋</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f13;
+  --surface:#1a1a22;
+  --card:#23232d;
+  --border:rgba(255,255,255,.06);
+  --accent:#f0b34b;
+  --accent2:#5fc3c3;
+  --text:#e8e6e3;
+  --dim:#7a7885;
+  --radius:12px;
+  --shadow:0 2px 20px rgba(0,0,0,.5);
+  --font:'Inter','SF Pro','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+}
+html{font-size:clamp(14px,4vw,17px)}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:12px;
+  transition:background .6s ease;
+  -webkit-tap-highlight-color:transparent;
+  overflow-x:hidden;
+  line-height:1.5;
+}
+.screen{display:none}
+.screen.active{display:flex;flex-direction:column;align-items:center;width:100%;max-width:480px}
+
+/* welcome */
+#welcome{gap:2rem;text-align:center}
+.logo{font-size:3rem;letter-spacing:2px}
+.logo span{color:var(--accent)}
+.tagline{color:var(--dim);font-size:.9rem;margin-top:-.5rem}
+.mode-cards{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px}
+.mode-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px 16px;cursor:pointer;
+  transition:.2s;text-align:left;display:flex;align-items:center;gap:14px;
+}
+.mode-card:active{background:var(--card);border-color:var(--accent)}
+.mode-card .icon{font-size:1.8rem;flex-shrink:0}
+.mode-card .body{flex:1}
+.mode-card .body h3{font-size:1rem;font-weight:600}
+.mode-card .body p{font-size:.8rem;color:var(--dim);margin-top:2px}
+
+/* lobby */
+#lobby,#aiLobby{max-width:480px;gap:1rem;width:100%}
+#lobby .back,#aiLobby .back{
+  align-self:flex-start;
+  background:none;border:none;color:var(--dim);
+  font-size:.85rem;cursor:pointer;padding:6px 0;
+  display:flex;align-items:center;gap:4px;transition:.15s;
+}
+#lobby .back:active,#aiLobby .back:active{color:var(--text)}
+#lobby h2,#aiLobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
+.form-row{margin:10px 0;display:flex;flex-direction:column;gap:4px;width:100%}
+.form-row label{font-size:.8rem;color:var(--dim)}
+.form-row input,.form-row select{
+  width:100%;padding:10px 12px;
+  border:1px solid var(--border);border-radius:8px;
+  background:rgba(255,255,255,.04);color:var(--text);
+  font-size:.9rem;outline:none;transition:.12s;
+}
+.form-row input:focus,.form-row select:focus{
+  border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,179,75,.15);
+}
+.form-row select option{background:var(--surface);color:var(--text)}
+.btn-primary{
+  width:100%;padding:12px;background:var(--accent);color:#0f0f13;
+  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;margin-top:12px;transition:.12s;
+}
+.btn-primary:active{opacity:.8}
+
+/* game */
+#game{max-width:480px;gap:8px;width:100%}
+#game .top{
+  display:flex;justify-content:space-between;align-items:center;
+  width:100%;padding:4px 0 6px;
+}
+#game .top-left{display:flex;gap:8px;align-items:center}
+#game .top-left button{
+  background:rgba(255,255,255,.08);color:var(--dim);
+  border:none;padding:6px 10px;border-radius:6px;font-size:.7rem;
+  cursor:pointer;transition:.12s;font-weight:500;
+}
+#game .top-left button:active{background:rgba(255,255,255,.15)}
+#game .top-right{display:flex;gap:4px;align-items:center}
+.turn-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:6px;
+  background:rgba(255,255,255,.06);
+}
+.turn-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.board-wrap{
+  position:relative;
+  width:min(88vw,420px);
+  height:min(88vw,420px);
+}
+#board{width:100%;height:100%;display:grid;gap:min(1.2vw,5px);touch-action:manipulation}
+.cell{
+  background:rgba(255,255,255,.05);
+  border-radius:min(2.2vw,10px);
+  position:relative;cursor:pointer;
+  transition:background .12s;
+}
+.cell.highlight{background:rgba(255,255,255,.12)}
+.cell .bg{
+  position:absolute;inset:0;
+  border-radius:min(2.2vw,10px);opacity:.15;
+  transition:.2s;
+}
+.cell .piece{
+  position:absolute;width:76%;height:76%;
+  left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  display:flex;justify-content:center;align-items:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.35);
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1);
+}
+.cell .piece.pop{animation:pop .25s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{
+  0%{transform:translate(-50%,-50%) scale(0)}
+  70%{transform:translate(-50%,-50%) scale(1.12)}
+  100%{transform:translate(-50%,-50%) scale(1)}
+}
+.cell.explode{animation:explode .35s ease}
+@keyframes explode{
+  0%{background:rgba(255,255,255,.4)}
+  50%{background:rgba(255,255,255,.7)}
+  100%{background:rgba(255,255,255,.05)}
+}
+.cell .dot{
+  position:absolute;width:20%;height:20%;
+  border-radius:50%;background:rgba(255,255,255,.88);
+  transform:translate(-50%,-50%);
+}
+
+/* player colours */
+.p0{background:#e8645a}
+.p1{background:#e8b84b}
+.p2{background:#5ab8e8}
+.p3{background:#6bc46b}
+.p4{background:#b07ce8}
+.p5{background:#e87ab8}
+.p6{background:#5cc9a9}
+
+/* msg */
+#msg{
+  font-size:.75rem;padding:4px 10px;border-radius:6px;
+  transition:.2s;min-height:1.5rem;
+}
+#msg.error{background:#c0392b;color:#fff}
+#msg.success{background:#27ae60;color:#fff}
+
+/* modal */
+.modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.65);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  justify-content:center;align-items:center;z-index:1000;padding:16px;
+}
+.modal.show{display:flex}
+.modal-inner{
+  background:var(--surface);
+  padding:24px;border-radius:var(--radius);
+  width:100%;max-width:360px;
+  animation:modalIn .2s ease;
+}
+@keyframes modalIn{
+  from{opacity:0;transform:translateY(16px) scale(.96)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.modal-inner h3{font-size:1.05rem;font-weight:600;text-align:center;margin-bottom:16px}
+.modal-actions{display:flex;gap:10px;margin-top:16px}
+.modal-actions button{
+  flex:1;padding:10px;border:none;border-radius:8px;
+  font-size:.9rem;font-weight:600;cursor:pointer;transition:.12s;
+}
+.modal-actions button:active{opacity:.75}
+.btn-ghost{background:rgba(255,255,255,.08);color:var(--dim)}
+
+/* game-over */
+.game-over{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.75);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  gap:12px;z-index:999;padding:20px;
+  animation:fadeIn .35s ease;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.game-over h2{font-size:1.6rem}
+.game-over p{font-size:.95rem;color:var(--dim)}
+.game-over button{
+  margin-top:8px;padding:12px 28px;
+  background:var(--accent);color:#0f0f13;
+  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;
+}
+
+/* player bar */
+.player-bar{
+  display:flex;gap:6px;width:min(88vw,420px);margin:6px 0;
+  flex-wrap:wrap;justify-content:center;
+}
+.player-tag{
+  padding:4px 10px;border-radius:6px;
+  font-size:.7rem;font-weight:600;
+  opacity:.35;transition:.2s;
+  border:1px solid transparent;
+  white-space:nowrap;
+}
+.player-tag .cnt{
+  display:inline-block;min-width:1.1em;
+  text-align:center;margin-left:4px;
+  font-size:.8rem;font-weight:700;
+}
+.player-tag.active{opacity:1;border-color:rgba(255,255,255,.15);transform:scale(1.04)}
+.player-tag.elim{opacity:.15;text-decoration:line-through}
+</style>
+</head>
+<body>
+
+<!-- Welcome -->
+<div id="welcome" class="screen active">
+  <div class="logo">♟<span>连锁棋</span></div>
+  <div class="tagline">多人联手，一触即发</div>
+  <div class="mode-cards">
+    <div class="mode-card" onclick="showAILobby()">
+      <div class="icon">🤖</div>
+      <div class="body">
+        <h3>AI 对战</h3>
+        <p>与电脑 AI 对决，挑战不同难度</p>
+      </div>
+    </div>
+    <div class="mode-card" onclick="showLocalLobby()">
+      <div class="icon">👥</div>
+      <div class="body">
+        <h3>本地对战</h3>
+        <p>同一设备，轮流落子，朋友面前大战</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AI Lobby -->
+<div id="aiLobby" class="screen">
+  <button class="back" onclick="goHome()">← 返回</button>
+  <h2>🤖 AI 对战</h2>
+  <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">选择对局配置</p>
+  <div class="form-row"><label>棋盘大小</label>
+    <select id="aiSize">
+      <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
+      <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
+      <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
+      <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
+      <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
+    </select>
+  </div>
+  <div class="form-row"><label>AI 对手数</label>
+    <select id="aiCount">
+      <option value="1" selected>1 个 AI</option>
+      <option value="2">2 个 AI</option>
+      <option value="3">3 个 AI</option>
+      <option value="4">4 个 AI</option>
+      <option value="5">5 个 AI</option>
+      <option value="6">6 个 AI</option>
+    </select>
+  </div>
+  <button class="btn-primary" onclick="startAIGame()">开始游戏</button>
+</div>
+
+<!-- Local Lobby -->
+<div id="localLobby" class="screen">
+  <button class="back" onclick="goHome()">← 返回</button>
+  <h2>👥 本地对战</h2>
+  <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">选择对局配置</p>
+  <div class="form-row"><label>棋盘大小</label>
+    <select id="localSize">
+      <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
+      <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
+      <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
+      <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
+      <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
+    </select>
+  </div>
+  <div class="form-row"><label>玩家人数</label>
+    <select id="localPlayers">
+      <option value="2" selected>2 人</option>
+      <option value="3">3 人</option>
+      <option value="4">4 人</option>
+      <option value="5">5 人</option>
+      <option value="6">6 人</option>
+      <option value="7">7 人</option>
+    </select>
+  </div>
+  <button class="btn-primary" onclick="startLocalGame()">开始游戏</button>
+</div>
+
+<!-- Game Screen -->
+<div id="game" class="screen">
+  <div class="top">
+    <div class="top-left">
+      <button onclick="exitGame()">← 退出</button>
+      <button onclick="openModal('resetModal')">↻ 重开</button>
+    </div>
+    <div class="top-right">
+      <span id="msg"></span>
+    </div>
+  </div>
+  <div id="playerBar" class="player-bar"></div>
+  <div class="board-wrap"><div id="board"></div></div>
+</div>
+
+<!-- Reset Modal -->
+<div id="resetModal" class="modal">
+  <div class="modal-inner">
+    <h3>重新开始</h3>
+    <div class="form-row"><label>棋盘大小</label>
+      <select id="resetSize">
+        <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
+        <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
+        <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
+        <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
+        <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
+      </select>
+    </div>
+    <div id="resetPlayersRow" class="form-row"><label>玩家人数</label>
+      <select id="resetPlayers">
+        <option value="2" selected>2 人</option><option value="3">3 人</option><option value="4">4 人</option>
+        <option value="5">5 人</option><option value="6">6 人</option><option value="7">7 人</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('resetModal')">取消</button>
+      <button class="btn-primary" onclick="confirmReset()" style="background:var(--accent);color:#0f0f13">重开</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==================== CONSTANTS ==================== */
+const COLORS=['#e8645a','#e8b84b','#5ab8e8','#6bc46b','#b07ce8','#e87ab8','#5cc9a9'];
+const COLORS_LIGHT=['rgba(232,100,90,.08)','rgba(232,184,75,.08)','rgba(90,184,232,.08)','rgba(107,196,107,.08)','rgba(176,124,232,.08)','rgba(232,122,184,.08)','rgba(92,201,169,.08)'];
+
+/* ==================== STATE ==================== */
+let board=[],curPlayer=0,size=7,maxPlayers=2;
+let cells=[];
+let gameMode=null; // 'ai'|'local'
+let gameOver=false;
+let aiPlayers=new Set();
+let aiThinking=false;
+let eliminatedPlayers=new Set();
+
+/* ==================== SCREEN MGMT ==================== */
+function show(s){
+  document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));
+  document.getElementById(s).classList.add('active');
+}
+function goHome(){exitGame();show('welcome')}
+
+/* ==================== GAME LOGIC ==================== */
+function cap(i,j,s){return 4}
+function nbrs(i,j,s){
+  let r=[];
+  if(i>0)r.push([i-1,j]);if(i<s-1)r.push([i+1,j]);
+  if(j>0)r.push([i,j-1]);if(j<s-1)r.push([i,j+1]);
+  return r;
+}
+function nbrs8(i,j,s){
+  let r=[];
+  for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++){
+    if(di===0&&dj===0)continue;
+    let ni=i+di,nj=j+dj;
+    if(ni>=0&&ni<s&&nj>=0&&nj<s)r.push([ni,nj]);
+  }
+  return r;
+}
+function mkBoard(s){
+  return Array.from({length:s},()=>Array.from({length:s},()=>({owner:null,count:0})));
+}
+function hasPieces(p,b){
+  for(let r of b)for(let c of r)if(c.owner===p)return true;
+  return false;
+}
+function nearAny(i,j,s,b){
+  for(let[ni,nj]of nbrs8(i,j,s)){if(b[ni][nj].owner!==null)return true}
+  return false;
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function processClick(b,s,x,y,pl,anim){
+  let c=b[x][y];
+  if(c.owner===null){
+    let first = !hasPieces(pl,b);
+    c.owner=pl;
+    c.count=first?3:1;
+  }
+  else if(c.owner===pl)c.count++
+  else return[];
+  let had=new Set();
+  for(let row of b)for(let cl of row)if(cl.owner!==null)had.add(cl.owner);
+  let chain=[[x,y]];
+  while(chain.length){
+    let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
+    if(cell.count>=capv){
+      cell.count=0;cell.owner=null;
+      for(let[nx,ny]of nbrs(cx,cy,s)){
+        let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
+      }
+      if(anim){
+        let el=cells?.[cx]?.[cy];if(el)el.classList.add('explode');
+        renderBoard(false,anim==='pop'?cx:undefined);
+        await sleep(180);
+        if(el)el.classList.remove('explode');
+      }
+    }
+  }
+  let now=new Set();
+  for(let row of b)for(let cl of row)if(cl.owner!==null)now.add(cl.owner);
+  return[...had].filter(p=>!now.has(p));
+}
+
+function nextTurn(){
+  let alive=[];
+  for(let p=0;p<maxPlayers;p++){
+    if(eliminatedPlayers.has(p))continue;
+    alive.push(p);
+  }
+  if(alive.length<=1){
+    gameOver=true;
+    showGameOver(alive[0]);
+    return;
+  }
+  let idx=alive.indexOf(curPlayer);
+  if(idx<0)idx=0;
+  curPlayer=alive[(idx+1)%alive.length];
+  renderPlayerBar();
+  setBg(curPlayer);
+  if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
+}
+
+/* ==================== LOCAL GAME ==================== */
+function startLocalGame(){
+  size=parseInt(document.getElementById('localSize').value)||7;
+  maxPlayers=parseInt(document.getElementById('localPlayers').value)||2;
+  board=mkBoard(size);curPlayer=0;gameOver=false;
+  gameMode='local';
+  aiPlayers=new Set();
+  aiThinking=false;
+  eliminatedPlayers=new Set();
+  renderBoard(true);
+  show('game');
+  document.body.style.background='';
+  renderPlayerBar();
+}
+
+function startLocalReset(){
+  size=parseInt(document.getElementById('resetSize').value)||size;
+  maxPlayers=parseInt(document.getElementById('resetPlayers').value)||maxPlayers;
+  board=mkBoard(size);curPlayer=0;gameOver=false;
+  aiThinking=false;
+  eliminatedPlayers=new Set();
+  renderBoard(true);
+  renderPlayerBar();
+  document.body.style.background='';
+  closeModal('resetModal');
+  document.querySelectorAll('.game-over').forEach(e=>e.remove());
+}
+
+async function localClick(x,y){
+  if(gameOver||(gameMode!=='local'&&gameMode!=='ai')||aiThinking)return;
+  if(aiPlayers.has(curPlayer))return;
+  let c=board[x][y];
+  let mine=hasPieces(curPlayer,board);
+  if(mine){
+    if(c.owner!==curPlayer){showMsg('只能点击自己的棋子','');return}
+  }else{
+    if(c.owner!==null){showMsg('不能抢占别人的格子','');return}
+    if(nearAny(x,y,size,board)){showMsg('不能在已有棋子旁边落子','');return}
+  }
+  let elim=await processClick(board,size,x,y,curPlayer,'pop');
+  for(let e of elim)eliminatedPlayers.add(e);
+  renderBoard(false,x,y);
+  nextTurn();
+}
+
+/* ==================== AI GAME ==================== */
+function showAILobby(){show('aiLobby')}
+function showLocalLobby(){show('localLobby')}
+
+function startAIGame(){
+  size=parseInt(document.getElementById('aiSize').value)||7;
+  let aiCount=parseInt(document.getElementById('aiCount').value)||1;
+  maxPlayers=aiCount+1;
+  board=mkBoard(size);curPlayer=0;gameOver=false;
+  gameMode='ai';
+  aiPlayers=new Set();
+  for(let p=maxPlayers-aiCount;p<maxPlayers;p++)aiPlayers.add(p);
+  aiThinking=false;
+  eliminatedPlayers=new Set();
+  renderBoard(true);
+  show('game');
+  document.body.style.background='';
+  renderPlayerBar();
+  if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+}
+
+async function triggerAI(){
+  if(gameOver||gameMode!=='ai'||aiThinking)return;
+  if(!aiPlayers.has(curPlayer))return;
+  aiThinking=true;
+  let move=aiFindMove(curPlayer,size,board);
+  if(!move){showMsg(`AI ${curPlayer+1} 无合法落子`,'error');aiThinking=false;return}
+  let[x,y]=move;
+  let el=cells[x][y];
+  if(el)el.style.background='rgba(255,255,255,.15)';
+  await new Promise(r=>setTimeout(r,350));
+  if(el)el.style.background='';
+  aiThinking=false;
+  let c=board[x][y];
+  if(c.owner!==null&&c.owner!==curPlayer){aiThinking=false;return}
+  let elim=await processClick(board,size,x,y,curPlayer,'pop');
+  for(let e of elim)eliminatedPlayers.add(e);
+  renderBoard(false,x,y);
+  nextTurn();
+}
+
+/* ==================== AI ENGINE ==================== */
+function cloneBoard(b){
+  return b.map(row=>row.map(c=>({owner:c.owner,count:c.count})));
+}
+function countTerritory(b,player){
+  let n=0;
+  for(let r of b)for(let c of r)if(c.owner===player)n++;
+  return n;
+}
+function countThreat(b,player,sz){
+  let threat=0;
+  for(let i=0;i<sz;i++)for(let j=0;j<sz;j++){
+    let c=b[i][j];
+    if(c.owner!==null&&c.owner!==player&&c.count>=cap(i,j,sz)-1)threat++;
+  }
+  return threat;
+}
+function aiFindMove(player,sz,b){
+  let best=null,bestScore=-Infinity;
+  let mine=[];
+  for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)if(b[i][j].owner===player)mine.push([i,j]);
+  if(mine.length===0){
+    let candidates=[];
+    for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
+      if(b[i][j].owner===null&&!nearAny(i,j,sz,b))
+        candidates.push([i,j]);
+    if(candidates.length===0)return null;
+    for(let[i,j]of candidates){
+      let cx=sz/2-0.5,cy=sz/2-0.5;
+      let dist=Math.sqrt((i-cx)**2+(j-cy)**2);
+      let edge=((i===0||i===sz-1)||(j===0||j===sz-1))?3:0;
+      let corner=((i===0||i===sz-1)&&(j===0||j===sz-1))?5:0;
+      let score=-dist+edge+corner+Math.random()*2;
+      if(score>bestScore){bestScore=score;best=[i,j]}
+    }
+    return best||candidates[0];
+  }
+  for(let [i,j] of mine){
+    let cell=b[i][j];
+    if(cell.count>=cap(i,j,sz))continue;
+    let copy=cloneBoard(b);
+    processClick(copy,sz,i,j,player);
+    let myTerritory=countTerritory(copy,player);
+    let oppTerritory=0;
+    for(let r of copy)for(let c of r)if(c.owner!==null&&c.owner!==player)oppTerritory++;
+    let oppThreat=countThreat(copy,player,sz);
+    let edgeBonus=(i===0||i===sz-1||j===0||j===sz-1)?3:0;
+    let cornerBonus=((i===0||i===sz-1)&&(j===0||j===sz-1))?5:0;
+    let capRatio=cell.count/cap(i,j,sz);
+    let nearOpp=0;
+    for(let[ni,nj]of nbrs(i,j,sz)){
+      let nc=b[ni][nj];
+      if(nc.owner!==null&&nc.owner!==player)nearOpp+=2;
+    }
+    let score=myTerritory*3-oppTerritory*2-oppThreat*4
+              +edgeBonus+cornerBonus+capRatio*5+nearOpp;
+    score+=Math.random()*2;
+    if(score>bestScore){bestScore=score;best=[i,j]}
+  }
+  return best||mine[0];
+}
+
+/* ==================== RENDER ==================== */
+function renderBoard(force,popX,popY){
+  let bd=document.getElementById('board');
+  if(force||cells.length!==size){
+    bd.innerHTML='';
+    bd.style.gridTemplateColumns=`repeat(${size},1fr)`;
+    cells=[];
+    for(let i=0;i<size;i++){
+      let row=[];
+      for(let j=0;j<size;j++){
+        let el=document.createElement('div');el.className='cell';
+        el.onclick=()=>handleClick(i,j);
+        bd.appendChild(el);row.push(el);
+      }
+      cells.push(row);
+    }
+  }
+  for(let i=0;i<size;i++)for(let j=0;j<size;j++){
+    let el=cells[i][j],d=board[i][j];
+    el.innerHTML='';
+    if(d.owner!==null){
+      if(d.owner===curPlayer){
+        let bg=document.createElement('div');bg.className='bg p'+d.owner;
+        el.appendChild(bg);
+      }
+      let p=document.createElement('div');p.className='piece p'+d.owner;
+      el.appendChild(p);
+      drawDots(p,d.count);
+      if(popX!==undefined&&i===popX&&j===popY)p.classList.add('pop');
+    }
+  }
+}
+function drawDots(p,n){
+  let cx=50,cy=50,r=30;
+  if(n===1)addDot(p,cx,cy);
+  else if(n===2){addDot(p,cx-20,cy);addDot(p,cx+20,cy)}
+  else if(n===3){let h=Math.sqrt(3)/2;addDot(p,cx,cy-r*h/2);addDot(p,cx-r/2,cy+r*h/2);addDot(p,cx+r/2,cy+r*h/2)}
+  else{addDot(p,34,34);addDot(p,66,34);addDot(p,34,66);addDot(p,66,66)}
+}
+function addDot(p,x,y){let d=document.createElement('div');d.className='dot';d.style.left=x+'%';d.style.top=y+'%';p.appendChild(d)}
+function setBg(pl){
+  let h=COLORS[pl];
+  let r=parseInt(h.substr(1,2),16)*.85,g=parseInt(h.substr(3,2),16)*.85,b=parseInt(h.substr(5,2),16)*.85;
+  document.body.style.background=`rgb(${r|0},${g|0},${b|0})`
+}
+function renderPlayerBar(){
+  let el=document.getElementById('playerBar');el.innerHTML='';
+  let cnt={};
+  for(let p=0;p<maxPlayers;p++)cnt[p]=0;
+  for(let row of board)for(let c of row)if(c.owner!==null)cnt[c.owner]++;
+  for(let p=0;p<maxPlayers;p++){
+    let t=document.createElement('span');t.className='player-tag';
+    if(p===curPlayer)t.classList.add('active');
+    let alive=!(eliminatedPlayers.has(p));
+    if(!alive&&board.some(r=>r.some(c=>c.owner!==null)))t.classList.add('elim');
+    t.style.background=COLORS_LIGHT[p];
+    t.style.color=COLORS[p];
+    let label=aiPlayers.has(p)?`AI ${p+1}`:`${gameMode==='ai'&&p===0?'你':`玩家 ${p+1}`}`;
+    t.innerHTML=`${label} <span class="cnt">${cnt[p]}</span>`;
+    el.appendChild(t);
+  }
+}
+
+/* ==================== EVENTS ==================== */
+function showGameOver(w){
+  let overlay=document.createElement('div');overlay.className='game-over';
+  let label=w!==null&&w!==undefined
+    ?(aiPlayers.has(w)?`AI ${w+1}`:(gameMode==='ai'&&w===0?'你':`玩家 ${w+1}`))+' 获胜'
+    :'平局';
+  overlay.innerHTML=`<h2>🏆 ${label}</h2><p>点击下方按钮再来一局</p><button onclick="this.parentElement.remove();openModal('resetModal')">再来一局</button>`;
+  document.body.appendChild(overlay);
+}
+
+function handleClick(x,y){
+  if(gameMode==='local'){if(!aiThinking)localClick(x,y);return}
+  if(gameMode==='ai'){
+    if(aiThinking||aiPlayers.has(curPlayer))return;
+    localClick(x,y);
+    return
+  }
+}
+
+function exitGame(){
+  gameMode=null;gameOver=false;
+  document.getElementById('board').innerHTML='';cells=[];board=[];
+  document.body.style.background='';
+  document.querySelectorAll('.game-over').forEach(e=>e.remove());
+  showMsg('','');
+  show('welcome');
+}
+
+function confirmReset(){
+  if(gameMode==='local'||gameMode==='ai'){
+    startLocalReset();
+    return;
+  }
+  closeModal('resetModal');
+}
+
+function showMsg(t,type){
+  let el=document.getElementById('msg');
+  el.textContent=t;el.className=type||'';
+  if(t)setTimeout(()=>{if(el.textContent===t){el.textContent='';el.className=''}},2000);
+}
+
+/* ==================== MODAL ==================== */
+function openModal(id){document.getElementById(id).classList.add('show')}
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+
+/* ==================== RESET PLAYERS ROW VISIBILITY ==================== */
+// When in AI mode, hide players row in reset modal
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+[package]
+name = "chain-chess"
+version = "1.0.0"
+description = "连锁棋 - AI & 本地对战"
+authors = ["ywnh1"]
+edition = "2021"
+
+[lib]
+name = "chain_chess_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

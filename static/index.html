@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>连锁棋</title>
+<style>
+/* ========== reset & vars ========== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f13;
+  --surface:#1a1a22;
+  --card:#23232d;
+  --border:rgba(255,255,255,.06);
+  --accent:#f0b34b;
+  --accent2:#5fc3c3;
+  --text:#e8e6e3;
+  --dim:#7a7885;
+  --radius:12px;
+  --shadow:0 2px 20px rgba(0,0,0,.5);
+  --font:'Inter','SF Pro','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+}
+html{font-size:clamp(14px,4vw,17px)}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:12px;
+  transition:background .6s ease;
+  -webkit-tap-highlight-color:transparent;
+  overflow-x:hidden;
+  line-height:1.5;
+}
+
+/* ========== screen toggle ========== */
+.screen{display:none}
+.screen.active{display:flex;flex-direction:column;align-items:center;width:100%;max-width:480px}
+
+/* ========== welcome ========== */
+#welcome{
+  gap:2rem;
+  text-align:center;
+}
+.logo{
+  font-size:3rem;
+  letter-spacing:2px;
+}
+.logo span{color:var(--accent)}
+.tagline{
+  color:var(--dim);
+  font-size:.9rem;
+  margin-top:-.5rem;
+}
+.mode-cards{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  width:100%;
+  max-width:320px;
+}
+.mode-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:20px 16px;
+  cursor:pointer;
+  transition:.2s;
+  text-align:left;
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+.mode-card:active{background:var(--card);border-color:var(--accent)}
+.mode-card .icon{font-size:1.8rem;flex-shrink:0}
+.mode-card .body{flex:1}
+.mode-card .body h3{font-size:1rem;font-weight:600}
+.mode-card .body p{font-size:.8rem;color:var(--dim);margin-top:2px}
+
+/* ========== lobby ========== */
+#lobby{max-width:480px;gap:1rem}
+#lobby .back{
+  align-self:flex-start;
+  background:none;border:none;color:var(--dim);
+  font-size:.85rem;cursor:pointer;padding:6px 0;
+  display:flex;align-items:center;gap:4px;
+  transition:.15s;
+}
+#lobby .back:active{color:var(--text)}
+#lobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
+.section-header{
+  display:flex;justify-content:space-between;align-items:center;
+  margin:12px 0 6px;font-size:.8rem;color:var(--dim);
+}
+.section-header strong{font-size:.85rem;color:var(--text)}
+.btn-sm{
+  background:var(--card);color:var(--accent2);
+  border:none;padding:4px 12px;border-radius:6px;
+  font-size:.7rem;cursor:pointer;transition:.15s;
+}
+.btn-sm:active{opacity:.65}
+.list-box{
+  margin:4px 0 8px;max-height:220px;overflow-y:auto;
+  border:1px solid var(--border);border-radius:10px;padding:6px;
+  scrollbar-width:thin;scrollbar-color:var(--card) transparent;
+}
+.empty{color:var(--dim);text-align:center;padding:24px 12px;font-size:.85rem}
+.list-item{
+  padding:12px;margin:6px 0;border-radius:10px;
+  background:rgba(255,255,255,.03);
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+  transition:.12s;
+}
+.list-item:active{background:rgba(255,255,255,.08)}
+.item-info{flex:1;min-width:0}
+.item-info .title{color:#fff;font-size:.9rem;font-weight:500}
+.item-info .title .lock{color:var(--accent);margin-left:3px}
+.item-info .sub{font-size:.7rem;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.btn-join,.btn-restore{
+  padding:6px 14px;background:var(--accent2);color:#0f0f13;
+  border:none;border-radius:6px;font-size:.75rem;font-weight:600;
+  cursor:pointer;flex-shrink:0;transition:.12s;
+}
+.btn-join:active,.btn-restore:active{opacity:.8}
+.btn-del{
+  padding:6px 14px;background:#c0392b;color:#fff;
+  border:none;border-radius:6px;font-size:.75rem;font-weight:600;
+  cursor:pointer;flex-shrink:0;transition:.12s;
+}
+.btn-del:active{opacity:.8}
+.lobby-actions{display:flex;gap:10px;width:100%;margin-top:8px}
+.lobby-actions button{
+  flex:1;padding:12px;background:var(--accent);color:#0f0f13;
+  border:none;border-radius:10px;font-size:.95rem;font-weight:600;
+  cursor:pointer;transition:.12s;
+}
+.lobby-actions button:active{opacity:.8}
+.lobby-actions .sec{
+  background:var(--card);color:var(--text);
+}
+
+/* ========== game panel ========== */
+#game{max-width:480px;gap:8px}
+#game .top{
+  display:flex;justify-content:space-between;align-items:center;
+  width:100%;padding:4px 0 6px;
+}
+#game .top-left{display:flex;gap:8px;align-items:center}
+#game .top-left button{
+  background:rgba(255,255,255,.08);color:var(--dim);
+  border:none;padding:6px 10px;border-radius:6px;font-size:.7rem;
+  cursor:pointer;transition:.12s;font-weight:500;
+}
+#game .top-left button:active{background:rgba(255,255,255,.15)}
+#game .top-right{display:flex;gap:4px;align-items:center}
+.turn-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:6px;
+  background:rgba(255,255,255,.06);
+}
+.turn-dot{
+  width:8px;height:8px;border-radius:50%;display:inline-block;
+}
+.board-wrap{
+  position:relative;
+  width:min(88vw,420px);
+  height:min(88vw,420px);
+}
+#board{
+  width:100%;height:100%;
+  display:grid;gap:min(1.2vw,5px);
+  touch-action:manipulation;
+}
+.cell{
+  background:rgba(255,255,255,.05);
+  border-radius:min(2.2vw,10px);
+  position:relative;cursor:pointer;
+  transition:background .12s;
+}
+.cell.highlight{background:rgba(255,255,255,.12)}
+.cell .bg{
+  position:absolute;inset:0;
+  border-radius:min(2.2vw,10px);opacity:.15;
+  transition:.2s;
+}
+.cell .piece{
+  position:absolute;width:76%;height:76%;
+  left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  display:flex;justify-content:center;align-items:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.35);
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1);
+}
+.cell .piece.pop{animation:pop .25s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{
+  0%{transform:translate(-50%,-50%) scale(0)}
+  70%{transform:translate(-50%,-50%) scale(1.12)}
+  100%{transform:translate(-50%,-50%) scale(1)}
+}
+/* 爆炸闪烁 */
+.cell.explode{animation:explode .35s ease}
+@keyframes explode{
+  0%{background:rgba(255,255,255,.4)}
+  50%{background:rgba(255,255,255,.7)}
+  100%{background:rgba(255,255,255,.05)}
+}
+.cell .dot{
+  position:absolute;width:20%;height:20%;
+  border-radius:50%;background:rgba(255,255,255,.88);
+  transform:translate(-50%,-50%);
+}
+
+/* player colours — muted, warm */
+.p0{background:#e8645a}
+.p1{background:#e8b84b}
+.p2{background:#5ab8e8}
+.p3{background:#6bc46b}
+.p4{background:#b07ce8}
+.p5{background:#e87ab8}
+.p6{background:#5cc9a9}
+
+/* ========== msg ========== */
+#msg{
+  font-size:.75rem;padding:4px 10px;border-radius:6px;
+  transition:.2s;min-height:1.5rem;
+}
+#msg.error{background:#c0392b;color:#fff}
+#msg.success{background:#27ae60;color:#fff}
+
+/* ========== modal ========== */
+.modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.65);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  justify-content:center;align-items:center;z-index:1000;padding:16px;
+}
+.modal.show{display:flex}
+.modal-inner{
+  background:var(--surface);
+  padding:24px;border-radius:var(--radius);
+  width:100%;max-width:360px;
+  animation:modalIn .2s ease;
+}
+@keyframes modalIn{
+  from{opacity:0;transform:translateY(16px) scale(.96)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.modal-inner h3{font-size:1.05rem;font-weight:600;text-align:center;margin-bottom:16px}
+.form-row{margin:10px 0;display:flex;flex-direction:column;gap:4px}
+.form-row label{font-size:.8rem;color:var(--dim)}
+.form-row input,.form-row select{
+  width:100%;padding:10px 12px;
+  border:1px solid var(--border);border-radius:8px;
+  background:rgba(255,255,255,.04);color:var(--text);
+  font-size:.9rem;outline:none;transition:.12s;
+}
+.form-row input:focus,.form-row select:focus{
+  border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,179,75,.15);
+}
+.form-row select option{background:var(--surface);color:var(--text)}
+.modal-actions{display:flex;gap:10px;margin-top:16px}
+.modal-actions button{
+  flex:1;padding:10px;border:none;border-radius:8px;
+  font-size:.9rem;font-weight:600;cursor:pointer;transition:.12s;
+}
+.modal-actions button:active{opacity:.75}
+.btn-primary{background:var(--accent);color:#0f0f13}
+.btn-ghost{background:rgba(255,255,255,.08);color:var(--dim)}
+
+/* ========== game-over ========== */
+.game-over{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.75);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  gap:12px;z-index:999;padding:20px;
+  animation:fadeIn .35s ease;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.game-over h2{font-size:1.6rem}
+.game-over p{font-size:.95rem;color:var(--dim)}
+.game-over button{
+  margin-top:8px;padding:12px 28px;
+  background:var(--accent);color:#0f0f13;
+  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;
+}
+/* ========== local player area ========== */
+.player-bar{
+  display:flex;gap:6px;width:min(88vw,420px);margin:6px 0;
+  flex-wrap:wrap;justify-content:center;
+}
+.player-tag{
+  padding:4px 10px;border-radius:6px;
+  font-size:.7rem;font-weight:600;
+  opacity:.35;transition:.2s;
+  border:1px solid transparent;
+  white-space:nowrap;
+}
+.player-tag .cnt{
+  display:inline-block;min-width:1.1em;
+  text-align:center;margin-left:4px;
+  font-size:.8rem;font-weight:700;
+}
+.player-tag.active{opacity:1;border-color:rgba(255,255,255,.15);transform:scale(1.04)}
+.player-tag.elim{opacity:.15;text-decoration:line-through}
+</style>
+</head>
+<body>
+
+<!-- ===== SCREENS ===== -->
+
+<!-- Welcome -->
+<div id="welcome" class="screen active">
+  <div class="logo">♟<span>连锁棋</span></div>
+  <div class="tagline">多⼈连⼿，⼀触即发</div>
+  <div class="mode-cards">
+    <div class="mode-card" onclick="showLocalLobby()">
+      <div class="icon">📱</div>
+      <div class="body">
+        <h3>本地对战</h3>
+        <p>同⼀设备，轮流落⼦，朋友⾯前⼤战</p>
+      </div>
+    </div>
+    <div class="mode-card" onclick="showOnlineLobby()">
+      <div class="icon">🌐</div>
+      <div class="body">
+        <h3>在线联机</h3>
+        <p>远程好友，创建或加⼊房间</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Online Lobby -->
+<div id="lobby" class="screen">
+  <button class="back" onclick="goHome()">← 返回</button>
+  <h2>🌐 在线联机</h2>
+
+  <div class="section-header">
+    <strong>房间列表</strong>
+    <button class="btn-sm" onclick="getRoomList()">↻ 刷新</button>
+  </div>
+  <div id="roomList" class="list-box"><div class="empty">点击刷新获取房间列表</div></div>
+
+  <div class="section-header" style="margin-top:2px">
+    <strong>我的存档</strong>
+    <button class="btn-sm" onclick="getSaveList()">↻ 刷新</button>
+  </div>
+  <div id="saveList" class="list-box"><div class="empty">点击刷新获取存档列表</div></div>
+
+  <div class="lobby-actions">
+    <button class="sec" onclick="joinRandomRoom()">快速加入</button>
+    <button onclick="openModal('createModal')">＋ 创建房间</button>
+  </div>
+</div>
+
+<!-- Local Lobby -->
+<div id="localLobby" class="screen">
+  <button class="back" onclick="goHome()">← 返回</button>
+  <h2>📱 本地对战</h2>
+  <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">选择对局配置</p>
+
+  <div class="form-row"><label>棋盘大小</label>
+    <select id="localSize">
+      <option value="5">5×5</option>
+      <option value="6">6×6</option>
+      <option value="7" selected>7×7</option>
+      <option value="8">8×8</option>
+      <option value="9">9×9</option>
+      <option value="10">10×10</option>
+      <option value="11">11×11</option>
+      <option value="12">12×12</option>
+      <option value="13">13×13</option>
+      <option value="14">14×14</option>
+      <option value="15">15×15</option>
+      <option value="16">16×16</option>
+      <option value="17">17×17</option>
+      <option value="18">18×18</option>
+      <option value="19">19×19</option>
+    </select>
+  </div>
+  <div class="form-row"><label>玩家人数（含 AI）</label>
+    <select id="localPlayers">
+      <option value="2" selected>2 人</option>
+      <option value="3">3 人</option>
+      <option value="4">4 人</option>
+      <option value="5">5 人</option>
+      <option value="6">6 人</option>
+      <option value="7">7 人</option>
+    </select>
+  </div>
+  <div class="form-row"><label>AI 对手数</label>
+    <select id="localAI">
+      <option value="0">0（纯人⼈对战）</option>
+      <option value="1" selected>1 个 AI</option>
+      <option value="2">2 个 AI</option>
+      <option value="3">3 个 AI</option>
+      <option value="4">4 个 AI</option>
+      <option value="5">5 个 AI</option>
+      <option value="6">6 个 AI</option>
+    </select>
+  </div>
+  <p style="font-size:.7rem;color:var(--dim);margin:4px 0">AI 会自动按顺序占⽤最后几个位置</p>
+  <button style="width:100%;padding:12px;background:var(--accent);color:#0f0f13;border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;margin-top:12px" onclick="startLocalGame()">开始游戏</button>
+</div>
+
+<!-- Game Screen -->
+<div id="game" class="screen">
+  <div class="top">
+    <div class="top-left">
+      <button onclick="exitGame()">← 退出</button>
+      <button onclick="openModal('resetModal')">↻ 重开</button>
+      <button onclick="openModal('saveModal')" id="saveBtn" style="display:none">💾 存档</button>
+    </div>
+    <div class="top-right">
+      <span id="msg"></span>
+    </div>
+  </div>
+  <div id="playerBar" class="player-bar"></div>
+  <div class="board-wrap"><div id="board"></div></div>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<div id="createModal" class="modal">
+  <div class="modal-inner">
+    <h3>创建房间</h3>
+    <div class="form-row"><label>房间名</label><input id="roomName" value="我的房间"></div>
+    <div class="form-row"><label>密码（可选）</label><input id="roomPwd" type="password" placeholder="留空则无密码"></div>
+    <div class="form-row"><label>棋盘大小</label>
+      <select id="createSize">
+        <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
+        <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
+        <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
+        <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
+        <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
+      </select>
+    </div>
+    <div class="form-row"><label>玩家数</label>
+      <select id="createPlayers">
+        <option value="2" selected>2 人</option><option value="3">3 人</option><option value="4">4 人</option>
+        <option value="5">5 人</option><option value="6">6 人</option><option value="7">7 人</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('createModal')">取消</button>
+      <button class="btn-primary" onclick="confirmCreate()">创建</button>
+    </div>
+  </div>
+</div>
+
+<div id="pwdModal" class="modal">
+  <div class="modal-inner">
+    <h3>输入密码</h3>
+    <div class="form-row"><label>密码</label><input id="joinPwd" type="password" placeholder="输入房间密码"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('pwdModal')">取消</button>
+      <button class="btn-primary" onclick="confirmPwd()">加入</button>
+    </div>
+  </div>
+</div>
+
+<div id="resetModal" class="modal">
+  <div class="modal-inner">
+    <h3>重新开始</h3>
+    <div class="form-row"><label>棋盘大小</label>
+      <select id="resetSize">
+        <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
+        <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
+        <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
+        <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
+        <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
+      </select>
+    </div>
+    <div class="form-row"><label>玩家数</label>
+      <select id="resetPlayers">
+        <option value="2" selected>2 人</option><option value="3">3 人</option><option value="4">4 人</option>
+        <option value="5">5 人</option><option value="6">6 人</option><option value="7">7 人</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('resetModal')">取消</button>
+      <button class="btn-primary" onclick="confirmReset()">重开</button>
+    </div>
+  </div>
+</div>
+
+<div id="saveModal" class="modal">
+  <div class="modal-inner">
+    <h3>保存存档</h3>
+    <div class="form-row"><label>备注名</label><input id="saveRemark" placeholder="可选"></div>
+    <div class="form-row"><label>密码（可选）</label><input id="savePwd" type="password" placeholder="恢复时需要"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('saveModal')">取消</button>
+      <button class="btn-primary" onclick="confirmSave()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="savePwdModal" class="modal">
+  <div class="modal-inner">
+    <h3 id="savePwdTitle">输入存档密码</h3>
+    <div class="form-row"><label>密码</label><input id="savePwdInput" type="password"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('savePwdModal')">取消</button>
+      <button class="btn-primary" onclick="confirmSavePwd()">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==================== CONSTANTS & STATE ==================== */
+const COLORS=['#e8645a','#e8b84b','#5ab8e8','#6bc46b','#b07ce8','#e87ab8','#5cc9a9'];
+const COLORS_LIGHT=['rgba(232,100,90,.08)','rgba(232,184,75,.08)','rgba(90,184,232,.08)','rgba(107,196,107,.08)','rgba(176,124,232,.08)','rgba(232,122,184,.08)','rgba(92,201,169,.08)'];
+
+// game state
+let board=[],curPlayer=0,size=7,maxPlayers=2;
+let cells=[];
+let gameMode=null; // 'local'|'online'
+let gameOver=false;
+let totalUsers=0;
+let meta={};
+let aiPlayers=new Set(); // indices of AI-controlled players
+let aiThinking=false;    // prevent re-entry
+let eliminatedPlayers=new Set(); // persistent across turns
+
+// online
+let ws=null,inRoom=false,roomId=null,wsReady=false,wsQueue=[];
+let pendingRid=null,pendSaveId=null,pendSaveAct=null;
+
+/* ==================== SCREEN MGMT ==================== */
+function show(s){document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));document.getElementById(s).classList.add('active')}
+function goHome(){exitGame();show('welcome')}
+
+/* ==================== LOCAL ==================== */
+function showLocalLobby(){show('localLobby')}
+
+function cap(i,j,s){return 4} // 统一：4级起爆，边界不足的邻居丢弃
+function nbrs(i,j,s){let r=[];if(i>0)r.push([i-1,j]);if(i<s-1)r.push([i+1,j]);if(j>0)r.push([i,j-1]);if(j<s-1)r.push([i,j+1]);return r}
+// 8方向邻居（包括斜角）
+function nbrs8(i,j,s){let r=[];for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++){if(di===0&&dj===0)continue;let ni=i+di,nj=j+dj;if(ni>=0&&ni<s&&nj>=0&&nj<s)r.push([ni,nj])}return r}
+function mkBoard(s){return Array.from({length:s},()=>Array.from({length:s},()=>({owner:null,count:0})))}
+// 玩家是否有棋子
+function hasPieces(p,b){for(let r of b)for(let c of r)if(c.owner===p)return true;return false}
+// 某格是否紧邻（8方向）任何棋子
+function nearAny(i,j,s,b){for(let[ni,nj]of nbrs8(i,j,s)){if(b[ni][nj].owner!==null)return true}return false}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function processClick(b,s,x,y,pl,anim){
+  let c=b[x][y];
+  if(c.owner===null){
+    let first = !hasPieces(pl,b);
+    c.owner=pl;
+    c.count=first?3:1;
+  }
+  else if(c.owner===pl)c.count++
+  else return [];
+  let had=new Set();
+  for(let row of b)for(let cl of row)if(cl.owner!==null)had.add(cl.owner);
+  let chain=[[x,y]];
+  while(chain.length){
+    let [cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
+    if(cell.count>=capv){
+      cell.count=0;cell.owner=null;
+      for(let [nx,ny] of nbrs(cx,cy,s)){
+        let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
+      }
+      // 每步爆炸后闪烁、渲染、停顿，展示连锁过程
+      if(anim){
+        let el=cells?.[cx]?.[cy];if(el)el.classList.add('explode');
+        renderBoard(false,anim==='pop'?cx:undefined);
+        await sleep(180);
+        if(el)el.classList.remove('explode');
+      }
+    }
+  }
+  let now=new Set();
+  for(let row of b)for(let cl of row)if(cl.owner!==null)now.add(cl.owner);
+  return [...had].filter(p=>!now.has(p));
+}
+
+function startLocalGame(){
+  size=parseInt(document.getElementById('localSize').value)||7;
+  maxPlayers=parseInt(document.getElementById('localPlayers').value)||2;
+  let aiCount=parseInt(document.getElementById('localAI').value)||0;
+  if(aiCount>=maxPlayers)aiCount=maxPlayers-1;
+  board=mkBoard(size);curPlayer=0;gameOver=false;
+  gameMode='local';
+  inRoom=false;
+  aiPlayers=new Set();
+  for(let p=maxPlayers-aiCount;p<maxPlayers;p++)aiPlayers.add(p);
+  aiThinking=false;
+  eliminatedPlayers=new Set();
+  renderBoard(true);
+  show('game');
+  document.body.style.background='';
+  renderPlayerBar();
+  // if first player is AI, trigger
+  if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+}
+
+function startLocalReset(){
+  size=parseInt(document.getElementById('resetSize').value)||size;
+  maxPlayers=parseInt(document.getElementById('resetPlayers').value)||maxPlayers;
+  board=mkBoard(size);curPlayer=0;gameOver=false;
+  aiThinking=false;
+  eliminatedPlayers=new Set();
+  renderBoard(true);
+  renderPlayerBar();
+  document.body.style.background='';
+  closeModal('resetModal');
+  document.querySelectorAll('.game-over').forEach(e=>e.remove());
+  if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+}
+
+async function localClick(x,y){
+  if(gameOver||gameMode!=='local'||aiThinking)return;
+  if(aiPlayers.has(curPlayer))return;
+  let c=board[x][y];
+  let mine=hasPieces(curPlayer,board);
+  // 有棋子 → 只能点自己的格子
+  if(mine){
+    if(c.owner!==curPlayer){showMsg('只能点击自己的棋子','');return}
+  }
+  // 没棋子 → 可以下空格，但不能紧邻任何已有棋子
+  else{
+    if(c.owner!==null){showMsg('不能抢占别人的格子','');return}
+    if(nearAny(x,y,size,board)){showMsg('不能在已有棋子旁边落子','');return}
+  }
+  let elim=await processClick(board,size,x,y,curPlayer,'pop');
+  // 将被本轮淘汰的记入持久集
+  for(let e of elim)eliminatedPlayers.add(e);
+  renderBoard(false,x,y);
+  // 存活玩家 = 所有未被淘汰的玩家
+  let alive=[];
+  for(let p=0;p<maxPlayers;p++){
+    if(eliminatedPlayers.has(p))continue;
+    alive.push(p);
+  }
+  if(alive.length<=1){
+    gameOver=true;
+    showGameOver(alive[0]);
+    return;
+  }
+  // 找当前玩家在存活列表中的位置
+  let idx=alive.indexOf(curPlayer);
+  if(idx<0)idx=0;
+  curPlayer=alive[(idx+1)%alive.length];
+  renderPlayerBar();
+  setBg(curPlayer);
+  // trigger AI if next player is AI
+  if(aiPlayers.has(curPlayer))setTimeout(()=>triggerAI(),500);
+}
+
+/* ==================== RENDER ==================== */
+function renderBoard(force,popX,popY){
+  let bd=document.getElementById('board');
+  if(force||cells.length!==size){
+    bd.innerHTML='';
+    bd.style.gridTemplateColumns=`repeat(${size},1fr)`;
+    cells=[];
+    for(let i=0;i<size;i++){
+      let row=[];
+      for(let j=0;j<size;j++){
+        let el=document.createElement('div');el.className='cell';
+        el.onclick=()=>handleClick(i,j);
+        bd.appendChild(el);row.push(el);
+      }
+      cells.push(row);
+    }
+  }
+  for(let i=0;i<size;i++)for(let j=0;j<size;j++){
+    let el=cells[i][j],d=board[i][j];
+    el.innerHTML='';
+    if(d.owner!==null){
+      if(d.owner===curPlayer){
+        let bg=document.createElement('div');bg.className='bg p'+d.owner;
+        el.appendChild(bg);
+      }
+      let p=document.createElement('div');p.className='piece p'+d.owner;
+      el.appendChild(p);
+      drawDots(p,d.count);
+      if(popX!==undefined&&i===popX&&j===popY)p.classList.add('pop');
+    }
+  }
+}
+
+function drawDots(p,n){
+  let cx=50,cy=50,r=30;
+  if(n===1)addDot(p,cx,cy);
+  else if(n===2){addDot(p,cx-20,cy);addDot(p,cx+20,cy)}
+  else if(n===3){let h=Math.sqrt(3)/2;addDot(p,cx,cy-r*h/2);addDot(p,cx-r/2,cy+r*h/2);addDot(p,cx+r/2,cy+r*h/2)}
+  else{addDot(p,34,34);addDot(p,66,34);addDot(p,34,66);addDot(p,66,66)}
+}
+function addDot(p,x,y){let d=document.createElement('div');d.className='dot';d.style.left=x+'%';d.style.top=y+'%';p.appendChild(d)}
+function setBg(pl){let h=COLORS[pl];let r=parseInt(h.substr(1,2),16)*.85,g=parseInt(h.substr(3,2),16)*.85,b=parseInt(h.substr(5,2),16)*.85;document.body.style.background=`rgb(${r|0},${g|0},${b|0})`}
+
+function renderPlayerBar(){
+  let el=document.getElementById('playerBar');el.innerHTML='';
+  // 统计每个玩家占据的格子数
+  let cnt={};
+  for(let p=0;p<maxPlayers;p++)cnt[p]=0;
+  for(let row of board)for(let c of row)if(c.owner!==null)cnt[c.owner]++;
+
+  for(let p=0;p<maxPlayers;p++){
+    let t=document.createElement('span');t.className='player-tag';
+    if(p===curPlayer)t.classList.add('active');
+    let alive=cnt[p]>0;
+    if(!alive&&gameMode==='local'&&board.some(r=>r.some(c=>c.owner!==null)))t.classList.add('elim');
+    t.style.background=COLORS_LIGHT[p];
+    t.style.color=COLORS[p];
+    let label=aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`;
+    t.innerHTML=`${label} <span class="cnt">${cnt[p]}</span>`;
+    el.appendChild(t);
+  }
+}
+
+/* ==================== AI ENGINE ==================== */
+
+function cloneBoard(b){
+  return b.map(row=>row.map(c=>({owner:c.owner,count:c.count})));
+}
+
+function countTerritory(b,player){
+  let n=0;
+  for(let r of b)for(let c of r)if(c.owner===player)n++;
+  return n;
+}
+
+function countThreat(b,player,sz){
+  // cells the opponent could capture in one click
+  let threat=0;
+  for(let i=0;i<sz;i++)for(let j=0;j<sz;j++){
+    let c=b[i][j];
+    if(c.owner!==null&&c.owner!==player&&c.count>=cap(i,j,sz)-1)threat++;
+  }
+  return threat;
+}
+
+function aiFindMove(player,sz,b){
+  let best=null,bestScore=-Infinity;
+  let mine=[];
+  for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)if(b[i][j].owner===player)mine.push([i,j]);
+  // 没棋子 → 找一个不紧邻任何棋子的空格
+  if(mine.length===0){
+    let candidates=[];
+    for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
+      if(b[i][j].owner===null&&!nearAny(i,j,sz,b))
+        candidates.push([i,j]);
+    if(candidates.length===0)return null;
+    // 评分：偏好中心 + 边角
+    for(let[i,j]of candidates){
+      let cx=sz/2-0.5,cy=sz/2-0.5;
+      let dist=Math.sqrt((i-cx)**2+(j-cy)**2);
+      let edge=((i===0||i===sz-1)||(j===0||j===sz-1))?3:0;
+      let corner=((i===0||i===sz-1)&&(j===0||j===sz-1))?5:0;
+      let score=-dist+edge+corner+Math.random()*2;
+      if(score>bestScore){bestScore=score;best=[i,j]}
+    }
+    return best||candidates[0];
+  }
+
+  for(let [i,j] of mine){
+    let cell=b[i][j];
+    if(cell.count>=cap(i,j,sz))continue; // already full, skip
+
+    let copy=cloneBoard(b);
+    processClick(copy,sz,i,j,player);
+
+    let myTerritory=countTerritory(copy,player);
+    let oppTerritory=0;
+    for(let r of copy)for(let c of r)if(c.owner!==null&&c.owner!==player)oppTerritory++;
+
+    // score: maximize territory gain, minimize opponent threat
+    let oppThreat=countThreat(copy,player,sz);
+    let edgeBonus=(i===0||i===sz-1||j===0||j===sz-1)?3:0;
+    let cornerBonus=((i===0||i===sz-1)&&(j===0||j===sz-1))?5:0;
+    let capRatio=cell.count/cap(i,j,sz);
+
+    // prefer cells close to exploding if they're near opponents
+    let nearOpp=0;
+    for(let [ni,nj] of nbrs(i,j,sz)){
+      let nc=b[ni][nj];
+      if(nc.owner!==null&&nc.owner!==player)nearOpp+=2;
+    }
+
+    let score=myTerritory*3-oppTerritory*2-oppThreat*4
+              +edgeBonus+cornerBonus+capRatio*5+nearOpp;
+
+    // noise for variety
+    score+=Math.random()*2;
+
+    if(score>bestScore){bestScore=score;best=[i,j]}
+  }
+  return best||mine[0];
+}
+
+async function triggerAI(){
+  if(gameOver||gameMode!=='local'||aiThinking)return;
+  if(!aiPlayers.has(curPlayer))return;
+  aiThinking=true;
+
+  let move=aiFindMove(curPlayer,size,board);
+  if(!move){showMsg(`AI ${curPlayer+1} 无合法落子`,'error');aiThinking=false;return}
+
+  let [x,y]=move;
+  let el=cells[x][y];
+  if(el)el.style.background='rgba(255,255,255,.15)';
+
+  // short delay for visual feedback
+  await new Promise(r=>setTimeout(r,350));
+
+  if(el)el.style.background='';
+  aiThinking=false;
+
+  // execute AI move
+  let c=board[x][y];
+  if(c.owner!==null&&c.owner!==curPlayer){aiThinking=false;return}
+  let elim=await processClick(board,size,x,y,curPlayer,'pop');
+  for(let e of elim)eliminatedPlayers.add(e);
+  renderBoard(false,x,y);
+  let alive=[];
+  for(let p=0;p<maxPlayers;p++){
+    if(eliminatedPlayers.has(p))continue;
+    alive.push(p);
+  }
+  if(alive.length<=1){
+    gameOver=true;
+    showGameOver(alive[0]);
+    return;
+  }
+  let idx=alive.indexOf(curPlayer);
+  if(idx<0)idx=0;
+  curPlayer=alive[(idx+1)%alive.length];
+  renderPlayerBar();
+  setBg(curPlayer);
+
+  // next AI in chain
+  if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
+}
+
+function showGameOver(w){
+  let overlay=document.createElement('div');overlay.className='game-over';
+  let label=w!==null&&w!==undefined
+    ?(aiPlayers.has(w)?`AI ${w+1}`:`玩家 ${w+1}`)+' 获胜'
+    :'平局';
+  overlay.innerHTML=`<h2>🏆 ${label}</h2><p>点击下方按钮再来一局</p><button onclick="this.parentElement.remove();openModal('resetModal')">再来一局</button>`;
+  document.body.appendChild(overlay);
+}
+
+function handleClick(x,y){
+  if(gameMode==='local'){if(!aiThinking)localClick(x,y);return}
+  if(ws&&inRoom)wsSend({type:"click",x,y});
+}
+
+/* ==================== ONLINE ==================== */
+function showOnlineLobby(){
+  show('lobby');
+  document.getElementById('roomList').innerHTML='<div class="empty">加载中...</div>';
+  if(!ws||ws.readyState!==WebSocket.OPEN){connectWS();setTimeout(getRoomList,500)}
+  else getRoomList();
+}
+
+function wsUrl(){let p=window.location.protocol==='https:'?'wss:':'ws:';return p+'//'+window.location.host+'/ws'}
+function connectWS(){
+  if(ws&&(ws.readyState===WebSocket.OPEN||ws.readyState===WebSocket.CONNECTING))return;
+  ws=new WebSocket(wsUrl());
+  wsReady=false;
+  ws.onopen=()=>{wsReady=true;let q=wsQueue;wsQueue=[];q.forEach(m=>{try{ws.send(m)}catch(e){showMsg('发送失败','error')}})}
+  ws.onmessage=e=>{
+    let d;
+    try{d=JSON.parse(e.data)}catch(_){showMsg('数据格式错误','error');return}
+    if(d.type==='roomList'){renderRoomList(d.list);return}
+    if(d.type==='saveList'){renderSaveList(d.list);return}
+    if(d.type==='saveDeleted'){showMsg(d.msg,'success');getSaveList();return}
+    if(d.type==='error'){showMsg(d.msg,'error');return}
+    if(d.type==='saveSuccess'){showMsg(d.msg,'success');return}
+    if(d.type==='loadSuccess'){showMsg(d.msg,'success');return}
+    if(d.type==='loadError'){showMsg(d.msg,'error');return}
+    if(d.gameOver){showGameOver(d.winner);return}
+    if(!inRoom)enterOnlineRoom();
+    board=d.board;curPlayer=d.current;size=d.size;
+    if(d.meta)meta=d.meta;
+    if(d.totalUsers!==undefined)totalUsers=d.totalUsers;
+    gameMode='online';
+    renderBoard(true);
+    gameOver=false;
+    setBg(curPlayer);
+    renderPlayerBar();
+  };
+  ws.onclose=()=>{
+    wsReady=false;
+    if(inRoom)setTimeout(connectWS,2000);
+    else showMsg('连接断开，点击刷新重试','error');
+  };
+  ws.onerror=()=>showMsg('无法连接服务器，请确认服务在运行','error');
+}
+function wsSend(msg){
+  let data=JSON.stringify(msg);
+  if(wsReady){try{ws.send(data);return true}catch(e){showMsg('发送失败','error');return false}}
+  else{wsQueue.push(data);connectWS();return false}
+}
+
+function enterOnlineRoom(){
+  inRoom=true;gameMode='online';show('game');
+  document.getElementById('saveBtn').style.display='';
+}
+function exitGame(){
+  if(ws&&inRoom){
+    wsSend({type:"exitRoom"});
+    ws.onclose=null;ws.close();ws=null;
+  }
+  inRoom=false;gameMode=null;gameOver=false;
+  document.getElementById('board').innerHTML='';cells=[];board=[];
+  document.getElementById('saveBtn').style.display='none';
+  document.body.style.background='';
+  document.querySelectorAll('.game-over').forEach(e=>e.remove());
+  showMsg('','');
+  show('welcome');
+}
+
+function getRoomList(){wsSend({type:"getRoomList"})}
+function getSaveList(){wsSend({type:"getSaveList"})}
+
+function renderRoomList(list){
+  let el=document.getElementById('roomList');
+  el.innerHTML=list.length===0?'<div class="empty">暂无房间</div>':'';
+  list.forEach(item=>{
+    let div=document.createElement('div');div.className='list-item';
+    let hp=!!(item.meta.password&&item.meta.password.length>0);
+    div.innerHTML=`<div class="item-info"><div class="title">${esc(item.meta.roomName)}${hp?'<span class="lock">🔒</span>':''}</div><div class="sub">ID:${item.roomId} · ${item.currentPlayers}/${item.meta.maxPlayers}⼈ · ${item.meta.size}×${item.meta.size}</div></div><button class="btn-join" onclick="event.stopPropagation();joinRoom(${item.roomId},${hp})">加入</button>`;
+    el.appendChild(div);
+  });
+}
+function renderSaveList(list){
+  let el=document.getElementById('saveList');
+  el.innerHTML=list.length===0?'<div class="empty">暂无存档</div>':'';
+  list.forEach(item=>{
+    let div=document.createElement('div');div.className='list-item';
+    let t=new Date(item.createTime).toLocaleString();
+    div.innerHTML=`<div class="item-info"><div class="title">${esc(item.displayName)}${item.hasPassword?'<span class="lock">🔒</span>':''}</div><div class="sub">ID:${item.id} · ${item.size}×${item.size} · ${item.players}人 · ${t}</div></div><button class="btn-restore" onclick="event.stopPropagation();restore(${item.id},${item.hasPassword})">恢复</button><button class="btn-del" onclick="event.stopPropagation();del(${item.id},${item.hasPassword})">删除</button>`;
+    el.appendChild(div);
+  });
+}
+function esc(s){let d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+function confirmCreate(){
+  let name=document.getElementById('roomName').value||'我的房间';
+  let pwd=document.getElementById('roomPwd').value;
+  let sv=parseInt(document.getElementById('createSize').value)||7;
+  let pv=parseInt(document.getElementById('createPlayers').value)||2;
+  wsSend({type:"createRoom",size:sv,players:pv,roomName:name,password:pwd});
+  closeModal('createModal');
+}
+function joinRoom(rid,hp){
+  if(hp){pendingRid=rid;openModal('pwdModal');document.getElementById('joinPwd').value='';return}
+  doJoin(rid,'');
+}
+function doJoin(rid,pwd){wsSend({type:"join",room:rid,joinPassword:pwd||''})}
+function confirmPwd(){doJoin(pendingRid,document.getElementById('joinPwd').value);closeModal('pwdModal')}
+
+function joinRandomRoom(){
+  getRoomList();
+  showMsg('请从列表中选择房间','');
+}
+function restore(id,hp){
+  if(hp){pendSaveId=id;pendSaveAct='restore';document.getElementById('savePwdTitle').textContent='输入存档密码（恢复）';openModal('savePwdModal');document.getElementById('savePwdInput').value='';return}
+  doRestore(id,'');
+}
+function del(id,hp){
+  if(hp){pendSaveId=id;pendSaveAct='delete';document.getElementById('savePwdTitle').textContent='输入存档密码（删除）';openModal('savePwdModal');document.getElementById('savePwdInput').value='';return}
+  if(confirm('确定删除？'))doDel(id,'');
+}
+function doRestore(id,pwd){wsSend({type:"restoreSave",saveId:id,savePassword:pwd||''})}
+function doDel(id,pwd){wsSend({type:"deleteSave",saveId:id,savePassword:pwd||''})}
+function confirmSavePwd(){
+  let p=document.getElementById('savePwdInput').value;
+  if(pendSaveAct==='restore')doRestore(pendSaveId,p);
+  else if(pendSaveAct==='delete')doDel(pendSaveId,p);
+  closeModal('savePwdModal');
+}
+function confirmSave(){
+  if(!inRoom){showMsg('仅在线模式可存档','error');closeModal('saveModal');return}
+  let remark=document.getElementById('saveRemark').value;
+  let pwd=document.getElementById('savePwd').value;
+  wsSend({type:"saveGame",remark:remark,savePassword:pwd});
+  closeModal('saveModal');
+}
+
+function confirmReset(){
+  if(gameMode==='local'){startLocalReset();return}
+  let ns=parseInt(document.getElementById('resetSize').value)||size;
+  let np=parseInt(document.getElementById('resetPlayers').value)||2;
+  wsSend({type:"reset",size:ns,players:np});
+  closeModal('resetModal');
+}
+
+/* ==================== UTILS ==================== */
+function openModal(id){document.getElementById(id).classList.add('show')}
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+function showMsg(t,c){
+  let el=document.getElementById('msg');el.textContent=t;el.className=c||'';
+  if(t)setTimeout(()=>{el.textContent='';el.className=''},3000);
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')['createModal','pwdModal','resetModal','saveModal','savePwdModal'].forEach(id=>closeModal(id));
+});
+</script>
+</body>
+</html>
