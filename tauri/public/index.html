@@ -471,6 +471,8 @@ function show(s){
   document.getElementById(s).classList.add('active');
 }
 function goHome(){exitGame();show('welcome')}
+function showAILobby(){show('aiLobby')}
+function showLocalLobby(){show('localLobby')}
 
 function toggleAIDepth(){
   let alg=document.getElementById('aiAlgorithm').value;
