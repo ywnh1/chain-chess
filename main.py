@@ -1,4 +1,7 @@
-#!/home/ywnh1/Programs/game/venv/bin/python3
+#!/usr/bin/env python3
+# Copyright (c) 2026 ywnh1
+# SPDX-License-Identifier: MIT
+
 """连锁棋 - FastAPI WebSocket Game Server"""
 import json, hashlib, os, asyncio, datetime, sys
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect

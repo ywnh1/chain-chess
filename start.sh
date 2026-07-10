@@ -1,4 +1,8 @@
 #!/bin/sh
+#
+# Copyright (c) 2026 ywnh1
+# SPDX-License-Identifier: MIT
+#
 # 连锁棋 - 启动/停止脚本
 # ./start.sh       → 启动
 # ./start.sh stop  → 停止

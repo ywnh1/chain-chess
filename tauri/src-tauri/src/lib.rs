@@ -1,3 +1,6 @@
+// Copyright (c) 2026 ywnh1
+// SPDX-License-Identifier: MIT
+
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 use rayon::prelude::*;

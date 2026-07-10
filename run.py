@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 ywnh1
+# SPDX-License-Identifier: MIT
+
 """守护脚本 — 保持服务器持久运行"""
 import subprocess
 import time

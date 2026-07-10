@@ -3,9 +3,16 @@ __pycache__/
 *.py[cod]
 *.so
 venv/
+.env/
+.venv/
+env/
 *.egg-info/
 dist/
 *.egg
+pip-wheel-metadata/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 
 # ─── Logs ───
 logs/
@@ -15,18 +22,13 @@ log.log
 # ─── Rust / Tauri ───
 tauri/node_modules/
 tauri/src-tauri/target/
-tauri/src-tauri/gen/android/.gradle/
-tauri/src-tauri/gen/android/build/
-tauri/src-tauri/gen/android/app/build/
-tauri/src-tauri/gen/android/app/src/main/assets/
-tauri/src-tauri/gen/android/local.properties
-tauri/src-tauri/gen/android/gradle/wrapper/gradle-wrapper.jar
-tauri/src-tauri/gen/android/buildSrc/build/
-tauri/src-tauri/gen/android/buildSrc/.gradle/
+tauri/src-tauri/gen/android/
+tauri/src-tauri/gen/schemas/
 tauri/src-tauri/.cargo/
 
 # ─── Android / APK 构建 ───
 *.apk
+*.idsig
 aapt2_arm64
 
 # ─── 运行时 PID 文件 ───
@@ -41,6 +43,10 @@ aapt2_arm64
 .DS_Store
 Thumbs.db
 
-# ─── Git ───
-# 保留 release 文件夹中的构建产物
-# release/ 不忽略，用于存放发布包
+# ─── 环境变量 / 密钥 ───
+.env
+.env.*
+!.env.example
+
+# ─── 构建产物（保留 release/ 下的发布包） ───
+# release/ 不忽略，用于存放正式发布包
