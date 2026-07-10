@@ -108,6 +108,8 @@ class GameRoom:
         self.player_queue = []
         self.connections = {}
         self.eliminated = set()
+        self.history = []  # 历史记录：每回合各玩家棋子数/点数快照
+        self.color_names = ["红色", "黄色", "蓝色", "绿色", "紫色", "粉色", "青色"]
 
     @property
     def current_players(self):
@@ -137,6 +139,15 @@ class GameRoom:
             },
             "totalUsers": total_users,
         }
+
+    def _record_history(self):
+        """记录当前棋盘快照（各玩家棋子数 / 点数）"""
+        snapshot = {}
+        for p in self.player_queue:
+            pieces = sum(1 for row in self.board for c in row if c["owner"] == p)
+            points = sum(c["count"] for row in self.board for c in row if c["owner"] == p)
+            snapshot[str(p)] = {"pieces": pieces, "points": points}
+        self.history.append({"turn": len(self.history), "snapshot": snapshot})
 
     async def broadcast(self, data, exclude=None):
         payload = json.dumps(data)
@@ -230,6 +241,8 @@ async def websocket_endpoint(ws: WebSocket):
                 rooms[rid] = room
                 current_room = room; player_index = 0
                 room.player_queue.append(0); room.connections[0] = ws
+                # 初始历史快照
+                room._record_history()
                 await ws.send_text(json.dumps(room.board_data(global_total_users)))
                 log(f"房间 {rid} 创建: {room_name} {size}x{size} {players}人")
                 continue
@@ -286,6 +299,8 @@ async def websocket_endpoint(ws: WebSocket):
                         continue
 
                 elim = process_click(current_room.board, current_room.size, x, y, player_index)
+                # 记录历史快照
+                current_room._record_history()
                 for e in elim:
                     current_room.eliminated.add(e)
                     if e in current_room.connections:
@@ -306,6 +321,8 @@ async def websocket_endpoint(ws: WebSocket):
                         try:
                             bd = current_room.board_data(global_total_users)
                             bd["gameOver"] = True; bd["winner"] = winner
+                            bd["history"] = current_room.history
+                            bd["colorNames"] = current_room.color_names
                             await c.send_text(json.dumps(bd))
                         except Exception:
                             pass
@@ -332,6 +349,8 @@ async def websocket_endpoint(ws: WebSocket):
                 current_room.size = new_size; current_room.max_players = new_players
                 current_room.board = make_board(new_size)
                 current_room.current_player = 0; current_room.eliminated = set()
+                current_room.history = []
+                current_room._record_history()
                 for pidx, c in list(current_room.connections.items()):
                     try:
                         await c.send_text(json.dumps(current_room.board_data(global_total_users)))

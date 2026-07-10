@@ -4,7 +4,6 @@
   "description": "默认权限",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "opener:default"
+    "core:default"
   ]
 }
