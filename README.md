@@ -141,7 +141,6 @@ chain-chess/
 ├── main.py                   # FastAPI WebSocket 游戏服务器
 ├── run.py                    # 守护进程（崩溃自动重启）
 ├── start.sh                  # 启动/停止/依赖检查脚本
-├── prompt.md                 # 开发备忘与待办
 ├── static/
 │   └── index.html            # 网页版前端（完整游戏 UI + AI + 音效）
 ├── tauri/
@@ -158,6 +157,7 @@ chain-chess/
 │           ├── main.rs        # Rust 入口
 │           └── lib.rs         # 🦀 游戏引擎（棋盘逻辑 + Alpha-Beta + Rayon）
 ├── release/                   # 发布构建产物（APK）
+├── release.keystore           # Android 签名密钥（请勿公开）
 ├── logs/                      # 运行时日志
 ├── LICENSE                    # MIT 开源协议
 └── README.md                  # 本文件
@@ -195,5 +195,5 @@ Copyright (c) 2026 ywnh1
 ---
 
 <div align="center">
-  <sub>Built with ♟ by <a href="https://github.com/ywnh1">ywnh1</a> · v1.1.0</sub>
+  <sub>Built with ♟ by <a href="https://github.com/ywnh1">ywnh1</a> · v1.2.0</sub>
 </div>

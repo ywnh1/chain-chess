@@ -48,5 +48,6 @@ Thumbs.db
 .env.*
 !.env.example
 
-# ─── 构建产物（保留 release/ 下的发布包） ───
+# ─── 构建产物 ───
 release/
+release.keystore
