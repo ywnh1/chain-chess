@@ -49,4 +49,4 @@ Thumbs.db
 !.env.example
 
 # ─── 构建产物（保留 release/ 下的发布包） ───
-# release/ 不忽略，用于存放正式发布包
+release/

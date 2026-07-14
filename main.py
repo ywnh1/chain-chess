@@ -74,18 +74,20 @@ def process_click(board, size, x, y, player):
     elif cell["owner"] == player:
         cell["count"] += 1
     else:
-        return set()
+        return set(), 0
     before = set()
     for row in board:
         for c in row:
             if c["owner"] is not None:
                 before.add(c["owner"])
     chain = [(x, y)]
+    chain_count = 0
     while chain:
         cx, cy = chain.pop(0)
         cell = board[cx][cy]
         cap = capacity(cx, cy, size)
         if cell["count"] >= cap:
+            chain_count += 1
             cell["count"] = 0; cell["owner"] = None
             for nx, ny in neighbors(cx, cy, size):
                 nc = board[nx][ny]
@@ -96,7 +98,7 @@ def process_click(board, size, x, y, player):
         for c in row:
             if c["owner"] is not None:
                 after.add(c["owner"])
-    return before - after
+    return before - after, chain_count
 
 # ─── data store ───
 class GameRoom:
@@ -112,7 +114,10 @@ class GameRoom:
         self.connections = {}
         self.eliminated = set()
         self.history = []  # 历史记录：每回合各玩家棋子数/点数快照
+        self.chain_stats = {}  # 连爆统计
+        self.max_chain = {'player': None, 'length': 0}  # 全局最长连爆
         self.color_names = ["红色", "黄色", "蓝色", "绿色", "紫色", "粉色", "青色"]
+        self.is_ai_game = False  # 是否AI游戏
 
     @property
     def current_players(self):
@@ -301,9 +306,21 @@ async def websocket_endpoint(ws: WebSocket):
                         await ws.send_text(json.dumps({"type": "error", "msg": "不能在已有棋子旁边落子"}))
                         continue
 
-                elim = process_click(current_room.board, current_room.size, x, y, player_index)
+                elim, chain_cnt = process_click(current_room.board, current_room.size, x, y, player_index)
                 # 记录历史快照
                 current_room._record_history()
+                # 记录连爆统计
+                if chain_cnt > 0:
+                    if not hasattr(current_room, 'chain_stats'):
+                        current_room.chain_stats = {}
+                        current_room.max_chain = {'player': None, 'length': 0}
+                    if player_index not in current_room.chain_stats:
+                        current_room.chain_stats[player_index] = {'triggered': 0, 'maxChain': 0}
+                    current_room.chain_stats[player_index]['triggered'] += 1
+                    if chain_cnt > current_room.chain_stats[player_index]['maxChain']:
+                        current_room.chain_stats[player_index]['maxChain'] = chain_cnt
+                    if chain_cnt > current_room.max_chain['length']:
+                        current_room.max_chain = {'player': player_index, 'length': chain_cnt}
                 for e in elim:
                     current_room.eliminated.add(e)
                     if e in current_room.connections:
@@ -326,6 +343,8 @@ async def websocket_endpoint(ws: WebSocket):
                             bd["gameOver"] = True; bd["winner"] = winner
                             bd["history"] = current_room.history
                             bd["colorNames"] = current_room.color_names
+                            bd["chainStats"] = current_room.chain_stats
+                            bd["maxChain"] = current_room.max_chain
                             await c.send_text(json.dumps(bd))
                         except Exception:
                             pass

@@ -1,10 +1,14 @@
 // Copyright (c) 2026 ywnh1
 // SPDX-License-Identifier: MIT
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use tauri::Manager;
 
 // ─── Board types ───
 
@@ -16,7 +20,110 @@ pub struct Cell {
 
 pub type GameBoard = Vec<Vec<Cell>>;
 
+// ─── History types ───
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ChainStatsPlayer {
+    pub triggered: u32,
+    pub max_chain: u32,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MaxChain {
+    pub player: Option<usize>,
+    pub length: u32,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerSnapshot {
+    pub pieces: u32,
+    pub points: u32,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TurnHistory {
+    pub turn: u32,
+    pub snapshot: std::collections::HashMap<String, PlayerSnapshot>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryRecord {
+    pub id: u64,
+    pub time: String,
+    pub mode: String,
+    pub ai_algorithm: String,
+    pub ai_depth: u32,
+    pub player_count: u32,
+    pub ai_count: u32,
+    pub board_size: u32,
+    pub winner: Option<usize>,
+    pub color_names: Vec<String>,
+    pub chain_stats: std::collections::HashMap<String, ChainStatsPlayer>,
+    pub max_chain: MaxChain,
+    #[serde(default)]
+    pub history: Vec<TurnHistory>,
+}
+
+// ─── Process move result ───
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessMoveResult {
+    pub board: GameBoard,
+    pub eliminated: Vec<usize>,
+    pub chain_count: u32,
+    pub game_over: bool,
+    pub winner: Option<usize>,
+}
+
+// ─── State ───
+
+pub struct AppState {
+    pub history_file: Mutex<PathBuf>,
+}
+
 // ─── Tauri commands ───
+
+#[tauri::command]
+async fn process_move(
+    board: GameBoard,
+    size: usize,
+    x: usize,
+    y: usize,
+    player: usize,
+    max_players: usize,
+) -> Result<ProcessMoveResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let mut b = board.clone();
+        let eliminated = process_click(&mut b, size, x, y, player, max_players);
+        let game_over = eliminated.len() >= max_players.saturating_sub(1);
+        let winner = if game_over {
+            // find the remaining player
+            let alive: Vec<usize> = (0..max_players)
+                .filter(|p| !eliminated.contains(p) && has_pieces(&b, *p))
+                .collect();
+            alive.first().copied()
+        } else {
+            None
+        };
+        ProcessMoveResult {
+            board: b,
+            chain_count: 0, // will be calculated separately
+            eliminated,
+            game_over,
+            winner,
+        }
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?;
+
+    Ok(result)
+}
 
 #[tauri::command]
 async fn ai_move(
@@ -39,10 +146,57 @@ async fn ai_move(
     }
 }
 
+#[tauri::command]
+async fn save_game_history(
+    state: tauri::State<'_, AppState>,
+    record: HistoryRecord,
+) -> Result<(), String> {
+    let path = state.history_file.lock().map_err(|e| e.to_string())?;
+    let mut history: Vec<HistoryRecord> = if path.exists() {
+        let content = fs::read_to_string(&*path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    history.push(record);
+    let json = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
+    fs::write(&*path, json).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn load_game_history(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<HistoryRecord>, String> {
+    let path = state.history_file.lock().map_err(|e| e.to_string())?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(&*path).map_err(|e| e.to_string())?;
+    let history: Vec<HistoryRecord> = serde_json::from_str(&content).unwrap_or_default();
+    Ok(history)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![ai_move])
+        .setup(|app| {
+            // 使用 Tauri 应用数据目录（Android/iOS/桌面通用）
+            let app_data_dir = app.path().app_data_dir()
+                .unwrap_or_else(|_| PathBuf::from("."));
+            fs::create_dir_all(&app_data_dir).ok();
+            let history_path = app_data_dir.join("history.json");
+            app.manage(AppState {
+                history_file: Mutex::new(history_path),
+            });
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            ai_move,
+            process_move,
+            save_game_history,
+            load_game_history,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -83,9 +237,9 @@ fn near_any(board: &GameBoard, sz: usize, x: usize, y: usize) -> bool {
     nbrs8(x, y, sz).iter().any(|&(ni, nj)| board[ni][nj].owner.is_some())
 }
 
-fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize) -> Vec<usize> {
+fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize, _max_players: usize) -> Vec<usize> {
     // collect owners before
-    let before: std::collections::HashSet<usize> = board
+    let before: HashSet<usize> = board
         .iter()
         .flatten()
         .filter_map(|c| c.owner)
@@ -123,7 +277,7 @@ fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: u
     }
 
     // owners after
-    let after: std::collections::HashSet<usize> = board
+    let after: HashSet<usize> = board
         .iter()
         .flatten()
         .filter_map(|c| c.owner)
@@ -244,7 +398,7 @@ fn alpha_beta(
     for k in 0..max_eval {
         let (i, j) = ordered[k];
         let mut nb = board.clone();
-        let elim = process_click(&mut nb, sz, i, j, player);
+        let elim = process_click(&mut nb, sz, i, j, player, sz);
 
         // merge eliminated
         let mut new_elim: Vec<usize> = elim_set.to_vec();
@@ -331,10 +485,20 @@ pub fn find_best_move(
             })
             .collect();
         if candidates.is_empty() {
-            // fallback to all cells
+            // fallback to all non-adjacent cells
             for i in 0..sz {
                 for j in 0..sz {
                     if board[i][j].owner.is_none() && !near_any(board, sz, i, j) {
+                        candidates.push((i, j));
+                    }
+                }
+            }
+        }
+        // fallback to any empty cell
+        if candidates.is_empty() {
+            for i in 0..sz {
+                for j in 0..sz {
+                    if board[i][j].owner.is_none() {
                         candidates.push((i, j));
                     }
                 }
@@ -375,7 +539,7 @@ pub fn find_best_move(
         .map(|k| {
             let (i, j) = ordered[k];
             let mut nb = board.clone();
-            let elim = process_click(&mut nb, sz, i, j, player);
+            let elim = process_click(&mut nb, sz, i, j, player, max_players);
 
             let mut new_elim: Vec<usize> = eliminated.to_vec();
             for &e in &elim {

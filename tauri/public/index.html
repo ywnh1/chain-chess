@@ -84,7 +84,7 @@ body{
 .form-row select option{background:var(--surface);color:var(--text)}
 .btn-primary{
   width:100%;padding:12px;background:var(--accent);color:#0f0f13;
-  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;margin-top:12px;transition:.12s;
+  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;transition:.12s;
 }
 .btn-primary:active{opacity:.8}
 
@@ -208,6 +208,7 @@ body{
 }
 .modal-actions button:active{opacity:.75}
 .btn-ghost{background:rgba(255,255,255,.08);color:var(--dim)}
+.btn-ghost:active{opacity:.75}
 
 /* player bar */
 .player-bar{
@@ -284,6 +285,17 @@ body{
   cursor:pointer;margin:8px 0 16px;transition:.12s;
 }
 .settlement .btn-again:active{opacity:.8}
+/* history */
+.history-list{width:100%;overflow-y:auto;max-height:60vh}
+.history-item{
+  background:rgba(255,255,255,.04);border-radius:10px;padding:12px;margin:8px 0;
+  border:1px solid var(--border);
+}
+.history-item .h-time{font-size:.7rem;color:var(--dim)}
+.history-item .h-info{font-size:.8rem;margin:4px 0}
+.history-item .h-info strong{color:var(--accent2)}
+.history-item .h-details{font-size:.7rem;color:var(--dim)}
+.history-item .h-winner{display:inline-block;font-size:.75rem;font-weight:600;margin-top:4px}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 </style>
 </head>
@@ -308,6 +320,23 @@ body{
         <p>同一设备，轮流落子，朋友面前大战</p>
       </div>
     </div>
+    <div class="mode-card" onclick="showHistory()" style="border-color:rgba(95,195,195,.2)">
+      <div class="icon">📋</div>
+      <div class="body">
+        <h3>历史记录</h3>
+        <p>查看对局记录和统计数据</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- History Screen -->
+<div id="history" class="screen">
+  <button class="back" onclick="goHome()">← 返回</button>
+  <h2>📋 历史记录</h2>
+  <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">所有对局记录</p>
+  <div id="historyList" class="history-list">
+    <div class="empty">加载中...</div>
   </div>
 </div>
 
@@ -333,6 +362,7 @@ body{
       <option value="4">4 个 AI</option>
       <option value="5">5 个 AI</option>
       <option value="6">6 个 AI</option>
+      <option value="7">7 个 AI（AI 斗蛐蛐）</option>
     </select>
   </div>
   <div class="form-row"><label>AI 算法</label>
@@ -349,7 +379,7 @@ body{
       <option value="4">4</option>
     </select>
   </div>
-  <button class="btn-primary" onclick="startAIGame()">开始游戏</button>
+  <button class="btn-primary" onclick="startAIGame()" style="margin-top:12px">开始游戏</button>
 </div>
 
 <!-- Local Lobby -->
@@ -373,7 +403,7 @@ body{
       <option value="6">6 人</option><option value="7">7 人</option>
     </select>
   </div>
-  <button class="btn-primary" onclick="startLocalGame()">开始游戏</button>
+  <button class="btn-primary" onclick="startLocalGame()" style="margin-top:12px">开始游戏</button>
 </div>
 
 <!-- Game Screen -->
@@ -382,6 +412,7 @@ body{
     <div class="top-left">
       <button onclick="exitGame()">← 退出</button>
       <button onclick="openModal('resetModal')">↻ 重开</button>
+      <button onclick="endGameNow()">⛳ 结束</button>
     </div>
     <div class="top-right">
       <span id="msg"></span>
@@ -468,6 +499,8 @@ let aiAlgorithm='strategy';
 let aiDepth=2;
 let eliminatedPlayers=new Set();
 let gameHistory=[];
+let chainStats={};
+let maxChainOverall={player:null,length:0};
 
 /* ==================== SCREEN MGMT ==================== */
 function show(s){
@@ -477,10 +510,114 @@ function show(s){
 function goHome(){exitGame();show('welcome')}
 function showAILobby(){show('aiLobby')}
 function showLocalLobby(){show('localLobby')}
+function showHistory(){
+  show('history');
+  loadHistoryList();
+}
+// Tauri invoke helper
+function tauriInvoke(cmd, args){
+  return window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke 
+    ? window.__TAURI_INTERNALS__.invoke(cmd, args || {})
+    : Promise.reject(new Error('Not in Tauri'));
+}
+function loadHistoryList(){
+  let el=document.getElementById('historyList');
+  el.innerHTML='<div class="empty">加载中...</div>';
+  tauriInvoke('load_game_history').then(list=>{
+    if(!list||list.length===0){
+      el.innerHTML='<div class="empty">暂无历史记录</div>';
+      return;
+    }
+    el.innerHTML='';
+    // 倒序显示（最新的在前）
+    for(let i=list.length-1;i>=0;i--){
+      let r=list[i];
+      let div=document.createElement('div');div.className='history-item';
+      let modeLabel=r.mode==='ai'?'AI对战':'本地对战';
+      let winnerName=(r.colorNames&&r.colorNames[r.winner])||(r.winner!==null&&r.winner!==undefined?`玩家 ${r.winner+1}`:'平局');
+      let winnerColor=r.winner!==null&&r.winner!==undefined?COLORS[r.winner]||'#888':'#888';
+      div.style.cursor='pointer';
+      div.onclick=function(){showHistoryDetail(r)};
+      div.innerHTML=`
+        <div class="h-time">🕐 ${r.time}</div>
+        <div class="h-info">${modeLabel} · ${r.boardSize}×${r.boardSize} · ${r.playerCount}人${r.aiCount>0?(' · AI×'+r.aiCount):''}</div>
+        <div class="h-winner" style="color:${winnerColor}">🏆 ${winnerName}</div>
+        <div class="h-details">${r.aiAlgorithm?('算法: '+r.aiAlgorithm):''}${r.aiDepth>0?(' · 深度: '+r.aiDepth):''}</div>
+      `;
+      el.appendChild(div);
+    }
+  }).catch(()=>{
+    el.innerHTML='<div class="empty">暂无可用的历史记录</div>';
+  });
+}
+// 格式化时间为 YYYY/MM/DD HH:mm:ss
+function formatTime(d){
+  let y=d.getFullYear(),m=d.getMonth()+1,dd=d.getDate();
+  let h=d.getHours(),mi=d.getMinutes(),s=d.getSeconds();
+  return y+'/'+(m<10?'0'+m:m)+'/'+(dd<10?'0'+dd:dd)+' '+(h<10?'0'+h:h)+':'+(mi<10?'0'+mi:mi)+':'+(s<10?'0'+s:s);
+}
+// Save game history for Tauri
+function saveGameHistory(winner, mode, aiAlg, aiDp){
+  tauriInvoke('save_game_history', {
+    record: {
+      id: Date.now(),
+      time: formatTime(new Date()),
+      mode: mode || gameMode || 'local',
+      aiAlgorithm: aiAlg || aiAlgorithm || '',
+      aiDepth: aiDp || aiDepth || 0,
+      playerCount: maxPlayers,
+      aiCount: aiPlayers.size,
+      boardSize: size,
+      winner: winner !== null && winner !== undefined ? winner : null,
+      colorNames: COLOR_NAMES,
+      chainStats: chainStats,
+      maxChain: maxChainOverall,
+      history: gameHistory,
+    }
+  }).catch(e=>console.warn('Save history failed:', e));
+}
 
 function toggleAIDepth(){
   let alg=document.getElementById('aiAlgorithm').value;
   document.getElementById('aiDepthRow').style.display=alg==='alphabeta'?'block':'none';
+}
+// 初始化时根据算法隐藏/显示深度设置
+toggleAIDepth();
+
+let selectedPlayerColor = 0;
+function toggleAISettings(){
+  let v=parseInt(document.getElementById('localAI').value)||0;
+  let maxP=parseInt(document.getElementById('localPlayers').value)||2;
+  document.getElementById('aiSettings').style.display=v>0?'block':'none';
+  let humanCount = maxP - v;
+  let colorRow = document.getElementById('colorPickerRow');
+  if(humanCount === 1 && v > 0){
+    colorRow.style.display = 'block';
+    generateColorOptions();
+  } else {
+    colorRow.style.display = 'none';
+  }
+}
+function generateColorOptions(){
+  let container = document.getElementById('colorOptions');
+  if(!container)return;
+  container.innerHTML = '';
+  let maxP=parseInt(document.getElementById('localPlayers').value)||2;
+  let aiCount=parseInt(document.getElementById('localAI').value)||0;
+  for(let i=0;i<maxP;i++){
+    let isAi = i >= maxP - aiCount;
+    if(isAi) continue;
+    let btn = document.createElement('button');
+    btn.style.cssText = `width:36px;height:36px;border-radius:50%;border:2px solid transparent;background:${COLORS[i]};cursor:pointer;transition:.15s;`;
+    btn.dataset.idx = i;
+    if(i === selectedPlayerColor) btn.style.border = '2px solid #fff';
+    btn.onclick = function(){
+      document.querySelectorAll('#colorOptions button').forEach(b => b.style.border = '2px solid transparent');
+      this.style.border = '2px solid #fff';
+      selectedPlayerColor = parseInt(this.dataset.idx);
+    };
+    container.appendChild(btn);
+  }
 }
 
 /* ==================== GAME LOGIC ==================== */
@@ -535,10 +672,12 @@ async function processClick(b,s,x,y,pl,anim){
   let had=new Set();
   for(let row of b)for(let cl of row)if(cl.owner!==null)had.add(cl.owner);
   let chain=[[x,y]];
+  let chainCount=0;
   while(chain.length){
     let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
     if(cell.count>=capv){
       cell.count=0;cell.owner=null;
+      chainCount++;
       playExplosion();
       for(let[nx,ny]of nbrs(cx,cy,s)){
         let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
@@ -549,6 +688,15 @@ async function processClick(b,s,x,y,pl,anim){
         await sleep(180);
         if(el)el.classList.remove('explode');
       }
+    }
+  }
+  // 记录连爆统计
+  if(chainCount > 0){
+    if(!chainStats[pl]) chainStats[pl] = {triggered: 0, maxChain: 0};
+    chainStats[pl].triggered++;
+    if(chainCount > chainStats[pl].maxChain) chainStats[pl].maxChain = chainCount;
+    if(chainCount > maxChainOverall.length){
+      maxChainOverall = {player: pl, length: chainCount};
     }
   }
   let now=new Set();
@@ -622,7 +770,7 @@ function drawDots(p,n){
   else{addDot(p,34,34);addDot(p,66,34);addDot(p,34,66);addDot(p,66,66)}
 }
 function addDot(p,x,y){let d=document.createElement('div');d.className='dot';d.style.left=x+'%';d.style.top=y+'%';p.appendChild(d)}
-function setBg(pl){let h=COLORS[pl];let r=parseInt(h.substr(1,2),16)*.85,g=parseInt(h.substr(3,2),16)*.85,b=parseInt(h.substr(5,2),16)*.85;document.body.style.background=`rgb(${r|0},${g|0},${b|0})`}
+function setBg(pl){let h=COLORS[pl];let r=parseInt(h.substr(1,2),16)*.85,g=parseInt(h.substr(3,2),16)*.85,b=parseInt(h.substr(5,2),16)*.85;document.body.style.background=`radial-gradient(ellipse 80% 50% at 50% -20%, rgba(240,179,75,.04) 0%, transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%, rgba(95,195,195,.03) 0%, transparent 70%),rgb(${r|0},${g|0},${b|0})`}
 function renderPlayerBar(){
   let el=document.getElementById('playerBar');el.innerHTML='';
   let cnt={};
@@ -672,6 +820,10 @@ function aiFindMove(player,sz,b){
       for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
         if(b[i][j].owner===null&&!nearAny(i,j,sz,b))
           candidates.push([i,j]);
+    }
+    if(candidates.length===0){
+      for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
+        if(b[i][j].owner===null)candidates.push([i,j]);
     }
     if(candidates.length===0)return null;
     // 选最靠近中心的
@@ -833,6 +985,10 @@ function aiFindMoveAlphaBeta(player,sz,b,depth){
     let candidates=[];
     for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
       if(b[i][j].owner===null&&!nearAny(i,j,sz,b))candidates.push([i,j]);
+    if(candidates.length===0){
+      for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
+        if(b[i][j].owner===null)candidates.push([i,j]);
+    }
     if(candidates.length===0)return null;
     let cx=sz/2-0.5;
     return candidates.reduce((a,b2)=>{let da=Math.abs(a[0]-cx)+Math.abs(a[1]-cx),db=Math.abs(b2[0]-cx)+Math.abs(b2[1]-cx);return da<=db?a:b2;});
@@ -874,7 +1030,22 @@ async function triggerAI(){
   }else{
     move=aiFindMove(curPlayer,size,board);
   }
-  if(!move){showMsg(`AI ${curPlayer+1} 无合法落子`,'error');aiThinking=false;return}
+  if(!move){
+    showMsg(`AI ${curPlayer+1} 无合法落子，跳过`,'error');
+    aiThinking=false;
+    let alive=[];
+    for(let p=0;p<maxPlayers;p++){if(!eliminatedPlayers.has(p))alive.push(p);}
+    if(alive.length<=1){
+      if(alive.length===1){gameOver=true;playGameOver();showSettlement(alive[0],COLOR_NAMES,gameHistory);}
+      return;
+    }
+    let idx=alive.indexOf(curPlayer);
+    if(idx<0)idx=0;
+    curPlayer=alive[(idx+1)%alive.length];
+    renderPlayerBar();setBg(curPlayer);
+    if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
+    return;
+  }
   let[x,y]=move;
   let el=cells[x][y];
   if(el)el.style.background='rgba(255,255,255,.15)';
@@ -917,6 +1088,8 @@ function startLocalGame(){
   aiThinking=false;
   eliminatedPlayers=new Set();
   gameHistory=[];
+  chainStats={};
+  maxChainOverall={player:null,length:0};
   recordHistory();
   renderBoard(true);
   show('game');
@@ -927,16 +1100,32 @@ function startLocalGame(){
 function startAIGame(){
   size=parseInt(document.getElementById('aiSize').value)||7;
   let aiCount=parseInt(document.getElementById('aiCount').value)||1;
-  maxPlayers=aiCount+1;
+  if(aiCount<1)aiCount=1;
+  // AI斗蛐蛐：7 AI = 全AI无人类
+  let isAllAi = aiCount >= 7;
+  maxPlayers = isAllAi ? aiCount : aiCount + 1;
   aiAlgorithm=document.getElementById('aiAlgorithm').value;
   aiDepth=parseInt(document.getElementById('aiDepth').value)||2;
   board=mkBoard(size);curPlayer=0;gameOver=false;
   gameMode='ai';
   aiPlayers=new Set();
-  for(let p=maxPlayers-aiCount;p<maxPlayers;p++)aiPlayers.add(p);
+  let humanCount = isAllAi ? 0 : 1;
+  let humanIdx = 0;
+  if(humanCount === 1){
+    humanIdx = selectedPlayerColor;
+  }
+  for(let p=0;p<maxPlayers;p++){
+    if(humanCount === 1){
+      if(p !== humanIdx) aiPlayers.add(p);
+    } else {
+      aiPlayers.add(p); // 全AI
+    }
+  }
   aiThinking=false;
   eliminatedPlayers=new Set();
   gameHistory=[];
+  chainStats={};
+  maxChainOverall={player:null,length:0};
   recordHistory();
   renderBoard(true);
   show('game');
@@ -958,6 +1147,8 @@ function startLocalReset(){
   aiThinking=false;
   eliminatedPlayers=new Set();
   gameHistory=[];
+  chainStats={};
+  maxChainOverall={player:null,length:0};
   recordHistory();
   renderBoard(true);
   renderPlayerBar();
@@ -965,6 +1156,21 @@ function startLocalReset(){
   closeModal('resetModal');
   document.querySelectorAll('.settlement').forEach(e=>e.remove());
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+}
+
+function endGameNow(){
+  if(gameOver)return;
+  gameOver=true;
+  let bestP = 0, bestCnt = -1;
+  for(let p=0;p<maxPlayers;p++){
+    if(eliminatedPlayers.has(p))continue;
+    let cnt=0;
+    for(let r of board)for(let c of r)if(c.owner===p)cnt++;
+    if(cnt>bestCnt){bestCnt=cnt;bestP=p}
+  }
+  recordHistory();
+  playGameOver();
+  showSettlement(bestCnt>0?bestP:null, COLOR_NAMES, gameHistory);
 }
 
 async function localClick(x,y){
@@ -1033,6 +1239,14 @@ function drawLineChart(canvas,history,colorNames,colors,valueKey){
       if(v>maxVal)maxVal=v;
     }
   }
+  // 总数计算
+  let totalByTurn=[];
+  for(let turn of history){
+    let total=0;
+    for(let pidStr in turn.snapshot)total+=turn.snapshot[pidStr][valueKey];
+    totalByTurn.push(total);
+    if(total>maxVal)maxVal=total;
+  }
   if(maxVal===0)maxVal=1;
   let sortedPlayers=[...players].sort((a,b)=>a-b);
   ctx.strokeStyle='rgba(255,255,255,.06)';
@@ -1056,6 +1270,19 @@ function drawLineChart(canvas,history,colorNames,colors,valueKey){
     let x=pad.left+(cw*i)/(turnCount-1||1);
     ctx.fillText(i,x,h-4);
   }
+  // 总数白线
+  ctx.strokeStyle='rgba(255,255,255,.5)';
+  ctx.lineWidth=2;ctx.setLineDash([4,3]);
+  ctx.beginPath();
+  let startedLine=false;
+  for(let i=0;i<history.length;i++){
+    let total=totalByTurn[i];
+    let x=pad.left+(cw*i)/(history.length-1||1);
+    let y=pad.top+ch*(1-total/maxVal);
+    if(!startedLine){ctx.moveTo(x,y);startedLine=true;}
+    else ctx.lineTo(x,y);
+  }
+  ctx.stroke();ctx.setLineDash([]);
   for(let pid of sortedPlayers){
     let color=colors[pid]||'#888';
     ctx.strokeStyle=color;
@@ -1085,17 +1312,24 @@ function showSettlement(winner,colorNames,history){
   let title=document.createElement('h2');
   title.innerHTML=`🏆 ${winnerLabel} 获胜`;
 
+  // 只显示存活玩家
   let statsGrid=document.createElement('div');statsGrid.className='stats-grid';
   let lastSnap=history.length>0?history[history.length-1].snapshot:{};
-  let displayPlayers=[];
-  for(let p=0;p<maxPlayers;p++)displayPlayers.push(p);
-  for(let pid of displayPlayers){
+  let alivePlayers=[];
+  for(let p=0;p<maxPlayers;p++){
+    let snap=lastSnap[String(p)];
+    if(snap&&snap.pieces>0)alivePlayers.push(p);
+  }
+  if(alivePlayers.length===0&&winner!==null&&winner!==undefined)alivePlayers=[winner];
+  for(let pid of alivePlayers){
     let snap=lastSnap[String(pid)];
     let pieces=snap?snap.pieces:0;
     let points=snap?snap.points:0;
     let card=document.createElement('div');card.className='stat-card';
     let isWinner=pid===winner;
     if(isWinner)card.style.border=`1px solid ${COLORS[pid]||'#888'}`;
+    let cs=chainStats[pid];
+    let chainStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">💥 连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
     card.innerHTML=`
       <div class="name">
         <span class="color-dot" style="background:${COLORS[pid]||'#888'}"></span>
@@ -1106,17 +1340,26 @@ function showSettlement(winner,colorNames,history){
       <div class="lbl">棋子</div>
       <div class="num" style="color:${COLORS[pid]||'#888'}">${points}</div>
       <div class="lbl">点数</div>
+      ${chainStr}
     `;
     statsGrid.appendChild(card);
   }
   inner.appendChild(title);
   inner.appendChild(statsGrid);
+  // 全局最长连爆
+  if(maxChainOverall.player!==null&&maxChainOverall.length>0){
+    let ci=document.createElement('p');
+    ci.style.cssText='font-size:.75rem;color:var(--dim);margin:4px 0;text-align:center;';
+    let cName=(colorNames&&colorNames[maxChainOverall.player])||getPlayerLabel(maxChainOverall.player);
+    ci.innerHTML=`🔥 最高连爆：<span style="color:${COLORS[maxChainOverall.player]||'#888'}">${cName}</span> 触发 <strong>${maxChainOverall.length}</strong> 连爆`;
+    inner.appendChild(ci);
+  }
 
   if(history&&history.length>=2){
     let chartBox1=document.createElement('div');chartBox1.className='chart-box';
-    chartBox1.innerHTML='<h4>📊 棋子数变化</h4><canvas id="chartPieces"></canvas>';
+    chartBox1.innerHTML='<h4 style="cursor:pointer" onclick="showFullscreenChart(\'chartPieces\')">📊 棋子数变化 🔍</h4><canvas id="chartPieces" onclick="showFullscreenChart(\'chartPieces\')" style="cursor:pointer"></canvas>';
     let legend1=document.createElement('div');legend1.className='chart-legend';
-    let sortedP=[...displayPlayers].sort((a,b)=>a-b);
+    let sortedP=[...alivePlayers].sort((a,b)=>a-b);
     for(let pid of sortedP){
       let cName=(colorNames&&colorNames[pid])||getPlayerLabel(pid);
       let s=document.createElement('span');
@@ -1127,7 +1370,7 @@ function showSettlement(winner,colorNames,history){
     inner.appendChild(chartBox1);
 
     let chartBox2=document.createElement('div');chartBox2.className='chart-box';
-    chartBox2.innerHTML='<h4>📊 点数变化</h4><canvas id="chartPoints"></canvas>';
+    chartBox2.innerHTML='<h4 style="cursor:pointer" onclick="showFullscreenChart(\'chartPoints\')">📊 点数变化 🔍</h4><canvas id="chartPoints" onclick="showFullscreenChart(\'chartPoints\')" style="cursor:pointer"></canvas>';
     let legend2=document.createElement('div');legend2.className='chart-legend';
     for(let pid of sortedP){
       let cName=(colorNames&&colorNames[pid])||getPlayerLabel(pid);
@@ -1148,6 +1391,137 @@ function showSettlement(winner,colorNames,history){
   setTimeout(()=>{
     drawLineChart(document.getElementById('chartPieces'),history,colorNames,COLORS,'pieces');
     drawLineChart(document.getElementById('chartPoints'),history,colorNames,COLORS,'points');
+  },50);
+  // 自动保存历史（Tauri模式）
+  saveGameHistory(winner);
+}
+
+function showHistoryDetail(r){
+  if(!r.history||r.history.length<2){
+    // 无快照数据，显示基本信息
+    let overlay=document.createElement('div');overlay.className='settlement';
+    let inner=document.createElement('div');inner.className='settlement-inner';
+    let winnerLabel='';
+    if(r.winner!==null&&r.winner!==undefined){
+      let cName=(r.colorNames&&r.colorNames[r.winner])||'玩家 '+(r.winner+1);
+      winnerLabel=`<span class="winner-color" style="background:${COLORS[r.winner]||'#888'}"></span>${cName}`;
+    }else{winnerLabel='平局'}
+    inner.innerHTML='<h2>🏆 '+winnerLabel+' 获胜</h2><p style="text-align:center;color:var(--dim);margin-top:12px">该记录无完整快照数据，无法展示图表</p>';
+    let btn=document.createElement('button');btn.className='btn-again';
+    btn.textContent='关闭';btn.onclick=()=>overlay.remove();
+    inner.appendChild(btn);overlay.appendChild(inner);
+    document.body.appendChild(overlay);
+    return;
+  }
+  let overlay=document.createElement('div');overlay.className='settlement';
+  let inner=document.createElement('div');inner.className='settlement-inner';
+  let winnerLabel='';
+  if(r.winner!==null&&r.winner!==undefined){
+    let cName=(r.colorNames&&r.colorNames[r.winner])||'玩家 '+(r.winner+1);
+    winnerLabel=`<span class="winner-color" style="background:${COLORS[r.winner]||'#888'}"></span>${cName}`;
+  }else{winnerLabel='平局'}
+  let title=document.createElement('h2');
+  title.innerHTML=`🏆 ${winnerLabel} 获胜`;
+  inner.appendChild(title);
+
+  // 统计面板
+  let statsGrid=document.createElement('div');statsGrid.className='stats-grid';
+  let lastSnap=r.history[r.history.length-1].snapshot||{};
+  let alivePlayers=[];
+  for(let p=0;p<r.playerCount;p++){
+    let snap=lastSnap[String(p)];
+    if(snap&&snap.pieces>0)alivePlayers.push(p);
+  }
+  if(alivePlayers.length===0&&r.winner!==null&&r.winner!==undefined)alivePlayers=[r.winner];
+  for(let pid of alivePlayers){
+    let snap=lastSnap[String(pid)];
+    let pieces=snap?snap.pieces:0;
+    let points=snap?snap.points:0;
+    let card=document.createElement('div');card.className='stat-card';
+    let isWinner=pid===r.winner;
+    if(isWinner)card.style.border=`1px solid ${COLORS[pid]||'#888'}`;
+    let cs=r.chainStats?r.chainStats[pid]:null;
+    let chainStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">💥 连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
+    let cName=(r.colorNames&&r.colorNames[pid])||'玩家 '+(pid+1);
+    card.innerHTML=`
+      <div class="name">
+        <span class="color-dot" style="background:${COLORS[pid]||'#888'}"></span>
+        ${cName}${isWinner?'👑':''}
+      </div>
+      <div class="num" style="color:${COLORS[pid]||'#888'}">${pieces}</div>
+      <div class="lbl">棋子</div>
+      <div class="num" style="color:${COLORS[pid]||'#888'}">${points}</div>
+      <div class="lbl">点数</div>
+      ${chainStr}
+    `;
+    statsGrid.appendChild(card);
+  }
+  inner.appendChild(statsGrid);
+
+  // 全局最长连爆
+  if(r.maxChain&&r.maxChain.player!==null&&r.maxChain.length>0){
+    let ci=document.createElement('p');
+    ci.style.cssText='font-size:.75rem;color:var(--dim);margin:4px 0;text-align:center;';
+    let cNameM=(r.colorNames&&r.colorNames[r.maxChain.player])||'玩家 '+(r.maxChain.player+1);
+    ci.innerHTML=`🔥 最高连爆：<span style="color:${COLORS[r.maxChain.player]||'#888'}">${cNameM}</span> 触发 <strong>${r.maxChain.length}</strong> 连爆`;
+    inner.appendChild(ci);
+  }
+
+  // 图表
+  let sortedP=[...alivePlayers].sort((a,b)=>a-b);
+  let chartBox1=document.createElement('div');chartBox1.className='chart-box';
+  chartBox1.innerHTML='<h4>📊 棋子数变化</h4><canvas id="hChartPieces" style="width:100%;height:150px;display:block"></canvas>';
+  let legend1=document.createElement('div');legend1.className='chart-legend';
+  for(let pid of sortedP){
+    let cName=(r.colorNames&&r.colorNames[pid])||'玩家 '+(pid+1);
+    let s=document.createElement('span');
+    s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>${cName}`;
+    legend1.appendChild(s);
+  }
+  chartBox1.appendChild(legend1);
+  inner.appendChild(chartBox1);
+
+  let chartBox2=document.createElement('div');chartBox2.className='chart-box';
+  chartBox2.innerHTML='<h4>📊 点数变化</h4><canvas id="hChartPoints" style="width:100%;height:150px;display:block"></canvas>';
+  let legend2=document.createElement('div');legend2.className='chart-legend';
+  for(let pid of sortedP){
+    let cName=(r.colorNames&&r.colorNames[pid])||'玩家 '+(pid+1);
+    let s=document.createElement('span');
+    s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>${cName}`;
+    legend2.appendChild(s);
+  }
+  chartBox2.appendChild(legend2);
+  inner.appendChild(chartBox2);
+
+  let btn=document.createElement('button');btn.className='btn-again';
+  btn.textContent='关闭';btn.onclick=()=>overlay.remove();
+  inner.appendChild(btn);
+  overlay.appendChild(inner);
+  document.body.appendChild(overlay);
+  setTimeout(()=>{
+    drawLineChart(document.getElementById('hChartPieces'),r.history,r.colorNames,COLORS,'pieces');
+    drawLineChart(document.getElementById('hChartPoints'),r.history,r.colorNames,COLORS,'points');
+  },50);
+}
+
+function showFullscreenChart(canvasId){
+  let srcCanvas=document.getElementById(canvasId);
+  if(!srcCanvas)return;
+  let overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.92);display:flex;justify-content:center;align-items:center;padding:20px;';
+  overlay.onclick=()=>overlay.remove();
+  let bigCanvas=document.createElement('canvas');
+  bigCanvas.style.cssText='max-width:100%;max-height:100%;border-radius:8px;';
+  overlay.appendChild(bigCanvas);
+  document.body.appendChild(overlay);
+  setTimeout(()=>{
+    let rect=bigCanvas.getBoundingClientRect();
+    let dpr=window.devicePixelRatio||1;
+    bigCanvas.width=rect.width*dpr;
+    bigCanvas.height=rect.height*dpr;
+    let dstCtx=bigCanvas.getContext('2d');
+    dstCtx.scale(dpr,dpr);
+    dstCtx.drawImage(srcCanvas,0,0,rect.width,rect.height);
   },50);
 }
 
