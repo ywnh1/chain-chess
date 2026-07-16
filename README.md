@@ -58,8 +58,6 @@ cargo build --release  # 构建可执行文件
 # 二进制文件：tauri/src-tauri/target/release/chain-chess
 ```
 
-桌面版额外提供 **Alpha-Beta 剪枝 AI**（Rust + Rayon 多线程），搜索深度可达 10 层。
-
 ### Android APK
 
 ```bash
@@ -72,7 +70,7 @@ cargo build --release  # 构建可执行文件
 
 > 脚本自动编译 arm64 APK，用 `release.keystore` 签名并输出到 `release/` 目录。
 
-预编译 APK 可在 [Releases](https://github.com/ywnh1/chain-chess/releases) 下载。
+预编译 APK 可在 [Releases](https://github.com/nihao15900375400/chain-chess/releases) 下载。
 
 #### 首次构建（已初始化则跳过）
 
@@ -176,5 +174,5 @@ Copyright (c) 2026 ywnh1
 ---
 
 <div align="center">
-  <sub>Built with ♟ by <a href="https://github.com/ywnh1">ywnh1</a> · v1.3.1-beta</sub>
+  <sub>Built with ♟ by <a href="https://github.com/nihao15900375400">ywnh1</a> · v1.3.1-beta</sub>
 </div>
