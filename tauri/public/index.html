@@ -26,6 +26,8 @@
   --glass:rgba(255,255,255,.04);
   --glass-border:rgba(255,255,255,.06);
   --glass-shadow:0 4px 24px rgba(0,0,0,.3);
+  --glass-shine:rgba(255,255,255,.03);
+  --glass-edge:rgba(255,255,255,.06);
   --font:'Inter','SF Pro','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
 }
 html{font-size:clamp(14px,3.5vw,17px)}
@@ -44,7 +46,21 @@ body{
   overflow-x:hidden;
   line-height:1.5;
 }
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 50% at 50% -10%,rgba(240,179,75,.03) 0%,transparent 70%),radial-gradient(ellipse 60% 40% at 100% 90%,rgba(95,195,195,.02) 0%,transparent 70%);pointer-events:none;z-index:0}
+body::before{content:'';position:fixed;inset:0;background:
+    radial-gradient(ellipse 70% 50% at 50% -10%,rgba(240,179,75,.04) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 40% at 100% 90%,rgba(95,195,195,.03) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 30% at 20% 40%,rgba(240,179,75,.015) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 25% at 80% 60%,rgba(95,195,195,.015) 0%,transparent 60%);
+  background-size:200% 200%,200% 200%,200% 200%,200% 200%;
+  animation:liquidDrift 20s ease-in-out infinite;
+  pointer-events:none;z-index:0}
+@keyframes liquidDrift{
+  0%{background-position:50% -10%,100% 90%,20% 40%,80% 60%}
+  25%{background-position:55% -8%,95% 88%,25% 38%,75% 65%}
+  50%{background-position:45% -12%,105% 92%,15% 42%,85% 55%}
+  75%{background-position:52% -9%,98% 85%,22% 36%,78% 62%}
+  100%{background-position:50% -10%,100% 90%,20% 40%,80% 60%}
+}
 .screen.active{position:relative;z-index:1}
 .screen{display:none}
 .screen.active{display:flex;flex-direction:column;align-items:center;width:100%;max-width:480px}
@@ -70,7 +86,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .mode-card .body p{font-size:.8rem;color:var(--dim);margin-top:2px}
 
 /* lobby */
-#aiLobby,#localLobby{max-width:480px;gap:1rem;width:100%}
+#aiLobby,#localLobby,#eveLobby{max-width:480px;gap:.75rem;width:100%}
 #aiLobby .back,#localLobby .back,#history .back,#eveLobby .back{
   align-self:flex-start;
   background:none;border:none;color:var(--dim);
@@ -79,8 +95,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 }
 #aiLobby .back:active,#localLobby .back:active,#history .back:active,#eveLobby .back:active{color:var(--text)}
 #aiLobby h2,#localLobby h2,#history h2,#eveLobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
-.form-row{margin:10px 0;display:flex;flex-direction:column;gap:4px;width:100%}
-.form-row label{font-size:.8rem;color:var(--dim)}
+.form-row{margin:8px 0;display:flex;flex-direction:column;gap:4px;width:100%}
+.form-row label{font-size:.78rem;color:var(--dim);font-weight:500}
 .form-row input,.form-row select{
   width:100%;padding:10px 12px;
   border:1px solid var(--border);border-radius:8px;
@@ -92,7 +108,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
   border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,179,75,.15);
 }
 .form-row select option{background:var(--surface);color:var(--text)}
-.form-eve-config{width:100%;max-height:240px;overflow-y:auto;margin:4px 0}
+.form-eve-config{width:100%;max-height:240px;overflow-y:auto;margin:4px 0;display:flex;flex-direction:column;gap:6px}
 .eve-ai-row{
   display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);
   border-radius:8px;padding:6px 10px;margin:4px 0;
@@ -117,15 +133,15 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 #game{max-width:520px;gap:8px;width:100%}
 #game .top{
   display:flex;justify-content:space-between;align-items:center;
-  width:100%;padding:4px 0 6px;
+  width:100%;padding:6px 0 8px;
 }
 #game .top-left{display:flex;gap:8px;align-items:center}
 #game .top-left button{
   background:rgba(255,255,255,.08);color:var(--dim);
-  border:none;padding:6px 10px;border-radius:6px;font-size:.7rem;
-  cursor:pointer;transition:.12s;font-weight:500;
+  border:none;padding:7px 12px;border-radius:8px;font-size:.72rem;
+  cursor:pointer;transition:.15s;font-weight:500;letter-spacing:.3px;
 }
-#game .top-left button:active{background:rgba(255,255,255,.15)}
+#game .top-left button:active{background:rgba(255,255,255,.15);transform:scale(.96)}
 #game .top-right{display:flex;gap:4px;align-items:center}
 .turn-badge{
   display:inline-flex;align-items:center;gap:5px;
@@ -138,14 +154,16 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
   width:min(88vw,440px);
   height:min(88vw,440px);
 }
-#board{width:100%;height:100%;display:grid;gap:min(1.2vw,5px);touch-action:manipulation}
+#board{width:100%;height:100%;display:grid;gap:min(1.6vw,8px);touch-action:manipulation}
 .cell{
   background:rgba(255,255,255,.05);
   border-radius:min(2.2vw,10px);
   position:relative;cursor:pointer;
-  transition:background .12s;
+  transition:background .12s,transform .08s,box-shadow .12s;
+  border:1px solid rgba(255,255,255,.03);
 }
-.cell.highlight{background:rgba(255,255,255,.12)}
+.cell.highlight{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.1);transform:scale(1.02)}
+.cell:active{transform:scale(.95)}
 .cell .bg{
   position:absolute;inset:0;
   border-radius:min(2.2vw,10px);opacity:.15;
@@ -177,6 +195,73 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
   border-radius:50%;background:rgba(255,255,255,.88);
   transform:translate(-50%,-50%);
 }
+
+/* === 液态玻璃光泽 === */
+.glass-shine,.mode-card,.modal-inner,.settlement .stat-card,.settlement .chart-box,
+.history-item,.eve-ai-row,.form-row input,.form-row select,#pauseOverlay .stat-card,
+#pauseOverlay .chart-box{position:relative;overflow:hidden}
+.glass-shine::after,.mode-card::after,.modal-inner::after,
+.settlement .stat-card::after,.settlement .chart-box::after,
+.history-item::after,.eve-ai-row::after,
+#pauseOverlay .stat-card::after,#pauseOverlay .chart-box::after{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
+  border-radius:inherit;
+  background:linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255,255,255,.04) 35%,
+    rgba(255,255,255,.07) 40%,
+    rgba(255,255,255,.02) 43%,
+    transparent 48%
+  );
+  background-size:300% 100%;
+  animation:glassSweep 6s ease-in-out infinite;
+}
+.mode-card::after,.modal-inner::after{border-radius:12px}
+@keyframes glassSweep{
+  0%{background-position:200% 0}
+  50%{background-position:-20% 0}
+  100%{background-position:-200% 0}
+}
+/* 边框液态光晕 */
+.mode-card,.modal-inner,.settlement .stat-card,.settlement .chart-box,
+.history-item,#pauseOverlay .stat-card,#pauseOverlay .chart-box{
+  border-color:rgba(255,255,255,.06);
+  transition:border-color .4s ease,box-shadow .4s ease;
+}
+.mode-card:hover,.history-item:hover{
+  border-color:rgba(255,255,255,.14);
+  box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 20px rgba(240,179,75,.04);
+}
+/* 按钮玻璃光泽 */
+.btn-primary,.settlement .btn-again{
+  position:relative;overflow:hidden;
+  background:linear-gradient(135deg,var(--accent) 0%,#e8a030 50%,var(--accent) 100%);
+  background-size:200% 100%;
+  animation:btnShimmer 8s ease-in-out infinite;
+}
+@keyframes btnShimmer{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+.btn-primary::after,.settlement .btn-again::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  border-radius:inherit;
+  background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.15) 35%,rgba(255,255,255,.08) 40%,transparent 45%);
+  background-size:300% 100%;
+  animation:glassSweep 5s ease-in-out infinite;
+}
+/* 暂停覆盖面保持液态玻璃 */
+#pauseOverlay.settlement{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+#pauseOverlay .stat-card,#pauseOverlay .chart-box{
+  background:rgba(255,255,255,.05);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:1px solid var(--glass-border);
+}
+#pauseOverlay #pauseCharts{display:flex;flex-direction:column;gap:12px;width:100%}
+#pauseOverlay .stats-grid{gap:8px}
+#pauseOverlay .btn-primary{margin-top:4px}
 
 /* player colours */
 .p0{background:#e8645a}
@@ -244,23 +329,23 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 
 /* player bar */
 .player-bar{
-  display:flex;gap:6px;width:min(88vw,440px);margin:6px 0;
+  display:flex;gap:8px;width:min(88vw,440px);margin:8px 0;
   flex-wrap:wrap;justify-content:center;
 }
 .player-tag{
-  padding:4px 10px;border-radius:6px;
-  font-size:.7rem;font-weight:600;
-  opacity:.35;transition:.2s;
+  padding:5px 12px;border-radius:8px;
+  font-size:.72rem;font-weight:600;
+  opacity:.35;transition:.25s;
   border:1px solid transparent;
   white-space:nowrap;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
 }
 .player-tag .cnt{
-  display:inline-block;min-width:1.1em;
+  display:inline-block;min-width:1.2em;
   text-align:center;margin-left:4px;
-  font-size:.8rem;font-weight:700;
+  font-size:.82rem;font-weight:700;
 }
-.player-tag.active{opacity:1;border-color:rgba(255,255,255,.15);transform:scale(1.04)}
+.player-tag.active{opacity:1;border-color:rgba(255,255,255,.15);transform:scale(1.06);box-shadow:0 0 12px rgba(255,255,255,.06)}
 .player-tag.elim{opacity:.15;text-decoration:line-through}
 
 /* settlement */
@@ -1386,7 +1471,18 @@ function startLocalReset(){
   } else if(gameMode==='eve'){
     // eve模式下保持玩家数（全是AI）
   }
-  board=mkBoard(size);curPlayer=0;gameOver=false;
+  // ★ 根据当前模式重新构建 aiPlayers
+  aiPlayers=new Set();
+  if(gameMode==='ai'){
+    for(let p=0;p<maxPlayers;p++){
+      if(p!==selectedPlayerColor)aiPlayers.add(p);
+    }
+  }else if(gameMode==='eve'){
+    for(let p=0;p<maxPlayers;p++)aiPlayers.add(p);
+  }
+  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;
+  document.getElementById('pauseBtn').textContent='⏸ 暂停';
+  document.getElementById('pauseOverlay').style.display='none';
   aiThinking=false;
   firstMovePos=null;
   eliminatedPlayers=new Set();
@@ -1399,7 +1495,16 @@ function startLocalReset(){
   renderPlayerBar();
   document.body.style.background='';
   closeModal('resetModal');
+  // ★ 保留静态 #pauseOverlay，只移除动态创建的结算覆盖层
   document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
+  document.getElementById('pauseOverlay').style.display='none';
+  // ★ eve 模式：重建 aiConfigs（用全局默认值补全）
+  if(gameMode==='eve'){
+    aiConfigs={};
+    for(let p=0;p<maxPlayers;p++){
+      aiConfigs[p]={algorithm:aiAlgorithm||'strategy',depth:aiDepth||2};
+    }
+  }
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
 }
 
@@ -1418,13 +1523,33 @@ function togglePause(){
 function showPauseOverlay(){
   let overlay=document.getElementById('pauseOverlay');
   overlay.style.display='flex';
-  // 构建暂停统计
+
+  // ★ 在展示暂停前，立即从 board 实时计算当前状态，追加到历史
+  let liveSnap={};
+  for(let p=0;p<maxPlayers;p++){
+    let pieces=0,points=0;
+    for(let r of board)for(let c of r)if(c.owner===p){pieces++;points+=c.count}
+    liveSnap[p]={pieces,points};
+  }
+  // 如果最新一条历史与当前状态不一致，立即追加快照
+  let lastSnap=gameHistory.length>0?gameHistory[gameHistory.length-1].snapshot:{};
+  let stale=false;
+  for(let p=0;p<maxPlayers;p++){
+    let old=lastSnap[String(p)];
+    let cur=liveSnap[String(p)];
+    if(!old||old.pieces!==cur.pieces||old.points!==cur.points){stale=true;break}
+  }
+  if(stale||gameHistory.length===0){
+    gameHistory.push({turn:gameHistory.length,snapshot:liveSnap});
+  }
+
+  // 构建暂停统计（使用确保最新的快照）
   let statsGrid=document.getElementById('pauseStats');
   statsGrid.innerHTML='';
-  let lastSnap=gameHistory.length>0?gameHistory[gameHistory.length-1].snapshot:{};
+  let lastSnap2=gameHistory[gameHistory.length-1].snapshot;
   for(let p=0;p<maxPlayers;p++){
     if(eliminatedPlayers.has(p))continue;
-    let snap=lastSnap[String(p)];
+    let snap=lastSnap2[String(p)];
     let pieces=snap?snap.pieces:0;
     let points=snap?snap.points:0;
     let card=document.createElement('div');card.className='stat-card';
@@ -1439,15 +1564,15 @@ function showPauseOverlay(){
       <div class="lbl">点数</div>`;
     statsGrid.appendChild(card);
   }
-  // 图表
+  // 图表（阈值调为 >=1，任何时候暂停都有数据可看）
   let chartArea=document.getElementById('pauseCharts');
   chartArea.innerHTML='';
-  if(gameHistory&&gameHistory.length>=2){
+  if(gameHistory&&gameHistory.length>=1){
     let box1=document.createElement('div');box1.className='chart-box';
-    box1.innerHTML='<h4>📊 棋子数变化</h4><canvas id="pauseChartPieces" style="width:100%;height:130px;display:block"></canvas>';
+    box1.innerHTML='<h4 style="cursor:pointer" onclick="showFullscreenChart(\'pauseChartPieces\')">📊 棋子数变化 🔍</h4><canvas id="pauseChartPieces" onclick="showFullscreenChart(\'pauseChartPieces\')" style="width:100%;height:150px;display:block;cursor:pointer"></canvas>';
     chartArea.appendChild(box1);
     let box2=document.createElement('div');box2.className='chart-box';
-    box2.innerHTML='<h4>📊 点数变化</h4><canvas id="pauseChartPoints" style="width:100%;height:130px;display:block"></canvas>';
+    box2.innerHTML='<h4 style="cursor:pointer" onclick="showFullscreenChart(\'pauseChartPoints\')">📊 点数变化 🔍</h4><canvas id="pauseChartPoints" onclick="showFullscreenChart(\'pauseChartPoints\')" style="width:100%;height:150px;display:block;cursor:pointer"></canvas>';
     chartArea.appendChild(box2);
     setTimeout(()=>{
       drawLineChart(document.getElementById('pauseChartPieces'),gameHistory,COLOR_NAMES,COLORS,'pieces');
@@ -1532,7 +1657,7 @@ function getPlayerLabel(p){
 }
 
 function drawLineChart(canvas,history,colorNames,colors,valueKey){
-  if(!canvas||history.length<2)return;
+  if(!canvas||history.length<1)return;
   let dpr=window.devicePixelRatio||1;
   let rect=canvas.getBoundingClientRect();
   canvas.width=rect.width*dpr;
@@ -1697,6 +1822,11 @@ function showSettlement(winner,colorNames,history){
   btn.textContent='再来一局';
   btn.onclick=function(){overlay.remove();openModal('resetModal')};
   inner.appendChild(btn);
+  let btnHome=document.createElement('button');btnHome.className='btn-again';
+  btnHome.textContent='返回主界面';
+  btnHome.style.marginTop='6px';
+  btnHome.onclick=function(){location.reload()};
+  inner.appendChild(btnHome);
   overlay.appendChild(inner);
   document.body.appendChild(overlay);
   setTimeout(()=>{
@@ -1816,22 +1946,41 @@ function showHistoryDetail(r){
 function showFullscreenChart(canvasId){
   let srcCanvas=document.getElementById(canvasId);
   if(!srcCanvas)return;
+  // 创建全屏浮层
   let overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.92);display:flex;justify-content:center;align-items:center;padding:20px;';
-  overlay.onclick=()=>overlay.remove();
+  overlay.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.93);display:flex;justify-content:center;align-items:center;padding:20px;animation:fadeIn .2s ease;';
+  // 点击浮层背景关闭
+  overlay.onclick=(e)=>{if(e.target===overlay||e.target===closeBtn)overlay.remove()};
+  // 关闭按钮
+  let closeBtn=document.createElement('button');
+  closeBtn.textContent='✕';
+  closeBtn.style.cssText='position:fixed;top:16px;right:16px;z-index:2001;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.5);color:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;';
+  closeBtn.onmouseover=()=>{closeBtn.style.background='rgba(255,255,255,.15)'};
+  closeBtn.onmouseout=()=>{closeBtn.style.background='rgba(0,0,0,.5)'};
+  // 大画布
   let bigCanvas=document.createElement('canvas');
-  bigCanvas.style.cssText='max-width:100%;max-height:100%;border-radius:8px;';
+  bigCanvas.style.cssText='max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.5);';
+  bigCanvas.onclick=(e)=>e.stopPropagation();
   overlay.appendChild(bigCanvas);
+  overlay.appendChild(closeBtn);
   document.body.appendChild(overlay);
+  // 以 2.5x 源尺寸重绘，保证清晰
   setTimeout(()=>{
     let rect=bigCanvas.getBoundingClientRect();
     let dpr=window.devicePixelRatio||1;
-    bigCanvas.width=rect.width*dpr;
-    bigCanvas.height=rect.height*dpr;
+    let scale=Math.min(2.5,rect.width/srcCanvas.width,rect.height/srcCanvas.height);
+    let w=Math.round(srcCanvas.width*scale);
+    let h=Math.round(srcCanvas.height*scale);
+    bigCanvas.width=w*dpr;
+    bigCanvas.height=h*dpr;
+    bigCanvas.style.width=w+'px';
+    bigCanvas.style.height=h+'px';
     let dstCtx=bigCanvas.getContext('2d');
     dstCtx.scale(dpr,dpr);
-    dstCtx.drawImage(srcCanvas,0,0,rect.width,rect.height);
-  },50);
+    dstCtx.imageSmoothingEnabled=true;
+    dstCtx.imageSmoothingQuality='high';
+    dstCtx.drawImage(srcCanvas,0,0,w,h);
+  },80);
 }
 
 /* ==================== GAME ACTIONS ==================== */
@@ -1839,15 +1988,17 @@ function exitGame(){
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
   aiPlayers=new Set();eliminatedPlayers=new Set();gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;
-  document.getElementById('board').innerHTML='';cells=[];board=[];
+  cells=[];board=[];
+  try{document.getElementById('board').innerHTML='';}catch(e){}
   document.body.style.background='';
-  // 只移除动态创建的结算覆盖层，保留 pauseOverlay（静态 HTML 元素）
+  // ★ 只移除动态 settlement，保留静态 #pauseOverlay，关闭模态
   document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
-  document.getElementById('pauseOverlay').style.display='none';
-  document.getElementById('pauseBtn').textContent='⏸ 暂停';
+  try{document.getElementById('pauseOverlay').style.display='none';}catch(e){}
+  document.querySelectorAll('.modal').forEach(e=>e.classList.remove('show'));
+  // ★ 重新显示 game screen 中的暂停按钮和消息，确保 DOM 干净
+  try{document.getElementById('pauseBtn').textContent='⏸ 暂停';}catch(e){}
   showMsg('','');
   show('welcome');
-  // 清理残留的 hash，避免 stale 导航
   if(location.hash)history.replaceState(null,'',window.location.pathname);
 }
 
