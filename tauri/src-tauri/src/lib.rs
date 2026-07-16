@@ -58,6 +58,8 @@ pub struct HistoryRecord {
     pub mode: String,
     pub ai_algorithm: String,
     pub ai_depth: u32,
+    #[serde(default)]
+    pub game_count: u32,
     pub player_count: u32,
     pub ai_count: u32,
     pub board_size: u32,
@@ -133,9 +135,11 @@ async fn ai_move(
     depth: usize,
     eliminated: Vec<usize>,
     max_players: usize,
+    game_count: u32,
+    first_move_pos: Option<[usize; 2]>,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        find_best_move(&board, size, player, depth, &eliminated, max_players)
+        find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -177,6 +181,23 @@ async fn load_game_history(
     Ok(history)
 }
 
+#[tauri::command]
+async fn clear_game_history(
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let path = state.history_file.lock().map_err(|e| e.to_string())?;
+    if path.exists() {
+        fs::remove_file(&*path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn exit_app(app_handle: tauri::AppHandle) -> Result<(), String> {
+    app_handle.exit(0);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -196,6 +217,8 @@ pub fn run() {
             process_move,
             save_game_history,
             load_game_history,
+            clear_game_history,
+            exit_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -235,6 +258,18 @@ fn has_pieces(board: &GameBoard, player: usize) -> bool {
 
 fn near_any(board: &GameBoard, sz: usize, x: usize, y: usize) -> bool {
     nbrs8(x, y, sz).iter().any(|&(ni, nj)| board[ni][nj].owner.is_some())
+}
+
+fn is_in_first_move_restricted(x: usize, y: usize, fx: usize, fy: usize) -> bool {
+    let dx = if x >= fx { x - fx } else { fx - x };
+    let dy = if y >= fy { y - fy } else { fy - y };
+    // (2,0) / (-2,0)
+    if dx == 2 && dy == 0 { return true; }
+    // (1,-1), (1,0), (1,1) / (-1,-1)... 
+    if dx == 1 && dy <= 1 { return true; }
+    // (0,-2), (0,-1), (0,1), (0,2) (but not (0,0))
+    if dx == 0 && dy >= 1 && dy <= 2 { return true; }
+    false
 }
 
 fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize, _max_players: usize) -> Vec<usize> {
@@ -286,7 +321,7 @@ fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: u
     before.difference(&after).copied().collect()
 }
 
-fn eval_board(board: &GameBoard, player: usize) -> i32 {
+fn eval_board(board: &GameBoard, player: usize, game_count: u32) -> i32 {
     let mut my_score = 0i32;
     let mut opp_score = 0i32;
     let mut my_territory = 0i32;
@@ -307,13 +342,42 @@ fn eval_board(board: &GameBoard, player: usize) -> i32 {
             }
         }
     }
-    (my_score - opp_score) * 2 + (my_territory - opp_territory)
+
+    let base = (my_score - opp_score) * 2 + (my_territory - opp_territory);
+
+    // 早期游戏（<7局）加入随机值，增加探索性
+    // 游戏开始时随机值较大，逐渐减小，5-7局后归零
+    let random_scale = if game_count < 5 {
+        (5 - game_count) as f64 * 8.0
+    } else if game_count < 7 {
+        (7 - game_count) as f64 * 2.0
+    } else {
+        0.0
+    };
+
+    if random_scale > 0.0 {
+        // 使用确定性伪随机（基于棋盘哈希），避免多线程问题
+        let hash: u64 = board.iter().enumerate().flat_map(|(i, row)| {
+            row.iter().enumerate().map(move |(j, c)| {
+                ((i as u64).wrapping_mul(31).wrapping_add(j as u64))
+                    .wrapping_mul(7)
+                    .wrapping_add(c.owner.unwrap_or(99) as u64)
+                    .wrapping_mul(c.count as u64)
+            })
+        }).fold(0u64, |a, b| a.wrapping_mul(6364136223846793005).wrapping_add(b));
+        let rnd = (hash % 100) as f64 / 100.0; // 0..1
+        base + (rnd * random_scale - random_scale * 0.5) as i32
+    } else {
+        base
+    }
 }
 
 // ─── Move generation & ordering ───
 
-fn get_moves(board: &GameBoard, sz: usize, player: usize) -> Vec<(usize, usize)> {
+fn get_moves(board: &GameBoard, sz: usize, player: usize, first_move_pos: Option<(usize, usize)>) -> Vec<(usize, usize)> {
     let has_p = has_pieces(board, player);
+    let skip_restricted = first_move_pos.is_some() && player != 0;
+    let (fx, fy) = match first_move_pos { Some(p) => p, _ => (0, 0) };
     let mut moves = Vec::new();
     for i in 0..sz {
         for j in 0..sz {
@@ -324,6 +388,9 @@ fn get_moves(board: &GameBoard, sz: usize, player: usize) -> Vec<(usize, usize)>
                 }
             } else {
                 if c.owner.is_none() && !near_any(board, sz, i, j) {
+                    if skip_restricted && is_in_first_move_restricted(i, j, fx, fy) {
+                        continue;
+                    }
                     moves.push((i, j));
                 }
             }
@@ -375,17 +442,19 @@ fn alpha_beta(
     limit: Duration,
     alive: &[usize],
     elim_set: &[usize],
+    game_count: u32,
+    first_move_pos: Option<(usize, usize)>,
 ) -> (i32, Option<(usize, usize)>) {
     if depth >= max_depth || start.elapsed() > limit {
-        return (eval_board(board, ai_player), None);
+        return (eval_board(board, ai_player, game_count), None);
     }
 
-    let moves = get_moves(board, sz, player);
+    let moves = get_moves(board, sz, player, first_move_pos);
     if moves.is_empty() {
-        return (eval_board(board, ai_player), None);
+        return (eval_board(board, ai_player, game_count), None);
     }
     if moves.len() == 1 {
-        return (eval_board(board, ai_player), Some(moves[0]));
+        return (eval_board(board, ai_player, game_count), Some(moves[0]));
     }
 
     let ordered = order_moves(moves, board, sz, player);
@@ -429,7 +498,7 @@ fn alpha_beta(
         let (score, _) = alpha_beta(
             &nb, sz, next_player, depth + 1, max_depth,
             alpha, beta, ai_player, start, limit,
-            &alive_next, &new_elim,
+            &alive_next, &new_elim, game_count, first_move_pos,
         );
 
         if is_max {
@@ -461,22 +530,30 @@ pub fn find_best_move(
     depth: usize,
     eliminated: &[usize],
     max_players: usize,
+    game_count: u32,
+    first_move_pos: Option<[usize; 2]>,
 ) -> Option<(usize, usize)> {
+    let fm_pos = first_move_pos.map(|[x, y]| (x, y));
     let start = Instant::now();
     let limit = Duration::from_millis(3000 + depth as u64 * 500);
 
     // single move → no search
-    let all_moves = get_moves(board, sz, player);
+    let all_moves = get_moves(board, sz, player, fm_pos);
     if all_moves.len() <= 1 {
         return all_moves.into_iter().next();
     }
 
     // first move (no pieces yet) → center preference, avoid edges
     if !has_pieces(board, player) {
+        let skip_restricted = fm_pos.is_some() && player != 0;
+        let (rfx, rfy) = match fm_pos { Some(p) => p, _ => (0, 0) };
         let mut candidates: Vec<(usize, usize)> = (1..sz - 1)
             .flat_map(|i| {
                 (1..sz - 1).filter_map(move |j| {
                     if board[i][j].owner.is_none() && !near_any(board, sz, i, j) {
+                        if skip_restricted && is_in_first_move_restricted(i, j, rfx, rfy) {
+                            return None;
+                        }
                         Some((i, j))
                     } else {
                         None
@@ -489,6 +566,9 @@ pub fn find_best_move(
             for i in 0..sz {
                 for j in 0..sz {
                     if board[i][j].owner.is_none() && !near_any(board, sz, i, j) {
+                        if skip_restricted && is_in_first_move_restricted(i, j, rfx, rfy) {
+                            continue;
+                        }
                         candidates.push((i, j));
                     }
                 }
@@ -499,6 +579,9 @@ pub fn find_best_move(
             for i in 0..sz {
                 for j in 0..sz {
                     if board[i][j].owner.is_none() {
+                        if skip_restricted && is_in_first_move_restricted(i, j, rfx, rfy) {
+                            continue;
+                        }
                         candidates.push((i, j));
                     }
                 }
@@ -527,7 +610,7 @@ pub fn find_best_move(
     }
 
     // order moves for root
-    let ordered = order_moves(get_moves(board, sz, player), board, sz, player);
+    let ordered = order_moves(get_moves(board, sz, player, fm_pos), board, sz, player);
     let max_eval = ordered.len().min(10);
     if max_eval == 0 {
         return None;
@@ -564,7 +647,7 @@ pub fn find_best_move(
             let (score, _) = alpha_beta(
                 &nb, sz, next_player, 1, depth,
                 i32::MIN, i32::MAX, player, start, limit,
-                &alive_next, &new_elim,
+                &alive_next, &new_elim, game_count, fm_pos,
             );
             (score, i, j)
         })

@@ -13,15 +13,19 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0f0f13;
-  --surface:#1a1a22;
-  --card:#23232d;
-  --border:rgba(255,255,255,.06);
+  --surface:rgba(26,26,34,.85);
+  --card:rgba(35,35,45,.75);
+  --border:rgba(255,255,255,.08);
   --accent:#f0b34b;
   --accent2:#5fc3c3;
   --text:#e8e6e3;
   --dim:#7a7885;
   --radius:12px;
-  --shadow:0 2px 20px rgba(0,0,0,.5);
+  --shadow:0 8px 32px rgba(0,0,0,.45);
+  --glow:0 0 40px rgba(240,179,75,.05);
+  --glass:rgba(255,255,255,.04);
+  --glass-border:rgba(255,255,255,.06);
+  --glass-shadow:0 4px 24px rgba(0,0,0,.3);
   --font:'Inter','SF Pro','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
 }
 html{font-size:clamp(14px,3.5vw,17px)}
@@ -35,11 +39,13 @@ body{
   align-items:center;
   justify-content:center;
   padding:12px;
-  transition:background .6s ease;
+  transition:background .6s ease,box-shadow .4s ease;
   -webkit-tap-highlight-color:transparent;
   overflow-x:hidden;
   line-height:1.5;
 }
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 50% at 50% -10%,rgba(240,179,75,.03) 0%,transparent 70%),radial-gradient(ellipse 60% 40% at 100% 90%,rgba(95,195,195,.02) 0%,transparent 70%);pointer-events:none;z-index:0}
+.screen.active{position:relative;z-index:1}
 .screen{display:none}
 .screen.active{display:flex;flex-direction:column;align-items:center;width:100%;max-width:480px}
 
@@ -52,9 +58,12 @@ body{
 .mode-card{
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius);padding:20px 16px;cursor:pointer;
-  transition:.2s;text-align:left;display:flex;align-items:center;gap:14px;
+  transition:.25s;text-align:left;display:flex;align-items:center;gap:14px;
+  box-shadow:var(--shadow);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
 }
-.mode-card:active{background:var(--card);border-color:var(--accent)}
+.mode-card:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);transform:translateY(-2px);box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.mode-card:active{background:rgba(255,255,255,.1);border-color:var(--accent);transform:scale(.98)}
 .mode-card .icon{font-size:1.8rem;flex-shrink:0}
 .mode-card .body{flex:1}
 .mode-card .body h3{font-size:1rem;font-weight:600}
@@ -62,31 +71,47 @@ body{
 
 /* lobby */
 #aiLobby,#localLobby{max-width:480px;gap:1rem;width:100%}
-#aiLobby .back,#localLobby .back{
+#aiLobby .back,#localLobby .back,#history .back,#eveLobby .back{
   align-self:flex-start;
   background:none;border:none;color:var(--dim);
   font-size:.85rem;cursor:pointer;padding:6px 0;
   display:flex;align-items:center;gap:4px;transition:.15s;
 }
-#aiLobby .back:active,#localLobby .back:active{color:var(--text)}
-#aiLobby h2,#localLobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
+#aiLobby .back:active,#localLobby .back:active,#history .back:active,#eveLobby .back:active{color:var(--text)}
+#aiLobby h2,#localLobby h2,#history h2,#eveLobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
 .form-row{margin:10px 0;display:flex;flex-direction:column;gap:4px;width:100%}
 .form-row label{font-size:.8rem;color:var(--dim)}
 .form-row input,.form-row select{
   width:100%;padding:10px 12px;
   border:1px solid var(--border);border-radius:8px;
   background:rgba(255,255,255,.04);color:var(--text);
-  font-size:.9rem;outline:none;transition:.12s;
+  font-size:.9rem;outline:none;transition:.15s;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
 }
 .form-row input:focus,.form-row select:focus{
   border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,179,75,.15);
 }
 .form-row select option{background:var(--surface);color:var(--text)}
+.form-eve-config{width:100%;max-height:240px;overflow-y:auto;margin:4px 0}
+.eve-ai-row{
+  display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);
+  border-radius:8px;padding:6px 10px;margin:4px 0;
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+}
+.eve-ai-row .color-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.eve-ai-row .eve-label{font-size:.78rem;font-weight:600;min-width:44px}
+.eve-ai-row select{flex:1;padding:5px 6px;border:1px solid var(--border);border-radius:6px;
+  background:rgba(255,255,255,.04);color:var(--text);font-size:.75rem;outline:none}
+.eve-ai-row select:focus{border-color:var(--accent)}
+.eve-ai-row select option{background:var(--surface);color:var(--text)}
 .btn-primary{
   width:100%;padding:12px;background:var(--accent);color:#0f0f13;
-  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;transition:.12s;
+  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;transition:.2s;
+  box-shadow:0 4px 20px rgba(240,179,75,.25);
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
 }
-.btn-primary:active{opacity:.8}
+.btn-primary:hover{opacity:.92;box-shadow:0 4px 20px rgba(240,179,75,.3);transform:translateY(-1px)}
+.btn-primary:active{opacity:.8;transform:scale(.98)}
 
 /* game */
 #game{max-width:520px;gap:8px;width:100%}
@@ -161,6 +186,9 @@ body{
 .p4{background:#c080f0}
 .p5{background:#f070c0}
 .p6{background:#50d0b0}
+.p7{background:#ff884d}
+.p8{background:#e868a0}
+.p9{background:#70c0e8}
 
 /* msg */
 #msg{
@@ -183,6 +211,9 @@ body{
   padding:24px;border-radius:var(--radius);
   width:100%;max-width:360px;
   animation:modalIn .2s ease;
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  border:1px solid var(--glass-border);
+  box-shadow:var(--glass-shadow);
 }
 @keyframes modalIn{
   from{opacity:0;transform:translateY(16px) scale(.96)}
@@ -195,7 +226,8 @@ body{
   width:100%;padding:10px 12px;
   border:1px solid var(--border);border-radius:8px;
   background:rgba(255,255,255,.04);color:var(--text);
-  font-size:.9rem;outline:none;transition:.12s;
+  font-size:.9rem;outline:none;transition:.15s;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
 }
 .form-row input:focus,.form-row select:focus{
   border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,179,75,.15);
@@ -221,6 +253,7 @@ body{
   opacity:.35;transition:.2s;
   border:1px solid transparent;
   white-space:nowrap;
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
 }
 .player-tag .cnt{
   display:inline-block;min-width:1.1em;
@@ -233,8 +266,8 @@ body{
 /* settlement */
 .settlement{
   position:fixed;inset:0;z-index:999;
-  background:rgba(0,0,0,.82);
-  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  background:rgba(0,0,0,.72);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
   display:flex;flex-direction:column;align-items:center;
   padding:16px;overflow-y:auto;
   animation:fadeIn .4s ease;
@@ -255,6 +288,8 @@ body{
 .settlement .stat-card{
   background:rgba(255,255,255,.06);border-radius:10px;
   padding:10px 8px;text-align:center;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border:1px solid var(--glass-border);
 }
 .settlement .stat-card .color-dot{
   display:inline-block;width:10px;height:10px;
@@ -266,6 +301,8 @@ body{
 .settlement .chart-box{
   width:100%;background:rgba(255,255,255,.04);
   border-radius:10px;padding:10px;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border:1px solid var(--glass-border);
 }
 .settlement .chart-box h4{font-size:.8rem;font-weight:500;margin-bottom:6px;text-align:center;color:var(--dim)}
 .settlement .chart-box canvas{width:100%;height:150px;display:block}
@@ -282,7 +319,8 @@ body{
 .settlement .btn-again{
   padding:12px 32px;background:var(--accent);color:#0f0f13;
   border:none;border-radius:10px;font-size:.95rem;font-weight:600;
-  cursor:pointer;margin:8px 0 16px;transition:.12s;
+  cursor:pointer;margin:8px 0 16px;transition:.2s;
+  box-shadow:0 4px 20px rgba(240,179,75,.25);
 }
 .settlement .btn-again:active{opacity:.8}
 /* history */
@@ -290,7 +328,10 @@ body{
 .history-item{
   background:rgba(255,255,255,.04);border-radius:10px;padding:12px;margin:8px 0;
   border:1px solid var(--border);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  transition:.15s;
 }
+.history-item:hover{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.06)}
 .history-item .h-time{font-size:.7rem;color:var(--dim)}
 .history-item .h-info{font-size:.8rem;margin:4px 0}
 .history-item .h-info strong{color:var(--accent2)}
@@ -306,18 +347,25 @@ body{
   <div class="logo">♟<span>连锁棋</span></div>
   <div class="tagline">多人联手，一触即发</div>
   <div class="mode-cards">
-    <div class="mode-card" onclick="showAILobby()">
+    <div class="mode-card" onclick="showAILobby()" style="border-color:rgba(240,179,75,.18)">
       <div class="icon">🤖</div>
       <div class="body">
         <h3>AI 对战</h3>
         <p>与电脑 AI 对决，挑战不同难度</p>
       </div>
     </div>
-    <div class="mode-card" onclick="showLocalLobby()">
+    <div class="mode-card" onclick="showLocalLobby()" style="border-color:rgba(95,195,195,.18)">
       <div class="icon">👥</div>
       <div class="body">
         <h3>本地对战</h3>
         <p>同一设备，轮流落子，朋友面前大战</p>
+      </div>
+    </div>
+    <div class="mode-card" onclick="showEveLobby()" style="border-color:rgba(192,128,240,.25)">
+      <div class="icon">⚔️</div>
+      <div class="body">
+        <h3>AI 斗蛐蛐</h3>
+        <p>自定义 AI 阵容，观看 AI 互相博弈</p>
       </div>
     </div>
     <div class="mode-card" onclick="showHistory()" style="border-color:rgba(95,195,195,.2)">
@@ -328,12 +376,16 @@ body{
       </div>
     </div>
   </div>
+  <button onclick="exitApp()" style="margin-top:1rem;background:none;border:1px solid rgba(255,255,255,.08);color:var(--dim);padding:8px 20px;border-radius:8px;font-size:.8rem;cursor:pointer;transition:.15s;" onmouseover="this.style.borderColor='rgba(255,255,255,.2)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">✕ 关闭应用</button>
 </div>
 
 <!-- History Screen -->
 <div id="history" class="screen">
   <button class="back" onclick="goHome()">← 返回</button>
-  <h2>📋 历史记录</h2>
+  <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+    <h2 style="margin:0">📋 历史记录</h2>
+    <button onclick="clearHistory()" style="background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.2);color:rgba(255,100,100,.9);padding:6px 14px;border-radius:8px;font-size:.75rem;cursor:pointer;transition:.15s;font-weight:500" onmouseover="this.style.background='rgba(255,80,80,.2)'" onmouseout="this.style.background='rgba(255,80,80,.12)'">🗑 清空历史</button>
+  </div>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">所有对局记录</p>
   <div id="historyList" class="history-list">
     <div class="empty">加载中...</div>
@@ -355,15 +407,17 @@ body{
     </select>
   </div>
   <div class="form-row"><label>AI 对手数</label>
-    <select id="aiCount">
+    <select id="aiCount" onchange="toggleAIColorPicker()">
       <option value="1" selected>1 个 AI</option>
       <option value="2">2 个 AI</option>
       <option value="3">3 个 AI</option>
       <option value="4">4 个 AI</option>
       <option value="5">5 个 AI</option>
       <option value="6">6 个 AI</option>
-      <option value="7">7 个 AI（AI 斗蛐蛐）</option>
     </select>
+  </div>
+  <div id="aiColorPickerRow" class="form-row" style="display:none"><label>选择你的颜色</label>
+    <div id="aiColorOptions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
   </div>
   <div class="form-row"><label>AI 算法</label>
     <select id="aiAlgorithm" onchange="toggleAIDepth()">
@@ -377,9 +431,48 @@ body{
       <option value="2" selected>2</option>
       <option value="3">3</option>
       <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+      <option value="9">9</option>
+      <option value="10">10</option>
     </select>
   </div>
   <button class="btn-primary" onclick="startAIGame()" style="margin-top:12px">开始游戏</button>
+</div>
+
+<!-- Eve Lobby -->
+<div id="eveLobby" class="screen">
+  <button class="back" onclick="goHome()">← 返回</button>
+  <h2>⚔️ AI 斗蛐蛐</h2>
+  <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">自定义 AI 阵容，观看 AI 互相博弈</p>
+  <div class="form-row"><label>棋盘大小</label>
+    <select id="eveSize">
+      <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
+      <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
+      <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
+      <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
+      <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
+    </select>
+  </div>
+  <div class="form-row"><label>AI 数量（2~10）</label>
+    <select id="eveCount" onchange="generateEveConfig()">
+      <option value="2">2 个 AI</option>
+      <option value="3" selected>3 个 AI</option>
+      <option value="4">4 个 AI</option>
+      <option value="5">5 个 AI</option>
+      <option value="6">6 个 AI</option>
+      <option value="7">7 个 AI</option>
+      <option value="8">8 个 AI</option>
+      <option value="9">9 个 AI</option>
+      <option value="10">10 个 AI</option>
+    </select>
+  </div>
+  <div id="eveConfigArea" class="form-eve-config">
+    <p style="font-size:.8rem;color:var(--dim);margin:8px 0 4px">配置每个 AI</p>
+  </div>
+  <button class="btn-primary" onclick="startEveGame()" style="margin-top:8px">开始观战</button>
 </div>
 
 <!-- Local Lobby -->
@@ -410,7 +503,7 @@ body{
 <div id="game" class="screen">
   <div class="top">
     <div class="top-left">
-      <button onclick="exitGame()">← 退出</button>
+      <button onclick="togglePause()" id="pauseBtn">⏸ 暂停</button>
       <button onclick="openModal('resetModal')">↻ 重开</button>
       <button onclick="endGameNow()">⛳ 结束</button>
     </div>
@@ -420,6 +513,18 @@ body{
   </div>
   <div id="playerBar" class="player-bar"></div>
   <div class="board-wrap"><div id="board"></div></div>
+</div>
+
+<!-- Pause Overlay -->
+<div id="pauseOverlay" class="settlement" style="display:none;z-index:998">
+  <div class="settlement-inner">
+    <h2>⏸ 游戏暂停</h2>
+    <div id="pauseStats" class="stats-grid"></div>
+    <div id="pauseCharts" style="width:100%"></div>
+    <div style="display:flex;gap:10px;margin-top:12px;width:100%">
+      <button class="btn-primary" onclick="resumeGame()" style="flex:1">▶ 继续游戏</button>
+    </div>
+  </div>
 </div>
 
 <!-- Reset Modal -->
@@ -451,9 +556,9 @@ body{
 
 <script>
 /* ==================== CONSTANTS ==================== */
-const COLORS=['#e8645a','#f0c040','#40b8f0','#50d060','#c080f0','#f070c0','#50d0b0'];
-const COLORS_LIGHT=['rgba(232,100,90,.08)','rgba(240,192,64,.08)','rgba(64,184,240,.08)','rgba(80,208,96,.08)','rgba(192,128,240,.08)','rgba(240,112,192,.08)','rgba(80,208,176,.08)'];
-const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色'];
+const COLORS=['#e8645a','#f0c040','#40b8f0','#50d060','#c080f0','#f070c0','#50d0b0','#ff884d','#e868a0','#70c0e8'];
+const COLORS_LIGHT=['rgba(232,100,90,.08)','rgba(240,192,64,.08)','rgba(64,184,240,.08)','rgba(80,208,96,.08)','rgba(192,128,240,.08)','rgba(240,112,192,.08)','rgba(80,208,176,.08)','rgba(255,136,77,.08)','rgba(232,104,160,.08)','rgba(112,192,232,.08)'];
+const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色','橙色','玫红','天蓝'];
 
 // ========== 音效 ==========
 let audioCtx = null;
@@ -491,26 +596,94 @@ function playGameOver(){
 /* ==================== STATE ==================== */
 let board=[],curPlayer=0,size=7,maxPlayers=2;
 let cells=[];
-let gameMode=null; // 'ai'|'local'
+let gameMode=null; // 'ai'|'local'|'eve'
 let gameOver=false;
 let aiPlayers=new Set();
 let aiThinking=false;
 let aiAlgorithm='strategy';
 let aiDepth=2;
+let aiConfigs={}; // per-AI configs for eve mode
+let gameCount=0;
 let eliminatedPlayers=new Set();
 let gameHistory=[];
 let chainStats={};
 let maxChainOverall={player:null,length:0};
+
+// 首子落位（用于限制其他玩家落子）
+let firstMovePos=null;
+
+// 暂停状态
+let isPaused=false;
 
 /* ==================== SCREEN MGMT ==================== */
 function show(s){
   document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));
   document.getElementById(s).classList.add('active');
 }
-function goHome(){exitGame();show('welcome')}
-function showAILobby(){show('aiLobby')}
-function showLocalLobby(){show('localLobby')}
+function goHome(){document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});document.getElementById('pauseOverlay').style.display='none';show('welcome')}
+function exitApp(){
+  // 尝试干净退出
+  try {
+    window.__TAURI_INTERNALS__?.invoke('exit_app').catch(()=>{});
+  } catch(e){}
+  // 如果 Tauri 关闭失败，当作退出游戏处理
+  exitGame();
+}
+function showAILobby(){location.hash='#aiLobby';show('aiLobby')}
+function showLocalLobby(){location.hash='#localLobby';show('localLobby')}
+function showEveLobby(){location.hash='#eveLobby';show('eveLobby');generateEveConfig()}
+function generateEveConfig(){
+  let cnt=parseInt(document.getElementById('eveCount').value)||3;
+  let area=document.getElementById('eveConfigArea');
+  area.innerHTML='<p style="font-size:.8rem;color:var(--dim);margin:8px 0 4px">配置每个 AI</p>';
+  for(let i=0;i<cnt;i++){
+    let row=document.createElement('div');row.className='eve-ai-row';
+    let dot=document.createElement('span');dot.className='color-dot';dot.style.background=COLORS[i%7]||'#888';
+    let label=document.createElement('span');label.className='eve-label';label.textContent='AI '+(i+1);
+    let algSel=document.createElement('select');algSel.id='eveAlg_'+i;
+    let opt1=document.createElement('option');opt1.value='strategy';opt1.textContent='策略算法';
+    let opt2=document.createElement('option');opt2.value='alphabeta';opt2.textContent='Alpha-Beta';
+    algSel.appendChild(opt1);algSel.appendChild(opt2);
+    let depSel=document.createElement('select');depSel.id='eveDepth_'+i;depSel.style.maxWidth='60px';
+    for(let d=1;d<=10;d++){let o=document.createElement('option');o.value=d;o.textContent=d;if(d===2)o.selected=true;depSel.appendChild(o)}
+    // 策略算法默认隐藏深度选项，切换算法时联动
+    depSel.style.display='none';
+    algSel.onchange=function(){depSel.style.display=this.value==='alphabeta'?'':'none'};
+    row.appendChild(dot);row.appendChild(label);row.appendChild(algSel);row.appendChild(depSel);
+    area.appendChild(row);
+  }
+}
+function startEveGame(){
+  location.hash='#game';
+  size=parseInt(document.getElementById('eveSize').value)||7;
+  let aiCount=parseInt(document.getElementById('eveCount').value)||3;
+  maxPlayers=aiCount;
+  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  document.getElementById('pauseBtn').textContent='⏸ 暂停';
+  gameMode='eve';
+  aiPlayers=new Set();
+  aiConfigs={};
+  for(let p=0;p<maxPlayers;p++){
+    aiPlayers.add(p);
+    let alg=document.getElementById('eveAlg_'+p).value;
+    let dep=parseInt(document.getElementById('eveDepth_'+p).value)||2;
+    aiConfigs[p]={algorithm:alg,depth:dep};
+  }
+  aiThinking=false;
+  eliminatedPlayers=new Set();
+  gameHistory=[];
+  chainStats={};
+  maxChainOverall={player:null,length:0};
+  gameCount=(gameCount||0)+1;
+  recordHistory();
+  renderBoard(true);
+  show('game');
+  document.body.style.background='';
+  renderPlayerBar();
+  if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+}
 function showHistory(){
+  location.hash='#history';
   show('history');
   loadHistoryList();
 }
@@ -550,6 +723,15 @@ function loadHistoryList(){
     el.innerHTML='<div class="empty">暂无可用的历史记录</div>';
   });
 }
+function clearHistory(){
+  if(!confirm('确定要清空所有历史记录吗？此操作不可恢复。'))return;
+  tauriInvoke('clear_game_history').then(()=>{
+    document.getElementById('historyList').innerHTML='<div class="empty">历史记录已清空</div>';
+  }).catch(e=>{
+    console.warn('Clear history failed:', e);
+    alert('清空历史失败');
+  });
+}
 // 格式化时间为 YYYY/MM/DD HH:mm:ss
 function formatTime(d){
   let y=d.getFullYear(),m=d.getMonth()+1,dd=d.getDate();
@@ -565,6 +747,7 @@ function saveGameHistory(winner, mode, aiAlg, aiDp){
       mode: mode || gameMode || 'local',
       aiAlgorithm: aiAlg || aiAlgorithm || '',
       aiDepth: aiDp || aiDepth || 0,
+      gameCount: gameCount,
       playerCount: maxPlayers,
       aiCount: aiPlayers.size,
       boardSize: size,
@@ -650,6 +833,17 @@ function nearAny(i,j,s,b){
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
+// 判断是否在首子限制区域内（上下各2格、左右各2格、斜角各1格，共12格）
+function isInFirstMoveRestricted(x,y,fx,fy){
+  let dx=x-fx, dy=y-fy;
+  if(dx===2&&dy===0)return true;
+  if(dx===-2&&dy===0)return true;
+  if(dx===1&&dy>=-1&&dy<=1)return true;
+  if(dx===-1&&dy>=-1&&dy<=1)return true;
+  if(dx===0&&dy>=-2&&dy<=2&&!(dx===0&&dy===0))return true;
+  return false;
+}
+
 function recordHistory(){
   let sn={};
   for(let p=0;p<maxPlayers;p++){
@@ -663,6 +857,10 @@ function recordHistory(){
 async function processClick(b,s,x,y,pl,anim){
   let c=b[x][y];
   if(c.owner===null){
+    // 记录全局首次落子位置
+    let anyPieces=false;
+    for(let r of b)for(let cl of r)if(cl.owner!==null)anyPieces=true;
+    if(!anyPieces) firstMovePos=[x,y];
     let first = !hasPieces(pl,b);
     c.owner=pl;
     c.count=first?3:1;
@@ -811,19 +1009,28 @@ function aiFindMove(player,sz,b){
     if(b[i][j].owner===player)mine.push([i,j]);
   if(mine.length===0){
     let candidates=[];
+    // 首子限制：非首位玩家首次落子需避开首子限制区域
+    let skipRestricted=firstMovePos&&player!==0;
     // 先只考虑非边角的格子
     for(let i=1;i<sz-1;i++)for(let j=1;j<sz-1;j++)
-      if(b[i][j].owner===null&&!nearAny(i,j,sz,b))
+      if(b[i][j].owner===null&&!nearAny(i,j,sz,b)){
+        if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
         candidates.push([i,j]);
+      }
     // 如果中间没有合法位置，才回退到边角
     if(candidates.length===0){
       for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
-        if(b[i][j].owner===null&&!nearAny(i,j,sz,b))
+        if(b[i][j].owner===null&&!nearAny(i,j,sz,b)){
+          if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
           candidates.push([i,j]);
+        }
     }
     if(candidates.length===0){
       for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
-        if(b[i][j].owner===null)candidates.push([i,j]);
+        if(b[i][j].owner===null){
+          if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
+          candidates.push([i,j]);
+        }
     }
     if(candidates.length===0)return null;
     // 选最靠近中心的
@@ -834,21 +1041,22 @@ function aiFindMove(player,sz,b){
       return da<=db?a:b2;
     });
   }
-  // 1. 三级棋子
+  // 1. 三级棋子（同等条件随机选择）
   let lv3=mine.filter(([i,j])=>b[i][j].count===3);
   if(lv3.length>0){
-    let best=null,bestCnt=0;
+    let best=[],bestCnt=-1;
     for(let[i,j]of lv3){
       let cnt=countOpponentLevelAround(b,sz,i,j,player,3);
-      if(cnt>bestCnt){bestCnt=cnt;best=[i,j]}
+      if(cnt>bestCnt){bestCnt=cnt;best=[[i,j]]}
+      else if(cnt===bestCnt)best.push([i,j]);
     }
-    if(bestCnt>=1)return best;
+    if(bestCnt>=1)return best[Math.floor(Math.random()*best.length)];
   }
-  // 2. 安全二级
+  // 2. 安全二级（同等条件随机选择）
   let lv2=mine.filter(([i,j])=>b[i][j].count===2);
   let safeLv2=lv2.filter(([i,j])=>!hasOpponentLevelNear(b,sz,i,j,player,3));
   if(safeLv2.length>0){
-    let best=null,bestScore=-Infinity;
+    let best=[],bestScore=-Infinity;
     for(let[i,j]of safeLv2){
       let edge=((i===0||i===sz-1)||(j===0||j===sz-1))?3:0;
       let corner=((i===0||i===sz-1)&&(j===0||j===sz-1))?5:0;
@@ -858,14 +1066,15 @@ function aiFindMove(player,sz,b){
         if(nc.owner!==null&&nc.owner!==player)nearAnyOpp++;
       }
       let score=edge+corner-nearAnyOpp*5+Math.random()*1;
-      if(score>bestScore){bestScore=score;best=[i,j]}
+      if(score>bestScore){bestScore=score;best=[[i,j]]}
+      else if(Math.abs(score-bestScore)<0.01)best.push([i,j]);
     }
-    return best;
+    return best[Math.floor(Math.random()*best.length)];
   }
-  // 3. 一进二
+  // 3. 一进二（同等条件随机选择）
   let lv1=mine.filter(([i,j])=>b[i][j].count===1);
   if(lv1.length>0){
-    let best=null,bestScore=-Infinity;
+    let best=[],bestScore=-Infinity;
     for(let[i,j]of lv1){
       let nearOpp=0;
       for(let[ni,nj]of nbrs(i,j,sz)){
@@ -873,9 +1082,10 @@ function aiFindMove(player,sz,b){
         if(nc.owner!==null&&nc.owner!==player)nearOpp++;
       }
       let score=-nearOpp*3+Math.random()*2;
-      if(score>bestScore){bestScore=score;best=[i,j]}
+      if(score>bestScore){bestScore=score;best=[[i,j]]}
+      else if(Math.abs(score-bestScore)<0.01)best.push([i,j]);
     }
-    return best;
+    return best[Math.floor(Math.random()*best.length)];
   }
   // 4. 下三级
   if(lv2.length>0){
@@ -925,7 +1135,11 @@ function getPlayerMoves(b,sz,player){
     if(hasP){
       if(c.owner===player&&c.count<cap(i,j,sz))moves.push([i,j]);
     }else{
-      if(c.owner===null&&!nearAny(i,j,sz,b))moves.push([i,j]);
+      if(c.owner===null&&!nearAny(i,j,sz,b)){
+        // 非首位玩家首次落子需避开首子限制区域
+        if(firstMovePos&&player!==0&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
+        moves.push([i,j]);
+      }
     }
   }
   return moves;
@@ -983,11 +1197,18 @@ function aiFindMoveAlphaBeta(player,sz,b,depth){
   if(allMoves.length===1)return allMoves[0];
   if(!hasPieces(player,b)){
     let candidates=[];
+    let skipRestricted=firstMovePos&&player!==0;
     for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
-      if(b[i][j].owner===null&&!nearAny(i,j,sz,b))candidates.push([i,j]);
+      if(b[i][j].owner===null&&!nearAny(i,j,sz,b)){
+        if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
+        candidates.push([i,j]);
+      }
     if(candidates.length===0){
       for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
-        if(b[i][j].owner===null)candidates.push([i,j]);
+        if(b[i][j].owner===null){
+          if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
+          candidates.push([i,j]);
+        }
     }
     if(candidates.length===0)return null;
     let cx=sz/2-0.5;
@@ -1003,29 +1224,34 @@ function aiFindMoveAlphaBeta(player,sz,b,depth){
 }
 
 async function triggerAI(){
-  if(gameOver||aiThinking)return;
+  if(gameOver||aiThinking||isPaused)return;
   if(!aiPlayers.has(curPlayer))return;
   aiThinking=true;
   showMsg(`🤔 AI ${curPlayer+1} 思考中...`,'');
   await sleep(50);
   let move;
-  if(aiAlgorithm==='alphabeta'){
+  // 获取当前 AI 的配置（eve 模式用 per-AI config，其他模式用全局配置）
+  let alg = aiConfigs[curPlayer] ? aiConfigs[curPlayer].algorithm : aiAlgorithm;
+  let dep = aiConfigs[curPlayer] ? aiConfigs[curPlayer].depth : aiDepth;
+  if(alg==='alphabeta'){
     // 调用 Rust 引擎（Rayon 多线程优化）
     try {
       const result = await window.__TAURI_INTERNALS__.invoke('ai_move', {
         board: board,
         size: size,
         player: curPlayer,
-        depth: aiDepth,
+        depth: dep,
         eliminated: [...eliminatedPlayers],
         maxPlayers: maxPlayers,
+        gameCount: gameCount,
+        firstMovePos: firstMovePos,
       });
       if (result && result.length === 2) {
         move = [result[0], result[1]];
       }
     } catch(e) {
       console.warn('Rust AI failed, falling back to JS:', e);
-      move = aiFindMoveAlphaBeta(curPlayer, size, board, aiDepth);
+      move = aiFindMoveAlphaBeta(curPlayer, size, board, dep);
     }
   }else{
     move=aiFindMove(curPlayer,size,board);
@@ -1080,9 +1306,11 @@ async function triggerAI(){
 
 /* ==================== LOCAL GAME ==================== */
 function startLocalGame(){
+  location.hash='#game';
   size=parseInt(document.getElementById('localSize').value)||7;
   maxPlayers=parseInt(document.getElementById('localPlayers').value)||2;
-  board=mkBoard(size);curPlayer=0;gameOver=false;
+  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  document.getElementById('pauseBtn').textContent='⏸ 暂停';
   gameMode='local';
   aiPlayers=new Set();
   aiThinking=false;
@@ -1097,35 +1325,48 @@ function startLocalGame(){
   renderPlayerBar();
 }
 
+function toggleAIColorPicker(){
+  let aiCount=parseInt(document.getElementById('aiCount').value)||1;
+  let row=document.getElementById('aiColorPickerRow');
+  let container=document.getElementById('aiColorOptions');
+  row.style.display='block';
+  container.innerHTML='';
+  let maxP=aiCount+1;
+  for(let i=0;i<maxP;i++){
+    let btn=document.createElement('button');
+    btn.style.cssText=`width:36px;height:36px;border-radius:50%;border:2px solid transparent;background:${COLORS[i]};cursor:pointer;transition:.15s;`;
+    btn.dataset.idx=i;
+    if(i===0) btn.style.border='2px solid #fff';
+    btn.onclick=function(){
+      document.querySelectorAll('#aiColorOptions button').forEach(b=>b.style.border='2px solid transparent');
+      this.style.border='2px solid #fff';
+      selectedPlayerColor=parseInt(this.dataset.idx);
+    };
+    container.appendChild(btn);
+  }
+}
 function startAIGame(){
+  location.hash='#game';
   size=parseInt(document.getElementById('aiSize').value)||7;
   let aiCount=parseInt(document.getElementById('aiCount').value)||1;
   if(aiCount<1)aiCount=1;
-  // AI斗蛐蛐：7 AI = 全AI无人类
-  let isAllAi = aiCount >= 7;
-  maxPlayers = isAllAi ? aiCount : aiCount + 1;
+  maxPlayers = aiCount + 1;
   aiAlgorithm=document.getElementById('aiAlgorithm').value;
   aiDepth=parseInt(document.getElementById('aiDepth').value)||2;
-  board=mkBoard(size);curPlayer=0;gameOver=false;
+  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  document.getElementById('pauseBtn').textContent='⏸ 暂停';
   gameMode='ai';
   aiPlayers=new Set();
-  let humanCount = isAllAi ? 0 : 1;
-  let humanIdx = 0;
-  if(humanCount === 1){
-    humanIdx = selectedPlayerColor;
-  }
+  let humanIdx = selectedPlayerColor;
   for(let p=0;p<maxPlayers;p++){
-    if(humanCount === 1){
-      if(p !== humanIdx) aiPlayers.add(p);
-    } else {
-      aiPlayers.add(p); // 全AI
-    }
+    if(p !== humanIdx) aiPlayers.add(p);
   }
   aiThinking=false;
   eliminatedPlayers=new Set();
   gameHistory=[];
   chainStats={};
   maxChainOverall={player:null,length:0};
+  gameCount=(gameCount||0)+1;
   recordHistory();
   renderBoard(true);
   show('game');
@@ -1137,27 +1378,93 @@ function startAIGame(){
 function startLocalReset(){
   size=parseInt(document.getElementById('resetSize').value)||size;
   maxPlayers=parseInt(document.getElementById('resetPlayers').value)||maxPlayers;
-  // 本地模式保持玩家数，AI模式保持 1+AI
+  // 本地模式保持玩家数，AI模式保持 1+AI，eve模式保持AI数
   if(gameMode==='ai'){
     let aiCount=maxPlayers-1;
     if(aiCount<1)aiCount=1;
     maxPlayers=aiCount+1;
+  } else if(gameMode==='eve'){
+    // eve模式下保持玩家数（全是AI）
   }
   board=mkBoard(size);curPlayer=0;gameOver=false;
   aiThinking=false;
+  firstMovePos=null;
   eliminatedPlayers=new Set();
   gameHistory=[];
   chainStats={};
   maxChainOverall={player:null,length:0};
+  gameCount=(gameCount||0)+1;
   recordHistory();
   renderBoard(true);
   renderPlayerBar();
   document.body.style.background='';
   closeModal('resetModal');
-  document.querySelectorAll('.settlement').forEach(e=>e.remove());
+  document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
 }
 
+function togglePause(){
+  if(gameOver)return;
+  isPaused=!isPaused;
+  let btn=document.getElementById('pauseBtn');
+  if(isPaused){
+    btn.textContent='▶ 继续';
+    showPauseOverlay();
+  } else {
+    btn.textContent='⏸ 暂停';
+    hidePauseOverlay();
+  }
+}
+function showPauseOverlay(){
+  let overlay=document.getElementById('pauseOverlay');
+  overlay.style.display='flex';
+  // 构建暂停统计
+  let statsGrid=document.getElementById('pauseStats');
+  statsGrid.innerHTML='';
+  let lastSnap=gameHistory.length>0?gameHistory[gameHistory.length-1].snapshot:{};
+  for(let p=0;p<maxPlayers;p++){
+    if(eliminatedPlayers.has(p))continue;
+    let snap=lastSnap[String(p)];
+    let pieces=snap?snap.pieces:0;
+    let points=snap?snap.points:0;
+    let card=document.createElement('div');card.className='stat-card';
+    card.innerHTML=`
+      <div class="name">
+        <span class="color-dot" style="background:${COLORS[p]||'#888'}"></span>
+        ${(COLOR_NAMES&&COLOR_NAMES[p])||getPlayerLabel(p)}
+      </div>
+      <div class="num" style="color:${COLORS[p]||'#888'}">${pieces}</div>
+      <div class="lbl">棋子</div>
+      <div class="num" style="color:${COLORS[p]||'#888'}">${points}</div>
+      <div class="lbl">点数</div>`;
+    statsGrid.appendChild(card);
+  }
+  // 图表
+  let chartArea=document.getElementById('pauseCharts');
+  chartArea.innerHTML='';
+  if(gameHistory&&gameHistory.length>=2){
+    let box1=document.createElement('div');box1.className='chart-box';
+    box1.innerHTML='<h4>📊 棋子数变化</h4><canvas id="pauseChartPieces" style="width:100%;height:130px;display:block"></canvas>';
+    chartArea.appendChild(box1);
+    let box2=document.createElement('div');box2.className='chart-box';
+    box2.innerHTML='<h4>📊 点数变化</h4><canvas id="pauseChartPoints" style="width:100%;height:130px;display:block"></canvas>';
+    chartArea.appendChild(box2);
+    setTimeout(()=>{
+      drawLineChart(document.getElementById('pauseChartPieces'),gameHistory,COLOR_NAMES,COLORS,'pieces');
+      drawLineChart(document.getElementById('pauseChartPoints'),gameHistory,COLOR_NAMES,COLORS,'points');
+    },50);
+  }
+}
+function hidePauseOverlay(){
+  document.getElementById('pauseOverlay').style.display='none';
+}
+function resumeGame(){
+  isPaused=false;
+  document.getElementById('pauseBtn').textContent='⏸ 暂停';
+  hidePauseOverlay();
+  // 如果是 AI 回合，继续触发 AI
+  if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),300);
+}
 function endGameNow(){
   if(gameOver)return;
   gameOver=true;
@@ -1174,7 +1481,7 @@ function endGameNow(){
 }
 
 async function localClick(x,y){
-  if(gameOver||aiThinking)return;
+  if(gameOver||aiThinking||isPaused)return;
   if(aiPlayers.has(curPlayer))return;
   let c=board[x][y];
   let mine=hasPieces(curPlayer,board);
@@ -1182,6 +1489,12 @@ async function localClick(x,y){
     if(c.owner!==curPlayer){showMsg('只能点击自己的棋子','');return}
   }else{
     if(c.owner!==null){showMsg('不能抢占别人的格子','');return}
+    // 首位玩家可以任意落子，其他玩家不能落在首子限制区域（12格）
+    if(firstMovePos&&curPlayer!==0){
+      if(isInFirstMoveRestricted(x,y,firstMovePos[0],firstMovePos[1])){
+        showMsg('该位置在首子限制区域内','');return
+      }
+    }
     if(nearAny(x,y,size,board)){showMsg('不能在已有棋子旁边落子','');return}
   }
   playClick();
@@ -1209,7 +1522,7 @@ async function localClick(x,y){
 }
 
 function handleClick(x,y){
-  if(!aiThinking)localClick(x,y);
+  if(!aiThinking&&!isPaused)localClick(x,y);
 }
 
 /* ==================== SETTLEMENT ==================== */
@@ -1361,9 +1674,8 @@ function showSettlement(winner,colorNames,history){
     let legend1=document.createElement('div');legend1.className='chart-legend';
     let sortedP=[...alivePlayers].sort((a,b)=>a-b);
     for(let pid of sortedP){
-      let cName=(colorNames&&colorNames[pid])||getPlayerLabel(pid);
       let s=document.createElement('span');
-      s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>${cName}`;
+      s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>`;
       legend1.appendChild(s);
     }
     chartBox1.appendChild(legend1);
@@ -1373,9 +1685,8 @@ function showSettlement(winner,colorNames,history){
     chartBox2.innerHTML='<h4 style="cursor:pointer" onclick="showFullscreenChart(\'chartPoints\')">📊 点数变化 🔍</h4><canvas id="chartPoints" onclick="showFullscreenChart(\'chartPoints\')" style="cursor:pointer"></canvas>';
     let legend2=document.createElement('div');legend2.className='chart-legend';
     for(let pid of sortedP){
-      let cName=(colorNames&&colorNames[pid])||getPlayerLabel(pid);
       let s=document.createElement('span');
-      s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>${cName}`;
+      s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>`;
       legend2.appendChild(s);
     }
     chartBox2.appendChild(legend2);
@@ -1467,15 +1778,14 @@ function showHistoryDetail(r){
     inner.appendChild(ci);
   }
 
-  // 图表
+  // 图表（去掉颜色名称，仅保留色点）
   let sortedP=[...alivePlayers].sort((a,b)=>a-b);
   let chartBox1=document.createElement('div');chartBox1.className='chart-box';
   chartBox1.innerHTML='<h4>📊 棋子数变化</h4><canvas id="hChartPieces" style="width:100%;height:150px;display:block"></canvas>';
   let legend1=document.createElement('div');legend1.className='chart-legend';
   for(let pid of sortedP){
-    let cName=(r.colorNames&&r.colorNames[pid])||'玩家 '+(pid+1);
     let s=document.createElement('span');
-    s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>${cName}`;
+    s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>`;
     legend1.appendChild(s);
   }
   chartBox1.appendChild(legend1);
@@ -1485,9 +1795,8 @@ function showHistoryDetail(r){
   chartBox2.innerHTML='<h4>📊 点数变化</h4><canvas id="hChartPoints" style="width:100%;height:150px;display:block"></canvas>';
   let legend2=document.createElement('div');legend2.className='chart-legend';
   for(let pid of sortedP){
-    let cName=(r.colorNames&&r.colorNames[pid])||'玩家 '+(pid+1);
     let s=document.createElement('span');
-    s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>${cName}`;
+    s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>`;
     legend2.appendChild(s);
   }
   chartBox2.appendChild(legend2);
@@ -1527,16 +1836,23 @@ function showFullscreenChart(canvasId){
 
 /* ==================== GAME ACTIONS ==================== */
 function exitGame(){
-  gameMode=null;gameOver=false;
+  gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
+  aiPlayers=new Set();eliminatedPlayers=new Set();gameHistory=[];chainStats={};
+  maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;
   document.getElementById('board').innerHTML='';cells=[];board=[];
   document.body.style.background='';
-  document.querySelectorAll('.settlement').forEach(e=>e.remove());
+  // 只移除动态创建的结算覆盖层，保留 pauseOverlay（静态 HTML 元素）
+  document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
+  document.getElementById('pauseOverlay').style.display='none';
+  document.getElementById('pauseBtn').textContent='⏸ 暂停';
   showMsg('','');
   show('welcome');
+  // 清理残留的 hash，避免 stale 导航
+  if(location.hash)history.replaceState(null,'',window.location.pathname);
 }
 
 function confirmReset(){
-  if(gameMode==='local'||gameMode==='ai'){startLocalReset();return}
+  if(gameMode==='local'||gameMode==='ai'||gameMode==='eve'){startLocalReset();return}
   closeModal('resetModal');
 }
 
@@ -1550,6 +1866,13 @@ function showMsg(t,c){
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape')['resetModal'].forEach(id=>closeModal(id));
+});
+window.addEventListener('popstate',()=>{
+  // 游戏中按返回键 → 退出游戏（先重置状态再导航）
+  if(gameMode&&gameMode!=='welcome'){exitGame();return}
+  // 非游戏中：根据 hash 导航到对应界面
+  const h=location.hash.slice(1);
+  if(h&&document.getElementById(h))show(h);else show('welcome');
 });
 </script>
 </body>

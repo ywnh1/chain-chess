@@ -20,7 +20,7 @@
 
 ## 🎮 游戏规则
 
-1. **落子** — 点击空位落子（首次需远离所有已有棋子），点击自己的棋子加子
+1. **落子** — 点击空位落子（首位玩家任意落子，后续玩家避开首子 12 格限制区），点击自己的棋子加子
 2. **爆裂** — 格子中的棋子数达到容量（4个）时，向上下左右各扩散一个棋子
 3. **连锁** — 爆裂扩散会触发相邻格子的连锁爆裂
 4. **淘汰** — 当某玩家的所有棋子被吞噬时该玩家被淘汰
@@ -33,9 +33,13 @@
 | 🕹️ 多人在线 | 2~7 人实时对战，WebSocket 通信 |
 | 🔐 密码房间 | 创建房间时可设置密码，私密对战 |
 | 💾 存档系统 | 游戏过程中随时存档，设置密码保护 |
-| 🤖 **AI 对战** | **两种算法可选：策略算法 / Alpha-Beta 剪枝** |
+| 🤖 **AI 对战** | **PVE：1 名人类 + 1~6 个 AI，可自定义颜色** |
+| ⚔️ **AI 斗蛐蛐** | **2~10 个 AI 对战，每个 AI 可独立配置算法和深度** |
 | ⚡ **Rust + Rayon 引擎** | **桌面端 Alpha-Beta 使用 Rust 实现，Rayon 多核并行搜索** |
-| 🎛️ **搜索深度可调** | Alpha-Beta 深度 1~4 可配置 |
+| 🎛️ **搜索深度可调** | Alpha-Beta 深度 1~7 可配置 |
+| 🎲 **随机化走法** | 早期对局加入随机探索，同等走法随机选择 |
+| 🎯 **首子限制区域** | 首位玩家任意落子，后续玩家避开 12 格限制区 |
+| ⏸ **暂停功能** | 游戏暂停时查看实时统计和折线图 |
 | 🔊 **音效系统** | 落子/爆炸/淘汰/获胜 音频反馈 |
 | 📊 **结算统计** | 游戏结束后显示双折线图（棋子数/点数变化） |
 | 📱 **响应式 UI** | 平板横屏 / 手机竖屏自动适配 |
@@ -74,17 +78,30 @@ cargo build --release  # 构建可执行文件
 # 二进制文件：tauri/src-tauri/target/release/chain-chess
 ```
 
-桌面版额外提供 **Alpha-Beta 剪枝 AI**（Rust + Rayon 多线程），搜索深度可达 4 层。
+桌面版额外提供 **Alpha-Beta 剪枝 AI**（Rust + Rayon 多线程），搜索深度可达 7 层。
 
 ### 方式三：Android APK
 
 ```bash
-cd tauri
-npx tauri android init      # 初始化 Android 项目（仅首次）
-npx tauri android build     # 构建 APK
+# 一键编译 + 签名（初次使用需先初始化 Android 项目）
+./build_apk.sh <keystore_password>
+
+# 例如：
+./build_apk.sh chainchess
 ```
 
+> 脚本自动编译 arm64 APK，用 `release.keystore` 签名并输出到 `release/` 目录。
+
 预编译 APK 可在 [Releases](https://github.com/ywnh1/chain-chess/releases) 下载。
+
+#### 首次构建（已初始化则跳过）
+
+```bash
+cd tauri
+npx tauri android init      # 初始化 Android 项目（仅首次）
+cd ..
+./build_apk.sh chainchess
+```
 
 ## 🤖 AI 引擎
 
@@ -106,12 +123,13 @@ npx tauri android build     # 构建 APK
 - **走法排序** — 三级棋子优先、周围对手多优先，提高剪枝效率
 - **自适应限时** — 每步自动分配时间（3 s + depth × 0.5 s）
 - **分支限制** — 每层最多搜索 top 10 个走法
-- **深度可调** — 支持 1~4 层搜索（默认 2）
+- **深度可调** — 支持 1~7 层搜索（默认 2）
+- **随机化探索** — 早期对局（前 5~7 局）加入随机扰动，增加走法多样性
 
 ### AI 设置界面
 
-- 算法选择：策略算法 / Alpha-Beta 剪枝
-- 搜索深度滑块（Alpha-Beta 模式下可用，1~4）
+- **PVE 模式** — 算法选择：策略算法 / Alpha-Beta 剪枝；搜索深度滑块（1~7）；用户可选择自己的颜色
+- **AI 斗蛐蛐模式** — 支持 2~10 个 AI 对战，每个 AI 独立配置算法和深度
 - 思考中提示
 
 ## 🔊 音效系统
@@ -156,6 +174,7 @@ chain-chess/
 │       └── src/
 │           ├── main.rs        # Rust 入口
 │           └── lib.rs         # 🦀 游戏引擎（棋盘逻辑 + Alpha-Beta + Rayon）
+├── build_apk.sh               # Android APK 一键构建 + 签名脚本
 ├── release/                   # 发布构建产物（APK）
 ├── release.keystore           # Android 签名密钥（请勿公开）
 ├── logs/                      # 运行时日志
@@ -195,5 +214,5 @@ Copyright (c) 2026 ywnh1
 ---
 
 <div align="center">
-  <sub>Built with ♟ by <a href="https://github.com/ywnh1">ywnh1</a> · v1.2.0</sub>
+  <sub>Built with ♟ by <a href="https://github.com/ywnh1">ywnh1</a> · v1.3.1-beta</sub>
 </div>
