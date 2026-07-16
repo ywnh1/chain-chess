@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=fff" alt="Android">
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/github/v/release/ywnh1/chain-chess?include_prereleases&label=release" alt="Release">
+    <img src="https://img.shields.io/github/v/release/nihao15900375400/chain-chess?include_prereleases&label=release" alt="Release">
   </p>
 </div>
 
