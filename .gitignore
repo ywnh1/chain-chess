@@ -51,3 +51,9 @@ Thumbs.db
 # ─── 构建产物 ───
 release/
 release.keystore
+
+# --- ai ---
+.skills/
+.skill/
+prompt.md
+
