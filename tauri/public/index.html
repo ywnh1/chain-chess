@@ -151,6 +151,7 @@ body::before{content:'';position:fixed;inset:0;background:
   cursor:pointer;transition:.15s;font-weight:500;letter-spacing:.3px;
 }
 #game .top-left button:active{background:rgba(255,255,255,.12);transform:scale(.97);transition:all .06s ease}
+#pauseBtn{padding:9px 16px;font-size:.82rem}
 /* 跳过动画按钮 */
 #skipChainBtn{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:500;
@@ -235,6 +236,17 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 .btn-primary:hover{opacity:.9;box-shadow:0 4px 20px rgba(240,179,75,.3);transform:translateY(-1px)}
 .btn-primary:active{opacity:.85;transform:scale(.97);transition:all .08s ease}
+/* 危险按钮 — 暂停界面的结束游戏 */
+.btn-danger{
+  width:100%;padding:10px;
+  background:rgba(255,80,80,.15);color:#ff6b6b;
+  border:1px solid rgba(255,80,80,.25);
+  border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;
+  transition:.2s;
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+}
+.btn-danger:hover{background:rgba(255,80,80,.22);border-color:rgba(255,80,80,.4)}
+.btn-danger:active{opacity:.7;transform:scale(.97);transition:all .08s ease}
 /* 暂停覆盖背景 */
 #pauseOverlay.settlement{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
 #pauseOverlay .stat-card,#pauseOverlay .chart-box{
@@ -757,8 +769,6 @@ body{padding-top:env(safe-area-inset-top,20px)}
   <div class="top">
     <div class="top-left">
       <button onclick="togglePause()" id="pauseBtn">⏸ 暂停</button>
-      <button onclick="openModal('resetModal')">↻ 重开</button>
-      <button onclick="endGameNow()">⛳ 结束</button>
     </div>
     <div class="top-right">
       <span id="msg"></span>
@@ -775,8 +785,11 @@ body{padding-top:env(safe-area-inset-top,20px)}
     <h2>⏸ 游戏暂停</h2>
     <div id="pauseStats" class="stats-grid"></div>
     <div id="pauseCharts" style="width:100%"></div>
-    <div style="display:flex;gap:10px;margin-top:12px;width:100%">
-      <button class="btn-primary" onclick="resumeGame()" style="flex:1">▶ 继续游戏</button>
+    <div style="display:flex;gap:10px;margin-top:14px;width:100%">
+      <button class="btn-primary" onclick="resumeGame()" style="flex:1;padding:14px;font-size:1.05rem">▶ 继续游戏</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:6px;width:100%">
+      <button class="btn-danger" onclick="endGameNow()" style="flex:1">⛳ 结束游戏</button>
     </div>
   </div>
 </div>
@@ -787,45 +800,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
   <div id="checkoutContent" class="chk-scroll"></div>
 </div>
 
-<!-- Reset Modal -->
-<div id="resetModal" class="modal">
-  <div class="modal-inner">
-    <h3>重新开始</h3>
-    <div class="form-row"><label>棋盘大小</label>
-      <div id="resetSizeGrid" class="size-grid">
-        <button class="size-btn" data-value="5">5×5</button>
-        <button class="size-btn" data-value="6">6×6</button>
-        <button class="size-btn selected" data-value="7">7×7</button>
-        <button class="size-btn" data-value="8">8×8</button>
-        <button class="size-btn" data-value="9">9×9</button>
-        <button class="size-btn" data-value="10">10×10</button>
-        <button class="size-btn" data-value="11">11×11</button>
-        <button class="size-btn" data-value="12">12×12</button>
-        <button class="size-btn" data-value="13">13×13</button>
-        <button class="size-btn" data-value="14">14×14</button>
-        <button class="size-btn" data-value="15">15×15</button>
-        <button class="size-btn" data-value="16">16×16</button>
-        <button class="size-btn" data-value="17">17×17</button>
-        <button class="size-btn" data-value="18">18×18</button>
-        <button class="size-btn" data-value="19">19×19</button>
-      </div>
-    </div>
-    <div id="resetPlayersRow" class="form-row"><label>玩家人数</label>
-      <div id="resetPlayersGroup" class="btn-group">
-        <button class="gb selected" data-value="2">2</button>
-        <button class="gb" data-value="3">3</button>
-        <button class="gb" data-value="4">4</button>
-        <button class="gb" data-value="5">5</button>
-        <button class="gb" data-value="6">6</button>
-        <button class="gb" data-value="7">7</button>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-ghost" id="resetCancelBtn">取消</button>
-      <button class="btn-primary" id="resetConfirmBtn" style="background:var(--accent);color:#0f0f13">重开</button>
-    </div>
-  </div>
-</div>
+
 
 <script>
 /* ==================== CONSTANTS ==================== */
@@ -936,16 +911,6 @@ if(aiDepthSlider&&aiDepthDisplay){
     toggleAIDepth();
   });
 }
-// 弹窗按钮事件绑定（用 JS 代替 onclick 避免 WebView 兼容性问题）
-document.getElementById('resetConfirmBtn')?.addEventListener('click',function(e){
-  e.stopPropagation();
-  confirmReset();
-});
-document.getElementById('resetCancelBtn')?.addEventListener('click',function(e){
-  e.stopPropagation();
-  closeModal('resetModal');
-});
-
 // 初始触发
 setTimeout(toggleAIColorPicker,20);
 setTimeout(toggleAIDepth,50);
@@ -1002,43 +967,43 @@ const Router = {
 // ─── 页面注册（7 页：welcome, history, localLobby, aiLobby, eveLobby, game, checkout） ───
 Router.register('welcome', {
   back: null,
-  enter() {},
+  enter() { document.body.style.background='' },
   leave() {}
 });
 
 Router.register('history', {
   back: 'welcome',
-  enter() { loadHistoryList(); },
+  enter() { document.body.style.background=''; loadHistoryList(); },
   leave() {}
 });
 
 Router.register('aiLobby', {
   back: 'welcome',
-  enter() { setTimeout(toggleAIDepth, 10); },
+  enter() { document.body.style.background=''; setTimeout(toggleAIDepth, 10); },
   leave() {}
 });
 
 Router.register('localLobby', {
   back: 'welcome',
-  enter() {},
+  enter() { document.body.style.background='' },
   leave() {}
 });
 
 Router.register('eveLobby', {
   back: 'welcome',
-  enter() { generateEveConfig(); },
+  enter() { document.body.style.background=''; generateEveConfig(); },
   leave() {}
 });
 
 Router.register('game', {
   back: null,
   enter() {},
-  leave() {}
+  leave() { document.body.style.background='' }
 });
 
 Router.register('checkout', {
   back() { return Router._checkoutPrev || 'welcome'; },
-  enter(prevPage) { Router._checkoutPrev = prevPage || 'welcome'; },
+  enter(prevPage) { document.body.style.background=''; Router._checkoutPrev = prevPage || 'welcome'; },
   leave() { document.getElementById('checkoutContent').innerHTML = ''; },
   _checkoutPrev: 'welcome'
 });
@@ -1841,13 +1806,13 @@ async function triggerAI(){
   if(c.owner!==null&&c.owner!==curPlayer){return}
   playClick();
   let elim;
-  let oldBoard=board.map(r=>r.map(cl=>({owner:cl.owner,count:cl.count})));
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
       player:curPlayer,maxPlayers:maxPlayers
     });
-    await animateBoardDiff(oldBoard,result.board,size);
+    // ★ JS 逐步连爆动画（一个一个真实爆炸），最后用 Tauri 结果覆盖
+    elim=await processClick(board,size,x,y,curPlayer,'explode');
     board=result.board;
     elim=result.eliminated||[];
   }catch(e){
@@ -1950,70 +1915,6 @@ function startAIGame(){
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
 }
 
-function startLocalReset(){
-  // 先强制清空旧棋盘，确保立即刷新
-  clearBoardDOM();
-  // 确保弹窗内的自定义控件有选中值
-  const rs=document.getElementById('resetSizeGrid');
-  if(rs&&!rs.querySelector('.selected'))rs.querySelector('.size-btn')?.classList.add('selected');
-  const rp=document.getElementById('resetPlayersGroup');
-  if(rp&&!rp.querySelector('.selected'))rp.querySelector('.gb')?.classList.add('selected');
-
-  size=getSel('resetSizeGrid')||size;
-  maxPlayers=getSel('resetPlayersGroup')||maxPlayers;
-  if(maxPlayers<2)maxPlayers=2;
-
-  // 根据当前模式调整
-  if(gameMode==='ai'){
-    let aiCount=maxPlayers-1;
-    if(aiCount<1)aiCount=1;
-    maxPlayers=aiCount+1;
-  }
-
-  // 重建 aiPlayers
-  aiPlayers=new Set();
-  if(gameMode==='ai'){
-    for(let p=0;p<maxPlayers;p++){
-      if(p!==selectedPlayerColor)aiPlayers.add(p);
-    }
-  }else if(gameMode==='eve'){
-    for(let p=0;p<maxPlayers;p++)aiPlayers.add(p);
-  }
-
-  // 重置所有状态
-  board=mkBoard(size);
-  curPlayer=0;
-  gameOver=false;
-  isPaused=false;
-  document.getElementById('pauseBtn').textContent='⏸ 暂停';
-  document.getElementById('pauseOverlay').style.display='none';
-  aiThinking=false;
-  firstMovePos=null;
-  eliminatedPlayers=new Set();
-  gameHistory=[];
-  chainStats={};
-  _boardCache=null;
-  maxChainOverall={player:null,length:0};
-  gameCount=(gameCount||0)+1;
-  recordHistory();
-  renderBoard(true);
-  renderPlayerBar();
-  document.body.style.background='';
-  closeModal('resetModal');
-  // 移除动态创建的结算/暂停覆盖层
-  document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
-  const po=document.getElementById('pauseOverlay');
-  if(po)po.style.display='none';
-  // 重建 eve AI 配置
-  if(gameMode==='eve'){
-    aiConfigs={};
-    for(let p=0;p<maxPlayers;p++){
-      aiConfigs[p]={algorithm:aiAlgorithm||'strategy',depth:aiDepth||2};
-    }
-  }
-  if(aiPlayers.has(0)&&!gameOver)setTimeout(()=>triggerAI(),400);
-}
-
 function togglePause(){
   if(gameOver)return;
   isPaused=!isPaused;
@@ -2056,7 +1957,8 @@ async function showPauseOverlay(){
   let chartArea=document.getElementById('pauseCharts');
   chartArea.innerHTML='';
   renderGameCharts(statsGrid,fullHistory,{
-    colorNames:COLOR_NAMES,colors:COLORS,eliminated:eliminatedPlayers
+    colorNames:COLOR_NAMES,colors:COLORS,eliminated:eliminatedPlayers,
+    _noBack:true
   });
   // 图表额外放进 chartArea（因为 pauseOverlay 布局分 stats 和 charts 两个容器）
   // 移动图表到 chartArea
@@ -2082,8 +1984,11 @@ function resumeGame(){
   // 如果是 AI 回合，继续触发 AI
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),300);
 }
-function endGameNow(){
+async function endGameNow(){
   if(gameOver)return;
+  // 关闭暂停覆盖层
+  hidePauseOverlay();
+  isPaused=false;
   gameOver=true;
   let bestP = 0, bestCnt = -1;
   for(let p=0;p<maxPlayers;p++){
@@ -2094,7 +1999,10 @@ function endGameNow(){
   }
   recordHistory();
   playGameOver();
-  showSettlement(bestCnt>0?bestP:null, COLOR_NAMES, gameHistory);
+  // 暂停界面已经刷盘（flushAndGetFullHistory），gameHistory 被清空，
+  // 需要从磁盘获取完整历史才能绘制图表
+  const fullHistory = await flushAndGetFullHistory();
+  showSettlement(bestCnt>0?bestP:null, COLOR_NAMES, fullHistory);
 }
 
 async function animateBoardDiff(oldBoard, newBoard, sz){
@@ -2136,15 +2044,13 @@ async function localClick(x,y){
   }
   playClick();
   let elim;
-  // 备份旧棋盘用于 diff 动画
-  let oldBoard=board.map(r=>r.map(cl=>({owner:cl.owner,count:cl.count})));
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
       player:curPlayer,maxPlayers:maxPlayers
     });
-    // 先展示动画，再更新 board
-    await animateBoardDiff(oldBoard,result.board,size);
+    // ★ JS 逐步连爆动画（一个一个真实爆炸），最后用 Tauri 结果覆盖
+    elim=await processClick(board,size,x,y,curPlayer,'explode');
     board=result.board;
     elim=result.eliminated||[];
   }catch(e){
@@ -2461,14 +2367,6 @@ function exitGame(){
   Router.navigate('welcome');
 }
 
-function confirmReset(){
-  if(gameMode==='local'||gameMode==='ai'||gameMode==='eve'){
-    try{startLocalReset()}catch(e){console.warn('reset error',e);closeModal('resetModal')}
-    return
-  }
-  closeModal('resetModal');
-}
-
 /* ==================== UTILS ==================== */
 function openModal(id){document.getElementById(id).classList.add('show')}
 function closeModal(id){document.getElementById(id).classList.remove('show')}
@@ -2477,9 +2375,6 @@ function showMsg(t,c){
   if(t)setTimeout(()=>{el.textContent='';el.className=''},3000);
 }
 
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape')['resetModal'].forEach(id=>closeModal(id));
-});
 window.addEventListener('popstate',()=>{
   // 游戏中按返回键 → 退出游戏（先重置状态再导航）
   if(gameMode&&gameMode!=='welcome'){exitGame();return}
