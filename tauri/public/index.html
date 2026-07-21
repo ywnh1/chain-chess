@@ -79,7 +79,7 @@ body::before{content:'';position:fixed;inset:0;background:
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
 }
 .mode-card:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);transform:translateY(-2px);box-shadow:0 10px 40px rgba(0,0,0,.4)}
-.mode-card:active{background:rgba(255,255,255,.1);border-color:var(--accent);transform:scale(.98)}
+.mode-card:active{background:rgba(255,255,255,.09);border-color:rgba(240,179,75,.5);transform:scale(.99);transition:all .06s ease}
 .mode-card .icon{font-size:1.8rem;flex-shrink:0}
 .mode-card .body{flex:1}
 .mode-card .body h3{font-size:1rem;font-weight:600}
@@ -87,13 +87,13 @@ body::before{content:'';position:fixed;inset:0;background:
 
 /* lobby */
 #aiLobby,#localLobby,#eveLobby{max-width:480px;gap:.75rem;width:100%}
-#aiLobby .back,#localLobby .back,#history .back,#eveLobby .back{
+#aiLobby .back,#localLobby .back,#history .back,#eveLobby .back,#checkout .chk-back{
   align-self:flex-start;
   background:none;border:none;color:var(--dim);
   font-size:.85rem;cursor:pointer;padding:6px 0;
   display:flex;align-items:center;gap:4px;transition:.15s;
 }
-#aiLobby .back:active,#localLobby .back:active,#history .back:active,#eveLobby .back:active{color:var(--text)}
+#aiLobby .back:active,#localLobby .back:active,#history .back:active,#eveLobby .back:active,#checkout .chk-back:active{color:var(--text)}
 #aiLobby h2,#localLobby h2,#history h2,#eveLobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
 .form-row{margin:8px 0;display:flex;flex-direction:column;gap:4px;width:100%}
 .form-row label{font-size:.78rem;color:var(--dim);font-weight:500}
@@ -103,11 +103,17 @@ body::before{content:'';position:fixed;inset:0;background:
   background:rgba(255,255,255,.04);color:var(--text);
   font-size:.9rem;outline:none;transition:.15s;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  -webkit-appearance:none;appearance:none;
 }
 .form-row input:focus,.form-row select:focus{
   border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,179,75,.15);
 }
-.form-row select option{background:var(--surface);color:var(--text)}
+/* select 自定义箭头 */
+.form-row select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%237a7885' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:30px;
+}
+.form-row select option{background:#1a1a22;color:var(--text)}
 .form-eve-config{width:100%;max-height:240px;overflow-y:auto;margin:4px 0;display:flex;flex-direction:column;gap:6px}
 .eve-ai-row{
   display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);
@@ -117,7 +123,10 @@ body::before{content:'';position:fixed;inset:0;background:
 .eve-ai-row .color-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .eve-ai-row .eve-label{font-size:.78rem;font-weight:600;min-width:44px}
 .eve-ai-row select{flex:1;padding:5px 6px;border:1px solid var(--border);border-radius:6px;
-  background:rgba(255,255,255,.04);color:var(--text);font-size:.75rem;outline:none}
+  background:rgba(255,255,255,.04);color:var(--text);font-size:.75rem;outline:none;
+  -webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 12 8'%3E%3Cpath fill='%237a7885' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;padding-right:22px;}
 .eve-ai-row select:focus{border-color:var(--accent)}
 .eve-ai-row select option{background:var(--surface);color:var(--text)}
 .btn-primary{
@@ -127,7 +136,7 @@ body::before{content:'';position:fixed;inset:0;background:
   -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
 }
 .btn-primary:hover{opacity:.92;box-shadow:0 4px 20px rgba(240,179,75,.3);transform:translateY(-1px)}
-.btn-primary:active{opacity:.8;transform:scale(.98)}
+.btn-primary:active{opacity:.9;transform:scale(.97);transition:all .08s ease}
 
 /* game */
 #game{max-width:520px;gap:8px;width:100%}
@@ -141,7 +150,18 @@ body::before{content:'';position:fixed;inset:0;background:
   border:none;padding:7px 12px;border-radius:8px;font-size:.72rem;
   cursor:pointer;transition:.15s;font-weight:500;letter-spacing:.3px;
 }
-#game .top-left button:active{background:rgba(255,255,255,.15);transform:scale(.96)}
+#game .top-left button:active{background:rgba(255,255,255,.12);transform:scale(.97);transition:all .06s ease}
+/* 跳过动画按钮 */
+#skipChainBtn{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:500;
+  background:rgba(240,179,75,.2);border:1px solid var(--accent);color:var(--accent);
+  padding:8px 20px;border-radius:20px;font-size:.78rem;font-weight:600;
+  cursor:pointer;transition:.15s;display:none;font-family:var(--font);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  box-shadow:0 4px 20px rgba(240,179,75,.15);
+}
+#skipChainBtn:hover{background:rgba(240,179,75,.3);box-shadow:0 4px 24px rgba(240,179,75,.25)}
+#skipChainBtn:active{transform:translateX(-50%) scale(.95)}
 #game .top-right{display:flex;gap:4px;align-items:center}
 .turn-badge{
   display:inline-flex;align-items:center;gap:5px;
@@ -196,72 +216,54 @@ body::before{content:'';position:fixed;inset:0;background:
   transform:translate(-50%,-50%);
 }
 
-/* === 液态玻璃光泽 === */
-.glass-shine,.mode-card,.modal-inner,.settlement .stat-card,.settlement .chart-box,
-.history-item,.eve-ai-row,.form-row input,.form-row select,#pauseOverlay .stat-card,
-#pauseOverlay .chart-box{position:relative;overflow:hidden}
-.glass-shine::after,.mode-card::after,.modal-inner::after,
-.settlement .stat-card::after,.settlement .chart-box::after,
-.history-item::after,.eve-ai-row::after,
-#pauseOverlay .stat-card::after,#pauseOverlay .chart-box::after{
-  content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
-  border-radius:inherit;
-  background:linear-gradient(
-    105deg,
-    transparent 30%,
-    rgba(255,255,255,.04) 35%,
-    rgba(255,255,255,.07) 40%,
-    rgba(255,255,255,.02) 43%,
-    transparent 48%
-  );
-  background-size:300% 100%;
-  animation:glassSweep 6s ease-in-out infinite;
-}
-.mode-card::after,.modal-inner::after{border-radius:12px}
-@keyframes glassSweep{
-  0%{background-position:200% 0}
-  50%{background-position:-20% 0}
-  100%{background-position:-200% 0}
-}
-/* 边框液态光晕 */
+/* 挖孔屏安全区 */
+body{padding-top:env(safe-area-inset-top,20px)}
+/* 简洁卡片风格（无流光） */
 .mode-card,.modal-inner,.settlement .stat-card,.settlement .chart-box,
 .history-item,#pauseOverlay .stat-card,#pauseOverlay .chart-box{
-  border-color:rgba(255,255,255,.06);
-  transition:border-color .4s ease,box-shadow .4s ease;
+  border:1px solid rgba(255,255,255,.08);
+  transition:border-color .25s ease,box-shadow .25s ease;
 }
 .mode-card:hover,.history-item:hover{
-  border-color:rgba(255,255,255,.14);
-  box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 20px rgba(240,179,75,.04);
+  border-color:rgba(255,255,255,.18);
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
 }
-/* 按钮玻璃光泽 */
 .btn-primary,.settlement .btn-again{
-  position:relative;overflow:hidden;
-  background:linear-gradient(135deg,var(--accent) 0%,#e8a030 50%,var(--accent) 100%);
-  background-size:200% 100%;
-  animation:btnShimmer 8s ease-in-out infinite;
+  background:var(--accent);color:#0f0f13;
+  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;
+  transition:.2s;box-shadow:0 4px 20px rgba(240,179,75,.25);
 }
-@keyframes btnShimmer{
-  0%{background-position:0% 50%}
-  50%{background-position:100% 50%}
-  100%{background-position:0% 50%}
-}
-.btn-primary::after,.settlement .btn-again::after{
-  content:'';position:absolute;inset:0;pointer-events:none;
-  border-radius:inherit;
-  background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.15) 35%,rgba(255,255,255,.08) 40%,transparent 45%);
-  background-size:300% 100%;
-  animation:glassSweep 5s ease-in-out infinite;
-}
-/* 暂停覆盖面保持液态玻璃 */
+.btn-primary:hover{opacity:.9;box-shadow:0 4px 20px rgba(240,179,75,.3);transform:translateY(-1px)}
+.btn-primary:active{opacity:.85;transform:scale(.97);transition:all .08s ease}
+/* 暂停覆盖背景 */
 #pauseOverlay.settlement{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
 #pauseOverlay .stat-card,#pauseOverlay .chart-box{
   background:rgba(255,255,255,.05);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  border:1px solid var(--glass-border);
+  border:1px solid rgba(255,255,255,.08);
 }
 #pauseOverlay #pauseCharts{display:flex;flex-direction:column;gap:12px;width:100%}
 #pauseOverlay .stats-grid{gap:8px}
 #pauseOverlay .btn-primary{margin-top:4px}
+
+/* checkout screen — 结算/历史详情页（复用 settlement 样式，但作为 .screen） */
+#checkout.screen{max-width:520px;gap:6px;padding:8px 6px 16px}
+#checkout.screen.active{display:flex;flex-direction:column;align-items:center}
+#checkout .chk-scroll{width:100%;max-height:calc(100dvh - 52px);overflow-y:auto;padding-right:4px}
+#checkout .chk-scroll::-webkit-scrollbar{width:3px}
+#checkout .chk-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+#checkout .chk-back{position:sticky;top:0;z-index:1;align-self:flex-start;margin-bottom:2px}
+#checkout .settlement{position:relative;inset:auto;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;animation:none;z-index:auto}
+#checkout .settlement-inner{gap:8px}
+#checkout .settlement h2{font-size:1.15rem;margin:2px 0 4px;width:100%}
+#checkout .stats-grid{gap:5px;width:100%}
+#checkout .stat-card{padding:7px 5px}
+#checkout .stat-card .num{font-size:.95rem}
+#checkout .chart-box{padding:6px 8px}
+#checkout .chart-box canvas{height:100px}
+#checkout .chart-box h4{font-size:.72rem;margin-bottom:3px}
+#checkout .chart-legend{gap:4px;margin-top:2px}
+#checkout .chart-legend span{font-size:.6rem}
+#checkout .btn-again{padding:9px 24px;font-size:.85rem;margin:10px 0 4px;width:auto}
 
 /* player colours */
 .p0{background:#e8645a}
@@ -283,49 +285,53 @@ body::before{content:'';position:fixed;inset:0;background:
 #msg.error{background:#c0392b;color:#fff}
 #msg.success{background:#27ae60;color:#fff}
 
-/* modal */
+/* modal — 简洁现代 */
 .modal{
   display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.65);
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  justify-content:center;align-items:center;z-index:1000;padding:16px;
+  background:rgba(0,0,0,.6);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  justify-content:center;align-items:center;z-index:1000;padding:20px;
 }
 .modal.show{display:flex}
 .modal-inner{
   background:var(--surface);
-  padding:24px;border-radius:var(--radius);
-  width:100%;max-width:360px;
-  animation:modalIn .2s ease;
-  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
-  border:1px solid var(--glass-border);
-  box-shadow:var(--glass-shadow);
+  padding:28px 24px 20px;
+  border-radius:16px;
+  width:100%;max-width:340px;
+  animation:modalIn .25s cubic-bezier(.16,1,.3,1);
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 12px 48px rgba(0,0,0,.5);
 }
 @keyframes modalIn{
-  from{opacity:0;transform:translateY(16px) scale(.96)}
+  from{opacity:0;transform:translateY(20px) scale(.95)}
   to{opacity:1;transform:translateY(0) scale(1)}
 }
-.modal-inner h3{font-size:1.05rem;font-weight:600;text-align:center;margin-bottom:16px}
-.form-row{margin:10px 0;display:flex;flex-direction:column;gap:4px}
-.form-row label{font-size:.8rem;color:var(--dim)}
+.modal-inner h3{font-size:1.1rem;font-weight:600;text-align:center;margin-bottom:20px;color:var(--text)}
+.form-row{margin:12px 0;display:flex;flex-direction:column;gap:6px}
+.form-row label{font-size:.78rem;color:var(--dim);font-weight:500;letter-spacing:.3px}
 .form-row input,.form-row select{
-  width:100%;padding:10px 12px;
-  border:1px solid var(--border);border-radius:8px;
-  background:rgba(255,255,255,.04);color:var(--text);
+  width:100%;padding:11px 14px;
+  border:1px solid rgba(255,255,255,.1);border-radius:10px;
+  background:rgba(255,255,255,.05);color:var(--text);
   font-size:.9rem;outline:none;transition:.15s;
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  -webkit-appearance:none;appearance:none;
 }
 .form-row input:focus,.form-row select:focus{
-  border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,179,75,.15);
+  border-color:var(--accent);box-shadow:0 0 0 3px rgba(240,179,75,.2);
 }
-.form-row select option{background:var(--surface);color:var(--text)}
-.modal-actions{display:flex;gap:10px;margin-top:16px}
+.form-row select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%237a7885' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;padding-right:32px;
+}
+.form-row select option{background:#1a1a22;color:var(--text)}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
 .modal-actions button{
-  flex:1;padding:10px;border:none;border-radius:8px;
-  font-size:.9rem;font-weight:600;cursor:pointer;transition:.12s;
+  flex:1;padding:11px;border:none;border-radius:10px;
+  font-size:.88rem;font-weight:600;cursor:pointer;transition:.15s;
 }
-.modal-actions button:active{opacity:.75}
+.modal-actions button:active{transform:scale(.97)}
 .btn-ghost{background:rgba(255,255,255,.08);color:var(--dim)}
-.btn-ghost:active{opacity:.75}
+.btn-ghost:hover{background:rgba(255,255,255,.12)}
 
 /* player bar */
 .player-bar{
@@ -423,6 +429,112 @@ body::before{content:'';position:fixed;inset:0;background:
 .history-item .h-details{font-size:.7rem;color:var(--dim)}
 .history-item .h-winner{display:inline-block;font-size:.75rem;font-weight:600;margin-top:4px}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* ═══════════════ 自定义控件（替换原生 select） ═══════════════ */
+/* 棋盘大小网格 */
+.size-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%}
+.size-btn{
+  padding:10px 4px;border-radius:8px;border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);color:var(--dim);font-size:.78rem;font-weight:500;
+  cursor:pointer;transition:.15s;text-align:center;font-family:var(--font);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+.size-btn:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
+.size-btn:active{transform:scale(.95);transition:all .06s ease}
+.size-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
+
+/* 按钮组（AI 数量、玩家数量） */
+.btn-group{display:flex;gap:6px;flex-wrap:wrap;width:100%}
+.btn-group .gb{
+  flex:1;min-width:38px;padding:9px 6px;border-radius:8px;border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);color:var(--dim);font-size:.78rem;font-weight:500;
+  cursor:pointer;transition:.15s;text-align:center;font-family:var(--font);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+.btn-group .gb:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
+.btn-group .gb:active{transform:scale(.95);transition:all .06s ease}
+.btn-group .gb.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
+
+/* 算法选择卡片 */
+.alg-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.alg-card{
+  padding:14px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);cursor:pointer;transition:.2s;text-align:center;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+.alg-card:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);transform:translateY(-1px)}
+.alg-card:active{transform:scale(.97);transition:all .06s ease}
+.alg-card.selected{background:rgba(240,179,75,.12);border-color:var(--accent);box-shadow:0 0 16px rgba(240,179,75,.12)}
+.alg-card .alg-icon{font-size:1.4rem;margin-bottom:4px}
+.alg-card .alg-name{font-size:.82rem;font-weight:600;color:var(--text)}
+.alg-card .alg-desc{font-size:.7rem;color:var(--dim);margin-top:2px;line-height:1.3}
+.alg-card.selected .alg-name{color:var(--accent)}
+
+/* 深度滑块 */
+.depth-slider-wrap{display:flex;align-items:center;gap:12px;width:100%}
+.depth-slider{
+  flex:1;-webkit-appearance:none;appearance:none;height:6px;
+  background:rgba(255,255,255,.1);border-radius:3px;outline:none;transition:.15s;
+}
+.depth-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:22px;height:22px;
+  border-radius:50%;background:var(--accent);cursor:pointer;
+  box-shadow:0 2px 8px rgba(240,179,75,.3);transition:.1s;
+  border:2px solid rgba(255,255,255,.15);
+}
+.depth-slider::-webkit-slider-thumb:active{transform:scale(1.15)}
+.depth-slider::-moz-range-thumb{
+  width:22px;height:22px;border-radius:50%;background:var(--accent);
+  cursor:pointer;border:2px solid rgba(255,255,255,.15);
+  box-shadow:0 2px 8px rgba(240,179,75,.3);
+}
+.depth-value{
+  min-width:32px;text-align:center;font-size:1.1rem;font-weight:700;
+  color:var(--accent);font-variant-numeric:tabular-nums;
+}
+.depth-labels{display:flex;justify-content:space-between;width:100%;font-size:.65rem;color:var(--dim);margin-top:2px}
+.depth-labels span:last-child{text-align:right}
+
+/* 颜色选择器 */
+.color-picker{display:flex;gap:8px;flex-wrap:wrap;width:100%;justify-content:center}
+.color-opt{
+  width:36px;height:36px;border-radius:50%;border:2px solid transparent;
+  cursor:pointer;transition:.15s;position:relative;
+}
+.color-opt:hover{transform:scale(1.12);box-shadow:0 0 12px rgba(255,255,255,.12)}
+.color-opt:active{transform:scale(.95)}
+.color-opt.selected{border-color:#fff;box-shadow:0 0 16px rgba(255,255,255,.2),0 0 0 3px rgba(255,255,255,.08)}
+.color-opt .color-label{
+  position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
+  font-size:.6rem;color:var(--dim);white-space:nowrap;display:none;
+}
+.color-opt.selected .color-label{display:block}
+
+/* Eve 配置行优化 */
+.eve-config-grid{display:flex;flex-direction:column;gap:6px;width:100%;max-height:260px;overflow-y:auto}
+.eve-ai-row{
+  display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);
+  border-radius:8px;padding:6px 10px;
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,.06);
+}
+.eve-ai-row .alg-mini{display:flex;gap:4px;flex:1}
+.eve-ai-row .alg-mini .am-btn{
+  flex:1;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);color:var(--dim);font-size:.7rem;font-weight:500;
+  cursor:pointer;transition:.1s;text-align:center;font-family:var(--font);white-space:nowrap;
+}
+.eve-ai-row .alg-mini .am-btn:hover{background:rgba(255,255,255,.08)}
+.eve-ai-row .alg-mini .am-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
+.eve-ai-row .depth-mini{display:flex;align-items:center;gap:2px}
+.eve-ai-row .depth-mini .dm-btn{
+  width:24px;height:24px;border-radius:50%;border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);color:var(--dim);font-size:.8rem;font-weight:600;
+  cursor:pointer;transition:.1s;display:flex;align-items:center;justify-content:center;font-family:var(--font);
+}
+.eve-ai-row .depth-mini .dm-btn:hover{background:rgba(255,255,255,.1)}
+.eve-ai-row .depth-mini .dm-val{min-width:20px;text-align:center;font-size:.8rem;font-weight:600;color:var(--text)}
+.eve-ai-row .depth-mini.hidden{display:none}
 </style>
 </head>
 <body>
@@ -432,28 +544,28 @@ body::before{content:'';position:fixed;inset:0;background:
   <div class="logo">♟<span>连锁棋</span></div>
   <div class="tagline">多人联手，一触即发</div>
   <div class="mode-cards">
-    <div class="mode-card" onclick="showAILobby()" style="border-color:rgba(240,179,75,.18)">
+    <div class="mode-card" onclick="Router.navigate('aiLobby')" style="border-color:rgba(240,179,75,.18)">
       <div class="icon">🤖</div>
       <div class="body">
         <h3>AI 对战</h3>
         <p>与电脑 AI 对决，挑战不同难度</p>
       </div>
     </div>
-    <div class="mode-card" onclick="showLocalLobby()" style="border-color:rgba(95,195,195,.18)">
+    <div class="mode-card" onclick="Router.navigate('localLobby')" style="border-color:rgba(95,195,195,.18)">
       <div class="icon">👥</div>
       <div class="body">
         <h3>本地对战</h3>
         <p>同一设备，轮流落子，朋友面前大战</p>
       </div>
     </div>
-    <div class="mode-card" onclick="showEveLobby()" style="border-color:rgba(192,128,240,.25)">
+    <div class="mode-card" onclick="Router.navigate('eveLobby')" style="border-color:rgba(192,128,240,.25)">
       <div class="icon">⚔️</div>
       <div class="body">
         <h3>AI 斗蛐蛐</h3>
         <p>自定义 AI 阵容，观看 AI 互相博弈</p>
       </div>
     </div>
-    <div class="mode-card" onclick="showHistory()" style="border-color:rgba(95,195,195,.2)">
+    <div class="mode-card" onclick="Router.navigate('history')" style="border-color:rgba(95,195,195,.2)">
       <div class="icon">📋</div>
       <div class="body">
         <h3>历史记录</h3>
@@ -466,7 +578,7 @@ body::before{content:'';position:fixed;inset:0;background:
 
 <!-- History Screen -->
 <div id="history" class="screen">
-  <button class="back" onclick="goHome()">← 返回</button>
+  <button class="back" onclick="Router.back()">← 返回</button>
   <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
     <h2 style="margin:0">📋 历史记录</h2>
     <button onclick="clearHistory()" style="background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.2);color:rgba(255,100,100,.9);padding:6px 14px;border-radius:8px;font-size:.75rem;cursor:pointer;transition:.15s;font-weight:500" onmouseover="this.style.background='rgba(255,80,80,.2)'" onmouseout="this.style.background='rgba(255,80,80,.12)'">🗑 清空历史</button>
@@ -479,81 +591,119 @@ body::before{content:'';position:fixed;inset:0;background:
 
 <!-- AI Lobby -->
 <div id="aiLobby" class="screen">
-  <button class="back" onclick="goHome()">← 返回</button>
+  <button class="back" onclick="Router.back()">← 返回</button>
   <h2>🤖 AI 对战</h2>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">选择对局配置</p>
+
+  <!-- 棋盘大小 -->
   <div class="form-row"><label>棋盘大小</label>
-    <select id="aiSize">
-      <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
-      <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
-      <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
-      <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
-      <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
-    </select>
+    <div id="aiSizeGrid" class="size-grid">
+      <button class="size-btn" data-value="5">5×5</button>
+      <button class="size-btn" data-value="6">6×6</button>
+      <button class="size-btn selected" data-value="7">7×7</button>
+      <button class="size-btn" data-value="8">8×8</button>
+      <button class="size-btn" data-value="9">9×9</button>
+      <button class="size-btn" data-value="10">10×10</button>
+      <button class="size-btn" data-value="11">11×11</button>
+      <button class="size-btn" data-value="12">12×12</button>
+      <button class="size-btn" data-value="13">13×13</button>
+      <button class="size-btn" data-value="14">14×14</button>
+      <button class="size-btn" data-value="15">15×15</button>
+      <button class="size-btn" data-value="16">16×16</button>
+      <button class="size-btn" data-value="17">17×17</button>
+      <button class="size-btn" data-value="18">18×18</button>
+      <button class="size-btn" data-value="19">19×19</button>
+    </div>
   </div>
+
+  <!-- AI 对手数 -->
   <div class="form-row"><label>AI 对手数</label>
-    <select id="aiCount" onchange="toggleAIColorPicker()">
-      <option value="1" selected>1 个 AI</option>
-      <option value="2">2 个 AI</option>
-      <option value="3">3 个 AI</option>
-      <option value="4">4 个 AI</option>
-      <option value="5">5 个 AI</option>
-      <option value="6">6 个 AI</option>
-    </select>
+    <div id="aiCountGroup" class="btn-group">
+      <button class="gb selected" data-value="1">1</button>
+      <button class="gb" data-value="2">2</button>
+      <button class="gb" data-value="3">3</button>
+      <button class="gb" data-value="4">4</button>
+      <button class="gb" data-value="5">5</button>
+      <button class="gb" data-value="6">6</button>
+    </div>
   </div>
+
+  <!-- 颜色选择 -->
   <div id="aiColorPickerRow" class="form-row" style="display:none"><label>选择你的颜色</label>
-    <div id="aiColorOptions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    <div id="aiColorOptions" class="color-picker"></div>
   </div>
+
+  <!-- AI 算法 -->
   <div class="form-row"><label>AI 算法</label>
-    <select id="aiAlgorithm" onchange="toggleAIDepth()">
-      <option value="strategy">策略算法</option>
-      <option value="alphabeta">Alpha-Beta 剪枝</option>
-    </select>
+    <div id="aiAlgorithmCards" class="alg-cards">
+      <div class="alg-card selected" data-value="strategy">
+        <div class="alg-icon">⚡</div>
+        <div class="alg-name">策略算法</div>
+        <div class="alg-desc">快速启发式搜索<br>推荐新手使用</div>
+      </div>
+      <div class="alg-card" data-value="alphabeta">
+        <div class="alg-icon">🧠</div>
+        <div class="alg-name">Alpha-Beta 剪枝</div>
+        <div class="alg-desc">Rust+Rayon 多核加速<br>深度可调 棋力更强</div>
+      </div>
+    </div>
   </div>
-  <div id="aiDepthRow" class="form-row"><label>搜索深度</label>
-    <select id="aiDepth">
-      <option value="1">1</option>
-      <option value="2" selected>2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="5">5</option>
-      <option value="6">6</option>
-      <option value="7">7</option>
-      <option value="8">8</option>
-      <option value="9">9</option>
-      <option value="10">10</option>
-    </select>
+
+  <!-- 搜索深度 -->
+  <div id="aiDepthRow" class="form-row">
+    <label>搜索深度</label>
+    <div class="depth-slider-wrap">
+      <input type="range" id="aiDepthSlider" class="depth-slider" min="1" max="10" value="2" step="1">
+      <span class="depth-value" id="aiDepthDisplay">2</span>
+    </div>
+    <div class="depth-labels"><span>浅层 · 快速</span><span>深层 · 精准</span></div>
   </div>
+
   <button class="btn-primary" onclick="startAIGame()" style="margin-top:12px">开始游戏</button>
 </div>
 
 <!-- Eve Lobby -->
 <div id="eveLobby" class="screen">
-  <button class="back" onclick="goHome()">← 返回</button>
+  <button class="back" onclick="Router.back()">← 返回</button>
   <h2>⚔️ AI 斗蛐蛐</h2>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">自定义 AI 阵容，观看 AI 互相博弈</p>
+
+  <!-- 棋盘大小 -->
   <div class="form-row"><label>棋盘大小</label>
-    <select id="eveSize">
-      <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
-      <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
-      <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
-      <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
-      <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
-    </select>
+    <div id="eveSizeGrid" class="size-grid">
+      <button class="size-btn" data-value="5">5×5</button>
+      <button class="size-btn" data-value="6">6×6</button>
+      <button class="size-btn selected" data-value="7">7×7</button>
+      <button class="size-btn" data-value="8">8×8</button>
+      <button class="size-btn" data-value="9">9×9</button>
+      <button class="size-btn" data-value="10">10×10</button>
+      <button class="size-btn" data-value="11">11×11</button>
+      <button class="size-btn" data-value="12">12×12</button>
+      <button class="size-btn" data-value="13">13×13</button>
+      <button class="size-btn" data-value="14">14×14</button>
+      <button class="size-btn" data-value="15">15×15</button>
+      <button class="size-btn" data-value="16">16×16</button>
+      <button class="size-btn" data-value="17">17×17</button>
+      <button class="size-btn" data-value="18">18×18</button>
+      <button class="size-btn" data-value="19">19×19</button>
+    </div>
   </div>
-  <div class="form-row"><label>AI 数量（2~10）</label>
-    <select id="eveCount" onchange="generateEveConfig()">
-      <option value="2">2 个 AI</option>
-      <option value="3" selected>3 个 AI</option>
-      <option value="4">4 个 AI</option>
-      <option value="5">5 个 AI</option>
-      <option value="6">6 个 AI</option>
-      <option value="7">7 个 AI</option>
-      <option value="8">8 个 AI</option>
-      <option value="9">9 个 AI</option>
-      <option value="10">10 个 AI</option>
-    </select>
+
+  <!-- AI 数量 -->
+  <div class="form-row"><label>AI 数量</label>
+    <div id="eveCountGroup" class="btn-group">
+      <button class="gb" data-value="2">2</button>
+      <button class="gb selected" data-value="3">3</button>
+      <button class="gb" data-value="4">4</button>
+      <button class="gb" data-value="5">5</button>
+      <button class="gb" data-value="6">6</button>
+      <button class="gb" data-value="7">7</button>
+      <button class="gb" data-value="8">8</button>
+      <button class="gb" data-value="9">9</button>
+      <button class="gb" data-value="10">10</button>
+    </div>
   </div>
+
   <div id="eveConfigArea" class="form-eve-config">
     <p style="font-size:.8rem;color:var(--dim);margin:8px 0 4px">配置每个 AI</p>
   </div>
@@ -562,25 +712,43 @@ body::before{content:'';position:fixed;inset:0;background:
 
 <!-- Local Lobby -->
 <div id="localLobby" class="screen">
-  <button class="back" onclick="goHome()">← 返回</button>
+  <button class="back" onclick="Router.back()">← 返回</button>
   <h2>👥 本地对战</h2>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">选择对局配置</p>
+
+  <!-- 棋盘大小 -->
   <div class="form-row"><label>棋盘大小</label>
-    <select id="localSize">
-      <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
-      <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
-      <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
-      <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
-      <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
-    </select>
+    <div id="localSizeGrid" class="size-grid">
+      <button class="size-btn" data-value="5">5×5</button>
+      <button class="size-btn" data-value="6">6×6</button>
+      <button class="size-btn selected" data-value="7">7×7</button>
+      <button class="size-btn" data-value="8">8×8</button>
+      <button class="size-btn" data-value="9">9×9</button>
+      <button class="size-btn" data-value="10">10×10</button>
+      <button class="size-btn" data-value="11">11×11</button>
+      <button class="size-btn" data-value="12">12×12</button>
+      <button class="size-btn" data-value="13">13×13</button>
+      <button class="size-btn" data-value="14">14×14</button>
+      <button class="size-btn" data-value="15">15×15</button>
+      <button class="size-btn" data-value="16">16×16</button>
+      <button class="size-btn" data-value="17">17×17</button>
+      <button class="size-btn" data-value="18">18×18</button>
+      <button class="size-btn" data-value="19">19×19</button>
+    </div>
   </div>
+
+  <!-- 玩家人数 -->
   <div class="form-row"><label>玩家人数</label>
-    <select id="localPlayers">
-      <option value="2" selected>2 人</option><option value="3">3 人</option>
-      <option value="4">4 人</option><option value="5">5 人</option>
-      <option value="6">6 人</option><option value="7">7 人</option>
-    </select>
+    <div id="localPlayersGroup" class="btn-group">
+      <button class="gb selected" data-value="2">2</button>
+      <button class="gb" data-value="3">3</button>
+      <button class="gb" data-value="4">4</button>
+      <button class="gb" data-value="5">5</button>
+      <button class="gb" data-value="6">6</button>
+      <button class="gb" data-value="7">7</button>
+    </div>
   </div>
+
   <button class="btn-primary" onclick="startLocalGame()" style="margin-top:12px">开始游戏</button>
 </div>
 
@@ -598,6 +766,7 @@ body::before{content:'';position:fixed;inset:0;background:
   </div>
   <div id="playerBar" class="player-bar"></div>
   <div class="board-wrap"><div id="board"></div></div>
+  <div id="skipChainBtn" onclick="chainSkipAll=true">▶ 跳过动画</div>
 </div>
 
 <!-- Pause Overlay -->
@@ -612,29 +781,48 @@ body::before{content:'';position:fixed;inset:0;background:
   </div>
 </div>
 
+<!-- Checkout Screen (结算/历史详情) -->
+<div id="checkout" class="screen">
+  <button class="back chk-back" onclick="Router.back()">← 返回</button>
+  <div id="checkoutContent" class="chk-scroll"></div>
+</div>
+
 <!-- Reset Modal -->
 <div id="resetModal" class="modal">
   <div class="modal-inner">
     <h3>重新开始</h3>
     <div class="form-row"><label>棋盘大小</label>
-      <select id="resetSize">
-        <option value="5">5×5</option><option value="6">6×6</option><option value="7" selected>7×7</option>
-        <option value="8">8×8</option><option value="9">9×9</option><option value="10">10×10</option>
-        <option value="11">11×11</option><option value="12">12×12</option><option value="13">13×13</option>
-        <option value="14">14×14</option><option value="15">15×15</option><option value="16">16×16</option>
-        <option value="17">17×17</option><option value="18">18×18</option><option value="19">19×19</option>
-      </select>
+      <div id="resetSizeGrid" class="size-grid">
+        <button class="size-btn" data-value="5">5×5</button>
+        <button class="size-btn" data-value="6">6×6</button>
+        <button class="size-btn selected" data-value="7">7×7</button>
+        <button class="size-btn" data-value="8">8×8</button>
+        <button class="size-btn" data-value="9">9×9</button>
+        <button class="size-btn" data-value="10">10×10</button>
+        <button class="size-btn" data-value="11">11×11</button>
+        <button class="size-btn" data-value="12">12×12</button>
+        <button class="size-btn" data-value="13">13×13</button>
+        <button class="size-btn" data-value="14">14×14</button>
+        <button class="size-btn" data-value="15">15×15</button>
+        <button class="size-btn" data-value="16">16×16</button>
+        <button class="size-btn" data-value="17">17×17</button>
+        <button class="size-btn" data-value="18">18×18</button>
+        <button class="size-btn" data-value="19">19×19</button>
+      </div>
     </div>
     <div id="resetPlayersRow" class="form-row"><label>玩家人数</label>
-      <select id="resetPlayers">
-        <option value="2" selected>2 人</option><option value="3">3 人</option>
-        <option value="4">4 人</option><option value="5">5 人</option>
-        <option value="6">6 人</option><option value="7">7 人</option>
-      </select>
+      <div id="resetPlayersGroup" class="btn-group">
+        <button class="gb selected" data-value="2">2</button>
+        <button class="gb" data-value="3">3</button>
+        <button class="gb" data-value="4">4</button>
+        <button class="gb" data-value="5">5</button>
+        <button class="gb" data-value="6">6</button>
+        <button class="gb" data-value="7">7</button>
+      </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-ghost" onclick="closeModal('resetModal')">取消</button>
-      <button class="btn-primary" onclick="confirmReset()" style="background:var(--accent);color:#0f0f13">重开</button>
+      <button class="btn-ghost" id="resetCancelBtn">取消</button>
+      <button class="btn-primary" id="resetConfirmBtn" style="background:var(--accent);color:#0f0f13">重开</button>
     </div>
   </div>
 </div>
@@ -694,64 +882,240 @@ let gameHistory=[];
 let chainStats={};
 let maxChainOverall={player:null,length:0};
 
+// 连炸跳过标志
+let chainSkipAll=false;
+
 // 首子落位（用于限制其他玩家落子）
 let firstMovePos=null;
 
 // 暂停状态
 let isPaused=false;
 
-/* ==================== SCREEN MGMT ==================== */
-function show(s){
-  document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));
-  document.getElementById(s).classList.add('active');
+// 图表上下文缓存（用于全屏重绘）
+let _chartCtx={};
+
+/* ═══════════════ 自定义控件事件绑定（文档级委托） ═══════════════ */
+// 通用：获取自定义控件的选中值
+function getSel(containerId){
+  const c=document.getElementById(containerId);
+  if(!c)return 7;
+  const s=c.querySelector('.selected');
+  return s?parseInt(s.dataset.value):7;
 }
-function goHome(){document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});document.getElementById('pauseOverlay').style.display='none';show('welcome')}
+function getSelStr(containerId){
+  const c=document.getElementById(containerId);
+  if(!c)return 'strategy';
+  const s=c.querySelector('.selected');
+  return s?s.dataset.value:'strategy';
+}
+// 设置选中状态
+function setSelected(container, target){
+  const sel = target.matches('.size-btn,.gb,.alg-card') ? '.size-btn,.gb,.alg-card' : '.' + target.className.split(' ')[0];
+  container.querySelectorAll(sel).forEach(b=>b.classList.remove('selected'));
+  target.classList.add('selected');
+}
+// 文档级委托：处理所有自定义控件点击（兼容 display:none 内的元素）
+document.addEventListener('click',function(e){
+  const t=e.target.closest('.size-btn,.gb,.alg-card');
+  if(!t)return;
+  // 查找最近的自定义控件容器
+  const container=t.closest('.size-grid,.btn-group,.alg-cards');
+  if(!container)return;
+  setSelected(container, t);
+  // 触发副作用
+  if(container.id==='aiCountGroup')setTimeout(toggleAIColorPicker,10);
+  else if(container.id==='aiAlgorithmCards')setTimeout(toggleAIDepth,10);
+  else if(container.id==='eveCountGroup')setTimeout(generateEveConfig,10);
+});
+// 深度滑块
+const aiDepthSlider=document.getElementById('aiDepthSlider');
+const aiDepthDisplay=document.getElementById('aiDepthDisplay');
+if(aiDepthSlider&&aiDepthDisplay){
+  aiDepthSlider.addEventListener('input',function(){
+    aiDepthDisplay.textContent=this.value;
+    toggleAIDepth();
+  });
+}
+// 弹窗按钮事件绑定（用 JS 代替 onclick 避免 WebView 兼容性问题）
+document.getElementById('resetConfirmBtn')?.addEventListener('click',function(e){
+  e.stopPropagation();
+  confirmReset();
+});
+document.getElementById('resetCancelBtn')?.addEventListener('click',function(e){
+  e.stopPropagation();
+  closeModal('resetModal');
+});
+
+// 初始触发
+setTimeout(toggleAIColorPicker,20);
+setTimeout(toggleAIDepth,50);
+
+/* ==================== ROUTER ==================== */
+const Router = {
+  _registry: {},
+  _current: null,
+  _prev: null,
+
+  register(id, config) {
+    this._registry[id] = config;
+  },
+
+  navigate(id, ...args) {
+    const page = this._registry[id];
+    if (!page || this._current === id) return;
+
+    // Leave current page
+    if (this._current && this._registry[this._current]?.leave) {
+      this._registry[this._current].leave();
+    }
+
+    // Update state
+    this._prev = this._current;
+    this._current = id;
+
+    // Switch screens
+    document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+
+    // Enter new page
+    if (page.enter) page.enter(...args);
+
+    // Sync hash
+    if (location.hash !== '#' + id) {
+      history.pushState(null, '', '#' + id);
+    }
+  },
+
+  back() {
+    const page = this._registry[this._current];
+    if (page && page.back) {
+      this.navigate(typeof page.back === 'function' ? page.back() : page.back);
+    } else {
+      this.navigate('welcome');
+    }
+  },
+
+  getPrev() { return this._prev; }
+};
+
+// ─── 页面注册（7 页：welcome, history, localLobby, aiLobby, eveLobby, game, checkout） ───
+Router.register('welcome', {
+  back: null,
+  enter() {},
+  leave() {}
+});
+
+Router.register('history', {
+  back: 'welcome',
+  enter() { loadHistoryList(); },
+  leave() {}
+});
+
+Router.register('aiLobby', {
+  back: 'welcome',
+  enter() { setTimeout(toggleAIDepth, 10); },
+  leave() {}
+});
+
+Router.register('localLobby', {
+  back: 'welcome',
+  enter() {},
+  leave() {}
+});
+
+Router.register('eveLobby', {
+  back: 'welcome',
+  enter() { generateEveConfig(); },
+  leave() {}
+});
+
+Router.register('game', {
+  back: null,
+  enter() {},
+  leave() {}
+});
+
+Router.register('checkout', {
+  back() { return Router._checkoutPrev || 'welcome'; },
+  enter(prevPage) { Router._checkoutPrev = prevPage || 'welcome'; },
+  leave() { document.getElementById('checkoutContent').innerHTML = ''; },
+  _checkoutPrev: 'welcome'
+});
+
+// ─── 兼容旧函数（逐步迁移） ───
+function show(s) { Router.navigate(s); }
+function goHome() {
+  document.querySelectorAll('.settlement').forEach(e => { if (e.id !== 'pauseOverlay') e.remove() });
+  document.getElementById('pauseOverlay').style.display = 'none';
+  Router.navigate('welcome');
+}
 function exitApp(){
-  // 尝试干净退出
-  try {
-    window.__TAURI_INTERNALS__?.invoke('exit_app').catch(()=>{});
-  } catch(e){}
-  // 如果 Tauri 关闭失败，当作退出游戏处理
+  try { window.__TAURI_INTERNALS__?.invoke('exit_app').catch(()=>{}); } catch(e){}
   exitGame();
 }
-function showAILobby(){location.hash='#aiLobby';show('aiLobby')}
-function showLocalLobby(){location.hash='#localLobby';show('localLobby')}
-function showEveLobby(){location.hash='#eveLobby';show('eveLobby');generateEveConfig()}
 function generateEveConfig(){
-  let cnt=parseInt(document.getElementById('eveCount').value)||3;
+  let cnt=getSel('eveCountGroup')||3;
+  if(cnt<2)cnt=2;if(cnt>10)cnt=10;
   let area=document.getElementById('eveConfigArea');
   area.innerHTML='<p style="font-size:.8rem;color:var(--dim);margin:8px 0 4px">配置每个 AI</p>';
   for(let i=0;i<cnt;i++){
     let row=document.createElement('div');row.className='eve-ai-row';
     let dot=document.createElement('span');dot.className='color-dot';dot.style.background=COLORS[i%7]||'#888';
     let label=document.createElement('span');label.className='eve-label';label.textContent='AI '+(i+1);
-    let algSel=document.createElement('select');algSel.id='eveAlg_'+i;
-    let opt1=document.createElement('option');opt1.value='strategy';opt1.textContent='策略算法';
-    let opt2=document.createElement('option');opt2.value='alphabeta';opt2.textContent='Alpha-Beta';
-    algSel.appendChild(opt1);algSel.appendChild(opt2);
-    let depSel=document.createElement('select');depSel.id='eveDepth_'+i;depSel.style.maxWidth='60px';
-    for(let d=1;d<=10;d++){let o=document.createElement('option');o.value=d;o.textContent=d;if(d===2)o.selected=true;depSel.appendChild(o)}
-    // 策略算法默认隐藏深度选项，切换算法时联动
-    depSel.style.display='none';
-    algSel.onchange=function(){depSel.style.display=this.value==='alphabeta'?'':'none'};
-    row.appendChild(dot);row.appendChild(label);row.appendChild(algSel);row.appendChild(depSel);
+    // 算法迷你切换
+    let algWrap=document.createElement('div');algWrap.className='alg-mini';
+    let algVal='strategy';
+    function makeAlgBtn(v,t){
+      let b=document.createElement('button');b.className='am-btn'+(v==='strategy'?' selected':'');
+      b.textContent=t;b.dataset.value=v;
+      b.onclick=function(e){
+        e.stopPropagation();
+        algWrap.querySelectorAll('.am-btn').forEach(x=>x.classList.remove('selected'));
+        this.classList.add('selected');
+        algVal=this.dataset.value;
+        depWrap.style.display=algVal==='alphabeta'?'flex':'none';
+      };
+      return b;
+    }
+    algWrap.appendChild(makeAlgBtn('strategy','策略'));
+    algWrap.appendChild(makeAlgBtn('alphabeta','A-B'));
+    // 深度迷你 +/- 
+    let depWrap=document.createElement('div');depWrap.className='depth-mini hidden';
+    let depVal=2;
+    let depDisp=document.createElement('span');depDisp.className='dm-val';depDisp.textContent='2';
+    let decBtn=document.createElement('button');decBtn.className='dm-btn';decBtn.textContent='−';
+    let incBtn=document.createElement('button');incBtn.className='dm-btn';incBtn.textContent='+';
+    decBtn.onclick=function(e){e.stopPropagation();if(depVal>1){depVal--;depDisp.textContent=depVal}};
+    incBtn.onclick=function(e){e.stopPropagation();if(depVal<10){depVal++;depDisp.textContent=depVal}};
+    depWrap.appendChild(decBtn);depWrap.appendChild(depDisp);depWrap.appendChild(incBtn);
+    // 存储用于 startEveGame 读取
+    row.dataset.algKey='eveAlg_'+i;
+    row.dataset.depKey='eveDepth_'+i;
+    row._eveGetAlg=()=>algVal;
+    row._eveGetDep=()=>depVal;
+    row.appendChild(dot);row.appendChild(label);row.appendChild(algWrap);row.appendChild(depWrap);
     area.appendChild(row);
   }
 }
 function startEveGame(){
+  clearBoardDOM();
   location.hash='#game';
-  size=parseInt(document.getElementById('eveSize').value)||7;
-  let aiCount=parseInt(document.getElementById('eveCount').value)||3;
+  resetRoundHistory();
+  size=getSel('eveSizeGrid')||7;
+  let aiCount=getSel('eveCountGroup')||3;
   maxPlayers=aiCount;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='⏸ 暂停';
   gameMode='eve';
   aiPlayers=new Set();
   aiConfigs={};
+  let eveRows=document.querySelectorAll('#eveConfigArea .eve-ai-row');
   for(let p=0;p<maxPlayers;p++){
     aiPlayers.add(p);
-    let alg=document.getElementById('eveAlg_'+p).value;
-    let dep=parseInt(document.getElementById('eveDepth_'+p).value)||2;
+    let row=eveRows[p];
+    let alg=row&&row._eveGetAlg?row._eveGetAlg():'strategy';
+    let dep=row&&row._eveGetDep?row._eveGetDep():2;
     aiConfigs[p]={algorithm:alg,depth:dep};
   }
   aiThinking=false;
@@ -767,11 +1131,7 @@ function startEveGame(){
   renderPlayerBar();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
 }
-function showHistory(){
-  location.hash='#history';
-  show('history');
-  loadHistoryList();
-}
+function showHistory(){ Router.navigate('history'); }
 // Tauri invoke helper
 function tauriInvoke(cmd, args){
   return window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke 
@@ -846,8 +1206,15 @@ function saveGameHistory(winner, mode, aiAlg, aiDp){
 }
 
 function toggleAIDepth(){
-  let alg=document.getElementById('aiAlgorithm').value;
-  document.getElementById('aiDepthRow').style.display=alg==='alphabeta'?'block':'none';
+  let alg=getSelStr('aiAlgorithmCards');
+  let row=document.getElementById('aiDepthRow');
+  let slider=document.getElementById('aiDepthSlider');
+  if(alg==='alphabeta'){
+    row.style.display='block';
+    if(slider)slider.disabled=false;
+  }else{
+    row.style.display='none';
+  }
 }
 // 初始化时根据算法隐藏/显示深度设置
 toggleAIDepth();
@@ -928,6 +1295,17 @@ function isInFirstMoveRestricted(x,y,fx,fy){
   if(dx===0&&dy>=-2&&dy<=2&&!(dx===0&&dy===0))return true;
   return false;
 }
+// 检查 (x,y) 是否在棋盘上任何已有棋子周围的12格限制区内
+function isInRestrictedZone(x,y,sz,b){
+  for(let i=0;i<sz;i++)for(let j=0;j<sz;j++){
+    if(b[i][j].owner!==null&&isInFirstMoveRestricted(x,y,i,j))return true;
+  }
+  return false;
+}
+
+// ─── 历史存储管理（内存+磁盘两层） ───
+const HISTORY_MEM_MAX=500;  // 内存上限，超出则刷盘
+const HISTORY_MEM_KEEP=100; // 刷盘后保留条数
 
 function recordHistory(){
   let sn={};
@@ -937,12 +1315,47 @@ function recordHistory(){
     sn[p]={pieces,points};
   }
   gameHistory.push({turn:gameHistory.length,snapshot:sn});
+  // 超过内存上限→异步溢出到磁盘（不阻塞落子）
+  if(gameHistory.length>HISTORY_MEM_MAX){
+    setTimeout(()=>flushOverflowHistory(),0);
+  }
+}
+
+async function flushOverflowHistory(){
+  const overflow=gameHistory.splice(0,gameHistory.length-HISTORY_MEM_KEEP);
+  for(let i=0;i<gameHistory.length;i++)gameHistory[i].turn=i;
+  let existing=[];
+  try{existing=await tauriInvoke('load_round_history')}catch(e){}
+  const merged=[...existing,...overflow];
+  for(let i=0;i<merged.length;i++)merged[i].turn=i;
+  await tauriInvoke('save_round_history',{data:merged}).catch(()=>{});
+}
+
+/// 把所有内存历史刷到磁盘，返回完整历史（磁盘+内存合并排序）
+async function flushAndGetFullHistory(){
+  if(gameHistory.length>0){
+    let existing=[];
+    try{existing=await tauriInvoke('load_round_history')}catch(e){}
+    const offset=existing.length;
+    const memOff=gameHistory.map((h,i)=>({...h,turn:offset+i}));
+    const merged=[...existing,...memOff];
+    await tauriInvoke('save_round_history',{data:merged}).catch(()=>{});
+    gameHistory=[];
+  }
+  let disk=[];
+  try{disk=await tauriInvoke('load_round_history')}catch(e){}
+  return disk;
+}
+
+/// 新游戏时清空历史
+function resetRoundHistory(){
+  gameHistory=[];
+  tauriInvoke('clear_round_history').catch(()=>{});
 }
 
 async function processClick(b,s,x,y,pl,anim){
   let c=b[x][y];
   if(c.owner===null){
-    // 记录全局首次落子位置
     let anyPieces=false;
     for(let r of b)for(let cl of r)if(cl.owner!==null)anyPieces=true;
     if(!anyPieces) firstMovePos=[x,y];
@@ -956,20 +1369,61 @@ async function processClick(b,s,x,y,pl,anim){
   for(let row of b)for(let cl of row)if(cl.owner!==null)had.add(cl.owner);
   let chain=[[x,y]];
   let chainCount=0;
-  while(chain.length){
-    let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
-    if(cell.count>=capv){
-      cell.count=0;cell.owner=null;
-      chainCount++;
-      playExplosion();
-      for(let[nx,ny]of nbrs(cx,cy,s)){
-        let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
+
+  if(anim==='explode'){
+    // ★ 逐格爆炸动画：每次只炸一个格子，用户可跳过
+    chainSkipAll=false;
+    showSkipBtn(true);
+    while(chain.length){
+      if(chainSkipAll){
+        // 跳过剩余动画 → 一口气处理完
+        while(chain.length){
+          let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
+          if(cell.count>=capv){
+            cell.count=0;cell.owner=null;
+            chainCount++;
+            playExplosion();
+            for(let[nx,ny]of nbrs(cx,cy,s)){
+              let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
+            }
+          }
+        }
+        break;
       }
-      if(anim){
-        let el=cells?.[cx]?.[cy];if(el)el.classList.add('explode');
-        renderBoard(false,anim==='pop'?cx:undefined);
-        await sleep(180);
+      let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
+      if(cell.count>=capv){
+        cell.count=0;cell.owner=null;
+        chainCount++;
+        playExplosion();
+        for(let[nx,ny]of nbrs(cx,cy,s)){
+          let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
+        }
+        // 渲染当前棋盘 + 爆炸动画
+        renderBoard(true);
+        let el=cells?.[cx]?.[cy];
+        if(el)el.classList.add('explode');
+        await sleep(220);
         if(el)el.classList.remove('explode');
+      }
+    }
+    showSkipBtn(false);
+  }else{
+    // 原快速处理（非动画模式）
+    while(chain.length){
+      let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
+      if(cell.count>=capv){
+        cell.count=0;cell.owner=null;
+        chainCount++;
+        playExplosion();
+        for(let[nx,ny]of nbrs(cx,cy,s)){
+          let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
+        }
+        if(anim){
+          let el=cells?.[cx]?.[cy];if(el)el.classList.add('explode');
+          renderBoard(false,anim==='pop'?cx:undefined);
+          await sleep(180);
+          if(el)el.classList.remove('explode');
+        }
       }
     }
   }
@@ -985,6 +1439,11 @@ async function processClick(b,s,x,y,pl,anim){
   let now=new Set();
   for(let row of b)for(let cl of row)if(cl.owner!==null)now.add(cl.owner);
   return[...had].filter(p=>!now.has(p));
+}
+
+function showSkipBtn(v){
+  const el=document.getElementById('skipChainBtn');
+  if(el)el.style.display=v?'block':'none';
 }
 
 /* 同步版落子（不含动画/音效，专供搜索使用） */
@@ -1014,10 +1473,26 @@ function processClickSync(b,s,x,y,pl){
 }
 
 /* ==================== RENDER ==================== */
+// 棋盘状态缓存，用于增量更新
+let _boardCache=null;
+
+function clearBoardDOM(){
+  // 强制清空棋盘 DOM（用于游戏结束/重开时确保画面刷新）
+  const bd=document.getElementById('board');
+  if(bd){
+    bd.replaceChildren();
+    void bd.offsetHeight;
+    void document.body.offsetHeight;
+  }
+  cells=[];
+  _boardCache=null;
+}
+
 function renderBoard(force,popX,popY){
   let bd=document.getElementById('board');
   if(force||cells.length!==size){
-    bd.innerHTML='';
+    bd.replaceChildren();
+    void bd.offsetHeight;
     bd.style.gridTemplateColumns=`repeat(${size},1fr)`;
     cells=[];
     for(let i=0;i<size;i++){
@@ -1029,21 +1504,30 @@ function renderBoard(force,popX,popY){
       }
       cells.push(row);
     }
+    void bd.offsetHeight;
+    void document.body.offsetHeight;
+    _boardCache=null;
   }
   for(let i=0;i<size;i++)for(let j=0;j<size;j++){
     let el=cells[i][j],d=board[i][j];
-    el.innerHTML='';
-    if(d.owner!==null){
-      if(d.owner===curPlayer){
-        let bg=document.createElement('div');bg.className='bg p'+d.owner;
-        el.appendChild(bg);
+    let prev=_boardCache?.[i]?.[j];
+    // 只有变化或有动画时才更新
+    if(force||!prev||prev.owner!==d.owner||prev.count!==d.count||prev.curPlayer!==curPlayer){
+      el.innerHTML='';
+      if(d.owner!==null){
+        if(d.owner===curPlayer){
+          let bg=document.createElement('div');bg.className='bg p'+d.owner;
+          el.appendChild(bg);
+        }
+        let p=document.createElement('div');p.className='piece p'+d.owner;
+        el.appendChild(p);
+        drawDots(p,d.count);
+        if(popX!==undefined&&i===popX&&j===popY)p.classList.add('pop');
       }
-      let p=document.createElement('div');p.className='piece p'+d.owner;
-      el.appendChild(p);
-      drawDots(p,d.count);
-      if(popX!==undefined&&i===popX&&j===popY)p.classList.add('pop');
     }
   }
+  // 缓存当前状态
+  _boardCache=board.map(row=>row.map(c=>({owner:c.owner,count:c.count,curPlayer})));
 }
 function drawDots(p,n){
   let cx=50,cy=50,r=30;
@@ -1094,26 +1578,21 @@ function aiFindMove(player,sz,b){
     if(b[i][j].owner===player)mine.push([i,j]);
   if(mine.length===0){
     let candidates=[];
-    // 首子限制：非首位玩家首次落子需避开首子限制区域
-    let skipRestricted=firstMovePos&&player!==0;
     // 先只考虑非边角的格子
     for(let i=1;i<sz-1;i++)for(let j=1;j<sz-1;j++)
-      if(b[i][j].owner===null&&!nearAny(i,j,sz,b)){
-        if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
+      if(b[i][j].owner===null&&!isInRestrictedZone(i,j,sz,b)){
         candidates.push([i,j]);
       }
     // 如果中间没有合法位置，才回退到边角
     if(candidates.length===0){
       for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
-        if(b[i][j].owner===null&&!nearAny(i,j,sz,b)){
-          if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
+        if(b[i][j].owner===null&&!isInRestrictedZone(i,j,sz,b)){
           candidates.push([i,j]);
         }
     }
     if(candidates.length===0){
       for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
         if(b[i][j].owner===null){
-          if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
           candidates.push([i,j]);
         }
     }
@@ -1220,9 +1699,7 @@ function getPlayerMoves(b,sz,player){
     if(hasP){
       if(c.owner===player&&c.count<cap(i,j,sz))moves.push([i,j]);
     }else{
-      if(c.owner===null&&!nearAny(i,j,sz,b)){
-        // 非首位玩家首次落子需避开首子限制区域
-        if(firstMovePos&&player!==0&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
+      if(c.owner===null&&!isInRestrictedZone(i,j,sz,b)){
         moves.push([i,j]);
       }
     }
@@ -1282,16 +1759,13 @@ function aiFindMoveAlphaBeta(player,sz,b,depth){
   if(allMoves.length===1)return allMoves[0];
   if(!hasPieces(player,b)){
     let candidates=[];
-    let skipRestricted=firstMovePos&&player!==0;
     for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
-      if(b[i][j].owner===null&&!nearAny(i,j,sz,b)){
-        if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
+      if(b[i][j].owner===null&&!isInRestrictedZone(i,j,sz,b)){
         candidates.push([i,j]);
       }
     if(candidates.length===0){
       for(let i=0;i<sz;i++)for(let j=0;j<sz;j++)
         if(b[i][j].owner===null){
-          if(skipRestricted&&isInFirstMoveRestricted(i,j,firstMovePos[0],firstMovePos[1]))continue;
           candidates.push([i,j]);
         }
     }
@@ -1364,12 +1838,24 @@ async function triggerAI(){
   if(el)el.style.background='';
   aiThinking=false;
   let c=board[x][y];
-  if(c.owner!==null&&c.owner!==curPlayer){aiThinking=false;return}
+  if(c.owner!==null&&c.owner!==curPlayer){return}
   playClick();
-  let elim=await processClick(board,size,x,y,curPlayer,'pop');
+  let elim;
+  let oldBoard=board.map(r=>r.map(cl=>({owner:cl.owner,count:cl.count})));
+  try {
+    let result=await tauriInvoke('process_move',{
+      board:board,size:size,x:x,y:y,
+      player:curPlayer,maxPlayers:maxPlayers
+    });
+    await animateBoardDiff(oldBoard,result.board,size);
+    board=result.board;
+    elim=result.eliminated||[];
+  }catch(e){
+    elim=await processClick(board,size,x,y,curPlayer,'explode');
+  }
   for(let e of elim){eliminatedPlayers.add(e);playElim()}
   recordHistory();
-  renderBoard(false,x,y);
+  renderBoard(true);
   let alive=[];
   for(let p=0;p<maxPlayers;p++){
     if(eliminatedPlayers.has(p))continue;
@@ -1391,9 +1877,11 @@ async function triggerAI(){
 
 /* ==================== LOCAL GAME ==================== */
 function startLocalGame(){
+  clearBoardDOM();
   location.hash='#game';
-  size=parseInt(document.getElementById('localSize').value)||7;
-  maxPlayers=parseInt(document.getElementById('localPlayers').value)||2;
+  resetRoundHistory();
+  size=getSel('localSizeGrid')||7;
+  maxPlayers=getSel('localPlayersGroup')||2;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='⏸ 暂停';
   gameMode='local';
@@ -1411,20 +1899,21 @@ function startLocalGame(){
 }
 
 function toggleAIColorPicker(){
-  let aiCount=parseInt(document.getElementById('aiCount').value)||1;
+  let aiCount=getSel('aiCountGroup')||1;
   let row=document.getElementById('aiColorPickerRow');
   let container=document.getElementById('aiColorOptions');
   row.style.display='block';
   container.innerHTML='';
   let maxP=aiCount+1;
   for(let i=0;i<maxP;i++){
-    let btn=document.createElement('button');
-    btn.style.cssText=`width:36px;height:36px;border-radius:50%;border:2px solid transparent;background:${COLORS[i]};cursor:pointer;transition:.15s;`;
+    let btn=document.createElement('button');btn.className='color-opt'+(i===selectedPlayerColor?' selected':'');
+    btn.style.background=COLORS[i];
     btn.dataset.idx=i;
-    if(i===0) btn.style.border='2px solid #fff';
+    let label=document.createElement('span');label.className='color-label';label.textContent=COLOR_NAMES[i]||('玩家'+(i+1));
+    btn.appendChild(label);
     btn.onclick=function(){
-      document.querySelectorAll('#aiColorOptions button').forEach(b=>b.style.border='2px solid transparent');
-      this.style.border='2px solid #fff';
+      container.querySelectorAll('.color-opt').forEach(b=>b.classList.remove('selected'));
+      this.classList.add('selected');
       selectedPlayerColor=parseInt(this.dataset.idx);
     };
     container.appendChild(btn);
@@ -1432,12 +1921,13 @@ function toggleAIColorPicker(){
 }
 function startAIGame(){
   location.hash='#game';
-  size=parseInt(document.getElementById('aiSize').value)||7;
-  let aiCount=parseInt(document.getElementById('aiCount').value)||1;
+  resetRoundHistory();
+  size=getSel('aiSizeGrid')||7;
+  let aiCount=getSel('aiCountGroup')||1;
   if(aiCount<1)aiCount=1;
   maxPlayers = aiCount + 1;
-  aiAlgorithm=document.getElementById('aiAlgorithm').value;
-  aiDepth=parseInt(document.getElementById('aiDepth').value)||2;
+  aiAlgorithm=getSelStr('aiAlgorithmCards');
+  aiDepth=parseInt(document.getElementById('aiDepthSlider')?.value)||2;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='⏸ 暂停';
   gameMode='ai';
@@ -1461,17 +1951,26 @@ function startAIGame(){
 }
 
 function startLocalReset(){
-  size=parseInt(document.getElementById('resetSize').value)||size;
-  maxPlayers=parseInt(document.getElementById('resetPlayers').value)||maxPlayers;
-  // 本地模式保持玩家数，AI模式保持 1+AI，eve模式保持AI数
+  // 先强制清空旧棋盘，确保立即刷新
+  clearBoardDOM();
+  // 确保弹窗内的自定义控件有选中值
+  const rs=document.getElementById('resetSizeGrid');
+  if(rs&&!rs.querySelector('.selected'))rs.querySelector('.size-btn')?.classList.add('selected');
+  const rp=document.getElementById('resetPlayersGroup');
+  if(rp&&!rp.querySelector('.selected'))rp.querySelector('.gb')?.classList.add('selected');
+
+  size=getSel('resetSizeGrid')||size;
+  maxPlayers=getSel('resetPlayersGroup')||maxPlayers;
+  if(maxPlayers<2)maxPlayers=2;
+
+  // 根据当前模式调整
   if(gameMode==='ai'){
     let aiCount=maxPlayers-1;
     if(aiCount<1)aiCount=1;
     maxPlayers=aiCount+1;
-  } else if(gameMode==='eve'){
-    // eve模式下保持玩家数（全是AI）
   }
-  // ★ 根据当前模式重新构建 aiPlayers
+
+  // 重建 aiPlayers
   aiPlayers=new Set();
   if(gameMode==='ai'){
     for(let p=0;p<maxPlayers;p++){
@@ -1480,7 +1979,12 @@ function startLocalReset(){
   }else if(gameMode==='eve'){
     for(let p=0;p<maxPlayers;p++)aiPlayers.add(p);
   }
-  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;
+
+  // 重置所有状态
+  board=mkBoard(size);
+  curPlayer=0;
+  gameOver=false;
+  isPaused=false;
   document.getElementById('pauseBtn').textContent='⏸ 暂停';
   document.getElementById('pauseOverlay').style.display='none';
   aiThinking=false;
@@ -1488,6 +1992,7 @@ function startLocalReset(){
   eliminatedPlayers=new Set();
   gameHistory=[];
   chainStats={};
+  _boardCache=null;
   maxChainOverall={player:null,length:0};
   gameCount=(gameCount||0)+1;
   recordHistory();
@@ -1495,17 +2000,18 @@ function startLocalReset(){
   renderPlayerBar();
   document.body.style.background='';
   closeModal('resetModal');
-  // ★ 保留静态 #pauseOverlay，只移除动态创建的结算覆盖层
+  // 移除动态创建的结算/暂停覆盖层
   document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
-  document.getElementById('pauseOverlay').style.display='none';
-  // ★ eve 模式：重建 aiConfigs（用全局默认值补全）
+  const po=document.getElementById('pauseOverlay');
+  if(po)po.style.display='none';
+  // 重建 eve AI 配置
   if(gameMode==='eve'){
     aiConfigs={};
     for(let p=0;p<maxPlayers;p++){
       aiConfigs[p]={algorithm:aiAlgorithm||'strategy',depth:aiDepth||2};
     }
   }
-  if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+  if(aiPlayers.has(0)&&!gameOver)setTimeout(()=>triggerAI(),400);
 }
 
 function togglePause(){
@@ -1520,68 +2026,54 @@ function togglePause(){
     hidePauseOverlay();
   }
 }
-function showPauseOverlay(){
+async function showPauseOverlay(){
   let overlay=document.getElementById('pauseOverlay');
   overlay.style.display='flex';
 
-  // ★ 在展示暂停前，立即从 board 实时计算当前状态，追加到历史
+  // 追加快照：从板面实时状态
   let liveSnap={};
   for(let p=0;p<maxPlayers;p++){
     let pieces=0,points=0;
     for(let r of board)for(let c of r)if(c.owner===p){pieces++;points+=c.count}
     liveSnap[p]={pieces,points};
   }
-  // 如果最新一条历史与当前状态不一致，立即追加快照
   let lastSnap=gameHistory.length>0?gameHistory[gameHistory.length-1].snapshot:{};
   let stale=false;
   for(let p=0;p<maxPlayers;p++){
-    let old=lastSnap[String(p)];
-    let cur=liveSnap[String(p)];
+    let old=lastSnap[String(p)],cur=liveSnap[String(p)];
     if(!old||old.pieces!==cur.pieces||old.points!==cur.points){stale=true;break}
   }
   if(stale||gameHistory.length===0){
     gameHistory.push({turn:gameHistory.length,snapshot:liveSnap});
   }
 
-  // 构建暂停统计（使用确保最新的快照）
+  // 刷盘获取完整历史
+  const fullHistory=await flushAndGetFullHistory();
+
+  // 统一渲染
   let statsGrid=document.getElementById('pauseStats');
   statsGrid.innerHTML='';
-  let lastSnap2=gameHistory[gameHistory.length-1].snapshot;
-  for(let p=0;p<maxPlayers;p++){
-    if(eliminatedPlayers.has(p))continue;
-    let snap=lastSnap2[String(p)];
-    let pieces=snap?snap.pieces:0;
-    let points=snap?snap.points:0;
-    let card=document.createElement('div');card.className='stat-card';
-    card.innerHTML=`
-      <div class="name">
-        <span class="color-dot" style="background:${COLORS[p]||'#888'}"></span>
-        ${(COLOR_NAMES&&COLOR_NAMES[p])||getPlayerLabel(p)}
-      </div>
-      <div class="num" style="color:${COLORS[p]||'#888'}">${pieces}</div>
-      <div class="lbl">棋子</div>
-      <div class="num" style="color:${COLORS[p]||'#888'}">${points}</div>
-      <div class="lbl">点数</div>`;
-    statsGrid.appendChild(card);
-  }
-  // 图表（阈值调为 >=1，任何时候暂停都有数据可看）
   let chartArea=document.getElementById('pauseCharts');
   chartArea.innerHTML='';
-  if(gameHistory&&gameHistory.length>=1){
-    let box1=document.createElement('div');box1.className='chart-box';
-    box1.innerHTML='<h4 style="cursor:pointer" onclick="showFullscreenChart(\'pauseChartPieces\')">📊 棋子数变化 🔍</h4><canvas id="pauseChartPieces" onclick="showFullscreenChart(\'pauseChartPieces\')" style="width:100%;height:150px;display:block;cursor:pointer"></canvas>';
-    chartArea.appendChild(box1);
-    let box2=document.createElement('div');box2.className='chart-box';
-    box2.innerHTML='<h4 style="cursor:pointer" onclick="showFullscreenChart(\'pauseChartPoints\')">📊 点数变化 🔍</h4><canvas id="pauseChartPoints" onclick="showFullscreenChart(\'pauseChartPoints\')" style="width:100%;height:150px;display:block;cursor:pointer"></canvas>';
-    chartArea.appendChild(box2);
-    setTimeout(()=>{
-      drawLineChart(document.getElementById('pauseChartPieces'),gameHistory,COLOR_NAMES,COLORS,'pieces');
-      drawLineChart(document.getElementById('pauseChartPoints'),gameHistory,COLOR_NAMES,COLORS,'points');
-    },50);
-  }
+  renderGameCharts(statsGrid,fullHistory,{
+    colorNames:COLOR_NAMES,colors:COLORS,eliminated:eliminatedPlayers
+  });
+  // 图表额外放进 chartArea（因为 pauseOverlay 布局分 stats 和 charts 两个容器）
+  // 移动图表到 chartArea
+  let chartBoxes=statsGrid.querySelectorAll('.chart-box');
+  chartBoxes.forEach(b=>chartArea.appendChild(b));
 }
 function hidePauseOverlay(){
-  document.getElementById('pauseOverlay').style.display='none';
+  let overlay=document.getElementById('pauseOverlay');
+  overlay.style.display='none';
+  // 清理图表 DOM 释放内存
+  document.getElementById('pauseStats').innerHTML='';
+  document.getElementById('pauseCharts').innerHTML='';
+  // 回收 Canvas 资源
+  ['pauseChartPieces','pauseChartPoints'].forEach(id=>{
+    let el=document.getElementById(id);
+    if(el){el.width=0;el.height=0}
+  });
 }
 function resumeGame(){
   isPaused=false;
@@ -1605,6 +2097,30 @@ function endGameNow(){
   showSettlement(bestCnt>0?bestP:null, COLOR_NAMES, gameHistory);
 }
 
+async function animateBoardDiff(oldBoard, newBoard, sz){
+  // 对比老棋盘和新棋盘，找出变化的格子逐个展示爆炸动画
+  let changed=[];
+  for(let i=0;i<sz;i++)for(let j=0;j<sz;j++){
+    let o=oldBoard[i][j],n=newBoard[i][j];
+    if(o.owner!==null&&(n.owner===null||n.count<o.count||n.owner!==o.owner)){
+      changed.push([i,j]);
+    }
+  }
+  if(changed.length===0){renderBoard(true);return}
+  chainSkipAll=false;
+  showSkipBtn(true);
+  for(let[cx,cy]of changed){
+    if(chainSkipAll)break;
+    renderBoard(true);
+    let el=cells?.[cx]?.[cy];
+    if(el)el.classList.add('explode');
+    await sleep(180);
+    if(el)el.classList.remove('explode');
+  }
+  showSkipBtn(false);
+  renderBoard(true);
+}
+
 async function localClick(x,y){
   if(gameOver||aiThinking||isPaused)return;
   if(aiPlayers.has(curPlayer))return;
@@ -1614,19 +2130,29 @@ async function localClick(x,y){
     if(c.owner!==curPlayer){showMsg('只能点击自己的棋子','');return}
   }else{
     if(c.owner!==null){showMsg('不能抢占别人的格子','');return}
-    // 首位玩家可以任意落子，其他玩家不能落在首子限制区域（12格）
-    if(firstMovePos&&curPlayer!==0){
-      if(isInFirstMoveRestricted(x,y,firstMovePos[0],firstMovePos[1])){
-        showMsg('该位置在首子限制区域内','');return
-      }
+    if(isInRestrictedZone(x,y,size,board)){
+      showMsg('该位置在已有棋子限制区域内','');return
     }
-    if(nearAny(x,y,size,board)){showMsg('不能在已有棋子旁边落子','');return}
   }
   playClick();
-  let elim=await processClick(board,size,x,y,curPlayer,'pop');
+  let elim;
+  // 备份旧棋盘用于 diff 动画
+  let oldBoard=board.map(r=>r.map(cl=>({owner:cl.owner,count:cl.count})));
+  try {
+    let result=await tauriInvoke('process_move',{
+      board:board,size:size,x:x,y:y,
+      player:curPlayer,maxPlayers:maxPlayers
+    });
+    // 先展示动画，再更新 board
+    await animateBoardDiff(oldBoard,result.board,size);
+    board=result.board;
+    elim=result.eliminated||[];
+  }catch(e){
+    elim=await processClick(board,size,x,y,curPlayer,'explode');
+  }
   for(let e of elim){eliminatedPlayers.add(e);playElim()}
   recordHistory();
-  renderBoard(false,x,y);
+  renderBoard(true);
   let alive=[];
   for(let p=0;p<maxPlayers;p++){
     if(eliminatedPlayers.has(p))continue;
@@ -1736,255 +2262,189 @@ function drawLineChart(canvas,history,colorNames,colors,valueKey){
     }
     ctx.stroke();
   }
+  // 保存图表上下文供全屏使用
+  if(canvas.id){
+    _chartCtx[canvas.id]={history,colorNames:colorNames||colors,colors,valueKey};
+  }
 }
 
-function showSettlement(winner,colorNames,history){
-  document.querySelectorAll('.settlement').forEach(e=>e.remove());
-  let overlay=document.createElement('div');overlay.className='settlement';
-  let inner=document.createElement('div');inner.className='settlement-inner';
-  let winnerLabel='';
-  if(winner!==null&&winner!==undefined){
-    let cName=(colorNames&&colorNames[winner])||getPlayerLabel(winner);
-    winnerLabel=`<span class="winner-color" style="background:${COLORS[winner]||'#888'}"></span>${cName}`;
-  }else{winnerLabel='平局'}
-  let title=document.createElement('h2');
-  title.innerHTML=`🏆 ${winnerLabel} 获胜`;
-
-  // 只显示存活玩家
-  let statsGrid=document.createElement('div');statsGrid.className='stats-grid';
-  let lastSnap=history.length>0?history[history.length-1].snapshot:{};
-  let alivePlayers=[];
+// ─── 统一图表渲染（暂停/结算/checkout 共用） ───
+function renderGameCharts(container, history, opts){
+  const {winner,colorNames,colors,eliminated,chainStats,maxChain,showTitle,onReplay,_noBack}=opts||{};
+  const cNames=colorNames||colors||[];
+  const lastSnap=history.length>0?history[history.length-1].snapshot:{};
+  if(showTitle&&winner!==null&&winner!==undefined){
+    let t=document.createElement('h2');
+    t.innerHTML=`🏆 <span class="winner-color" style="background:${colors[winner]||'#888'}"></span>${cNames[winner]||getPlayerLabel(winner)} 获胜`;
+    container.appendChild(t);
+  }else if(showTitle&&winner===undefined){
+    let t=document.createElement('h2');t.textContent='📊 对局统计';container.appendChild(t);
+  }
+  let grid=document.createElement('div');grid.className='stats-grid';
+  let active=[];
   for(let p=0;p<maxPlayers;p++){
+    if(eliminated&&eliminated.has(p))continue;
     let snap=lastSnap[String(p)];
-    if(snap&&snap.pieces>0)alivePlayers.push(p);
+    if(snap&&snap.pieces>0)active.push(p);
   }
-  if(alivePlayers.length===0&&winner!==null&&winner!==undefined)alivePlayers=[winner];
-  for(let pid of alivePlayers){
-    let snap=lastSnap[String(pid)];
-    let pieces=snap?snap.pieces:0;
-    let points=snap?snap.points:0;
+  if(active.length===0&&winner!==null&&winner!==undefined)active=[winner];
+  for(let pid of active){
+    let snap=lastSnap[String(pid)],pieces=snap?snap.pieces:0,points=snap?snap.points:0;
     let card=document.createElement('div');card.className='stat-card';
-    let isWinner=pid===winner;
-    if(isWinner)card.style.border=`1px solid ${COLORS[pid]||'#888'}`;
-    let cs=chainStats[pid];
-    let chainStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">💥 连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
-    card.innerHTML=`
-      <div class="name">
-        <span class="color-dot" style="background:${COLORS[pid]||'#888'}"></span>
-        ${(colorNames&&colorNames[pid])||getPlayerLabel(pid)}
-        ${isWinner?'👑':''}
-      </div>
-      <div class="num" style="color:${COLORS[pid]||'#888'}">${pieces}</div>
-      <div class="lbl">棋子</div>
-      <div class="num" style="color:${COLORS[pid]||'#888'}">${points}</div>
-      <div class="lbl">点数</div>
-      ${chainStr}
-    `;
-    statsGrid.appendChild(card);
+    if(pid===winner)card.style.border=`1px solid ${colors[pid]||'#888'}`;
+    let cs=chainStats&&chainStats[pid];
+    let csStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">💥 连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
+    card.innerHTML=`<div class="name"><span class="color-dot" style="background:${colors[pid]||'#888'}"></span>${cNames[pid]||getPlayerLabel(pid)} ${pid===winner?'👑':''}</div>
+      <div class="num" style="color:${colors[pid]||'#888'}">${pieces}</div><div class="lbl">棋子</div>
+      <div class="num" style="color:${colors[pid]||'#888'}">${points}</div><div class="lbl">点数</div>${csStr}`;
+    grid.appendChild(card);
   }
-  inner.appendChild(title);
-  inner.appendChild(statsGrid);
-  // 全局最长连爆
-  if(maxChainOverall.player!==null&&maxChainOverall.length>0){
+  container.appendChild(grid);
+  if(maxChain&&maxChain.player!==null&&maxChain.length>0){
     let ci=document.createElement('p');
     ci.style.cssText='font-size:.75rem;color:var(--dim);margin:4px 0;text-align:center;';
-    let cName=(colorNames&&colorNames[maxChainOverall.player])||getPlayerLabel(maxChainOverall.player);
-    ci.innerHTML=`🔥 最高连爆：<span style="color:${COLORS[maxChainOverall.player]||'#888'}">${cName}</span> 触发 <strong>${maxChainOverall.length}</strong> 连爆`;
-    inner.appendChild(ci);
+    ci.innerHTML=`🔥 最高连爆：<span style="color:${colors[maxChain.player]||'#888'}">${cNames[maxChain.player]||getPlayerLabel(maxChain.player)}</span> 触发 <strong>${maxChain.length}</strong> 连爆`;
+    container.appendChild(ci);
   }
-
   if(history&&history.length>=2){
-    let chartBox1=document.createElement('div');chartBox1.className='chart-box';
-    chartBox1.innerHTML='<h4 style="cursor:pointer" onclick="showFullscreenChart(\'chartPieces\')">📊 棋子数变化 🔍</h4><canvas id="chartPieces" onclick="showFullscreenChart(\'chartPieces\')" style="cursor:pointer"></canvas>';
-    let legend1=document.createElement('div');legend1.className='chart-legend';
-    let sortedP=[...alivePlayers].sort((a,b)=>a-b);
-    for(let pid of sortedP){
-      let s=document.createElement('span');
-      s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>`;
-      legend1.appendChild(s);
-    }
-    chartBox1.appendChild(legend1);
-    inner.appendChild(chartBox1);
-
-    let chartBox2=document.createElement('div');chartBox2.className='chart-box';
-    chartBox2.innerHTML='<h4 style="cursor:pointer" onclick="showFullscreenChart(\'chartPoints\')">📊 点数变化 🔍</h4><canvas id="chartPoints" onclick="showFullscreenChart(\'chartPoints\')" style="cursor:pointer"></canvas>';
-    let legend2=document.createElement('div');legend2.className='chart-legend';
-    for(let pid of sortedP){
-      let s=document.createElement('span');
-      s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>`;
-      legend2.appendChild(s);
-    }
-    chartBox2.appendChild(legend2);
-    inner.appendChild(chartBox2);
+    let id1='cP_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    let id2='cPt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    let b1=document.createElement('div');b1.className='chart-box';
+    b1.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id1}')">📊 棋子数变化 🔍</h4><canvas id="${id1}" onclick="showFullscreenChart('${id1}')" style="cursor:pointer"></canvas>`;
+    let l1=document.createElement('div');l1.className='chart-legend';
+    for(let p of[...active].sort((a,b)=>a-b)){let s=document.createElement('span');s.innerHTML=`<span class="leg-dot" style="background:${colors[p]||'#888'}"></span>`;l1.appendChild(s)}
+    b1.appendChild(l1);container.appendChild(b1);
+    let b2=document.createElement('div');b2.className='chart-box';
+    b2.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id2}')">📊 点数变化 🔍</h4><canvas id="${id2}" onclick="showFullscreenChart('${id2}')" style="cursor:pointer"></canvas>`;
+    let l2=document.createElement('div');l2.className='chart-legend';
+    for(let p of[...active].sort((a,b)=>a-b)){let s=document.createElement('span');s.innerHTML=`<span class="leg-dot" style="background:${colors[p]||'#888'}"></span>`;l2.appendChild(s)}
+    b2.appendChild(l2);container.appendChild(b2);
+    setTimeout(()=>{drawLineChart(document.getElementById(id1),history,cNames,colors,'pieces');drawLineChart(document.getElementById(id2),history,cNames,colors,'points')},50);
   }
+  if(onReplay){let btn=document.createElement('button');btn.className='btn-again';btn.textContent='再来一局';btn.onclick=onReplay;container.appendChild(btn)}
+  if(!_noBack){
+    let bh=document.createElement('button');bh.className='btn-again';bh.textContent='返回主界面';bh.style.marginTop='6px';bh.onclick=()=>Router.navigate('welcome');container.appendChild(bh);
+  }
+}
 
-  let btn=document.createElement('button');btn.className='btn-again';
-  btn.textContent='再来一局';
-  btn.onclick=function(){overlay.remove();openModal('resetModal')};
-  inner.appendChild(btn);
-  let btnHome=document.createElement('button');btnHome.className='btn-again';
-  btnHome.textContent='返回主界面';
-  btnHome.style.marginTop='6px';
-  btnHome.onclick=function(){location.reload()};
-  inner.appendChild(btnHome);
-  overlay.appendChild(inner);
-  document.body.appendChild(overlay);
-  setTimeout(()=>{
-    drawLineChart(document.getElementById('chartPieces'),history,colorNames,COLORS,'pieces');
-    drawLineChart(document.getElementById('chartPoints'),history,colorNames,COLORS,'points');
-  },50);
-  // 自动保存历史（Tauri模式）
+async function showSettlement(winner,colorNames,history){
+  // 清理动态 settlement overlay（如果有残留）
+  document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
+  const fullHistory = history&&history.length>0 ? history : await flushAndGetFullHistory();
+  // 渲染到 #checkout 页面（包 settlement 容器使 CSS 选择器生效）
+  const prevPage = Router.getPrev() || 'welcome';
+  const content = document.getElementById('checkoutContent');
+  content.innerHTML = '<div class="settlement"><div class="settlement-inner" id="chkInner"></div></div>';
+  const inner = document.getElementById('chkInner');
+  renderGameCharts(inner, fullHistory, {
+    winner, colorNames, colors: COLORS, eliminated: eliminatedPlayers,
+    chainStats, maxChain: maxChainOverall, showTitle: true,
+    onReplay: () => Router.navigate(prevPage)
+  });
+  Router.navigate('checkout', prevPage);
   saveGameHistory(winner);
 }
 
 function showHistoryDetail(r){
+  const prevPage = Router.getPrev() || 'welcome';
+  const content = document.getElementById('checkoutContent');
+  content.innerHTML = '<div class="settlement"><div class="settlement-inner" id="chkInner"></div></div>';
+  const inner = document.getElementById('chkInner');
   if(!r.history||r.history.length<2){
-    // 无快照数据，显示基本信息
-    let overlay=document.createElement('div');overlay.className='settlement';
-    let inner=document.createElement('div');inner.className='settlement-inner';
-    let winnerLabel='';
-    if(r.winner!==null&&r.winner!==undefined){
-      let cName=(r.colorNames&&r.colorNames[r.winner])||'玩家 '+(r.winner+1);
-      winnerLabel=`<span class="winner-color" style="background:${COLORS[r.winner]||'#888'}"></span>${cName}`;
-    }else{winnerLabel='平局'}
-    inner.innerHTML='<h2>🏆 '+winnerLabel+' 获胜</h2><p style="text-align:center;color:var(--dim);margin-top:12px">该记录无完整快照数据，无法展示图表</p>';
-    let btn=document.createElement('button');btn.className='btn-again';
-    btn.textContent='关闭';btn.onclick=()=>overlay.remove();
-    inner.appendChild(btn);overlay.appendChild(inner);
-    document.body.appendChild(overlay);
+    const winnerLabel = (r.winner!==null&&r.winner!==undefined)
+      ? `<span class="winner-color" style="background:${COLORS[r.winner]||'#888'}"></span>${r.colorNames?.[r.winner]||'玩家 '+(r.winner+1)}`
+      : '平局';
+    inner.innerHTML = '<h2>🏆 '+winnerLabel+' 获胜</h2><p style="text-align:center;color:var(--dim);margin-top:12px">该记录无完整快照数据，无法展示图表</p>';
+    Router.navigate('checkout', prevPage);
     return;
   }
-  let overlay=document.createElement('div');overlay.className='settlement';
-  let inner=document.createElement('div');inner.className='settlement-inner';
-  let winnerLabel='';
-  if(r.winner!==null&&r.winner!==undefined){
-    let cName=(r.colorNames&&r.colorNames[r.winner])||'玩家 '+(r.winner+1);
-    winnerLabel=`<span class="winner-color" style="background:${COLORS[r.winner]||'#888'}"></span>${cName}`;
-  }else{winnerLabel='平局'}
-  let title=document.createElement('h2');
-  title.innerHTML=`🏆 ${winnerLabel} 获胜`;
-  inner.appendChild(title);
-
-  // 统计面板
-  let statsGrid=document.createElement('div');statsGrid.className='stats-grid';
-  let lastSnap=r.history[r.history.length-1].snapshot||{};
-  let alivePlayers=[];
-  for(let p=0;p<r.playerCount;p++){
-    let snap=lastSnap[String(p)];
-    if(snap&&snap.pieces>0)alivePlayers.push(p);
-  }
-  if(alivePlayers.length===0&&r.winner!==null&&r.winner!==undefined)alivePlayers=[r.winner];
-  for(let pid of alivePlayers){
-    let snap=lastSnap[String(pid)];
-    let pieces=snap?snap.pieces:0;
-    let points=snap?snap.points:0;
-    let card=document.createElement('div');card.className='stat-card';
-    let isWinner=pid===r.winner;
-    if(isWinner)card.style.border=`1px solid ${COLORS[pid]||'#888'}`;
-    let cs=r.chainStats?r.chainStats[pid]:null;
-    let chainStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">💥 连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
-    let cName=(r.colorNames&&r.colorNames[pid])||'玩家 '+(pid+1);
-    card.innerHTML=`
-      <div class="name">
-        <span class="color-dot" style="background:${COLORS[pid]||'#888'}"></span>
-        ${cName}${isWinner?'👑':''}
-      </div>
-      <div class="num" style="color:${COLORS[pid]||'#888'}">${pieces}</div>
-      <div class="lbl">棋子</div>
-      <div class="num" style="color:${COLORS[pid]||'#888'}">${points}</div>
-      <div class="lbl">点数</div>
-      ${chainStr}
-    `;
-    statsGrid.appendChild(card);
-  }
-  inner.appendChild(statsGrid);
-
-  // 全局最长连爆
-  if(r.maxChain&&r.maxChain.player!==null&&r.maxChain.length>0){
-    let ci=document.createElement('p');
-    ci.style.cssText='font-size:.75rem;color:var(--dim);margin:4px 0;text-align:center;';
-    let cNameM=(r.colorNames&&r.colorNames[r.maxChain.player])||'玩家 '+(r.maxChain.player+1);
-    ci.innerHTML=`🔥 最高连爆：<span style="color:${COLORS[r.maxChain.player]||'#888'}">${cNameM}</span> 触发 <strong>${r.maxChain.length}</strong> 连爆`;
-    inner.appendChild(ci);
-  }
-
-  // 图表（去掉颜色名称，仅保留色点）
-  let sortedP=[...alivePlayers].sort((a,b)=>a-b);
-  let chartBox1=document.createElement('div');chartBox1.className='chart-box';
-  chartBox1.innerHTML='<h4>📊 棋子数变化</h4><canvas id="hChartPieces" style="width:100%;height:150px;display:block"></canvas>';
-  let legend1=document.createElement('div');legend1.className='chart-legend';
-  for(let pid of sortedP){
-    let s=document.createElement('span');
-    s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>`;
-    legend1.appendChild(s);
-  }
-  chartBox1.appendChild(legend1);
-  inner.appendChild(chartBox1);
-
-  let chartBox2=document.createElement('div');chartBox2.className='chart-box';
-  chartBox2.innerHTML='<h4>📊 点数变化</h4><canvas id="hChartPoints" style="width:100%;height:150px;display:block"></canvas>';
-  let legend2=document.createElement('div');legend2.className='chart-legend';
-  for(let pid of sortedP){
-    let s=document.createElement('span');
-    s.innerHTML=`<span class="leg-dot" style="background:${COLORS[pid]||'#888'}"></span>`;
-    legend2.appendChild(s);
-  }
-  chartBox2.appendChild(legend2);
-  inner.appendChild(chartBox2);
-
-  let btn=document.createElement('button');btn.className='btn-again';
-  btn.textContent='关闭';btn.onclick=()=>overlay.remove();
-  inner.appendChild(btn);
-  overlay.appendChild(inner);
-  document.body.appendChild(overlay);
-  setTimeout(()=>{
-    drawLineChart(document.getElementById('hChartPieces'),r.history,r.colorNames,COLORS,'pieces');
-    drawLineChart(document.getElementById('hChartPoints'),r.history,r.colorNames,COLORS,'points');
-  },50);
+  // 用记录中 playerCount 临时覆盖 maxPlayers 以复用统一渲染，不显示默认"返回主界面"
+  const origMax = maxPlayers;
+  maxPlayers = r.playerCount || maxPlayers;
+  renderGameCharts(inner, r.history, {
+    winner: r.winner, colorNames: r.colorNames, colors: COLORS,
+    chainStats: r.chainStats, maxChain: r.maxChain,
+    showTitle: true, _noBack: true,
+  });
+  // 添加"关闭"按钮（还原 maxPlayers）
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'btn-again';
+  closeBtn.textContent = '关闭';
+  closeBtn.onclick = () => { maxPlayers = origMax; Router.back(); };
+  inner.appendChild(closeBtn);
+  Router.navigate('checkout', prevPage);
 }
 
 function showFullscreenChart(canvasId){
-  let srcCanvas=document.getElementById(canvasId);
-  if(!srcCanvas)return;
-  // 创建全屏浮层
+  let ctx=_chartCtx[canvasId];
+  if(!ctx)return;
   let overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.93);display:flex;justify-content:center;align-items:center;padding:20px;animation:fadeIn .2s ease;';
-  // 点击浮层背景关闭
+  overlay.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.93);display:flex;justify-content:center;align-items:center;padding:20px;animation:fadeIn .2s ease;overflow:hidden';
   overlay.onclick=(e)=>{if(e.target===overlay||e.target===closeBtn)overlay.remove()};
-  // 关闭按钮
   let closeBtn=document.createElement('button');
   closeBtn.textContent='✕';
-  closeBtn.style.cssText='position:fixed;top:16px;right:16px;z-index:2001;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.5);color:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;';
+  closeBtn.style.cssText='position:fixed;top:16px;right:16px;z-index:2001;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.5);color:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;z-index:2002';
   closeBtn.onmouseover=()=>{closeBtn.style.background='rgba(255,255,255,.15)'};
   closeBtn.onmouseout=()=>{closeBtn.style.background='rgba(0,0,0,.5)'};
-  // 大画布
+  // 容器用于缩放变换
+  let container=document.createElement('div');
+  container.style.cssText='max-width:100%;max-height:100%;display:flex;justify-content:center;align-items:center;transition:transform .1s ease;transform-origin:center center';
   let bigCanvas=document.createElement('canvas');
-  bigCanvas.style.cssText='max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.5);';
+  bigCanvas.style.cssText='max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.5);cursor:grab';
   bigCanvas.onclick=(e)=>e.stopPropagation();
-  overlay.appendChild(bigCanvas);
+  overlay.appendChild(container);
+  container.appendChild(bigCanvas);
   overlay.appendChild(closeBtn);
   document.body.appendChild(overlay);
-  // 以 2.5x 源尺寸重绘，保证清晰
+  // 从数据重绘
   setTimeout(()=>{
     let rect=bigCanvas.getBoundingClientRect();
+    if(rect.width===0||rect.height===0)return;
     let dpr=window.devicePixelRatio||1;
-    let scale=Math.min(2.5,rect.width/srcCanvas.width,rect.height/srcCanvas.height);
-    let w=Math.round(srcCanvas.width*scale);
-    let h=Math.round(srcCanvas.height*scale);
-    bigCanvas.width=w*dpr;
-    bigCanvas.height=h*dpr;
-    bigCanvas.style.width=w+'px';
-    bigCanvas.style.height=h+'px';
-    let dstCtx=bigCanvas.getContext('2d');
-    dstCtx.scale(dpr,dpr);
-    dstCtx.imageSmoothingEnabled=true;
-    dstCtx.imageSmoothingQuality='high';
-    dstCtx.drawImage(srcCanvas,0,0,w,h);
-  },80);
+    bigCanvas.width=rect.width*dpr;
+    bigCanvas.height=rect.height*dpr;
+    bigCanvas.style.width=rect.width+'px';
+    bigCanvas.style.height=rect.height+'px';
+    // 调用重绘
+    drawLineChart(bigCanvas,ctx.history,ctx.colorNames,ctx.colors,ctx.valueKey);
+  },50);
+  // 双指缩放（touch）
+  let lastDist=0,scale=1;
+  bigCanvas.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){
+      e.preventDefault();
+      let dx=e.touches[0].clientX-e.touches[1].clientX;
+      let dy=e.touches[0].clientY-e.touches[1].clientY;
+      lastDist=Math.sqrt(dx*dx+dy*dy);
+    }
+  },{passive:false});
+  bigCanvas.addEventListener('touchmove',e=>{
+    if(e.touches.length===2){
+      e.preventDefault();
+      let dx=e.touches[0].clientX-e.touches[1].clientX;
+      let dy=e.touches[0].clientY-e.touches[1].clientY;
+      let dist=Math.sqrt(dx*dx+dy*dy);
+      if(lastDist>0){
+        let delta=dist/lastDist;
+        scale=Math.max(0.5,Math.min(5,scale*delta));
+        container.style.transform=`scale(${scale})`;
+      }
+      lastDist=dist;
+    }
+  },{passive:false});
+  bigCanvas.addEventListener('touchend',()=>{lastDist=0});
+  // 鼠标滚轮缩放
+  overlay.addEventListener('wheel',e=>{
+    e.preventDefault();
+    scale=Math.max(0.5,Math.min(5,scale+(e.deltaY>0?-0.1:0.1)));
+    container.style.transform=`scale(${scale})`;
+  },{passive:false});
 }
 
 /* ==================== GAME ACTIONS ==================== */
 function exitGame(){
+  // 刷盘残留历史再退出
+  if(gameHistory.length>0)flushAndGetFullHistory();
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
   aiPlayers=new Set();eliminatedPlayers=new Set();gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;
@@ -1998,12 +2458,14 @@ function exitGame(){
   // ★ 重新显示 game screen 中的暂停按钮和消息，确保 DOM 干净
   try{document.getElementById('pauseBtn').textContent='⏸ 暂停';}catch(e){}
   showMsg('','');
-  show('welcome');
-  if(location.hash)history.replaceState(null,'',window.location.pathname);
+  Router.navigate('welcome');
 }
 
 function confirmReset(){
-  if(gameMode==='local'||gameMode==='ai'||gameMode==='eve'){startLocalReset();return}
+  if(gameMode==='local'||gameMode==='ai'||gameMode==='eve'){
+    try{startLocalReset()}catch(e){console.warn('reset error',e);closeModal('resetModal')}
+    return
+  }
   closeModal('resetModal');
 }
 
@@ -2023,7 +2485,7 @@ window.addEventListener('popstate',()=>{
   if(gameMode&&gameMode!=='welcome'){exitGame();return}
   // 非游戏中：根据 hash 导航到对应界面
   const h=location.hash.slice(1);
-  if(h&&document.getElementById(h))show(h);else show('welcome');
+  if(h&&document.getElementById(h))Router.navigate(h);else Router.navigate('welcome');
 });
 </script>
 </body>

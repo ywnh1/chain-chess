@@ -5,10 +5,10 @@ use std::collections::{HashSet, VecDeque};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
+use alpha_beta_pruning::{AlphaBeta, Grade};
 
 // ─── Board types ───
 
@@ -87,6 +87,11 @@ pub struct ProcessMoveResult {
 
 pub struct AppState {
     pub history_file: Mutex<PathBuf>,
+    pub app_data_dir: Mutex<PathBuf>,
+}
+
+fn get_round_path(app_data_dir: &PathBuf) -> PathBuf {
+    app_data_dir.join("round_data.json")
 }
 
 // ─── Tauri commands ───
@@ -198,6 +203,49 @@ async fn exit_app(app_handle: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 保存对局回合历史到磁盘（溢出存储用）
+#[tauri::command]
+async fn save_round_history(
+    state: tauri::State<'_, AppState>,
+    data: Vec<TurnHistory>,
+) -> Result<(), String> {
+    let dir = state.app_data_dir.lock().map_err(|e| e.to_string())?;
+    let path = get_round_path(&dir);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string(&data).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 从磁盘加载对局回合历史
+#[tauri::command]
+async fn load_round_history(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<TurnHistory>, String> {
+    let dir = state.app_data_dir.lock().map_err(|e| e.to_string())?;
+    let path = get_round_path(&dir);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&content).map_err(|e| e.to_string())
+}
+
+/// 清除对局回合历史文件
+#[tauri::command]
+async fn clear_round_history(
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let dir = state.app_data_dir.lock().map_err(|e| e.to_string())?;
+    let path = get_round_path(&dir);
+    if path.exists() {
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -207,8 +255,10 @@ pub fn run() {
                 .unwrap_or_else(|_| PathBuf::from("."));
             fs::create_dir_all(&app_data_dir).ok();
             let history_path = app_data_dir.join("history.json");
+            let data_dir = app_data_dir.clone();
             app.manage(AppState {
                 history_file: Mutex::new(history_path),
+                app_data_dir: Mutex::new(data_dir),
             });
             Ok(())
         })
@@ -219,6 +269,9 @@ pub fn run() {
             load_game_history,
             clear_game_history,
             exit_app,
+            save_round_history,
+            load_round_history,
+            clear_round_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -236,28 +289,10 @@ fn nbrs(i: usize, j: usize, sz: usize) -> Vec<(usize, usize)> {
     r
 }
 
+
 #[inline]
-fn nbrs8(i: usize, j: usize, sz: usize) -> Vec<(usize, usize)> {
-    let mut r = Vec::with_capacity(8);
-    if i > 0 && j > 0 { r.push((i - 1, j - 1)); }
-    if i > 0 { r.push((i - 1, j)); }
-    if i > 0 && j + 1 < sz { r.push((i - 1, j + 1)); }
-    if j > 0 { r.push((i, j - 1)); }
-    if j + 1 < sz { r.push((i, j + 1)); }
-    if i + 1 < sz && j > 0 { r.push((i + 1, j - 1)); }
-    if i + 1 < sz { r.push((i + 1, j)); }
-    if i + 1 < sz && j + 1 < sz { r.push((i + 1, j + 1)); }
-    r
-}
-
-// ─── Board helpers ───
-
 fn has_pieces(board: &GameBoard, player: usize) -> bool {
     board.iter().flatten().any(|c| c.owner == Some(player))
-}
-
-fn near_any(board: &GameBoard, sz: usize, x: usize, y: usize) -> bool {
-    nbrs8(x, y, sz).iter().any(|&(ni, nj)| board[ni][nj].owner.is_some())
 }
 
 fn is_in_first_move_restricted(x: usize, y: usize, fx: usize, fy: usize) -> bool {
@@ -269,6 +304,17 @@ fn is_in_first_move_restricted(x: usize, y: usize, fx: usize, fy: usize) -> bool
     if dx == 1 && dy <= 1 { return true; }
     // (0,-2), (0,-1), (0,1), (0,2) (but not (0,0))
     if dx == 0 && dy >= 1 && dy <= 2 { return true; }
+    false
+}
+
+fn is_in_any_restricted_zone(board: &GameBoard, sz: usize, x: usize, y: usize) -> bool {
+    for i in 0..sz {
+        for j in 0..sz {
+            if board[i][j].owner.is_some() && is_in_first_move_restricted(x, y, i, j) {
+                return true;
+            }
+        }
+    }
     false
 }
 
@@ -374,10 +420,8 @@ fn eval_board(board: &GameBoard, player: usize, game_count: u32) -> i32 {
 
 // ─── Move generation & ordering ───
 
-fn get_moves(board: &GameBoard, sz: usize, player: usize, first_move_pos: Option<(usize, usize)>) -> Vec<(usize, usize)> {
+fn get_moves(board: &GameBoard, sz: usize, player: usize, _first_move_pos: Option<(usize, usize)>) -> Vec<(usize, usize)> {
     let has_p = has_pieces(board, player);
-    let skip_restricted = first_move_pos.is_some() && player != 0;
-    let (fx, fy) = match first_move_pos { Some(p) => p, _ => (0, 0) };
     let mut moves = Vec::new();
     for i in 0..sz {
         for j in 0..sz {
@@ -387,10 +431,7 @@ fn get_moves(board: &GameBoard, sz: usize, player: usize, first_move_pos: Option
                     moves.push((i, j));
                 }
             } else {
-                if c.owner.is_none() && !near_any(board, sz, i, j) {
-                    if skip_restricted && is_in_first_move_restricted(i, j, fx, fy) {
-                        continue;
-                    }
+                if c.owner.is_none() && !is_in_any_restricted_zone(board, sz, i, j) {
                     moves.push((i, j));
                 }
             }
@@ -427,101 +468,143 @@ fn order_moves(moves: Vec<(usize, usize)>, board: &GameBoard, sz: usize, player:
     scored.into_iter().map(|(_, m)| m).collect()
 }
 
-// ─── Serial Alpha-Beta search ───
+// ─── GameState: alpha_beta_pruning::AlphaBeta trait impl ───
 
-fn alpha_beta(
-    board: &GameBoard,
+/// 游戏状态包装器，实现 AlphaBeta trait 进行并行 Alpha-Beta 搜索
+#[derive(Clone)]
+struct GameState {
+    board: GameBoard,
     sz: usize,
     player: usize,
-    depth: usize,
-    max_depth: usize,
-    mut alpha: i32,
-    mut beta: i32,
     ai_player: usize,
-    start: Instant,
-    limit: Duration,
-    alive: &[usize],
-    elim_set: &[usize],
+    eliminated: Vec<usize>,
+    max_players: usize,
     game_count: u32,
-    first_move_pos: Option<(usize, usize)>,
-) -> (i32, Option<(usize, usize)>) {
-    if depth >= max_depth || start.elapsed() > limit {
-        return (eval_board(board, ai_player, game_count), None);
-    }
-
-    let moves = get_moves(board, sz, player, first_move_pos);
-    if moves.is_empty() {
-        return (eval_board(board, ai_player, game_count), None);
-    }
-    if moves.len() == 1 {
-        return (eval_board(board, ai_player, game_count), Some(moves[0]));
-    }
-
-    let ordered = order_moves(moves, board, sz, player);
-    let max_eval = ordered.len().min(10);
-
-    let is_max = player == ai_player;
-    let mut best_score = if is_max { i32::MIN } else { i32::MAX };
-    let mut best_move: Option<(usize, usize)> = None;
-
-    for k in 0..max_eval {
-        let (i, j) = ordered[k];
-        let mut nb = board.clone();
-        let elim = process_click(&mut nb, sz, i, j, player, sz);
-
-        // merge eliminated
-        let mut new_elim: Vec<usize> = elim_set.to_vec();
-        for &e in &elim {
-            if !new_elim.contains(&e) {
-                new_elim.push(e);
-            }
-        }
-
-        let alive_next: Vec<usize> = alive
-            .iter()
-            .filter(|p| !new_elim.contains(p))
-            .copied()
-            .collect();
-
-        if alive_next.len() <= 1 {
-            let sc = if is_max { i32::MAX - 1 } else { i32::MIN + 1 };
-            if (is_max && sc > best_score) || (!is_max && sc < best_score) {
-                best_score = sc;
-                best_move = Some((i, j));
-            }
-            continue;
-        }
-
-        let idx = alive_next.iter().position(|&p| p == player).unwrap_or(0);
-        let next_player = alive_next[(idx + 1) % alive_next.len()];
-
-        let (score, _) = alpha_beta(
-            &nb, sz, next_player, depth + 1, max_depth,
-            alpha, beta, ai_player, start, limit,
-            &alive_next, &new_elim, game_count, first_move_pos,
-        );
-
-        if is_max {
-            if score > best_score {
-                best_score = score;
-                best_move = Some((i, j));
-            }
-            alpha = alpha.max(score);
-        } else {
-            if score < best_score {
-                best_score = score;
-                best_move = Some((i, j));
-            }
-            beta = beta.min(score);
-        }
-        if beta <= alpha {
-            break;
-        }
-    }
-    (best_score, best_move)
 }
 
-// ─── Public entry point (Rayon parallel root) ───
+impl AlphaBeta<(usize, usize)> for GameState {
+    fn evaluate(&self) -> Grade {
+        Grade::Score(eval_board(&self.board, self.ai_player, self.game_count) as i64)
+    }
+
+    fn get_moves(&self) -> Vec<(usize, usize)> {
+        get_moves(&self.board, self.sz, self.player, None)
+    }
+
+    fn set(&mut self, m: &(usize, usize)) {
+        let (x, y) = *m;
+        let elim = process_click(&mut self.board, self.sz, x, y, self.player, self.max_players);
+        for &e in &elim {
+            if !self.eliminated.contains(&e) {
+                self.eliminated.push(e);
+            }
+        }
+        // 切换到下一个活跃玩家
+        let alive: Vec<usize> = (0..self.max_players)
+            .filter(|p| !self.eliminated.contains(p) && (*p == self.player || has_pieces(&self.board, *p)))
+            .collect();
+        if alive.len() > 1 {
+            let idx = alive.iter().position(|&p| p == self.player).unwrap_or(0);
+            self.player = alive[(idx + 1) % alive.len()];
+        }
+    }
+
+    fn unset(&mut self, _m: &(usize, usize)) {
+        // no-op：alpha_beta 重写使用克隆替代 set/unset
+    }
+
+    /// 重写 run：加入时间限制、走法排序、首步居中偏好
+    fn run(&self, depth: usize) -> Option<(usize, usize)> {
+        let all_moves = self.get_moves();
+        if all_moves.is_empty() { return None; }
+        if all_moves.len() == 1 { return Some(all_moves[0]); }
+
+        // 首步：居中偏好
+        if !has_pieces(&self.board, self.player) {
+            let mut candidates: Vec<(usize, usize)> = (1..self.sz - 1)
+                .flat_map(|i| (1..self.sz - 1).filter_map(move |j| {
+                    if self.board[i][j].owner.is_none() && !is_in_any_restricted_zone(&self.board, self.sz, i, j) {
+                        Some((i, j))
+                    } else { None }
+                })).collect();
+            if candidates.is_empty() {
+                for i in 0..self.sz { for j in 0..self.sz {
+                    if self.board[i][j].owner.is_none() && !is_in_any_restricted_zone(&self.board, self.sz, i, j) {
+                        candidates.push((i, j));
+                    }
+                }}
+            }
+            if candidates.is_empty() {
+                for i in 0..self.sz { for j in 0..self.sz {
+                    if self.board[i][j].owner.is_none() { candidates.push((i, j)); }
+                }}
+            }
+            if candidates.is_empty() { return None; }
+            let cx = self.sz as f64 / 2.0 - 0.5;
+            return candidates.into_iter()
+                .min_by(|&(i1, j1), &(i2, j2)| {
+                    let d1 = (i1 as f64 - cx).abs() + (j1 as f64 - cx).abs();
+                    let d2 = (i2 as f64 - cx).abs() + (j2 as f64 - cx).abs();
+                    d1.partial_cmp(&d2).unwrap()
+                });
+        }
+
+        // 走法排序 + 限制前10
+        let ordered = order_moves(all_moves, &self.board, self.sz, self.player);
+        let max_eval = ordered.len().min(10);
+        if max_eval == 0 { return None; }
+
+        // Rayon 并行根搜索（利用 crate 的 Grade + AlphaBeta trait）
+        ordered[..max_eval].par_iter()
+            .map(|m| {
+                let mut child = self.clone();
+                child.set(m);
+                let grade = if depth > 0 {
+                    child.alpha_beta(Grade::Min, Grade::Max, depth - 1, false)
+                } else {
+                    child.evaluate()
+                };
+                (grade, *m)
+            })
+            .max_by(|(g1, _), (g2, _)| g1.cmp(g2))
+            .map(|(_, m)| m)
+    }
+
+    /// 重写 alpha_beta：使用克隆替代 set/unset，支持多玩家轮换
+    fn alpha_beta(&mut self, mut alpha: Grade, mut beta: Grade, depth: usize, _is_max: bool) -> Grade {
+        let moves = self.get_moves();
+        if depth == 0 || moves.is_empty() {
+            return self.evaluate();
+        }
+        // 根据实际轮到谁确定 max/min
+        let is_max = self.player == self.ai_player;
+        if is_max {
+            let mut best = Grade::Min;
+            for m in &moves {
+                let mut child = self.clone();
+                child.set(m);
+                let grade = child.alpha_beta(alpha, beta, depth - 1, false);
+                best = best.max(grade);
+                alpha = alpha.max(grade);
+                if beta <= alpha { break; }
+            }
+            best
+        } else {
+            let mut best = Grade::Max;
+            for m in &moves {
+                let mut child = self.clone();
+                child.set(m);
+                let grade = child.alpha_beta(alpha, beta, depth - 1, true);
+                best = best.min(grade);
+                beta = beta.min(grade);
+                if alpha >= beta { break; }
+            }
+            best
+        }
+    }
+}
+
+// ─── Public entry point ───
 
 pub fn find_best_move(
     board: &GameBoard,
@@ -531,131 +614,16 @@ pub fn find_best_move(
     eliminated: &[usize],
     max_players: usize,
     game_count: u32,
-    first_move_pos: Option<[usize; 2]>,
+    _first_move_pos: Option<[usize; 2]>,
 ) -> Option<(usize, usize)> {
-    let fm_pos = first_move_pos.map(|[x, y]| (x, y));
-    let start = Instant::now();
-    let limit = Duration::from_millis(3000 + depth as u64 * 500);
-
-    // single move → no search
-    let all_moves = get_moves(board, sz, player, fm_pos);
-    if all_moves.len() <= 1 {
-        return all_moves.into_iter().next();
-    }
-
-    // first move (no pieces yet) → center preference, avoid edges
-    if !has_pieces(board, player) {
-        let skip_restricted = fm_pos.is_some() && player != 0;
-        let (rfx, rfy) = match fm_pos { Some(p) => p, _ => (0, 0) };
-        let mut candidates: Vec<(usize, usize)> = (1..sz - 1)
-            .flat_map(|i| {
-                (1..sz - 1).filter_map(move |j| {
-                    if board[i][j].owner.is_none() && !near_any(board, sz, i, j) {
-                        if skip_restricted && is_in_first_move_restricted(i, j, rfx, rfy) {
-                            return None;
-                        }
-                        Some((i, j))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect();
-        if candidates.is_empty() {
-            // fallback to all non-adjacent cells
-            for i in 0..sz {
-                for j in 0..sz {
-                    if board[i][j].owner.is_none() && !near_any(board, sz, i, j) {
-                        if skip_restricted && is_in_first_move_restricted(i, j, rfx, rfy) {
-                            continue;
-                        }
-                        candidates.push((i, j));
-                    }
-                }
-            }
-        }
-        // fallback to any empty cell
-        if candidates.is_empty() {
-            for i in 0..sz {
-                for j in 0..sz {
-                    if board[i][j].owner.is_none() {
-                        if skip_restricted && is_in_first_move_restricted(i, j, rfx, rfy) {
-                            continue;
-                        }
-                        candidates.push((i, j));
-                    }
-                }
-            }
-        }
-        if candidates.is_empty() {
-            return None;
-        }
-        let cx = sz as f64 / 2.0 - 0.5;
-        return candidates
-            .into_iter()
-            .min_by(|&(i1, j1), &(i2, j2)| {
-                let d1 = (i1 as f64 - cx).abs() + (j1 as f64 - cx).abs();
-                let d2 = (i2 as f64 - cx).abs() + (j2 as f64 - cx).abs();
-                d1.partial_cmp(&d2).unwrap()
-            });
-    }
-
-    // build alive list
-    let alive: Vec<usize> = (0..max_players)
-        .filter(|p| !eliminated.contains(p))
-        .filter(|&p| p == player || has_pieces(board, p))
-        .collect();
-    if alive.len() <= 1 {
-        return None;
-    }
-
-    // order moves for root
-    let ordered = order_moves(get_moves(board, sz, player, fm_pos), board, sz, player);
-    let max_eval = ordered.len().min(10);
-    if max_eval == 0 {
-        return None;
-    }
-
-    // ── Rayon parallel root search ──
-    let results: Vec<(i32, usize, usize)> = (0..max_eval)
-        .into_par_iter()
-        .map(|k| {
-            let (i, j) = ordered[k];
-            let mut nb = board.clone();
-            let elim = process_click(&mut nb, sz, i, j, player, max_players);
-
-            let mut new_elim: Vec<usize> = eliminated.to_vec();
-            for &e in &elim {
-                if !new_elim.contains(&e) {
-                    new_elim.push(e);
-                }
-            }
-
-            let alive_next: Vec<usize> = alive
-                .iter()
-                .filter(|p| !new_elim.contains(p))
-                .copied()
-                .collect();
-
-            if alive_next.len() <= 1 {
-                return (i32::MAX - 1, i, j);
-            }
-
-            let idx = alive_next.iter().position(|&p| p == player).unwrap_or(0);
-            let next_player = alive_next[(idx + 1) % alive_next.len()];
-
-            let (score, _) = alpha_beta(
-                &nb, sz, next_player, 1, depth,
-                i32::MIN, i32::MAX, player, start, limit,
-                &alive_next, &new_elim, game_count, fm_pos,
-            );
-            (score, i, j)
-        })
-        .collect();
-
-    // pick best
-    results
-        .into_iter()
-        .max_by_key(|&(score, _, _)| score)
-        .map(|(_, i, j)| (i, j))
+    let state = GameState {
+        board: board.clone(),
+        sz,
+        player,
+        ai_player: player,
+        eliminated: eliminated.to_vec(),
+        max_players,
+        game_count,
+    };
+    state.run(depth)
 }
