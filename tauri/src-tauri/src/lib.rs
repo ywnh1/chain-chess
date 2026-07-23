@@ -68,7 +68,7 @@ pub struct HistoryRecord {
     pub chain_stats: std::collections::HashMap<String, ChainStatsPlayer>,
     pub max_chain: MaxChain,
     #[serde(default)]
-    pub history: Vec<TurnHistory>,
+    pub history: serde_json::Value,
 }
 
 // ─── Process move result ───
@@ -187,6 +187,36 @@ async fn load_game_history(
 }
 
 #[tauri::command]
+async fn import_game_history(
+    state: tauri::State<'_, AppState>,
+    json_data: String,
+) -> Result<usize, String> {
+    let records: Vec<HistoryRecord> = serde_json::from_str(&json_data)
+        .map_err(|e| format!("JSON 格式错误: {}", e))?;
+    let path = state.history_file.lock().map_err(|e| e.to_string())?;
+    let mut existing: Vec<HistoryRecord> = if path.exists() {
+        let content = fs::read_to_string(&*path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    // 按 id 去重合并
+    let existing_ids: std::collections::HashSet<u64> = existing.iter().map(|r| r.id).collect();
+    let mut imported = 0usize;
+    for record in records {
+        if !existing_ids.contains(&record.id) {
+            existing.push(record);
+            imported += 1;
+        }
+    }
+    if imported > 0 {
+        let json = serde_json::to_string_pretty(&existing).map_err(|e| e.to_string())?;
+        fs::write(&*path, json).map_err(|e| e.to_string())?;
+    }
+    Ok(imported)
+}
+
+#[tauri::command]
 async fn clear_game_history(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
@@ -246,9 +276,68 @@ async fn clear_round_history(
     Ok(())
 }
 
+#[tauri::command]
+async fn export_game_history_dialog(
+    app_handle: tauri::AppHandle,
+    json_data: String,
+) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+    // 用时间戳做默认文件名
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let days = secs / 86400;
+    let date_str = format!(
+        "{}-{:02}-{:02}",
+        1970 + days / 365,
+        ((days % 365) / 30 + 1).min(12),
+        (days % 30 + 1).min(31)
+    );
+    let default_name = format!("连锁棋历史_{}.json", date_str);
+
+    use std::io::Write;
+
+    // 1) 系统原生保存对话框（用户选路径，授权读写权限）
+    match app_handle.dialog()
+        .file()
+        .add_filter("JSON", &["json"])
+        .set_file_name(&default_name)
+        .blocking_save_file()
+    {
+        Some(fpath) => {
+            // 通过 tauri-plugin-fs 的 Fs::open 写入（支持普通路径和 Android content:// URI）
+            use tauri_plugin_fs::OpenOptions;
+            let fs = app_handle.state::<tauri_plugin_fs::Fs<tauri::Wry>>();
+            let mut opts = OpenOptions::new();
+            opts.write(true);
+            let mut file = fs.open(fpath.clone(), opts)
+                .map_err(|e| format!("打开文件失败: {}", e))?;
+            file.write_all(json_data.as_bytes())
+                .map_err(|e| format!("写入文件失败: {}", e))?;
+            drop(file);
+            Ok(format!("{}", json_data.len()))
+        }
+        None => {
+            // 2) 用户取消 → 写入 app 数据目录保底
+            let data_dir = app_handle.path().app_data_dir()
+                .map_err(|e| format!("获取数据目录失败: {}", e))?;
+            let fallback_path = data_dir.join(&default_name);
+            fs::write(&fallback_path, &json_data)
+                .map_err(|e| format!("写入保底文件失败: {}", e))?;
+            let size = fallback_path.metadata()
+                .map(|m| m.len())
+                .unwrap_or(0);
+            Ok(format!("fallback:{}", size))
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             // 使用 Tauri 应用数据目录（Android/iOS/桌面通用）
             let app_data_dir = app.path().app_data_dir()
@@ -267,6 +356,8 @@ pub fn run() {
             process_move,
             save_game_history,
             load_game_history,
+            import_game_history,
+            export_game_history_dialog,
             clear_game_history,
             exit_app,
             save_round_history,

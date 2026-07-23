@@ -8,14 +8,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f0f13" id="metaThemeColor">
+<meta name="color-scheme" content="light dark">
 <title>连锁棋</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* 防止系统字体缩放破坏布局 */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 :root{
   --bg:#0f0f13;
   --surface:rgba(26,26,34,.85);
   --card:rgba(35,35,45,.75);
-  --border:rgba(255,255,255,.08);
+  --border:var(--glass-w-08);
   --accent:#f0b34b;
   --accent2:#5fc3c3;
   --text:#e8e6e3;
@@ -23,28 +27,56 @@
   --radius:12px;
   --shadow:0 8px 32px rgba(0,0,0,.45);
   --glow:0 0 40px rgba(240,179,75,.05);
-  --glass:rgba(255,255,255,.04);
-  --glass-border:rgba(255,255,255,.06);
+  --glass:var(--glass-w-04);
+  --glass-border:var(--glass-w-06);
   --glass-shadow:0 4px 24px rgba(0,0,0,.3);
-  --glass-shine:rgba(255,255,255,.03);
-  --glass-edge:rgba(255,255,255,.06);
+  --glass-shine:var(--glass-w-03);
+  --glass-edge:var(--glass-w-06);
   --font:'Inter','SF Pro','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+
+  /* ─── 玻璃色阶（浅色/深色模式自动切换） ─── */
+  --glass-w-004:rgba(255,255,255,.004);
+  --glass-w-008:rgba(255,255,255,.008);
+  --glass-w-012:rgba(255,255,255,.012);
+  --glass-w-025:rgba(255,255,255,.025);
+  --glass-w-03:rgba(255,255,255,.03);
+  --glass-w-035:rgba(255,255,255,.035);
+  --glass-w-04:rgba(255,255,255,.04);
+  --glass-w-05:rgba(255,255,255,.05);
+  --glass-w-06:rgba(255,255,255,.06);
+  --glass-w-08:rgba(255,255,255,.08);
+  --glass-w-09:rgba(255,255,255,.09);
+  --glass-w-10:rgba(255,255,255,.10);
+  --glass-w-12:rgba(255,255,255,.12);
+  --glass-w-14:rgba(255,255,255,.14);
+  --glass-w-15:rgba(255,255,255,.15);
+  --glass-w-16:rgba(255,255,255,.16);
+  --glass-w-18:rgba(255,255,255,.18);
+  --glass-w-20:rgba(255,255,255,.20);
+  --glass-w-88:rgba(255,255,255,.88);
+
 }
+
+
 html{font-size:clamp(14px,3.5vw,17px)}
 body{
   font-family:var(--font);
   background:var(--bg);
   color:var(--text);
   min-height:100dvh;
+  min-height:calc(100dvh - env(safe-area-inset-bottom,0px));
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
   padding:12px;
-  transition:background .6s ease,box-shadow .4s ease;
+  padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  transition:background .6s ease,color .4s ease,box-shadow .4s ease;
   -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
   overflow-x:hidden;
   line-height:1.5;
+  overscroll-behavior:none;
 }
 body::before{content:'';position:fixed;inset:0;background:
     radial-gradient(ellipse 70% 50% at 50% -10%,rgba(240,179,75,.04) 0%,transparent 70%),
@@ -53,6 +85,12 @@ body::before{content:'';position:fixed;inset:0;background:
     radial-gradient(ellipse 40% 25% at 80% 60%,rgba(95,195,195,.015) 0%,transparent 60%);
   background-size:200% 200%,200% 200%,200% 200%,200% 200%;
   animation:liquidDrift 20s ease-in-out infinite;
+  pointer-events:none;z-index:0;
+  will-change:background-position,transform;
+  contain:layout style paint}
+/* 暗色遮罩 — 深色模式下给整体加一层深色覆盖，让亮度更沉 */
+body::after{content:'';position:fixed;inset:0;
+  background:rgba(0,0,0,.18);
   pointer-events:none;z-index:0}
 @keyframes liquidDrift{
   0%{background-position:50% -10%,100% 90%,20% 40%,80% 60%}
@@ -61,9 +99,24 @@ body::before{content:'';position:fixed;inset:0;background:
   75%{background-position:52% -9%,98% 85%,22% 36%,78% 62%}
   100%{background-position:50% -10%,100% 90%,20% 40%,80% 60%}
 }
-.screen.active{position:relative;z-index:1}
-.screen{display:none}
-.screen.active{display:flex;flex-direction:column;align-items:center;width:100%;max-width:480px}
+/* ═══════ 页面过渡动画 ═══════ */
+.screen{display:none;opacity:0;will-change:transform,opacity}
+.screen.active{
+  display:flex;flex-direction:column;align-items:center;width:100%;max-width:480px;
+  animation:pageEnter .4s cubic-bezier(.22,1,.36,1) both;
+}
+.screen.leaving{
+  animation:pageLeave .25s ease both;
+  pointer-events:none;
+}
+@keyframes pageEnter{
+  0%{opacity:0;transform:translateY(18px) scale(.97)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes pageLeave{
+  0%{opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(-12px) scale(.98)}
+}
 
 /* welcome */
 #welcome{gap:2rem;text-align:center}
@@ -77,9 +130,11 @@ body::before{content:'';position:fixed;inset:0;background:
   transition:.25s;text-align:left;display:flex;align-items:center;gap:14px;
   box-shadow:var(--shadow);
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  touch-action:manipulation;
+  min-height:56px;
 }
-.mode-card:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);transform:translateY(-2px);box-shadow:0 10px 40px rgba(0,0,0,.4)}
-.mode-card:active{background:rgba(255,255,255,.09);border-color:rgba(240,179,75,.5);transform:scale(.99);transition:all .06s ease}
+.mode-card:hover{background:var(--glass-w-08);border-color:var(--glass-w-18);transform:translateY(-2px);box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.mode-card:active{background:var(--glass-w-09);border-color:rgba(240,179,75,.5);transform:scale(.99);transition:all .06s ease}
 .mode-card .icon{font-size:1.8rem;flex-shrink:0}
 .mode-card .body{flex:1}
 .mode-card .body h3{font-size:1rem;font-weight:600}
@@ -87,20 +142,20 @@ body::before{content:'';position:fixed;inset:0;background:
 
 /* lobby */
 #aiLobby,#localLobby,#eveLobby{max-width:480px;gap:.75rem;width:100%}
-#aiLobby .back,#localLobby .back,#history .back,#eveLobby .back,#checkout .chk-back{
+#aiLobby .back,#localLobby .back,#history .back,#eveLobby .back{
   align-self:flex-start;
   background:none;border:none;color:var(--dim);
   font-size:.85rem;cursor:pointer;padding:6px 0;
   display:flex;align-items:center;gap:4px;transition:.15s;
 }
-#aiLobby .back:active,#localLobby .back:active,#history .back:active,#eveLobby .back:active,#checkout .chk-back:active{color:var(--text)}
+#aiLobby .back:active,#localLobby .back:active,#history .back:active,#eveLobby .back:active{color:var(--text)}
 #aiLobby h2,#localLobby h2,#history h2,#eveLobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
 .form-row{margin:8px 0;display:flex;flex-direction:column;gap:4px;width:100%}
 .form-row label{font-size:.78rem;color:var(--dim);font-weight:500}
 .form-row input,.form-row select{
   width:100%;padding:10px 12px;
   border:1px solid var(--border);border-radius:8px;
-  background:rgba(255,255,255,.04);color:var(--text);
+  background:var(--glass-w-04);color:var(--text);
   font-size:.9rem;outline:none;transition:.15s;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   -webkit-appearance:none;appearance:none;
@@ -116,14 +171,14 @@ body::before{content:'';position:fixed;inset:0;background:
 .form-row select option{background:#1a1a22;color:var(--text)}
 .form-eve-config{width:100%;max-height:240px;overflow-y:auto;margin:4px 0;display:flex;flex-direction:column;gap:6px}
 .eve-ai-row{
-  display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);
+  display:flex;align-items:center;gap:8px;background:var(--glass-w-04);
   border-radius:8px;padding:6px 10px;margin:4px 0;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
 }
 .eve-ai-row .color-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .eve-ai-row .eve-label{font-size:.78rem;font-weight:600;min-width:44px}
 .eve-ai-row select{flex:1;padding:5px 6px;border:1px solid var(--border);border-radius:6px;
-  background:rgba(255,255,255,.04);color:var(--text);font-size:.75rem;outline:none;
+  background:var(--glass-w-04);color:var(--text);font-size:.75rem;outline:none;
   -webkit-appearance:none;appearance:none;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 12 8'%3E%3Cpath fill='%237a7885' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 8px center;padding-right:22px;}
@@ -141,17 +196,36 @@ body::before{content:'';position:fixed;inset:0;background:
 /* game */
 #game{max-width:520px;gap:8px;width:100%}
 #game .top{
-  display:flex;justify-content:space-between;align-items:center;
-  width:100%;padding:6px 0 8px;
+  display:flex;justify-content:center;align-items:center;
+  width:100%;padding:8px 0 10px;position:relative;
 }
-#game .top-left{display:flex;gap:8px;align-items:center}
-#game .top-left button{
-  background:rgba(255,255,255,.08);color:var(--dim);
+#game .top-left{display:flex;gap:8px;align-items:center;width:100%;justify-content:center}
+#game .top-left button:not(#pauseBtn){
+  background:var(--glass-w-08);color:var(--dim);
   border:none;padding:7px 12px;border-radius:8px;font-size:.72rem;
   cursor:pointer;transition:.15s;font-weight:500;letter-spacing:.3px;
 }
-#game .top-left button:active{background:rgba(255,255,255,.12);transform:scale(.97);transition:all .06s ease}
-#pauseBtn{padding:9px 16px;font-size:.82rem}
+#game .top-left button:not(#pauseBtn):active{background:var(--glass-w-12);transform:scale(.97);transition:all .06s ease}
+/* ═══ 暂停按钮（醒目大按钮+呼吸发光） ═══ */
+#pauseBtn{
+  padding:12px 28px;font-size:.95rem;font-weight:700;letter-spacing:1px;
+  background:rgba(240,179,75,.12);color:var(--accent);
+  border:1.5px solid rgba(240,179,75,.25);border-radius:14px;
+  cursor:pointer;transition:all .25s ease;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:0 0 20px rgba(240,179,75,.08),inset 0 1px 0 rgba(240,179,75,.1);
+  animation:pausePulse 3s ease-in-out infinite;
+  text-shadow:0 0 8px rgba(240,179,75,.1);
+}
+#pauseBtn:hover{
+  background:rgba(240,179,75,.2);box-shadow:0 0 30px rgba(240,179,75,.2),inset 0 1px 0 rgba(240,179,75,.15);
+  transform:translateY(-1px);
+}
+#pauseBtn:active{transform:scale(.96);transition:all .08s ease}
+@keyframes pausePulse{
+  0%,100%{box-shadow:0 0 20px rgba(240,179,75,.08),inset 0 1px 0 rgba(240,179,75,.1);border-color:rgba(240,179,75,.25)}
+  50%{box-shadow:0 0 35px rgba(240,179,75,.18),inset 0 1px 0 rgba(240,179,75,.15);border-color:rgba(240,179,75,.4)}
+}
 /* 跳过动画按钮 */
 #skipChainBtn{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:500;
@@ -163,11 +237,11 @@ body::before{content:'';position:fixed;inset:0;background:
 }
 #skipChainBtn:hover{background:rgba(240,179,75,.3);box-shadow:0 4px 24px rgba(240,179,75,.25)}
 #skipChainBtn:active{transform:translateX(-50%) scale(.95)}
-#game .top-right{display:flex;gap:4px;align-items:center}
+#game .top-right{position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;gap:4px;align-items:center}
 .turn-badge{
   display:inline-flex;align-items:center;gap:5px;
   font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:6px;
-  background:rgba(255,255,255,.06);
+  background:var(--glass-w-06);
 }
 .turn-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 .board-wrap{
@@ -175,16 +249,46 @@ body::before{content:'';position:fixed;inset:0;background:
   width:min(88vw,440px);
   height:min(88vw,440px);
 }
-#board{width:100%;height:100%;display:grid;gap:min(1.6vw,8px);touch-action:manipulation}
+#board{width:100%;height:100%;display:grid;gap:min(1.6vw,8px);touch-action:manipulation;contain:layout style paint}
 .cell{
-  background:rgba(255,255,255,.05);
+  background:var(--glass-w-05);
   border-radius:min(2.2vw,10px);
   position:relative;cursor:pointer;
   transition:background .12s,transform .08s,box-shadow .12s;
-  border:1px solid rgba(255,255,255,.03);
+  border:1px solid var(--glass-w-03);
+  overflow:hidden;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
 }
-.cell.highlight{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.1);transform:scale(1.02)}
-.cell:active{transform:scale(.95)}
+.cell.highlight{background:var(--glass-w-12);border-color:var(--glass-w-10);transform:scale(1.02)}
+.cell:active{transform:scale(.93)}
+/* ═══ 落子波纹特效 ═══ */
+.cell .ripple{
+  position:absolute;inset:0;border-radius:min(2.2vw,10px);
+  pointer-events:none;animation:rippleAnim .5s ease-out forwards;
+}
+@keyframes rippleAnim{
+  0%{box-shadow:0 0 0 0 rgba(255,255,255,.35),inset 0 0 0 0 var(--glass-w-15)}
+  100%{box-shadow:0 0 0 12px rgba(255,255,255,0),inset 0 0 0 6px rgba(255,255,255,0)}
+}
+/* ═══ 爆炸冲击波+碎片 ═══ */
+.cell .shockwave{
+  position:absolute;inset:-8px;border-radius:50%;
+  pointer-events:none;animation:shockwaveAnim .5s ease-out forwards;
+  border:2px solid rgba(255,255,255,.5);
+}
+@keyframes shockwaveAnim{
+  0%{transform:scale(.8);opacity:1;border-width:3px}
+  100%{transform:scale(2.5);opacity:0;border-width:1px}
+}
+.cell .particle{
+  position:absolute;width:6px;height:6px;border-radius:50%;
+  pointer-events:none;animation:particleFly .6s ease-out forwards;
+}
+@keyframes particleFly{
+  0%{opacity:1;transform:translate(0,0) scale(1)}
+  100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(0)}
+}
 .cell .bg{
   position:absolute;inset:0;
   border-radius:min(2.2vw,10px);opacity:.15;
@@ -205,11 +309,13 @@ body::before{content:'';position:fixed;inset:0;background:
   70%{transform:translate(-50%,-50%) scale(1.12)}
   100%{transform:translate(-50%,-50%) scale(1)}
 }
-.cell.explode{animation:explode .35s ease}
+.cell.explode{animation:explode .4s ease forwards;z-index:10}
 @keyframes explode{
-  0%{background:rgba(255,255,255,.4)}
-  50%{background:rgba(255,255,255,.7)}
-  100%{background:rgba(255,255,255,.05)}
+  0%{background:rgba(255,255,255,.3);transform:scale(1)}
+  20%{background:rgba(255,255,255,.7);transform:scale(1.1)}
+  40%{background:rgba(255,255,255,.8);transform:scale(1.15)}
+  60%{background:rgba(255,255,255,.5);transform:scale(1.05)}
+  100%{background:var(--glass-w-05);transform:scale(1)}
 }
 .cell .dot{
   position:absolute;width:20%;height:20%;
@@ -219,20 +325,25 @@ body::before{content:'';position:fixed;inset:0;background:
 
 /* 挖孔屏安全区 */
 body{padding-top:env(safe-area-inset-top,20px)}
-/* 简洁卡片风格（无流光） */
+/* 统一玻璃卡片边缘折射（内斜面高光 + 色散光晕） */
 .mode-card,.modal-inner,.settlement .stat-card,.settlement .chart-box,
 .history-item,#pauseOverlay .stat-card,#pauseOverlay .chart-box{
-  border:1px solid rgba(255,255,255,.08);
+  border:1px solid var(--glass-w-08);
+  box-shadow:
+    inset 0 1px 0 var(--glass-w-03),              /* 上沿内斜面采光 */
+    0 0 0 1px rgba(200,215,255,.02);              /* 色散偏移光晕 */
   transition:border-color .25s ease,box-shadow .25s ease;
 }
 .mode-card:hover,.history-item:hover{
-  border-color:rgba(255,255,255,.18);
+  border-color:var(--glass-w-18);
   box-shadow:0 8px 32px rgba(0,0,0,.4);
 }
 .btn-primary,.settlement .btn-again{
   background:var(--accent);color:#0f0f13;
   border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;
   transition:.2s;box-shadow:0 4px 20px rgba(240,179,75,.25);
+  touch-action:manipulation;
+  min-height:44px;
 }
 .btn-primary:hover{opacity:.9;box-shadow:0 4px 20px rgba(240,179,75,.3);transform:translateY(-1px)}
 .btn-primary:active{opacity:.85;transform:scale(.97);transition:all .08s ease}
@@ -247,35 +358,115 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 .btn-danger:hover{background:rgba(255,80,80,.22);border-color:rgba(255,80,80,.4)}
 .btn-danger:active{opacity:.7;transform:scale(.97);transition:all .08s ease}
-/* 暂停覆盖背景 */
-#pauseOverlay.settlement{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
-#pauseOverlay .stat-card,#pauseOverlay .chart-box{
-  background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.08);
+/* 暂停覆盖 — 浮动液态玻璃面板，居中显示，周边可见棋盘 */
+#pauseOverlay.settlement{
+  position:fixed;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:92vw;max-width:480px;
+  max-height:calc(100dvh - 20px);
+  min-height:320px;
+  border-radius:20px;
+  z-index:999;
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  background:linear-gradient(
+    135deg,
+    rgba(15,15,19,.38) 0%,
+    rgba(22,24,30,.30) 50%,
+    rgba(15,15,19,.26) 100%
+  );
+  display:flex;flex-direction:column;align-items:center;
+  padding:calc(10px + env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  overflow:hidden;
+  /* ═══ 液态玻璃边缘折射（宽厚版） ═══ */
+  border:1.5px solid rgba(255,255,255,.15);
+  border-radius:20px;
+  box-shadow:
+    0 0 0 2px rgba(200,215,255,.05),
+    0 0 0 4px rgba(200,215,255,.015),
+    0 0 20px rgba(200,215,255,.022),
+    0 0 0 6px rgba(255,255,255,.008),
+    0 16px 48px rgba(0,0,0,.5),
+    inset 0 2px 0 rgba(255,255,255,.08),
+    inset 0 -1.5px 0 rgba(255,255,255,.025),
+    inset 0 0 60px rgba(255,255,255,.008);
 }
-#pauseOverlay #pauseCharts{display:flex;flex-direction:column;gap:12px;width:100%}
-#pauseOverlay .stats-grid{gap:8px}
-#pauseOverlay .btn-primary{margin-top:4px}
+#pauseOverlay .stat-card{
+  background:var(--glass-w-035);
+  padding:12px 10px;
+  border:1px solid var(--glass-w-08);
+  box-shadow:
+    inset 0 1.5px 0 var(--glass-w-05),
+    0 0 0 1px rgba(200,215,255,.025),
+    0 0 8px rgba(200,215,255,.006);
+}
+#pauseOverlay .chart-box{
+  background:var(--glass-w-025);
+  padding:12px 14px;
+  border:1px solid var(--glass-w-06);
+  box-shadow:
+    inset 0 1.5px 0 var(--glass-w-04),
+    0 0 0 1px rgba(200,215,255,.02),
+    0 0 6px rgba(200,215,255,.004);
+}
+/* 暂停面板内滚动容器 — 内容超出时框内滑动，背景固定 */
+#pauseOverlay .settlement-inner{
+  width:100%;
+  overflow-y:auto;
+  flex:1;
+  min-height:0;
+  -webkit-overflow-scrolling:touch;
+}
+#pauseOverlay>h2{
+  flex-shrink:0;
+  width:100%;
+  text-align:center;
+  font-size:1.15rem;
+  margin:0 0 8px 0;
+  text-shadow:0 2px 20px rgba(0,0,0,.5);
+}
+#pauseOverlay .settlement-inner::-webkit-scrollbar{width:3px}
+#pauseOverlay .settlement-inner::-webkit-scrollbar-thumb{background:var(--glass-w-10);border-radius:3px}
+#pauseOverlay .settlement-inner h2{
+  flex-shrink:0;
+  text-shadow:0 2px 20px rgba(0,0,0,.5);
+}
+#pauseOverlay #pauseCharts{display:flex;flex-direction:column;gap:14px;width:100%}
+#pauseOverlay .stats-grid{gap:10px}
+#pauseOverlay .btn-primary{margin-top:10px}
+#pauseOverlay .chart-box canvas{height:150px}
 
 /* checkout screen — 结算/历史详情页（复用 settlement 样式，但作为 .screen） */
-#checkout.screen{max-width:520px;gap:6px;padding:8px 6px 16px}
+#checkout.screen{max-width:520px;gap:10px;padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(32px + env(safe-area-inset-bottom, 0px));height:100dvh;overflow:hidden}
 #checkout.screen.active{display:flex;flex-direction:column;align-items:center}
-#checkout .chk-scroll{width:100%;max-height:calc(100dvh - 52px);overflow-y:auto;padding-right:4px}
+#checkout .chk-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
 #checkout .chk-scroll::-webkit-scrollbar{width:3px}
-#checkout .chk-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
-#checkout .chk-back{position:sticky;top:0;z-index:1;align-self:flex-start;margin-bottom:2px}
-#checkout .settlement{position:relative;inset:auto;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;animation:none;z-index:auto}
-#checkout .settlement-inner{gap:8px}
-#checkout .settlement h2{font-size:1.15rem;margin:2px 0 4px;width:100%}
+#checkout .chk-scroll::-webkit-scrollbar-thumb{background:var(--glass-w-10);border-radius:3px}
+#chkOuterTitle{width:100%;text-align:center;font-size:1.05rem;font-weight:600;padding:4px 0 2px;flex-shrink:0}
+#checkout .settlement{
+  position:relative;inset:auto;padding:18px 14px 10px;animation:none;z-index:auto;
+  background:rgba(15,15,19,.65);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+  border:1.5px solid var(--glass-w-08);border-radius:16px;
+  box-shadow:
+    0 0 0 2px rgba(200,215,255,.035),
+    0 0 12px rgba(200,215,255,.012),
+    0 0 0 4px rgba(255,255,255,.006),
+    inset 0 1.5px 0 var(--glass-w-05),
+    inset 0 -1px 0 var(--glass-w-015),
+    inset 0 0 40px rgba(255,255,255,.004),
+    0 8px 40px rgba(0,0,0,.4);
+}
+#checkout .settlement-inner{gap:10px}
+#checkout .settlement h2{font-size:1.15rem;margin:6px 0 4px;width:100%}
 #checkout .stats-grid{gap:5px;width:100%}
 #checkout .stat-card{padding:7px 5px}
 #checkout .stat-card .num{font-size:.95rem}
-#checkout .chart-box{padding:6px 8px}
-#checkout .chart-box canvas{height:100px}
-#checkout .chart-box h4{font-size:.72rem;margin-bottom:3px}
-#checkout .chart-legend{gap:4px;margin-top:2px}
-#checkout .chart-legend span{font-size:.6rem}
-#checkout .btn-again{padding:9px 24px;font-size:.85rem;margin:10px 0 4px;width:auto}
+#checkout .chart-box{padding:8px 10px;border-radius:10px}
+#checkout .chart-box canvas{height:100px;border-radius:4px}
+#checkout .chart-box h4{font-size:.78rem;margin-bottom:5px}
+
+#checkout .btn-again{padding:9px 24px;font-size:.85rem;margin:14px 0 6px;width:auto}
 
 /* player colours */
 .p0{background:#e8645a}
@@ -311,7 +502,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
   border-radius:16px;
   width:100%;max-width:340px;
   animation:modalIn .25s cubic-bezier(.16,1,.3,1);
-  border:1px solid rgba(255,255,255,.1);
+  border:1px solid var(--glass-w-10);
   box-shadow:0 12px 48px rgba(0,0,0,.5);
 }
 @keyframes modalIn{
@@ -323,8 +514,8 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .form-row label{font-size:.78rem;color:var(--dim);font-weight:500;letter-spacing:.3px}
 .form-row input,.form-row select{
   width:100%;padding:11px 14px;
-  border:1px solid rgba(255,255,255,.1);border-radius:10px;
-  background:rgba(255,255,255,.05);color:var(--text);
+  border:1px solid var(--glass-w-10);border-radius:10px;
+  background:var(--glass-w-05);color:var(--text);
   font-size:.9rem;outline:none;transition:.15s;
   -webkit-appearance:none;appearance:none;
 }
@@ -342,8 +533,8 @@ body{padding-top:env(safe-area-inset-top,20px)}
   font-size:.88rem;font-weight:600;cursor:pointer;transition:.15s;
 }
 .modal-actions button:active{transform:scale(.97)}
-.btn-ghost{background:rgba(255,255,255,.08);color:var(--dim)}
-.btn-ghost:hover{background:rgba(255,255,255,.12)}
+.btn-ghost{background:var(--glass-w-08);color:var(--dim)}
+.btn-ghost:hover{background:var(--glass-w-12)}
 
 /* player bar */
 .player-bar{
@@ -363,34 +554,37 @@ body{padding-top:env(safe-area-inset-top,20px)}
   text-align:center;margin-left:4px;
   font-size:.82rem;font-weight:700;
 }
-.player-tag.active{opacity:1;border-color:rgba(255,255,255,.15);transform:scale(1.06);box-shadow:0 0 12px rgba(255,255,255,.06)}
+.player-tag.active{opacity:1;border-color:var(--glass-w-15);transform:scale(1.06);box-shadow:0 0 12px var(--glass-w-06)}
 .player-tag.elim{opacity:.15;text-decoration:line-through}
 
 /* settlement */
 .settlement{
   position:fixed;inset:0;z-index:999;
-  background:rgba(0,0,0,.72);
-  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  background:rgba(0,0,0,.68);
+  -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
   display:flex;flex-direction:column;align-items:center;
-  padding:16px;overflow-y:auto;
+  padding:24px 16px;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
   animation:fadeIn .4s ease;
+  -webkit-overflow-scrolling:touch;
+  will-change:transform,opacity;
 }
 .settlement-inner{
   width:100%;max-width:520px;
-  display:flex;flex-direction:column;align-items:center;gap:12px;
+  display:flex;flex-direction:column;align-items:center;gap:16px;
 }
-.settlement h2{font-size:1.5rem;margin:8px 0 4px;text-align:center}
+.settlement h2{font-size:1.5rem;margin:16px 0 8px;text-align:center}
 .settlement .winner-color{
   display:inline-block;width:14px;height:14px;
   border-radius:50%;vertical-align:middle;margin-right:6px;
 }
 .settlement .stats-grid{
   display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));
-  gap:8px;width:100%;
+  gap:12px;width:100%;
 }
 .settlement .stat-card{
-  background:rgba(255,255,255,.06);border-radius:10px;
-  padding:10px 8px;text-align:center;
+  background:var(--glass-w-06);border-radius:10px;
+  padding:12px 10px;text-align:center;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   border:1px solid var(--glass-border);
 }
@@ -398,27 +592,18 @@ body{padding-top:env(safe-area-inset-top,20px)}
   display:inline-block;width:10px;height:10px;
   border-radius:50%;margin-right:4px;vertical-align:middle;
 }
-.settlement .stat-card .name{font-size:.8rem;font-weight:600}
-.settlement .stat-card .num{font-size:1.1rem;font-weight:700;margin-top:2px}
-.settlement .stat-card .lbl{font-size:.65rem;color:var(--dim)}
+.settlement .stat-card .name{font-size:.82rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px}
+.settlement .stat-card .num{font-size:1.2rem;font-weight:700;margin-top:4px}
+.settlement .stat-card .lbl{font-size:.65rem;color:var(--dim);margin-top:2px}
 .settlement .chart-box{
-  width:100%;background:rgba(255,255,255,.04);
-  border-radius:10px;padding:10px;
+  width:100%;background:var(--glass-w-04);
+  border-radius:10px;padding:12px 14px;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   border:1px solid var(--glass-border);
 }
-.settlement .chart-box h4{font-size:.8rem;font-weight:500;margin-bottom:6px;text-align:center;color:var(--dim)}
-.settlement .chart-box canvas{width:100%;height:150px;display:block}
-.settlement .chart-legend{
-  display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
-  margin-top:4px;
-}
-.settlement .chart-legend span{
-  font-size:.65rem;display:inline-flex;align-items:center;gap:3px;
-}
-.settlement .chart-legend .leg-dot{
-  width:8px;height:8px;border-radius:50%;display:inline-block;
-}
+.settlement .chart-box h4{font-size:.85rem;font-weight:600;margin-bottom:8px;text-align:center;color:var(--text)}
+.settlement .chart-box canvas{width:100%;height:150px;display:block;border-radius:6px}
+
 .settlement .btn-again{
   padding:12px 32px;background:var(--accent);color:#0f0f13;
   border:none;border-radius:10px;font-size:.95rem;font-weight:600;
@@ -427,14 +612,16 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 .settlement .btn-again:active{opacity:.8}
 /* history */
-.history-list{width:100%;overflow-y:auto;max-height:60vh}
+#history.screen{height:100dvh;overflow:hidden;padding:calc(12px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px))}
+#history .back,#history>div,#history>p{flex-shrink:0}
+.history-list{width:100%;overflow-y:auto;flex:1;min-height:0}
 .history-item{
-  background:rgba(255,255,255,.04);border-radius:10px;padding:12px;margin:8px 0;
+  background:var(--glass-w-04);border-radius:10px;padding:12px;margin:8px 0;
   border:1px solid var(--border);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   transition:.15s;
 }
-.history-item:hover{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.06)}
+.history-item:hover{border-color:var(--glass-w-15);background:var(--glass-w-06)}
 .history-item .h-time{font-size:.7rem;color:var(--dim)}
 .history-item .h-info{font-size:.8rem;margin:4px 0}
 .history-item .h-info strong{color:var(--accent2)}
@@ -446,35 +633,35 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* 棋盘大小网格 */
 .size-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%}
 .size-btn{
-  padding:10px 4px;border-radius:8px;border:1px solid rgba(255,255,255,.08);
-  background:rgba(255,255,255,.04);color:var(--dim);font-size:.78rem;font-weight:500;
+  padding:10px 4px;border-radius:8px;border:1px solid var(--glass-w-08);
+  background:var(--glass-w-04);color:var(--dim);font-size:.78rem;font-weight:500;
   cursor:pointer;transition:.15s;text-align:center;font-family:var(--font);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
 }
-.size-btn:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
+.size-btn:hover{background:var(--glass-w-08);border-color:var(--glass-w-14)}
 .size-btn:active{transform:scale(.95);transition:all .06s ease}
 .size-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
 
 /* 按钮组（AI 数量、玩家数量） */
 .btn-group{display:flex;gap:6px;flex-wrap:wrap;width:100%}
 .btn-group .gb{
-  flex:1;min-width:38px;padding:9px 6px;border-radius:8px;border:1px solid rgba(255,255,255,.08);
-  background:rgba(255,255,255,.04);color:var(--dim);font-size:.78rem;font-weight:500;
+  flex:1;min-width:38px;padding:9px 6px;border-radius:8px;border:1px solid var(--glass-w-08);
+  background:var(--glass-w-04);color:var(--dim);font-size:.78rem;font-weight:500;
   cursor:pointer;transition:.15s;text-align:center;font-family:var(--font);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
 }
-.btn-group .gb:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
+.btn-group .gb:hover{background:var(--glass-w-08);border-color:var(--glass-w-14)}
 .btn-group .gb:active{transform:scale(.95);transition:all .06s ease}
 .btn-group .gb.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
 
 /* 算法选择卡片 */
 .alg-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
 .alg-card{
-  padding:14px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.08);
-  background:rgba(255,255,255,.04);cursor:pointer;transition:.2s;text-align:center;
+  padding:14px 10px;border-radius:10px;border:1px solid var(--glass-w-08);
+  background:var(--glass-w-04);cursor:pointer;transition:.2s;text-align:center;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
 }
-.alg-card:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);transform:translateY(-1px)}
+.alg-card:hover{background:var(--glass-w-08);border-color:var(--glass-w-16);transform:translateY(-1px)}
 .alg-card:active{transform:scale(.97);transition:all .06s ease}
 .alg-card.selected{background:rgba(240,179,75,.12);border-color:var(--accent);box-shadow:0 0 16px rgba(240,179,75,.12)}
 .alg-card .alg-icon{font-size:1.4rem;margin-bottom:4px}
@@ -486,18 +673,18 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .depth-slider-wrap{display:flex;align-items:center;gap:12px;width:100%}
 .depth-slider{
   flex:1;-webkit-appearance:none;appearance:none;height:6px;
-  background:rgba(255,255,255,.1);border-radius:3px;outline:none;transition:.15s;
+  background:var(--glass-w-10);border-radius:3px;outline:none;transition:.15s;
 }
 .depth-slider::-webkit-slider-thumb{
   -webkit-appearance:none;appearance:none;width:22px;height:22px;
   border-radius:50%;background:var(--accent);cursor:pointer;
   box-shadow:0 2px 8px rgba(240,179,75,.3);transition:.1s;
-  border:2px solid rgba(255,255,255,.15);
+  border:2px solid var(--glass-w-15);
 }
 .depth-slider::-webkit-slider-thumb:active{transform:scale(1.15)}
 .depth-slider::-moz-range-thumb{
   width:22px;height:22px;border-radius:50%;background:var(--accent);
-  cursor:pointer;border:2px solid rgba(255,255,255,.15);
+  cursor:pointer;border:2px solid var(--glass-w-15);
   box-shadow:0 2px 8px rgba(240,179,75,.3);
 }
 .depth-value{
@@ -513,9 +700,9 @@ body{padding-top:env(safe-area-inset-top,20px)}
   width:36px;height:36px;border-radius:50%;border:2px solid transparent;
   cursor:pointer;transition:.15s;position:relative;
 }
-.color-opt:hover{transform:scale(1.12);box-shadow:0 0 12px rgba(255,255,255,.12)}
+.color-opt:hover{transform:scale(1.12);box-shadow:0 0 12px var(--glass-w-12)}
 .color-opt:active{transform:scale(.95)}
-.color-opt.selected{border-color:#fff;box-shadow:0 0 16px rgba(255,255,255,.2),0 0 0 3px rgba(255,255,255,.08)}
+.color-opt.selected{border-color:#fff;box-shadow:0 0 16px var(--glass-w-20),0 0 0 3px var(--glass-w-08)}
 .color-opt .color-label{
   position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
   font-size:.6rem;color:var(--dim);white-space:nowrap;display:none;
@@ -525,28 +712,101 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* Eve 配置行优化 */
 .eve-config-grid{display:flex;flex-direction:column;gap:6px;width:100%;max-height:260px;overflow-y:auto}
 .eve-ai-row{
-  display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);
+  display:flex;align-items:center;gap:8px;background:var(--glass-w-04);
   border-radius:8px;padding:6px 10px;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  border:1px solid rgba(255,255,255,.06);
+  border:1px solid var(--glass-w-06);
 }
 .eve-ai-row .alg-mini{display:flex;gap:4px;flex:1}
 .eve-ai-row .alg-mini .am-btn{
-  flex:1;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.08);
-  background:rgba(255,255,255,.04);color:var(--dim);font-size:.7rem;font-weight:500;
+  flex:1;padding:4px 6px;border-radius:6px;border:1px solid var(--glass-w-08);
+  background:var(--glass-w-04);color:var(--dim);font-size:.7rem;font-weight:500;
   cursor:pointer;transition:.1s;text-align:center;font-family:var(--font);white-space:nowrap;
 }
-.eve-ai-row .alg-mini .am-btn:hover{background:rgba(255,255,255,.08)}
+.eve-ai-row .alg-mini .am-btn:hover{background:var(--glass-w-08)}
 .eve-ai-row .alg-mini .am-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
 .eve-ai-row .depth-mini{display:flex;align-items:center;gap:2px}
 .eve-ai-row .depth-mini .dm-btn{
-  width:24px;height:24px;border-radius:50%;border:1px solid rgba(255,255,255,.08);
-  background:rgba(255,255,255,.04);color:var(--dim);font-size:.8rem;font-weight:600;
+  width:24px;height:24px;border-radius:50%;border:1px solid var(--glass-w-08);
+  background:var(--glass-w-04);color:var(--dim);font-size:.8rem;font-weight:600;
   cursor:pointer;transition:.1s;display:flex;align-items:center;justify-content:center;font-family:var(--font);
 }
-.eve-ai-row .depth-mini .dm-btn:hover{background:rgba(255,255,255,.1)}
+.eve-ai-row .depth-mini .dm-btn:hover{background:var(--glass-w-10)}
 .eve-ai-row .depth-mini .dm-val{min-width:20px;text-align:center;font-size:.8rem;font-weight:600;color:var(--text)}
 .eve-ai-row .depth-mini.hidden{display:none}
+
+/* ═══════ 浅色模式 ═══════ */
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#eae8e0;
+    --surface:rgba(255,255,255,.82);
+    --card:rgba(245,243,238,.85);
+    --border:rgba(0,0,0,.06);
+    --text:#1a1a22;
+    --dim:#8a8895;
+    --shadow:0 8px 32px rgba(0,0,0,.08);
+    --glow:0 0 40px rgba(240,179,75,.1);
+    --glass:rgba(0,0,0,.025);
+    --glass-border:rgba(0,0,0,.04);
+    --glass-shadow:0 4px 24px rgba(0,0,0,.06);
+    --glass-shine:rgba(0,0,0,.015);
+    --glass-edge:rgba(0,0,0,.03);
+    /* ── 浅色模式玻璃色阶：卡片背景用半透明白，边框用半透明灰 ── */
+    --glass-w-004:rgba(255,255,255,.60);
+    --glass-w-008:rgba(255,255,255,.62);
+    --glass-w-012:rgba(255,255,255,.64);
+    --glass-w-025:rgba(255,255,255,.65);
+    --glass-w-03:rgba(255,255,255,.68);
+    --glass-w-035:rgba(255,255,255,.70);
+    --glass-w-04:rgba(255,255,255,.72);
+    --glass-w-05:rgba(255,255,255,.74);
+    --glass-w-06:rgba(255,255,255,.76);
+    --glass-w-08:rgba(0,0,0,.08);
+    --glass-w-09:rgba(0,0,0,.09);
+    --glass-w-10:rgba(0,0,0,.10);
+    --glass-w-12:rgba(0,0,0,.12);
+    --glass-w-14:rgba(0,0,0,.14);
+    --glass-w-15:rgba(0,0,0,.15);
+    --glass-w-16:rgba(0,0,0,.16);
+    --glass-w-18:rgba(0,0,0,.18);
+    --glass-w-20:rgba(0,0,0,.20);
+  }
+  body::before{background:
+    radial-gradient(ellipse 70% 50% at 50% -10%,rgba(240,179,75,.08) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 40% at 100% 90%,rgba(95,195,195,.05) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 30% at 20% 40%,rgba(240,179,75,.03) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 25% at 80% 60%,rgba(95,195,195,.025) 0%,transparent 60%)}
+   .form-row select option{background:#fff;color:var(--text)}
+  body::after{display:none}
+  /* ☀️ 暂停面板：浅色浮动玻璃面板 */
+  #pauseOverlay.settlement{
+    background:linear-gradient(135deg,rgba(255,255,255,.52) 0%,rgba(248,246,242,.42) 50%,rgba(255,255,255,.36) 100%);
+    border:1.5px solid rgba(255,255,255,.6);
+    border-radius:20px;
+    box-shadow:
+      0 0 0 2px rgba(200,215,255,.08),
+      0 0 0 4px rgba(200,215,255,.025),
+      0 0 20px rgba(200,215,255,.035),
+      0 0 0 6px rgba(255,255,255,.04),
+      0 16px 48px rgba(0,0,0,.12),
+      inset 0 2px 0 rgba(255,255,255,.2),
+      inset 0 -1.5px 0 rgba(255,255,255,.05),
+      inset 0 0 60px rgba(255,255,255,.02)
+  }
+  /* ☀️ 结算面板玻璃边缘 */
+  #checkout .settlement{
+    background:rgba(245,243,238,.75);
+    border-color:rgba(255,255,255,.5);
+    box-shadow:
+      0 0 0 2px rgba(200,215,255,.05),
+      0 0 12px rgba(200,215,255,.015),
+      0 0 0 4px rgba(255,255,255,.03),
+      inset 0 1.5px 0 rgba(255,255,255,.12),
+      inset 0 -1px 0 rgba(255,255,255,.03),
+      inset 0 0 40px rgba(255,255,255,.01),
+      0 8px 40px rgba(0,0,0,.08)
+  }
+ }
 </style>
 </head>
 <body>
@@ -593,12 +853,17 @@ body{padding-top:env(safe-area-inset-top,20px)}
   <button class="back" onclick="Router.back()">← 返回</button>
   <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
     <h2 style="margin:0">📋 历史记录</h2>
-    <button onclick="clearHistory()" style="background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.2);color:rgba(255,100,100,.9);padding:6px 14px;border-radius:8px;font-size:.75rem;cursor:pointer;transition:.15s;font-weight:500" onmouseover="this.style.background='rgba(255,80,80,.2)'" onmouseout="this.style.background='rgba(255,80,80,.12)'">🗑 清空历史</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button onclick="exportHistory()" style="background:rgba(95,195,195,.12);border:1px solid rgba(95,195,195,.2);color:var(--accent2);padding:6px 12px;border-radius:8px;font-size:.73rem;cursor:pointer;transition:.15s;font-weight:500" onmouseover="this.style.background='rgba(95,195,195,.2)'" onmouseout="this.style.background='rgba(95,195,195,.12)'">📤 导出</button>
+        <button onclick="document.getElementById('historyImportInput').click()" style="background:rgba(95,195,195,.12);border:1px solid rgba(95,195,195,.2);color:var(--accent2);padding:6px 12px;border-radius:8px;font-size:.73rem;cursor:pointer;transition:.15s;font-weight:500" onmouseover="this.style.background='rgba(95,195,195,.2)'" onmouseout="this.style.background='rgba(95,195,195,.12)'">📥 导入</button>
+        <button onclick="clearHistory()" style="background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.2);color:rgba(255,100,100,.9);padding:6px 10px;border-radius:8px;font-size:.73rem;cursor:pointer;transition:.15s;font-weight:500" onmouseover="this.style.background='rgba(255,80,80,.2)'" onmouseout="this.style.background='rgba(255,80,80,.12)'">🗑 清空</button>
+      </div>
   </div>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">所有对局记录</p>
   <div id="historyList" class="history-list">
     <div class="empty">加载中...</div>
   </div>
+  <input type="file" id="historyImportInput" accept=".json" style="display:none" onchange="importHistory(event)">
 </div>
 
 <!-- AI Lobby -->
@@ -781,8 +1046,8 @@ body{padding-top:env(safe-area-inset-top,20px)}
 
 <!-- Pause Overlay -->
 <div id="pauseOverlay" class="settlement" style="display:none;z-index:998">
+  <h2>⏸ 游戏暂停</h2>
   <div class="settlement-inner">
-    <h2>⏸ 游戏暂停</h2>
     <div id="pauseStats" class="stats-grid"></div>
     <div id="pauseCharts" style="width:100%"></div>
     <div style="display:flex;gap:10px;margin-top:14px;width:100%">
@@ -796,13 +1061,22 @@ body{padding-top:env(safe-area-inset-top,20px)}
 
 <!-- Checkout Screen (结算/历史详情) -->
 <div id="checkout" class="screen">
-  <button class="back chk-back" onclick="Router.back()">← 返回</button>
+  <div id="chkOuterTitle"></div>
   <div id="checkoutContent" class="chk-scroll"></div>
 </div>
 
 
 
 <script>
+/* ═══════ 系统颜色模式监听（自动切换浅色/深色） ═══════ */
+(function(){
+  const meta=document.getElementById('metaThemeColor');
+  const mq=window.matchMedia('(prefers-color-scheme: light)');
+  function updateTheme(){meta.content=mq.matches?'#eae8e0':'#0f0f13'}
+  updateTheme();
+  mq.addEventListener('change',updateTheme);
+})();
+
 /* ==================== CONSTANTS ==================== */
 const COLORS=['#e8645a','#f0c040','#40b8f0','#50d060','#c080f0','#f070c0','#50d0b0','#ff884d','#e868a0','#70c0e8'];
 const COLORS_LIGHT=['rgba(232,100,90,.08)','rgba(240,192,64,.08)','rgba(64,184,240,.08)','rgba(80,208,96,.08)','rgba(192,128,240,.08)','rgba(240,112,192,.08)','rgba(80,208,176,.08)','rgba(255,136,77,.08)','rgba(232,104,160,.08)','rgba(112,192,232,.08)'];
@@ -845,6 +1119,7 @@ function playGameOver(){
 let board=[],curPlayer=0,size=7,maxPlayers=2;
 let cells=[];
 let gameMode=null; // 'ai'|'local'|'eve'
+let _originPage=null; // 游戏从哪个 lobby 页面发起（用于「再来一局」返回）
 let gameOver=false;
 let aiPlayers=new Set();
 let aiThinking=false;
@@ -868,6 +1143,9 @@ let isPaused=false;
 
 // 图表上下文缓存（用于全屏重绘）
 let _chartCtx={};
+
+// 最后游戏配置（用于「再来一局」直接重开，不再读 DOM）
+let _lastGameConfig=null;
 
 /* ═══════════════ 自定义控件事件绑定（文档级委托） ═══════════════ */
 // 通用：获取自定义控件的选中值
@@ -929,26 +1207,39 @@ const Router = {
     const page = this._registry[id];
     if (!page || this._current === id) return;
 
-    // Leave current page
-    if (this._current && this._registry[this._current]?.leave) {
-      this._registry[this._current].leave();
-    }
+    const doSwitch = () => {
+      // Leave current page
+      if (this._current && this._registry[this._current]?.leave) {
+        this._registry[this._current].leave();
+      }
 
-    // Update state
-    this._prev = this._current;
-    this._current = id;
+      // Update state
+      this._prev = this._current;
+      this._current = id;
 
-    // Switch screens
-    document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
-    const el = document.getElementById(id);
-    if (el) el.classList.add('active');
+      // Remove old leaving class, deactivate all, activate new
+      document.querySelectorAll('.screen').forEach(e => e.classList.remove('leaving','active'));
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active');
 
-    // Enter new page
-    if (page.enter) page.enter(...args);
+      // Enter new page
+      if (page.enter) page.enter(...args);
 
-    // Sync hash
-    if (location.hash !== '#' + id) {
-      history.pushState(null, '', '#' + id);
+      // Sync hash
+      if (location.hash !== '#' + id) {
+        history.pushState(null, '', '#' + id);
+      }
+    };
+
+    // Animate leave → switch
+    const currentEl = this._current ? document.getElementById(this._current) : null;
+    if (currentEl) {
+      currentEl.classList.add('leaving');
+      currentEl.addEventListener('animationend', () => { doSwitch(); }, { once: true });
+      // 超时保护
+      setTimeout(() => { if (currentEl.classList.contains('leaving')) doSwitch(); }, 400);
+    } else {
+      doSwitch();
     }
   },
 
@@ -1004,7 +1295,7 @@ Router.register('game', {
 Router.register('checkout', {
   back() { return Router._checkoutPrev || 'welcome'; },
   enter(prevPage) { document.body.style.background=''; Router._checkoutPrev = prevPage || 'welcome'; },
-  leave() { document.getElementById('checkoutContent').innerHTML = ''; },
+  leave() { document.getElementById('checkoutContent').innerHTML = ''; document.getElementById('chkOuterTitle').textContent=''; },
   _checkoutPrev: 'welcome'
 });
 
@@ -1072,7 +1363,7 @@ function startEveGame(){
   maxPlayers=aiCount;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='⏸ 暂停';
-  gameMode='eve';
+  gameMode='eve';_originPage='eveLobby';
   aiPlayers=new Set();
   aiConfigs={};
   let eveRows=document.querySelectorAll('#eveConfigArea .eve-ai-row');
@@ -1095,6 +1386,8 @@ function startEveGame(){
   document.body.style.background='';
   renderPlayerBar();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+  // 保存配置用于「再来一局」
+  _lastGameConfig={mode:'eve',size,aiCount:maxPlayers,aiConfigs:JSON.parse(JSON.stringify(aiConfigs))};
 }
 function showHistory(){ Router.navigate('history'); }
 // Tauri invoke helper
@@ -1133,6 +1426,53 @@ function loadHistoryList(){
     el.innerHTML='<div class="empty">暂无可用的历史记录</div>';
   });
 }
+function exportHistory(){
+  tauriInvoke('load_game_history').then(list=>{
+    if(!list||list.length===0){
+      alert('暂无历史记录可导出');
+      return;
+    }
+    const jsonData = JSON.stringify(list, null, 2);
+    return tauriInvoke('export_game_history_dialog', {jsonData}).then(res=>{
+      if(res){
+        const isFallback = res.startsWith('fallback:');
+        const bytes = isFallback ? res.slice(9) : res;
+        document.getElementById('historyList').insertAdjacentHTML('afterbegin',
+          '<div class="history-item" style="border-color:var(--accent2);animation:fadeIn .3s"><div class="h-time">✅ 导出成功</div><div class="h-info">' + bytes + ' 字节</div></div>');
+      }
+    });
+  }).catch(e=>{
+    console.warn('Export failed:', e);
+    alert('导出失败: ' + (e||'未知错误'));
+  });
+}
+function importHistory(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const jsonData = e.target.result;
+      // 先验证 JSON 格式
+      JSON.parse(jsonData);
+      tauriInvoke('import_game_history', {jsonData}).then(count=>{
+        if(count>0){
+          alert(`成功导入 ${count} 条记录`);
+          loadHistoryList();
+        }else{
+          alert('没有新记录需要导入（全部已存在）');
+        }
+      }).catch(err=>{
+        alert('导入失败: ' + (err||'未知错误'));
+      });
+    }catch(err){
+      alert('文件格式错误，请选择有效的 JSON 文件');
+    }
+  };
+  reader.readAsText(file);
+  // 重置 input 以便重复选择同一文件
+  event.target.value = '';
+}
 function clearHistory(){
   if(!confirm('确定要清空所有历史记录吗？此操作不可恢复。'))return;
   tauriInvoke('clear_game_history').then(()=>{
@@ -1148,8 +1488,44 @@ function formatTime(d){
   let h=d.getHours(),mi=d.getMinutes(),s=d.getSeconds();
   return y+'/'+(m<10?'0'+m:m)+'/'+(dd<10?'0'+dd:dd)+' '+(h<10?'0'+h:h)+':'+(mi<10?'0'+mi:mi)+':'+(s<10?'0'+s:s);
 }
-// Save game history for Tauri
-function saveGameHistory(winner, mode, aiAlg, aiDp){
+// ─── 紧凑历史格式转换 ───
+// 将逐回合快照 [{turn,snapshot:{pid:{pieces,points}}}] 压缩为 {c:true,t:回合数,p:[[pieces..],[pieces..]],pt:[[points..],[points..]]}
+function compactHistory(history, playerCount){
+  if(!history||history.length===0)return null;
+  const n=history.length;
+  const pieces=Array.from({length:playerCount},()=>new Array(n).fill(0));
+  const points=Array.from({length:playerCount},()=>new Array(n).fill(0));
+  for(let t=0;t<n;t++){
+    const snap=history[t].snapshot||{};
+    for(let p=0;p<playerCount;p++){
+      const d=snap[String(p)];
+      if(d){pieces[p][t]=d.pieces||0;points[p][t]=d.points||0}
+    }
+  }
+  return {c:true,t:n,p:pieces,pt:points};
+}
+// 将紧凑格式展开为逐回合快照格式（供图表渲染用）
+function expandHistory(compact, playerCount){
+  if(!compact||!compact.c)return compact; // 已经是旧格式或空
+  const n=compact.t||0;
+  const history=[];
+  for(let t=0;t<n;t++){
+    const snapshot={};
+    for(let p=0;p<playerCount;p++){
+      snapshot[String(p)]={
+        pieces:(compact.p&&compact.p[p]?compact.p[p][t]:0),
+        points:(compact.pt&&compact.pt[p]?compact.pt[p][t]:0),
+      };
+    }
+    history.push({turn:t, snapshot});
+  }
+  return history;
+}
+// Save game history for Tauri（紧凑存储）
+// historyArg 可选：若传入则用其代替 gameHistory（用于 gameHistory 已被清空的场景）
+function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
+  const src = historyArg || gameHistory;
+  const compact = compactHistory(src, maxPlayers);
   tauriInvoke('save_game_history', {
     record: {
       id: Date.now(),
@@ -1165,8 +1541,11 @@ function saveGameHistory(winner, mode, aiAlg, aiDp){
       colorNames: COLOR_NAMES,
       chainStats: chainStats,
       maxChain: maxChainOverall,
-      history: gameHistory,
+      history: compact,
     }
+  }).then(() => {
+    // 保存成功后清理磁盘上的回合数据（不再需要）
+    tauriInvoke('clear_round_history').catch(()=>{});
   }).catch(e=>console.warn('Save history failed:', e));
 }
 
@@ -1318,7 +1697,7 @@ function resetRoundHistory(){
   tauriInvoke('clear_round_history').catch(()=>{});
 }
 
-async function processClick(b,s,x,y,pl,anim){
+async function processClick(b,s,x,y,pl,anim,playerColor){
   let c=b[x][y];
   if(c.owner===null){
     let anyPieces=false;
@@ -1348,6 +1727,8 @@ async function processClick(b,s,x,y,pl,anim){
             cell.count=0;cell.owner=null;
             chainCount++;
             playExplosion();
+            const cl=cells?.[cx]?.[cy];
+            if(cl){addShockwave(cl,playerColor);addParticles(cl,playerColor,8)}
             for(let[nx,ny]of nbrs(cx,cy,s)){
               let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
             }
@@ -1360,6 +1741,8 @@ async function processClick(b,s,x,y,pl,anim){
         cell.count=0;cell.owner=null;
         chainCount++;
         playExplosion();
+        const el2=cells?.[cx]?.[cy];
+        if(el2){addShockwave(el2,playerColor);addParticles(el2,playerColor,8)}
         for(let[nx,ny]of nbrs(cx,cy,s)){
           let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
         }
@@ -1453,6 +1836,33 @@ function clearBoardDOM(){
   _boardCache=null;
 }
 
+/* ═══ 视觉特效辅助函数 ═══ */
+function addRipple(el){
+  if(!el)return;
+  const rip=document.createElement('div');rip.className='ripple';
+  el.appendChild(rip);
+  setTimeout(()=>rip.remove(),600);
+}
+function addShockwave(el,color){
+  if(!el)return;
+  const sw=document.createElement('div');sw.className='shockwave';
+  sw.style.borderColor=color||'rgba(255,255,255,.5)';
+  el.appendChild(sw);
+  setTimeout(()=>sw.remove(),600);
+}
+function addParticles(el,color,count){
+  if(!el)return;
+  const rect=el.getBoundingClientRect();
+  const cx=rect.width/2,cy=rect.height/2;
+  for(let i=0;i<(count||6);i++){
+    const p=document.createElement('div');p.className='particle';
+    const angle=Math.random()*Math.PI*2;
+    const dist=30+Math.random()*50;
+    p.style.cssText=`left:${cx}px;top:${cy}px;background:${color||'rgba(255,255,255,.7)'};--dx:${Math.cos(angle)*dist}px;--dy:${Math.sin(angle)*dist}px`;
+    el.appendChild(p);
+    setTimeout(()=>p.remove(),700);
+  }
+}
 function renderBoard(force,popX,popY){
   let bd=document.getElementById('board');
   if(force||cells.length!==size){
@@ -1804,6 +2214,9 @@ async function triggerAI(){
   aiThinking=false;
   let c=board[x][y];
   if(c.owner!==null&&c.owner!==curPlayer){return}
+  // AI 落子也显示波纹
+  const aiClickEl=cells?.[x]?.[y];
+  if(aiClickEl)addRipple(aiClickEl);
   playClick();
   let elim;
   try {
@@ -1811,12 +2224,11 @@ async function triggerAI(){
       board:board,size:size,x:x,y:y,
       player:curPlayer,maxPlayers:maxPlayers
     });
-    // ★ JS 逐步连爆动画（一个一个真实爆炸），最后用 Tauri 结果覆盖
-    elim=await processClick(board,size,x,y,curPlayer,'explode');
+    elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
     board=result.board;
     elim=result.eliminated||[];
   }catch(e){
-    elim=await processClick(board,size,x,y,curPlayer,'explode');
+    elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
   }
   for(let e of elim){eliminatedPlayers.add(e);playElim()}
   recordHistory();
@@ -1849,7 +2261,7 @@ function startLocalGame(){
   maxPlayers=getSel('localPlayersGroup')||2;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='⏸ 暂停';
-  gameMode='local';
+  gameMode='local';_originPage='localLobby';
   aiPlayers=new Set();
   aiThinking=false;
   eliminatedPlayers=new Set();
@@ -1861,6 +2273,8 @@ function startLocalGame(){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
+  // 保存配置用于「再来一局」
+  _lastGameConfig={mode:'local',size,maxPlayers};
 }
 
 function toggleAIColorPicker(){
@@ -1895,7 +2309,7 @@ function startAIGame(){
   aiDepth=parseInt(document.getElementById('aiDepthSlider')?.value)||2;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='⏸ 暂停';
-  gameMode='ai';
+  gameMode='ai';_originPage='aiLobby';
   aiPlayers=new Set();
   let humanIdx = selectedPlayerColor;
   for(let p=0;p<maxPlayers;p++){
@@ -1913,6 +2327,8 @@ function startAIGame(){
   document.body.style.background='';
   renderPlayerBar();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+  // 保存配置用于「再来一局」
+  _lastGameConfig={mode:'ai',size,aiCount:maxPlayers-1,aiAlgorithm,aiDepth,humanIdx};
 }
 
 function togglePause(){
@@ -1964,6 +2380,17 @@ async function showPauseOverlay(){
   // 移动图表到 chartArea
   let chartBoxes=statsGrid.querySelectorAll('.chart-box');
   chartBoxes.forEach(b=>chartArea.appendChild(b));
+  // ⚠️ 强制重绘：避免 Canvas 在移动后尺寸变化导致拉伸
+  chartBoxes.forEach(b=>{
+    let cv=b.querySelector('canvas');
+    if(cv&&cv.id&&_chartCtx[cv.id]){
+      (function repoll(){
+        let r=cv.getBoundingClientRect();
+        if(r.width>0&&r.height>0)drawLineChart(cv,_chartCtx[cv.id].history,_chartCtx[cv.id].colorNames,_chartCtx[cv.id].colors,_chartCtx[cv.id].valueKey);
+        else requestAnimationFrame(repoll);
+      })();
+    }
+  });
 }
 function hidePauseOverlay(){
   let overlay=document.getElementById('pauseOverlay');
@@ -2043,18 +2470,20 @@ async function localClick(x,y){
     }
   }
   playClick();
+  // 落子波纹视觉反馈
+  const clickEl=cells?.[x]?.[y];
+  if(clickEl)addRipple(clickEl);
   let elim;
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
       player:curPlayer,maxPlayers:maxPlayers
     });
-    // ★ JS 逐步连爆动画（一个一个真实爆炸），最后用 Tauri 结果覆盖
-    elim=await processClick(board,size,x,y,curPlayer,'explode');
+    elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
     board=result.board;
     elim=result.eliminated||[];
   }catch(e){
-    elim=await processClick(board,size,x,y,curPlayer,'explode');
+    elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
   }
   for(let e of elim){eliminatedPlayers.add(e);playElim()}
   recordHistory();
@@ -2119,13 +2548,13 @@ function drawLineChart(canvas,history,colorNames,colors,valueKey){
   }
   if(maxVal===0)maxVal=1;
   let sortedPlayers=[...players].sort((a,b)=>a-b);
-  ctx.strokeStyle='rgba(255,255,255,.06)';
+  ctx.strokeStyle='rgba(128,128,128,.25)';
   ctx.lineWidth=1;
   for(let i=0;i<=4;i++){
     let y=pad.top+(ch*i)/4;
     ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);ctx.stroke();
   }
-  ctx.fillStyle='rgba(255,255,255,.35)';
+  ctx.fillStyle='rgba(128,128,128,.55)';
   ctx.font='9px sans-serif';
   ctx.textAlign='right';
   for(let i=0;i<=4;i++){
@@ -2140,8 +2569,8 @@ function drawLineChart(canvas,history,colorNames,colors,valueKey){
     let x=pad.left+(cw*i)/(turnCount-1||1);
     ctx.fillText(i,x,h-4);
   }
-  // 总数白线
-  ctx.strokeStyle='rgba(255,255,255,.5)';
+  // 总数灰线
+  ctx.strokeStyle='rgba(128,128,128,.55)';
   ctx.lineWidth=2;ctx.setLineDash([4,3]);
   ctx.beginPath();
   let startedLine=false;
@@ -2217,15 +2646,22 @@ function renderGameCharts(container, history, opts){
     let id2='cPt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     let b1=document.createElement('div');b1.className='chart-box';
     b1.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id1}')">📊 棋子数变化 🔍</h4><canvas id="${id1}" onclick="showFullscreenChart('${id1}')" style="cursor:pointer"></canvas>`;
-    let l1=document.createElement('div');l1.className='chart-legend';
-    for(let p of[...active].sort((a,b)=>a-b)){let s=document.createElement('span');s.innerHTML=`<span class="leg-dot" style="background:${colors[p]||'#888'}"></span>`;l1.appendChild(s)}
-    b1.appendChild(l1);container.appendChild(b1);
+    container.appendChild(b1);
     let b2=document.createElement('div');b2.className='chart-box';
     b2.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id2}')">📊 点数变化 🔍</h4><canvas id="${id2}" onclick="showFullscreenChart('${id2}')" style="cursor:pointer"></canvas>`;
-    let l2=document.createElement('div');l2.className='chart-legend';
-    for(let p of[...active].sort((a,b)=>a-b)){let s=document.createElement('span');s.innerHTML=`<span class="leg-dot" style="background:${colors[p]||'#888'}"></span>`;l2.appendChild(s)}
-    b2.appendChild(l2);container.appendChild(b2);
-    setTimeout(()=>{drawLineChart(document.getElementById(id1),history,cNames,colors,'pieces');drawLineChart(document.getElementById(id2),history,cNames,colors,'points')},50);
+    container.appendChild(b2);
+    // 等待 Canvas 可见后再绘制（兼容 Router 页面过渡延迟）
+    function drawWhenReady(cid,h,cn,co,k){
+      const el=document.getElementById(cid);
+      if(!el)return;
+      (function poll(){
+        const r=el.getBoundingClientRect();
+        if(r.width>0&&r.height>0)drawLineChart(el,h,cn,co,k);
+        else requestAnimationFrame(poll);
+      })();
+    }
+    drawWhenReady(id1,history,cNames,colors,'pieces');
+    drawWhenReady(id2,history,cNames,colors,'points');
   }
   if(onReplay){let btn=document.createElement('button');btn.className='btn-again';btn.textContent='再来一局';btn.onclick=onReplay;container.appendChild(btn)}
   if(!_noBack){
@@ -2233,44 +2669,144 @@ function renderGameCharts(container, history, opts){
   }
 }
 
+// 根据保存的配置直接重开游戏（不再读 DOM，确保与上次配置完全一致）
+function replayGame(){
+  const c=_lastGameConfig;
+  if(!c)return;
+  if(c.mode==='ai'){
+    clearBoardDOM();
+    location.hash='#game';
+    resetRoundHistory();
+    size=c.size;
+    maxPlayers=c.aiCount+1;
+    aiAlgorithm=c.aiAlgorithm;
+    aiDepth=c.aiDepth;
+    selectedPlayerColor=c.humanIdx;
+    board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+    document.getElementById('pauseBtn').textContent='⏸ 暂停';
+    gameMode='ai';
+    aiPlayers=new Set();
+    for(let p=0;p<maxPlayers;p++){if(p!==c.humanIdx)aiPlayers.add(p)}
+    aiThinking=false;
+    eliminatedPlayers=new Set();
+    gameHistory=[];
+    chainStats={};
+    maxChainOverall={player:null,length:0};
+    gameCount=(gameCount||0)+1;
+    recordHistory();
+    renderBoard(true);
+    show('game');
+    document.body.style.background='';
+    renderPlayerBar();
+    if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+  }else if(c.mode==='local'){
+    clearBoardDOM();
+    location.hash='#game';
+    resetRoundHistory();
+    size=c.size;
+    maxPlayers=c.maxPlayers;
+    board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+    document.getElementById('pauseBtn').textContent='⏸ 暂停';
+    gameMode='local';
+    aiPlayers=new Set();
+    aiThinking=false;
+    eliminatedPlayers=new Set();
+    gameHistory=[];
+    chainStats={};
+    maxChainOverall={player:null,length:0};
+    recordHistory();
+    renderBoard(true);
+    show('game');
+    document.body.style.background='';
+    renderPlayerBar();
+  }else if(c.mode==='eve'){
+    clearBoardDOM();
+    location.hash='#game';
+    resetRoundHistory();
+    size=c.size;
+    maxPlayers=c.aiCount;
+    board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+    document.getElementById('pauseBtn').textContent='⏸ 暂停';
+    gameMode='eve';
+    aiPlayers=new Set();
+    aiConfigs={};
+    for(let p=0;p<maxPlayers;p++){
+      aiPlayers.add(p);
+      aiConfigs[p]={algorithm:(c.aiConfigs[p]||{}).algorithm||'strategy',depth:(c.aiConfigs[p]||{}).depth||2};
+    }
+    aiThinking=false;
+    eliminatedPlayers=new Set();
+    gameHistory=[];
+    chainStats={};
+    maxChainOverall={player:null,length:0};
+    gameCount=(gameCount||0)+1;
+    recordHistory();
+    renderBoard(true);
+    show('game');
+    document.body.style.background='';
+    renderPlayerBar();
+    if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
+  }
+}
+
 async function showSettlement(winner,colorNames,history){
   // 清理动态 settlement overlay（如果有残留）
   document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
   const fullHistory = history&&history.length>0 ? history : await flushAndGetFullHistory();
+  // 设置外框标题（放在玻璃框上方，作为页面固定标题）
+  const titleEl = document.getElementById('chkOuterTitle');
+  if(winner!==null&&winner!==undefined){
+    titleEl.innerHTML = `🏆 <span class="winner-color" style="background:${COLORS[winner]||'#888'}"></span> ${colorNames?.[winner]||getPlayerLabel(winner)} 获胜`;
+  }else{
+    titleEl.textContent = '📊 对局统计';
+  }
   // 渲染到 #checkout 页面（包 settlement 容器使 CSS 选择器生效）
-  const prevPage = Router.getPrev() || 'welcome';
+  const prevPage = 'welcome';
   const content = document.getElementById('checkoutContent');
   content.innerHTML = '<div class="settlement"><div class="settlement-inner" id="chkInner"></div></div>';
   const inner = document.getElementById('chkInner');
   renderGameCharts(inner, fullHistory, {
     winner, colorNames, colors: COLORS, eliminated: eliminatedPlayers,
-    chainStats, maxChain: maxChainOverall, showTitle: true,
-    onReplay: () => Router.navigate(prevPage)
+    chainStats, maxChain: maxChainOverall, showTitle: false, _noBack: true,
+    onReplay: () => { Router.navigate(_originPage || 'welcome'); }
   });
+  // 返回主菜单按钮
+  const homeBtn = document.createElement('button');
+  homeBtn.className = 'btn-again';
+  homeBtn.textContent = '返回主菜单';
+  homeBtn.style.marginTop = '6px';
+  homeBtn.onclick = () => { Router.navigate('welcome'); };
+  inner.appendChild(homeBtn);
   Router.navigate('checkout', prevPage);
-  saveGameHistory(winner);
+  saveGameHistory(winner, undefined, undefined, undefined, fullHistory);
 }
 
 function showHistoryDetail(r){
-  const prevPage = Router.getPrev() || 'welcome';
+  const prevPage = 'history';
+  // 设置外框标题
+  const titleEl = document.getElementById('chkOuterTitle');
+  if(r.winner!==null&&r.winner!==undefined){
+    titleEl.innerHTML = `🏆 <span class="winner-color" style="background:${COLORS[r.winner]||'#888'}"></span> ${r.colorNames?.[r.winner]||'玩家 '+(r.winner+1)} 获胜`;
+  }else{
+    titleEl.textContent = '📊 对局统计';
+  }
   const content = document.getElementById('checkoutContent');
   content.innerHTML = '<div class="settlement"><div class="settlement-inner" id="chkInner"></div></div>';
   const inner = document.getElementById('chkInner');
-  if(!r.history||r.history.length<2){
-    const winnerLabel = (r.winner!==null&&r.winner!==undefined)
-      ? `<span class="winner-color" style="background:${COLORS[r.winner]||'#888'}"></span>${r.colorNames?.[r.winner]||'玩家 '+(r.winner+1)}`
-      : '平局';
-    inner.innerHTML = '<h2>🏆 '+winnerLabel+' 获胜</h2><p style="text-align:center;color:var(--dim);margin-top:12px">该记录无完整快照数据，无法展示图表</p>';
+  // 展开紧凑格式（若为旧版全量格式则原样返回）
+  const historyData = expandHistory(r.history, r.playerCount||maxPlayers);
+  if(!historyData||historyData.length<2){
+    inner.innerHTML = '<p style="text-align:center;color:var(--dim);margin-top:12px">该记录无完整快照数据，无法展示图表</p>';
     Router.navigate('checkout', prevPage);
     return;
   }
   // 用记录中 playerCount 临时覆盖 maxPlayers 以复用统一渲染，不显示默认"返回主界面"
   const origMax = maxPlayers;
   maxPlayers = r.playerCount || maxPlayers;
-  renderGameCharts(inner, r.history, {
+  renderGameCharts(inner, historyData, {
     winner: r.winner, colorNames: r.colorNames, colors: COLORS,
     chainStats: r.chainStats, maxChain: r.maxChain,
-    showTitle: true, _noBack: true,
+    showTitle: false, _noBack: true,
   });
   // 添加"关闭"按钮（还原 maxPlayers）
   const closeBtn = document.createElement('button');
@@ -2284,38 +2820,83 @@ function showHistoryDetail(r){
 function showFullscreenChart(canvasId){
   let ctx=_chartCtx[canvasId];
   if(!ctx)return;
+  // ---------- 创建全屏覆盖层 ----------
   let overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.93);display:flex;justify-content:center;align-items:center;padding:20px;animation:fadeIn .2s ease;overflow:hidden';
-  overlay.onclick=(e)=>{if(e.target===overlay||e.target===closeBtn)overlay.remove()};
+  overlay.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.93);display:flex;justify-content:center;align-items:center;padding:48px 20px 20px;animation:fadeIn .2s ease';
+  // 上方多留空间，避免图标紧贴边缘
+  // overflow 不设 hidden，缩放后的内容可溢出显示
   let closeBtn=document.createElement('button');
   closeBtn.textContent='✕';
-  closeBtn.style.cssText='position:fixed;top:16px;right:16px;z-index:2001;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.5);color:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;z-index:2002';
+  closeBtn.style.cssText='position:fixed;top:16px;right:16px;z-index:2002;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.5);color:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s';
   closeBtn.onmouseover=()=>{closeBtn.style.background='rgba(255,255,255,.15)'};
   closeBtn.onmouseout=()=>{closeBtn.style.background='rgba(0,0,0,.5)'};
-  // 容器用于缩放变换
+  overlay.onclick=(e)=>{if(e.target===overlay||e.target===closeBtn)overlay.remove()};
+  // 容器：初始无 max 限制（transform 会让视觉尺寸变化）
   let container=document.createElement('div');
-  container.style.cssText='max-width:100%;max-height:100%;display:flex;justify-content:center;align-items:center;transition:transform .1s ease;transform-origin:center center';
+  container.style.cssText='display:flex;justify-content:center;align-items:center;transform-origin:center center';
   let bigCanvas=document.createElement('canvas');
-  bigCanvas.style.cssText='max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.5);cursor:grab';
+  bigCanvas.style.cssText='max-width:90vw;max-height:90vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.5);cursor:grab;user-select:none;-webkit-user-select:none';
   bigCanvas.onclick=(e)=>e.stopPropagation();
   overlay.appendChild(container);
   container.appendChild(bigCanvas);
   overlay.appendChild(closeBtn);
   document.body.appendChild(overlay);
-  // 从数据重绘
+  // ---------- 从数据重绘 ----------
+  let baseW=0,baseH=0;
   setTimeout(()=>{
     let rect=bigCanvas.getBoundingClientRect();
     if(rect.width===0||rect.height===0)return;
+    baseW=rect.width;baseH=rect.height;
     let dpr=window.devicePixelRatio||1;
-    bigCanvas.width=rect.width*dpr;
-    bigCanvas.height=rect.height*dpr;
-    bigCanvas.style.width=rect.width+'px';
-    bigCanvas.style.height=rect.height+'px';
-    // 调用重绘
+    bigCanvas.width=baseW*dpr;
+    bigCanvas.height=baseH*dpr;
+    bigCanvas.style.width=baseW+'px';
+    bigCanvas.style.height=baseH+'px';
     drawLineChart(bigCanvas,ctx.history,ctx.colorNames,ctx.colors,ctx.valueKey);
   },50);
-  // 双指缩放（touch）
-  let lastDist=0,scale=1;
+  // ---------- 缩放 + 平移状态 ----------
+  let scale=1,tx=0,ty=0;
+  let isDragging=false;
+  let dragStartX=0,dragStartY=0,panStartX=0,panStartY=0;
+  let lastDist=0;
+  function applyTransform(){
+    container.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
+  }
+  // ------- 鼠标拖拽平移（缩放后才可拖动） -------
+  function onMouseDown(e){
+    if(scale>1){
+      isDragging=true;
+      dragStartX=e.clientX;dragStartY=e.clientY;
+      panStartX=tx;panStartY=ty;
+      bigCanvas.style.cursor='grabbing';
+    }
+  }
+  function onMouseMove(e){
+    if(isDragging){
+      tx=panStartX+(e.clientX-dragStartX);
+      ty=panStartY+(e.clientY-dragStartY);
+      applyTransform();
+    }
+  }
+  function onMouseUp(){
+    if(isDragging){
+      isDragging=false;
+      bigCanvas.style.cursor='grab';
+    }
+  }
+  bigCanvas.addEventListener('mousedown',onMouseDown);
+  document.addEventListener('mousemove',onMouseMove);
+  document.addEventListener('mouseup',onMouseUp);
+  // 关闭时清理 document 事件监听
+  const origClose=overlay.onclick;
+  overlay.onclick=function(e){
+    if(e.target===overlay||e.target===closeBtn){
+      document.removeEventListener('mousemove',onMouseMove);
+      document.removeEventListener('mouseup',onMouseUp);
+      overlay.remove();
+    }
+  };
+  // ------- 双指缩放（touch）-------
   bigCanvas.addEventListener('touchstart',e=>{
     if(e.touches.length===2){
       e.preventDefault();
@@ -2333,24 +2914,36 @@ function showFullscreenChart(canvasId){
       if(lastDist>0){
         let delta=dist/lastDist;
         scale=Math.max(0.5,Math.min(5,scale*delta));
-        container.style.transform=`scale(${scale})`;
+        applyTransform();
       }
       lastDist=dist;
+    }else if(e.touches.length===1&&scale>1){
+      // 单指平移（缩放后才可拖动）
+      let t=e.touches[0];
+      if(!isDragging){
+        isDragging=true;
+        dragStartX=t.clientX;dragStartY=t.clientY;
+        panStartX=tx;panStartY=ty;
+      }
+      tx=panStartX+(t.clientX-dragStartX);
+      ty=panStartY+(t.clientY-dragStartY);
+      applyTransform();
     }
   },{passive:false});
-  bigCanvas.addEventListener('touchend',()=>{lastDist=0});
-  // 鼠标滚轮缩放
+  bigCanvas.addEventListener('touchend',()=>{lastDist=0;isDragging=false});
+  // ------- 鼠标滚轮缩放 -------
   overlay.addEventListener('wheel',e=>{
     e.preventDefault();
-    scale=Math.max(0.5,Math.min(5,scale+(e.deltaY>0?-0.1:0.1)));
-    container.style.transform=`scale(${scale})`;
+    let newScale=Math.max(0.5,Math.min(5,scale+(e.deltaY>0?-0.1:0.1)));
+    scale=newScale;
+    applyTransform();
   },{passive:false});
 }
 
 /* ==================== GAME ACTIONS ==================== */
 function exitGame(){
-  // 刷盘残留历史再退出
-  if(gameHistory.length>0)flushAndGetFullHistory();
+  // 刷盘残留历史再退出，清理磁盘回合数据
+  if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(()=>{})}
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
   aiPlayers=new Set();eliminatedPlayers=new Set();gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;
@@ -2376,9 +2969,12 @@ function showMsg(t,c){
 }
 
 window.addEventListener('popstate',()=>{
-  // 游戏中按返回键 → 退出游戏（先重置状态再导航）
-  if(gameMode&&gameMode!=='welcome'){exitGame();return}
-  // 非游戏中：根据 hash 导航到对应界面
+  const cur = Router._current;
+  // 在结算/详情页: 使用 Router.back() 回到前一页（checkout 的 back 返回 _checkoutPrev）
+  if(cur === 'checkout'){ Router.back(); return; }
+  // 游戏中按返回键 → 退出游戏
+  if(gameMode && gameMode !== 'welcome' && cur === 'game'){ exitGame(); return; }
+  // 其他页面: 根据 hash 导航
   const h=location.hash.slice(1);
   if(h&&document.getElementById(h))Router.navigate(h);else Router.navigate('welcome');
 });

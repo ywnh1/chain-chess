@@ -14,7 +14,7 @@ fi
 PASSWORD="$1"
 KEYSTORE="release.keystore"
 PRODUCT="连锁棋"
-VERSION="2.0.0-beta"
+VERSION="2.1.0-beta"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 
