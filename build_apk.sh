@@ -5,12 +5,7 @@
 
 set -e
 
-if [ $# -lt 1 ]; then
-  echo "用法: $0 <keystore_password>"
-  echo "例如: $0 chainchess"
-  exit 1
-fi
-
+# ── 配置 ──────────────────────────────────────────────────
 PASSWORD="$1"
 KEYSTORE="release.keystore"
 PRODUCT="连锁棋"
@@ -18,31 +13,66 @@ VERSION="2.1.0-beta"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 
-# 检查 keystore
-if [ ! -f "$KEYSTORE" ]; then
-  echo "错误: 找不到 keystore 文件 $KEYSTORE"
+# ── 参数检查 ──────────────────────────────────────────────
+if [ $# -lt 1 ]; then
+  echo "用法: $0 <keystore_password>"
+  echo "例如: $0 chainchess"
   exit 1
 fi
 
-echo "=== 编译 arm64 APK ==="
+if [ ! -f "$KEYSTORE" ]; then
+  echo "❌ 错误: 找不到 keystore 文件 $KEYSTORE"
+  exit 1
+fi
+
+START_EPOCH=$(date +%s)
+
+# ── 步骤 1: 编译 ──────────────────────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  🔨 步骤 1/3: 编译 arm64 APK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  产物: ${OUTPUT}"
+echo ""
+
 npx tauri android build --target aarch64
 
+# ── 步骤 2: 签名 ──────────────────────────────────────────
 echo ""
-echo "=== 验证编译产物 ==="
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  📝 步骤 2/3: 签名 APK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  keystore: ${KEYSTORE}"
+echo ""
+
 if [ ! -f "$UNSIGNED_APK" ]; then
-  echo "错误: 编译产物不存在: $UNSIGNED_APK"
+  echo "❌ 错误: 编译产物不存在: $UNSIGNED_APK"
+  echo "  编译阶段可能失败，请检查上方日志。"
   exit 1
 fi
 
-echo "=== 签名 APK ==="
 mkdir -p release
 cp "$UNSIGNED_APK" "$OUTPUT"
 apksigner sign --ks "$KEYSTORE" --ks-pass "pass:${PASSWORD}" --out "$OUTPUT" "$OUTPUT"
 
+# ── 步骤 3: 验证 ──────────────────────────────────────────
 echo ""
-echo "=== 验证签名 ==="
-apksigner verify --verbose "$OUTPUT"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  ✅ 步骤 3/3: 验证签名"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+apksigner verify --verbose "$OUTPUT" | sed 's/^/  /'
+
+# ── 完成 ──────────────────────────────────────────────────
+ELAPSED=$(( $(date +%s) - START_EPOCH ))
+FILESIZE=$(ls -lh "$OUTPUT" | awk '{print $5}')
 
 echo ""
-echo "✅ 完成: $OUTPUT"
-ls -lh "$OUTPUT"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  🎉 构建完成！"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  文件: ${OUTPUT}"
+echo "  大小: ${FILESIZE}"
+echo "  耗时: ${ELAPSED}s"
+echo ""

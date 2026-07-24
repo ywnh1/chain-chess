@@ -226,6 +226,16 @@ body::after{content:'';position:fixed;inset:0;
   0%,100%{box-shadow:0 0 20px rgba(240,179,75,.08),inset 0 1px 0 rgba(240,179,75,.1);border-color:rgba(240,179,75,.25)}
   50%{box-shadow:0 0 35px rgba(240,179,75,.18),inset 0 1px 0 rgba(240,179,75,.15);border-color:rgba(240,179,75,.4)}
 }
+/* ═══ 悔棋按钮 ═══ */
+#undoBtn{
+  background:rgba(95,195,195,.12);color:var(--accent2);
+  border:1px solid rgba(95,195,195,.2);padding:7px 12px;border-radius:8px;font-size:.72rem;
+  cursor:pointer;transition:.15s;font-weight:500;letter-spacing:.3px;
+  font-family:var(--font);
+}
+#undoBtn:hover{background:rgba(95,195,195,.2);border-color:rgba(95,195,195,.3)}
+#undoBtn:active{transform:scale(.97);transition:all .08s ease}
+#undoBtn:disabled{opacity:.3;cursor:not-allowed;transform:none}
 /* 跳过动画按钮 */
 #skipChainBtn{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:500;
@@ -364,8 +374,9 @@ body{padding-top:env(safe-area-inset-top,20px)}
   top:50%;left:50%;
   transform:translate(-50%,-50%);
   width:92vw;max-width:480px;
-  max-height:calc(100dvh - 20px);
-  min-height:320px;
+  height:80dvh;
+  max-height:calc(100dvh - 12px);
+  min-height:420px;
   border-radius:20px;
   z-index:999;
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
@@ -376,7 +387,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
     rgba(15,15,19,.26) 100%
   );
   display:flex;flex-direction:column;align-items:center;
-  padding:calc(10px + env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  padding:calc(6px + env(safe-area-inset-top, 0px)) 16px calc(10px + env(safe-area-inset-bottom, 0px));
   overflow:hidden;
   /* ═══ 液态玻璃边缘折射（宽厚版） ═══ */
   border:1.5px solid rgba(255,255,255,.15);
@@ -393,7 +404,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 #pauseOverlay .stat-card{
   background:var(--glass-w-035);
-  padding:12px 10px;
+  padding:8px 8px;
   border:1px solid var(--glass-w-08);
   box-shadow:
     inset 0 1.5px 0 var(--glass-w-05),
@@ -402,7 +413,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 #pauseOverlay .chart-box{
   background:var(--glass-w-025);
-  padding:12px 14px;
+  padding:8px 10px;
   border:1px solid var(--glass-w-06);
   box-shadow:
     inset 0 1.5px 0 var(--glass-w-04),
@@ -421,8 +432,8 @@ body{padding-top:env(safe-area-inset-top,20px)}
   flex-shrink:0;
   width:100%;
   text-align:center;
-  font-size:1.15rem;
-  margin:0 0 8px 0;
+  font-size:1.05rem;
+  margin:0 0 4px 0;
   text-shadow:0 2px 20px rgba(0,0,0,.5);
 }
 #pauseOverlay .settlement-inner::-webkit-scrollbar{width:3px}
@@ -433,8 +444,8 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 #pauseOverlay #pauseCharts{display:flex;flex-direction:column;gap:14px;width:100%}
 #pauseOverlay .stats-grid{gap:10px}
-#pauseOverlay .btn-primary{margin-top:10px}
-#pauseOverlay .chart-box canvas{height:150px}
+#pauseOverlay .btn-primary{margin-top:6px}
+#pauseOverlay .chart-box canvas{height:200px}
 
 /* checkout screen — 结算/历史详情页（复用 settlement 样式，但作为 .screen） */
 #checkout.screen{max-width:520px;gap:10px;padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(32px + env(safe-area-inset-bottom, 0px));height:100dvh;overflow:hidden}
@@ -1033,6 +1044,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 <div id="game" class="screen">
   <div class="top">
     <div class="top-left">
+      <button onclick="undoLastMove()" id="undoBtn" disabled>↩ 悔棋</button>
       <button onclick="togglePause()" id="pauseBtn">⏸ 暂停</button>
     </div>
     <div class="top-right">
@@ -1050,10 +1062,10 @@ body{padding-top:env(safe-area-inset-top,20px)}
   <div class="settlement-inner">
     <div id="pauseStats" class="stats-grid"></div>
     <div id="pauseCharts" style="width:100%"></div>
-    <div style="display:flex;gap:10px;margin-top:14px;width:100%">
-      <button class="btn-primary" onclick="resumeGame()" style="flex:1;padding:14px;font-size:1.05rem">▶ 继续游戏</button>
+    <div style="display:flex;gap:10px;margin-top:10px;width:100%">
+      <button class="btn-primary" onclick="resumeGame()" style="flex:1;padding:12px;font-size:1rem">▶ 继续游戏</button>
     </div>
-    <div style="display:flex;gap:10px;margin-top:6px;width:100%">
+    <div style="display:flex;gap:10px;margin-top:4px;width:100%">
       <button class="btn-danger" onclick="endGameNow()" style="flex:1">⛳ 结束游戏</button>
     </div>
   </div>
@@ -1140,6 +1152,9 @@ let firstMovePos=null;
 
 // 暂停状态
 let isPaused=false;
+
+// 悔棋状态栈
+let undoStack=[];
 
 // 图表上下文缓存（用于全屏重绘）
 let _chartCtx={};
@@ -1358,6 +1373,7 @@ function startEveGame(){
   clearBoardDOM();
   location.hash='#game';
   resetRoundHistory();
+  undoStack=[];
   size=getSel('eveSizeGrid')||7;
   let aiCount=getSel('eveCountGroup')||3;
   maxPlayers=aiCount;
@@ -2160,6 +2176,7 @@ function aiFindMoveAlphaBeta(player,sz,b,depth){
 async function triggerAI(){
   if(gameOver||aiThinking||isPaused)return;
   if(!aiPlayers.has(curPlayer))return;
+  saveUndoState();
   aiThinking=true;
   showMsg(`🤔 AI ${curPlayer+1} 思考中...`,'');
   await sleep(50);
@@ -2257,6 +2274,7 @@ function startLocalGame(){
   clearBoardDOM();
   location.hash='#game';
   resetRoundHistory();
+  undoStack=[];
   size=getSel('localSizeGrid')||7;
   maxPlayers=getSel('localPlayersGroup')||2;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
@@ -2301,6 +2319,7 @@ function toggleAIColorPicker(){
 function startAIGame(){
   location.hash='#game';
   resetRoundHistory();
+  undoStack=[];
   size=getSel('aiSizeGrid')||7;
   let aiCount=getSel('aiCountGroup')||1;
   if(aiCount<1)aiCount=1;
@@ -2341,6 +2360,7 @@ function togglePause(){
   } else {
     btn.textContent='⏸ 暂停';
     hidePauseOverlay();
+    updateUndoBtn();
   }
 }
 async function showPauseOverlay(){
@@ -2392,6 +2412,43 @@ async function showPauseOverlay(){
     }
   });
 }
+/* ═══ 悔棋 ═══ */
+function saveUndoState(){
+  undoStack.push({
+    board: cloneBoard(board),
+    curPlayer: curPlayer,
+    firstMovePos: firstMovePos,
+    eliminatedPlayers: new Set(eliminatedPlayers),
+    chainStats: JSON.parse(JSON.stringify(chainStats)),
+    maxChainOverall: {...maxChainOverall},
+  });
+  // 最多保留 50 步防止内存溢出
+  if(undoStack.length>50)undoStack.shift();
+  updateUndoBtn();
+}
+function undoLastMove(){
+  if(undoStack.length===0||gameOver||aiThinking)return;
+  let state=undoStack.pop();
+  board=state.board;
+  curPlayer=state.curPlayer;
+  firstMovePos=state.firstMovePos;
+  eliminatedPlayers=state.eliminatedPlayers;
+  chainStats=state.chainStats;
+  maxChainOverall=state.maxChainOverall;
+  // 移除 gameHistory 最后一条
+  if(gameHistory.length>0)gameHistory.pop();
+  renderBoard(true);
+  renderPlayerBar();
+  setBg(curPlayer);
+  updateUndoBtn();
+  showMsg('已撤销上一步','');
+  // 如果当前轮到 AI，触发 AI
+  if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),300);
+}
+function updateUndoBtn(){
+  let btn=document.getElementById('undoBtn');
+  if(btn)btn.disabled=undoStack.length===0||gameOver||aiThinking;
+}
 function hidePauseOverlay(){
   let overlay=document.getElementById('pauseOverlay');
   overlay.style.display='none';
@@ -2408,6 +2465,7 @@ function resumeGame(){
   isPaused=false;
   document.getElementById('pauseBtn').textContent='⏸ 暂停';
   hidePauseOverlay();
+  updateUndoBtn();
   // 如果是 AI 回合，继续触发 AI
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),300);
 }
@@ -2417,6 +2475,7 @@ async function endGameNow(){
   hidePauseOverlay();
   isPaused=false;
   gameOver=true;
+  updateUndoBtn();
   let bestP = 0, bestCnt = -1;
   for(let p=0;p<maxPlayers;p++){
     if(eliminatedPlayers.has(p))continue;
@@ -2459,6 +2518,7 @@ async function animateBoardDiff(oldBoard, newBoard, sz){
 async function localClick(x,y){
   if(gameOver||aiThinking||isPaused)return;
   if(aiPlayers.has(curPlayer))return;
+  saveUndoState();
   let c=board[x][y];
   let mine=hasPieces(curPlayer,board);
   if(mine){
@@ -2677,6 +2737,7 @@ function replayGame(){
     clearBoardDOM();
     location.hash='#game';
     resetRoundHistory();
+    undoStack=[];
     size=c.size;
     maxPlayers=c.aiCount+1;
     aiAlgorithm=c.aiAlgorithm;
@@ -2703,6 +2764,7 @@ function replayGame(){
     clearBoardDOM();
     location.hash='#game';
     resetRoundHistory();
+    undoStack=[];
     size=c.size;
     maxPlayers=c.maxPlayers;
     board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
@@ -2723,6 +2785,7 @@ function replayGame(){
     clearBoardDOM();
     location.hash='#game';
     resetRoundHistory();
+    undoStack=[];
     size=c.size;
     maxPlayers=c.aiCount;
     board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
@@ -2946,7 +3009,7 @@ function exitGame(){
   if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(()=>{})}
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
   aiPlayers=new Set();eliminatedPlayers=new Set();gameHistory=[];chainStats={};
-  maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;
+  maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;undoStack=[];
   cells=[];board=[];
   try{document.getElementById('board').innerHTML='';}catch(e){}
   document.body.style.background='';
