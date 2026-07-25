@@ -6,10 +6,9 @@
 set -e
 
 # ── 配置 ──────────────────────────────────────────────────
-PASSWORD="$1"
 KEYSTORE="release.keystore"
 PRODUCT="连锁棋"
-VERSION="2.2.0-beta"
+VERSION="2.3.0-beta"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 
@@ -19,6 +18,7 @@ if [ $# -lt 1 ]; then
   echo "例如: $0 chainchess"
   exit 1
 fi
+PASSWORD="$1"
 
 if [ ! -f "$KEYSTORE" ]; then
   echo "❌ 错误: 找不到 keystore 文件 $KEYSTORE"
@@ -75,4 +75,12 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "  文件: ${OUTPUT}"
 echo "  大小: ${FILESIZE}"
 echo "  耗时: ${ELAPSED}s"
+echo ""
+
+cp release /storage/emulated/0/用户/ -r
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  🎉 复制完成！"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""

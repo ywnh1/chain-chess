@@ -6,7 +6,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f0f13" id="metaThemeColor">
 <meta name="color-scheme" content="light dark">
@@ -15,8 +15,16 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 /* 防止系统字体缩放破坏布局 */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* 自定义字体：FiraCode Nerd Font（复制到项目内，Tauri 打包自动包含） */
+@font-face{
+  font-family:'CustomFont';
+  src:local('FiraCode Nerd Font'),
+       url('fonts/aaa_FiraCodeNerdFont_白桃乌龙甜茶.ttf') format('truetype');
+  font-display:swap;
+}
 :root{
-  --bg:#0f0f13;
+  --bg:linear-gradient(160deg,#0f0f15 0%,#0a0a10 30%,#0e0a14 70%,#0f0f17 100%);
+  --bg-solid:#0f0f15;
   --surface:rgba(26,26,34,.85);
   --card:rgba(35,35,45,.75);
   --border:var(--glass-w-08);
@@ -24,20 +32,26 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   --accent2:#5fc3c3;
   --text:#e8e6e3;
   --dim:#7a7885;
-  --radius:12px;
-  --shadow:0 8px 32px rgba(0,0,0,.45);
-  --glow:0 0 40px rgba(240,179,75,.05);
+  --radius:16px;
+  --radius-sm:12px;
+  --shadow:0 8px 40px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.25);
+  --glow:0 0 60px rgba(240,179,75,.04);
   --glass:var(--glass-w-04);
-  --glass-border:var(--glass-w-06);
-  --glass-shadow:0 4px 24px rgba(0,0,0,.3);
-  --glass-shine:var(--glass-w-03);
-  --glass-edge:var(--glass-w-06);
-  --font:'Inter','SF Pro','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+  --glass-border:var(--glass-w-08);
+  --glass-shadow:0 4px 28px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.03);
+  --glass-shine:var(--glass-w-04);
+  --glass-edge:var(--glass-w-08);
+  --liquid-iris:linear-gradient(135deg,rgba(160,120,255,.06) 0%,rgba(240,179,75,.04) 50%,rgba(95,195,195,.06) 100%);
+  --liquid-blur:16px;
+  --overlay-bg:linear-gradient(135deg,rgba(15,15,19,.38) 0%,rgba(22,24,30,.30) 50%,rgba(20,18,24,.25) 100%);
+  --checkout-bg:rgba(15,15,19,.65);
+  --font:'CustomFont','Inter','SF Pro','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
 
   /* ─── 玻璃色阶（浅色/深色模式自动切换） ─── */
   --glass-w-004:rgba(255,255,255,.004);
   --glass-w-008:rgba(255,255,255,.008);
   --glass-w-012:rgba(255,255,255,.012);
+  --glass-w-015:rgba(255,255,255,.015);
   --glass-w-025:rgba(255,255,255,.025);
   --glass-w-03:rgba(255,255,255,.03);
   --glass-w-035:rgba(255,255,255,.035);
@@ -58,10 +72,18 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 }
 
 
+/* 尊重系统减少动效设置 */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  body::before{animation:none!important}
+}
 html{font-size:clamp(14px,3.5vw,17px)}
 body{
   font-family:var(--font);
-  background:var(--bg);
+  background:var(--bg-solid);
+  background-image:var(--bg),radial-gradient(ellipse 90% 60% at 20% 10%,rgba(160,120,255,.02) 0%,transparent 60%),radial-gradient(ellipse 80% 50% at 80% 90%,rgba(95,195,195,.02) 0%,transparent 60%);
+  background-size:100% 100%,100% 100%,100% 100%;
+  background-repeat:no-repeat;
   color:var(--text);
   min-height:100dvh;
   min-height:calc(100dvh - env(safe-area-inset-bottom,0px));
@@ -78,32 +100,36 @@ body{
   line-height:1.5;
   overscroll-behavior:none;
 }
-body::before{content:'';position:fixed;inset:0;background:
-    radial-gradient(ellipse 70% 50% at 50% -10%,rgba(240,179,75,.04) 0%,transparent 70%),
-    radial-gradient(ellipse 60% 40% at 100% 90%,rgba(95,195,195,.03) 0%,transparent 70%),
-    radial-gradient(ellipse 50% 30% at 20% 40%,rgba(240,179,75,.015) 0%,transparent 60%),
-    radial-gradient(ellipse 40% 25% at 80% 60%,rgba(95,195,195,.015) 0%,transparent 60%);
-  background-size:200% 200%,200% 200%,200% 200%,200% 200%;
-  animation:liquidDrift 20s ease-in-out infinite;
-  pointer-events:none;z-index:0;
-  will-change:background-position,transform;
-  contain:layout style paint}
-/* 暗色遮罩 — 深色模式下给整体加一层深色覆盖，让亮度更沉 */
+body::before{content:'';position:fixed;inset:-25%;width:150%;height:150%;background:
+    radial-gradient(ellipse 80% 55% at 50% -5%,rgba(240,179,75,.07) 0%,rgba(200,140,240,.03) 20%,transparent 70%),
+    radial-gradient(ellipse 60% 45% at 25% 85%,rgba(95,195,195,.06) 0%,rgba(160,120,255,.03) 30%,transparent 65%),
+    radial-gradient(ellipse 50% 35% at 75% 25%,rgba(160,120,255,.05) 0%,rgba(240,179,75,.02) 30%,transparent 60%),
+    radial-gradient(ellipse 40% 40% at 90% 65%,rgba(95,195,195,.04) 0%,rgba(200,140,240,.015) 40%,transparent 65%);
+  background-size:250% 250%,250% 250%,250% 250%,250% 250%;
+  background-position:50% 50%,50% 50%,50% 50%,50% 50%;
+  animation:liquidDrift 25s ease-in-out infinite;
+  pointer-events:none;z-index:-2;
+  will-change:transform;
+  filter:blur(8px) saturate(1.1);}
+/* 让 body 自己处理层叠上下文，不割裂点击通道 */
+body{position:relative;z-index:0}
+/* 背景底层效果 — 位于所有内容之下 */
 body::after{content:'';position:fixed;inset:0;
   background:rgba(0,0,0,.18);
-  pointer-events:none;z-index:0}
+  pointer-events:none;z-index:-1}
 @keyframes liquidDrift{
-  0%{background-position:50% -10%,100% 90%,20% 40%,80% 60%}
-  25%{background-position:55% -8%,95% 88%,25% 38%,75% 65%}
-  50%{background-position:45% -12%,105% 92%,15% 42%,85% 55%}
-  75%{background-position:52% -9%,98% 85%,22% 36%,78% 62%}
-  100%{background-position:50% -10%,100% 90%,20% 40%,80% 60%}
+  0%{transform:translate(0,0)}
+  25%{transform:translate(5%,3%)}
+  50%{transform:translate(-3%,-5%)}
+  75%{transform:translate(4%,-2%)}
+  100%{transform:translate(0,0)}
 }
 /* ═══════ 页面过渡动画 ═══════ */
-.screen{display:none;opacity:0;will-change:transform,opacity}
+.screen{display:none;opacity:0}
 .screen.active{
   display:flex;flex-direction:column;align-items:center;width:100%;max-width:480px;
   animation:pageEnter .4s cubic-bezier(.22,1,.36,1) both;
+  will-change:transform,opacity;
 }
 .screen.leaving{
   animation:pageLeave .25s ease both;
@@ -125,16 +151,17 @@ body::after{content:'';position:fixed;inset:0;
 .tagline{color:var(--dim);font-size:.9rem;margin-top:-.5rem}
 .mode-cards{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px}
 .mode-card{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:20px 16px;cursor:pointer;
-  transition:.25s;text-align:left;display:flex;align-items:center;gap:14px;
-  box-shadow:var(--shadow);
-  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;
+  border:1px solid var(--glass-border);border-radius:var(--radius);
+  backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
+  box-shadow:var(--glass-shadow);
+  padding:20px 16px;cursor:pointer;
+  transition:.35s cubic-bezier(.22,1,.36,1);text-align:left;display:flex;align-items:center;gap:14px;
   touch-action:manipulation;
   min-height:56px;
 }
-.mode-card:hover{background:var(--glass-w-08);border-color:var(--glass-w-18);transform:translateY(-2px);box-shadow:0 10px 40px rgba(0,0,0,.4)}
-.mode-card:active{background:var(--glass-w-09);border-color:rgba(240,179,75,.5);transform:scale(.99);transition:all .06s ease}
+.mode-card:hover{border-color:var(--glass-w-16);transform:translateY(-2px);box-shadow:0 12px 48px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
+.mode-card:active{transform:scale(.97);transition:all .08s ease}
 .mode-card .icon{font-size:1.8rem;flex-shrink:0}
 .mode-card .body{flex:1}
 .mode-card .body h3{font-size:1rem;font-weight:600}
@@ -144,11 +171,13 @@ body::after{content:'';position:fixed;inset:0;
 #aiLobby,#localLobby,#eveLobby{max-width:480px;gap:.75rem;width:100%}
 #aiLobby .back,#localLobby .back,#history .back,#eveLobby .back{
   align-self:flex-start;
-  background:none;border:none;color:var(--dim);
-  font-size:.85rem;cursor:pointer;padding:6px 0;
-  display:flex;align-items:center;gap:4px;transition:.15s;
+  background:var(--glass-w-06);border:1px solid var(--glass-w-10);color:var(--dim);
+  font-size:.82rem;cursor:pointer;padding:7px 16px;border-radius:16px;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  display:flex;align-items:center;gap:4px;transition:.2s;
 }
-#aiLobby .back:active,#localLobby .back:active,#history .back:active,#eveLobby .back:active{color:var(--text)}
+#aiLobby .back:hover,#localLobby .back:hover,#history .back:hover,#eveLobby .back:hover{background:var(--glass-w-10);border-color:var(--glass-w-20);color:var(--text)}
+#aiLobby .back:active,#localLobby .back:active,#history .back:active,#eveLobby .back:active{transform:scale(.97)}
 #aiLobby h2,#localLobby h2,#history h2,#eveLobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
 .form-row{margin:8px 0;display:flex;flex-direction:column;gap:4px;width:100%}
 .form-row label{font-size:.78rem;color:var(--dim);font-weight:500}
@@ -368,6 +397,14 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 .btn-danger:hover{background:rgba(255,80,80,.22);border-color:rgba(255,80,80,.4)}
 .btn-danger:active{opacity:.7;transform:scale(.97);transition:all .08s ease}
+/* 统一玻璃小按钮（历史页、各处操作按钮） */
+.glass-btn{border:1px solid var(--glass-border);background-image:var(--liquid-iris),var(--glass-w-06);background-origin:padding-box;color:var(--text);padding:6px 12px;border-radius:var(--radius-sm);font-size:.75rem;cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);font-weight:500;font-family:var(--font);touch-action:manipulation;min-height:36px;display:inline-flex;align-items:center;justify-content:center;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow)}
+.glass-btn:hover{border-color:var(--glass-w-16);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
+.glass-btn:active{transform:scale(.95);transition:all .06s ease}
+.glass-btn.primary{border-color:rgba(95,195,195,.2);background:rgba(95,195,195,.12);color:var(--accent2)}
+.glass-btn.primary:hover{background:rgba(95,195,195,.2);border-color:rgba(95,195,195,.3)}
+.glass-btn.danger{border-color:rgba(255,80,80,.2);background:rgba(255,80,80,.12);color:rgba(255,100,100,.9)}
+.glass-btn.danger:hover{background:rgba(255,80,80,.2);border-color:rgba(255,80,80,.4)}
 /* 暂停覆盖 — 浮动液态玻璃面板，居中显示，周边可见棋盘 */
 #pauseOverlay.settlement{
   position:fixed;
@@ -377,30 +414,15 @@ body{padding-top:env(safe-area-inset-top,20px)}
   height:80dvh;
   max-height:calc(100dvh - 12px);
   min-height:420px;
-  border-radius:20px;
+  border-radius:var(--radius);
   z-index:999;
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-  background:linear-gradient(
-    135deg,
-    rgba(15,15,19,.38) 0%,
-    rgba(22,24,30,.30) 50%,
-    rgba(15,15,19,.26) 100%
-  );
+  backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
+  border:1px solid var(--glass-border);
+  box-shadow:var(--glass-shadow);
+  background:var(--overlay-bg);background-image:var(--liquid-iris);
   display:flex;flex-direction:column;align-items:center;
   padding:calc(6px + env(safe-area-inset-top, 0px)) 16px calc(10px + env(safe-area-inset-bottom, 0px));
   overflow:hidden;
-  /* ═══ 液态玻璃边缘折射（宽厚版） ═══ */
-  border:1.5px solid rgba(255,255,255,.15);
-  border-radius:20px;
-  box-shadow:
-    0 0 0 2px rgba(200,215,255,.05),
-    0 0 0 4px rgba(200,215,255,.015),
-    0 0 20px rgba(200,215,255,.022),
-    0 0 0 6px rgba(255,255,255,.008),
-    0 16px 48px rgba(0,0,0,.5),
-    inset 0 2px 0 rgba(255,255,255,.08),
-    inset 0 -1.5px 0 rgba(255,255,255,.025),
-    inset 0 0 60px rgba(255,255,255,.008);
 }
 #pauseOverlay .stat-card{
   background:var(--glass-w-035);
@@ -456,17 +478,10 @@ body{padding-top:env(safe-area-inset-top,20px)}
 #chkOuterTitle{width:100%;text-align:center;font-size:1.05rem;font-weight:600;padding:4px 0 2px;flex-shrink:0}
 #checkout .settlement{
   position:relative;inset:auto;padding:18px 14px 10px;animation:none;z-index:auto;
-  background:rgba(15,15,19,.65);
-  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
-  border:1.5px solid var(--glass-w-08);border-radius:16px;
-  box-shadow:
-    0 0 0 2px rgba(200,215,255,.035),
-    0 0 12px rgba(200,215,255,.012),
-    0 0 0 4px rgba(255,255,255,.006),
-    inset 0 1.5px 0 var(--glass-w-05),
-    inset 0 -1px 0 var(--glass-w-015),
-    inset 0 0 40px rgba(255,255,255,.004),
-    0 8px 40px rgba(0,0,0,.4);
+  background:var(--checkout-bg);background-image:var(--liquid-iris);background-origin:padding-box;
+  backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
+  border:1px solid var(--glass-border);border-radius:var(--radius);
+  box-shadow:var(--glass-shadow);
 }
 #checkout .settlement-inner{gap:10px}
 #checkout .settlement h2{font-size:1.15rem;margin:6px 0 4px;width:100%}
@@ -491,6 +506,49 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .p8{background:#e868a0}
 .p9{background:#70c0e8}
 
+/* about screen — 一级页 */
+#about.screen,#about-ai.screen,#about-changelog.screen,#about-license.screen{max-width:520px;gap:10px;padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(32px + env(safe-area-inset-bottom, 0px));height:100dvh;overflow:hidden;width:100%}
+#about.screen.active,#about-ai.screen.active,#about-changelog.screen.active,#about-license.screen.active{display:flex;flex-direction:column;align-items:center}
+#about .back,#about-ai .back,#about-changelog .back,#about-license .back{align-self:flex-start;background:var(--glass-w-06);border:1px solid var(--glass-w-10);color:var(--dim);font-size:.82rem;cursor:pointer;padding:7px 16px;border-radius:16px;display:flex;align-items:center;gap:4px;transition:.2s;flex-shrink:0;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#about .back:hover,#about-ai .back:hover,#about-changelog .back:hover,#about-license .back:hover{background:var(--glass-w-10);border-color:var(--glass-w-20);color:var(--text)}
+#about .back:active,#about-ai .back:active,#about-changelog .back:active,#about-license .back:active{transform:scale(.97)}
+#about h2,#about-ai h2,#about-license h2{font-size:1.15rem;font-weight:600;text-align:center;padding:4px 0 6px;flex-shrink:0;letter-spacing:1px}
+#about .about-scroll,#about-ai .about-scroll,#about-changelog .about-scroll,#about-license .about-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:14px}
+#about .about-scroll::-webkit-scrollbar,#about-ai .about-scroll::-webkit-scrollbar,#about-changelog .about-scroll::-webkit-scrollbar,#about-license .about-scroll::-webkit-scrollbar{width:3px}
+#about .about-scroll::-webkit-scrollbar-thumb,#about-ai .about-scroll::-webkit-scrollbar-thumb,#about-changelog .about-scroll::-webkit-scrollbar-thumb,#about-license .about-scroll::-webkit-scrollbar-thumb{background:var(--glass-w-10);border-radius:3px}
+
+/* 信息行（键值对齐） */
+#about .about-info{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 18px;display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow)}
+#about .about-info-row{display:flex;align-items:center;font-size:.82rem;color:var(--text);line-height:1.5;padding:3px 0}
+#about .about-info-row+.about-info-row{border-top:1px solid var(--glass-w-06)}
+#about .info-key{color:var(--dim);width:60px;flex-shrink:0}
+#about .info-val{color:var(--text)}
+
+/* 短内容卡片 */
+#about .about-card,#about-ai .about-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:16px 18px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1)}
+#about .about-card h3{font-size:.9rem;font-weight:600;margin:0 0 6px;color:var(--accent)}
+#about .about-card p{font-size:.82rem;line-height:1.6;color:var(--text);margin:0}
+#about .about-card ol{margin:4px 0 0;padding-left:16px}
+#about .about-card li{font-size:.82rem;line-height:1.6;color:var(--text);margin-bottom:3px}
+#about .about-card li:last-child{margin-bottom:0}
+
+/* 导航条目（指向二级页面） */
+#about .about-nav{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1);touch-action:manipulation}
+#about .about-nav:hover{background:var(--glass-w-08);border-color:var(--glass-w-14)}
+#about .about-nav:active{transform:scale(.99)}
+#about .about-nav .nav-label{font-size:.85rem;font-weight:500;color:var(--text)}
+#about .about-nav .nav-arrow{font-size:.7rem;color:var(--dim)}
+
+/* 二级页公共样式 */
+#about-ai .about-card ul{margin:4px 0 0;padding-left:16px}
+#about-ai .about-card ul li{font-size:.82rem;line-height:1.6;color:var(--text);margin-bottom:3px}
+
+/* 更新详情卡片 */
+#about-changelog .about-scroll{gap:10px}
+#about-changelog .cl-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow)}
+#about-changelog .cl-version{font-size:.82rem;font-weight:600;color:var(--accent);margin-bottom:4px}
+#about-changelog .cl-desc{font-size:.78rem;line-height:1.5;color:var(--dim)}
+
 /* msg */
 #msg{
   font-size:.75rem;padding:4px 10px;border-radius:6px;
@@ -502,7 +560,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* modal — 简洁现代 */
 .modal{
   display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.6);
+  background:var(--modal-overlay, rgba(0,0,0,.6));
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   justify-content:center;align-items:center;z-index:1000;padding:20px;
 }
@@ -656,7 +714,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* 按钮组（AI 数量、玩家数量） */
 .btn-group{display:flex;gap:6px;flex-wrap:wrap;width:100%}
 .btn-group .gb{
-  flex:1;min-width:38px;padding:9px 6px;border-radius:8px;border:1px solid var(--glass-w-08);
+  flex:1;min-width:44px;padding:9px 6px;border-radius:8px;border:1px solid var(--glass-w-08);
   background:var(--glass-w-04);color:var(--dim);font-size:.78rem;font-weight:500;
   cursor:pointer;transition:.15s;text-align:center;font-family:var(--font);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
@@ -668,16 +726,17 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* 算法选择卡片 */
 .alg-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
 .alg-card{
-  padding:14px 10px;border-radius:10px;border:1px solid var(--glass-w-08);
-  background:var(--glass-w-04);cursor:pointer;transition:.2s;text-align:center;
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  padding:16px 12px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);
+  background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;
+  cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);text-align:center;
+  backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
+  box-shadow:var(--glass-shadow);
 }
-.alg-card:hover{background:var(--glass-w-08);border-color:var(--glass-w-16);transform:translateY(-1px)}
+.alg-card:hover{background:var(--glass-w-08);border-color:var(--glass-w-16);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.04)}
 .alg-card:active{transform:scale(.97);transition:all .06s ease}
 .alg-card.selected{background:rgba(240,179,75,.12);border-color:var(--accent);box-shadow:0 0 16px rgba(240,179,75,.12)}
-.alg-card .alg-icon{font-size:1.4rem;margin-bottom:4px}
-.alg-card .alg-name{font-size:.82rem;font-weight:600;color:var(--text)}
-.alg-card .alg-desc{font-size:.7rem;color:var(--dim);margin-top:2px;line-height:1.3}
+.alg-card .alg-name{font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:4px}
+.alg-card .alg-desc{font-size:.78rem;color:var(--dim);line-height:1.5;padding:0 4px}
 .alg-card.selected .alg-name{color:var(--accent)}
 
 /* 深度滑块 */
@@ -708,7 +767,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* 颜色选择器 */
 .color-picker{display:flex;gap:8px;flex-wrap:wrap;width:100%;justify-content:center}
 .color-opt{
-  width:36px;height:36px;border-radius:50%;border:2px solid transparent;
+  width:44px;height:44px;border-radius:50%;border:2px solid transparent;
   cursor:pointer;transition:.15s;position:relative;
 }
 .color-opt:hover{transform:scale(1.12);box-shadow:0 0 12px var(--glass-w-12)}
@@ -738,7 +797,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .eve-ai-row .alg-mini .am-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
 .eve-ai-row .depth-mini{display:flex;align-items:center;gap:2px}
 .eve-ai-row .depth-mini .dm-btn{
-  width:24px;height:24px;border-radius:50%;border:1px solid var(--glass-w-08);
+  width:32px;height:32px;border-radius:50%;border:1px solid var(--glass-w-08);
   background:var(--glass-w-04);color:var(--dim);font-size:.8rem;font-weight:600;
   cursor:pointer;transition:.1s;display:flex;align-items:center;justify-content:center;font-family:var(--font);
 }
@@ -749,20 +808,20 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* ═══════ 浅色模式 ═══════ */
 @media (prefers-color-scheme: light){
   :root{
-    --bg:#eae8e0;
-    --surface:rgba(255,255,255,.82);
-    --card:rgba(245,243,238,.85);
-    --border:rgba(0,0,0,.06);
-    --text:#1a1a22;
-    --dim:#8a8895;
-    --shadow:0 8px 32px rgba(0,0,0,.08);
-    --glow:0 0 40px rgba(240,179,75,.1);
-    --glass:rgba(0,0,0,.025);
-    --glass-border:rgba(0,0,0,.04);
-    --glass-shadow:0 4px 24px rgba(0,0,0,.06);
-    --glass-shine:rgba(0,0,0,.015);
-    --glass-edge:rgba(0,0,0,.03);
-    /* ── 浅色模式玻璃色阶：卡片背景用半透明白，边框用半透明灰 ── */
+    --bg:linear-gradient(160deg,#f3f2ec 0%,#ede9e0 30%,#f2eaea 70%,#eeeae0 100%);
+    --bg-solid:#f3f2ec;
+    --surface:rgba(255,255,255,.88);
+    --card:rgba(250,248,244,.90);
+    --border:rgba(0,0,0,.07);
+    --accent:#c06807;
+    --accent2:#1a8b7f;
+    --text:#111115;
+    --dim:#4a4855;
+    --shadow:0 8px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06);
+    --glass-shadow:0 4px 28px rgba(0,0,0,.08),inset 0 1px 0 rgba(255,255,255,.8);
+    --overlay-bg:linear-gradient(135deg,rgba(255,255,255,.52) 0%,rgba(248,246,242,.42) 50%,rgba(255,255,255,.36) 100%);
+    --checkout-bg:rgba(245,243,238,.75);
+    --liquid-iris:linear-gradient(135deg,rgba(180,140,200,.04) 0%,rgba(217,119,6,.03) 50%,rgba(42,157,143,.04) 100%);
     --glass-w-004:rgba(255,255,255,.60);
     --glass-w-008:rgba(255,255,255,.62);
     --glass-w-012:rgba(255,255,255,.64);
@@ -783,41 +842,58 @@ body{padding-top:env(safe-area-inset-top,20px)}
     --glass-w-20:rgba(0,0,0,.20);
   }
   body::before{background:
-    radial-gradient(ellipse 70% 50% at 50% -10%,rgba(240,179,75,.08) 0%,transparent 70%),
-    radial-gradient(ellipse 60% 40% at 100% 90%,rgba(95,195,195,.05) 0%,transparent 70%),
-    radial-gradient(ellipse 50% 30% at 20% 40%,rgba(240,179,75,.03) 0%,transparent 60%),
-    radial-gradient(ellipse 40% 25% at 80% 60%,rgba(95,195,195,.025) 0%,transparent 60%)}
-   .form-row select option{background:#fff;color:var(--text)}
-  body::after{display:none}
-  /* ☀️ 暂停面板：浅色浮动玻璃面板 */
-  #pauseOverlay.settlement{
-    background:linear-gradient(135deg,rgba(255,255,255,.52) 0%,rgba(248,246,242,.42) 50%,rgba(255,255,255,.36) 100%);
-    border:1.5px solid rgba(255,255,255,.6);
-    border-radius:20px;
-    box-shadow:
-      0 0 0 2px rgba(200,215,255,.08),
-      0 0 0 4px rgba(200,215,255,.025),
-      0 0 20px rgba(200,215,255,.035),
-      0 0 0 6px rgba(255,255,255,.04),
-      0 16px 48px rgba(0,0,0,.12),
-      inset 0 2px 0 rgba(255,255,255,.2),
-      inset 0 -1.5px 0 rgba(255,255,255,.05),
-      inset 0 0 60px rgba(255,255,255,.02)
+    radial-gradient(ellipse 70% 50% at 50% -10%,rgba(217,119,6,.06) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 40% at 100% 90%,rgba(42,157,143,.04) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 30% at 20% 40%,rgba(217,119,6,.02) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 25% at 80% 60%,rgba(42,157,143,.02) 0%,transparent 60%);
+    filter:blur(6px) saturate(1.05);}
+  body::after{background:rgba(0,0,0,.04)}
+  .form-row select option{background:#fff;color:var(--text)}
+}
+
+/* 手动切换浅色模式（body.light-mode） */
+body.light-mode{
+    --bg:linear-gradient(160deg,#f3f2ec 0%,#ede9e0 30%,#f2eaea 70%,#eeeae0 100%);
+    --bg-solid:#f3f2ec;
+    --surface:rgba(255,255,255,.88);
+    --card:rgba(250,248,244,.90);
+    --border:rgba(0,0,0,.07);
+    --accent:#c06807;
+    --accent2:#1a8b7f;
+    --text:#111115;
+    --dim:#4a4855;
+    --shadow:0 8px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06);
+    --glass-shadow:0 4px 28px rgba(0,0,0,.08),inset 0 1px 0 rgba(255,255,255,.8);
+    --overlay-bg:linear-gradient(135deg,rgba(255,255,255,.52) 0%,rgba(248,246,242,.42) 50%,rgba(255,255,255,.36) 100%);
+    --checkout-bg:rgba(245,243,238,.75);
+    --liquid-iris:linear-gradient(135deg,rgba(180,140,200,.04) 0%,rgba(217,119,6,.03) 50%,rgba(42,157,143,.04) 100%);
+    --glass-w-004:rgba(255,255,255,.60);
+    --glass-w-008:rgba(255,255,255,.62);
+    --glass-w-012:rgba(255,255,255,.64);
+    --glass-w-025:rgba(255,255,255,.65);
+    --glass-w-03:rgba(255,255,255,.68);
+    --glass-w-035:rgba(255,255,255,.70);
+    --glass-w-04:rgba(255,255,255,.72);
+    --glass-w-05:rgba(255,255,255,.74);
+    --glass-w-06:rgba(255,255,255,.76);
+    --glass-w-08:rgba(0,0,0,.08);
+    --glass-w-09:rgba(0,0,0,.09);
+    --glass-w-10:rgba(0,0,0,.10);
+    --glass-w-12:rgba(0,0,0,.12);
+    --glass-w-14:rgba(0,0,0,.14);
+    --glass-w-15:rgba(0,0,0,.15);
+    --glass-w-16:rgba(0,0,0,.16);
+    --glass-w-18:rgba(0,0,0,.18);
+    --glass-w-20:rgba(0,0,0,.20);
   }
-  /* ☀️ 结算面板玻璃边缘 */
-  #checkout .settlement{
-    background:rgba(245,243,238,.75);
-    border-color:rgba(255,255,255,.5);
-    box-shadow:
-      0 0 0 2px rgba(200,215,255,.05),
-      0 0 12px rgba(200,215,255,.015),
-      0 0 0 4px rgba(255,255,255,.03),
-      inset 0 1.5px 0 rgba(255,255,255,.12),
-      inset 0 -1px 0 rgba(255,255,255,.03),
-      inset 0 0 40px rgba(255,255,255,.01),
-      0 8px 40px rgba(0,0,0,.08)
-  }
- }
+  body.light-mode::before{background:
+    radial-gradient(ellipse 70% 50% at 50% -10%,rgba(217,119,6,.06) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 40% at 100% 90%,rgba(42,157,143,.04) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 30% at 20% 40%,rgba(217,119,6,.02) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 25% at 80% 60%,rgba(42,157,143,.02) 0%,transparent 60%);
+    filter:blur(6px) saturate(1.05)}
+  body.light-mode::after{background:rgba(0,0,0,.04)}
+  body.light-mode .form-row select option{background:#fff;color:var(--text)}
 </style>
 </head>
 <body>
@@ -856,18 +932,133 @@ body{padding-top:env(safe-area-inset-top,20px)}
       </div>
     </div>
   </div>
-  <button onclick="exitApp()" style="margin-top:1rem;background:none;border:1px solid rgba(255,255,255,.08);color:var(--dim);padding:8px 20px;border-radius:8px;font-size:.8rem;cursor:pointer;transition:.15s;" onmouseover="this.style.borderColor='rgba(255,255,255,.2)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">✕ 关闭应用</button>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:.8rem">
+    <button onclick="Router.navigate('about')" class="glass-btn" style="padding:8px 28px;border-radius:18px;font-size:.78rem;letter-spacing:1px">关于</button>
+  </div>
+</div>
+
+<!-- About Screen -->
+<div id="about" class="screen">
+  <button class="back" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>关于连锁棋</h2>
+
+    <!-- 信息行：键值对齐 -->
+    <div class="about-info">
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v2.3.0-beta</span></div>
+      <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
+      <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
+      <div class="about-info-row" style="cursor:pointer" onclick="Router.navigate('about-license')"><span class="info-key">许可证</span><span class="info-val" style="color:var(--accent2)">MIT License →</span></div>
+    </div>
+
+    <!-- 游戏介绍（短卡片） -->
+    <div class="about-card">
+      <h3>游戏介绍</h3>
+      <p>连锁棋是一款基于「爆裂棋 / Chain Reaction」玩法改进的多人策略棋盘游戏。支持本地多人、AI 对战和 AI 斗蛐蛐三种模式，棋子数量超过棋盘格容量时会发生连锁爆裂，扩散到相邻格子。纯客户端应用，无需服务器。</p>
+    </div>
+
+    <!-- 游戏规则（短卡片） -->
+    <div class="about-card">
+      <h3>游戏规则</h3>
+      <ol>
+        <li><strong>落子</strong> — 点击空位落子，每位玩家首步需避开所有已有棋子周围 12 格；点击自己的棋子可加子</li>
+        <li><strong>爆裂</strong> — 格子中的棋子数达到容量（4 个）时，向上下左右各扩散一个棋子</li>
+        <li><strong>连锁</strong> — 爆裂扩散会触发相邻格子的连锁爆裂，形成连爆效应</li>
+        <li><strong>淘汰</strong> — 当某玩家的所有棋子被吞噬时该玩家被淘汰</li>
+        <li><strong>胜利</strong> — 最后存活的一位玩家获胜</li>
+      </ol>
+    </div>
+
+    <!-- AI 介绍 → 二级页 -->
+    <div class="about-nav" onclick="Router.navigate('about-ai')">
+      <span class="nav-label">AI 介绍</span>
+      <span class="nav-arrow">→</span>
+    </div>
+
+    <!-- 更新详情 → 二级页 -->
+    <div class="about-nav" onclick="Router.navigate('about-changelog')">
+      <span class="nav-label">更新详情</span>
+      <span class="nav-arrow">→</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- About AI page (二级) -->
+<div id="about-ai" class="screen">
+  <button class="back" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>AI 介绍</h2>
+
+    <div class="about-card">
+      <p style="margin-bottom:12px">连锁棋内置 <strong>四款 AI 算法</strong>，覆盖启发式规则、树搜索剪枝和随机模拟三大搜索范式。PVE、本地AI、斗蛐蛐模式均可自由切换。Alpha-Beta、PVS NegaMax、MCTS 使用 <strong>Rust + Rayon</strong> 多核并行加速。</p>
+
+      <h3 style="font-size:.88rem;font-weight:600;color:var(--accent);margin:0 0 6px">⚡ 策略算法 · 启发式规则</h3>
+      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">纯 JavaScript 实现，基于人工设计的优先级规则快速决策。无需 Rust 引擎，响应最快，适合新手入门和低算力设备。</p>
+      <div style="margin:6px 0 10px 0;padding:8px 12px;background:rgba(240,179,75,.06);border-radius:8px;font-size:.82rem;line-height:1.6">
+        <strong style="color:var(--accent)">三级优先</strong> → 优先走 count=3 即将爆裂的棋子<br>
+        <strong style="color:var(--accent)">安全升级</strong> → 避开对手三级棋子附近的二级棋子<br>
+        <strong style="color:var(--accent)">一进二 / 下三级</strong> → 逐步升级，控制棋盘<br>
+        <strong style="color:var(--accent)">首子中心</strong> → 首回合落子优选棋盘中央
+      </div>
+
+      <h3 style="font-size:.88rem;font-weight:600;color:var(--accent);margin:16px 0 6px">🧠 Alpha-Beta 剪枝 · 经典搜索</h3>
+      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">标准 Alpha-Beta 剪枝搜索，Rust 实现 + Rayon 多线程根级并行。采用 <strong>克隆式搜索</strong>（每次走法复制棋盘而非撤销操作），天然适配连锁反应的多玩家轮换逻辑。</p>
+      <div style="margin:6px 0 10px 0;padding:8px 12px;background:rgba(95,195,195,.06);border-radius:8px;font-size:.82rem;line-height:1.6">
+        <strong style="color:var(--accent2)">搜索深度</strong> 1~10 层 | <strong style="color:var(--accent2)">分支限制</strong> top 15 | <strong style="color:var(--accent2)">走法排序</strong> 三级优先、对手多优先 | <strong style="color:var(--accent2)">随机化</strong> 早期探索
+      </div>
+      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">剪枝效率高，对局面评估准确。配合走法排序和分支限制，能在有限深度内找到高质量走法。</p>
+
+      <h3 style="font-size:.88rem;font-weight:600;color:var(--accent);margin:16px 0 6px">🔬 PVS NegaMax · 精炼剪枝</h3>
+      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">Principal Variation Search（主变例搜索）是 Alpha-Beta 的进一步优化：假设第一个走法就是最优，后续走法用<strong>零窗口（Null Window）</strong>试探来快速证明或证伪，大幅减少搜索量。</p>
+      <div style="margin:6px 0 10px 0;padding:8px 12px;background:rgba(95,195,195,.06);border-radius:8px;font-size:.82rem;line-height:1.6">
+        <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录杀招 | <strong style="color:var(--accent2)">History 启发</strong> 全局走法评分 | <strong style="color:var(--accent2)">QSearch</strong> 静止搜索防水平线效应
+      </div>
+      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">相比标准 Alpha-Beta，PVS 在搜索深度相同时探索更高效，同等时间内等效深度更高。适合需要更强棋力的场景。</p>
+
+      <h3 style="font-size:.88rem;font-weight:600;color:var(--accent);margin:16px 0 6px">🎲 MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
+      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">与前三种算法截然不同的搜索范式——<strong>不依赖任何评估函数</strong>，而是通过大量随机模拟来评估走法优劣。四步循环迭代：</p>
+      <div style="margin:6px 0 10px 0;padding:8px 12px;background:rgba(200,140,255,.06);border-radius:8px;font-size:.82rem;line-height:1.6">
+        <strong style="color:#c88cff">SELECT</strong> 🡒 <strong style="color:#c88cff">EXPAND</strong> 🡒 <strong style="color:#c88cff">PLAYOUT</strong> 🡒 <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
+        <span style="font-size:.78rem">UCB1 平衡探索与利用 · 优先展开最有希望的走法 · 随机走子直到终局 · 反向传播更新统计</span>
+      </div>
+      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">完整树搜索：每棵子树独立存储棋盘状态，内层 UCB1 引导搜索聚焦最优分支，无需人为设计的评估函数就能发现 Alpha-Beta 不易察觉的非直觉走法。Rust + Rayon 根级并行，depth=1~10 对应 1200~12000 次迭代，树节点上限 3000 防内存暴涨。</p>
+    </div>
+  </div>
+</div>
+
+<!-- About Changelog page (二级) -->
+<div id="about-changelog" class="screen">
+  <button class="back" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll" id="changelogContainer">
+    <h2>更新详情</h2>
+  </div>
+</div>
+
+<!-- About License page (二级) -->
+<div id="about-license" class="screen">
+  <button class="back" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>许可证</h2>
+    <div class="about-card">
+      <h3>MIT License</h3>
+      <p>Copyright (c) 2026 ywnh1</p>
+      <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+      <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+      <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+    </div>
+  </div>
 </div>
 
 <!-- History Screen -->
 <div id="history" class="screen">
   <button class="back" onclick="Router.back()">← 返回</button>
   <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-    <h2 style="margin:0">📋 历史记录</h2>
+    <h2 style="margin:0">历史记录</h2>
       <div style="display:flex;gap:6px;align-items:center">
-        <button onclick="exportHistory()" style="background:rgba(95,195,195,.12);border:1px solid rgba(95,195,195,.2);color:var(--accent2);padding:6px 12px;border-radius:8px;font-size:.73rem;cursor:pointer;transition:.15s;font-weight:500" onmouseover="this.style.background='rgba(95,195,195,.2)'" onmouseout="this.style.background='rgba(95,195,195,.12)'">📤 导出</button>
-        <button onclick="document.getElementById('historyImportInput').click()" style="background:rgba(95,195,195,.12);border:1px solid rgba(95,195,195,.2);color:var(--accent2);padding:6px 12px;border-radius:8px;font-size:.73rem;cursor:pointer;transition:.15s;font-weight:500" onmouseover="this.style.background='rgba(95,195,195,.2)'" onmouseout="this.style.background='rgba(95,195,195,.12)'">📥 导入</button>
-        <button onclick="clearHistory()" style="background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.2);color:rgba(255,100,100,.9);padding:6px 10px;border-radius:8px;font-size:.73rem;cursor:pointer;transition:.15s;font-weight:500" onmouseover="this.style.background='rgba(255,80,80,.2)'" onmouseout="this.style.background='rgba(255,80,80,.12)'">🗑 清空</button>
+        <button class="glass-btn primary" onclick="exportHistory()">导出</button>
+        <button class="glass-btn primary" onclick="document.getElementById('historyImportInput').click()">导入</button>
+        <button class="glass-btn danger" onclick="clearHistory()">清空</button>
       </div>
   </div>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">所有对局记录</p>
@@ -880,7 +1071,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 <!-- AI Lobby -->
 <div id="aiLobby" class="screen">
   <button class="back" onclick="Router.back()">← 返回</button>
-  <h2>🤖 AI 对战</h2>
+  <h2>AI 对战</h2>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">选择对局配置</p>
 
   <!-- 棋盘大小 -->
@@ -925,14 +1116,20 @@ body{padding-top:env(safe-area-inset-top,20px)}
   <div class="form-row"><label>AI 算法</label>
     <div id="aiAlgorithmCards" class="alg-cards">
       <div class="alg-card selected" data-value="strategy">
-        <div class="alg-icon">⚡</div>
         <div class="alg-name">策略算法</div>
-        <div class="alg-desc">快速启发式搜索<br>推荐新手使用</div>
+        <div class="alg-desc">快速启发式搜索，推荐新手使用</div>
       </div>
       <div class="alg-card" data-value="alphabeta">
-        <div class="alg-icon">🧠</div>
         <div class="alg-name">Alpha-Beta 剪枝</div>
-        <div class="alg-desc">Rust+Rayon 多核加速<br>深度可调 棋力更强</div>
+        <div class="alg-desc">Rust + Rayon 多核加速，深度可调棋力更强</div>
+      </div>
+      <div class="alg-card" data-value="pvs">
+        <div class="alg-name">PVS NegaMax</div>
+        <div class="alg-desc">Principal Variation Search + Killer/History + 静止搜索</div>
+      </div>
+      <div class="alg-card" data-value="mcts">
+        <div class="alg-name">MCTS 蒙特卡洛</div>
+        <div class="alg-desc">基于随机模拟的树搜索，探索性强且无需评估函数</div>
       </div>
     </div>
   </div>
@@ -953,7 +1150,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 <!-- Eve Lobby -->
 <div id="eveLobby" class="screen">
   <button class="back" onclick="Router.back()">← 返回</button>
-  <h2>⚔️ AI 斗蛐蛐</h2>
+  <h2>AI 斗蛐蛐</h2>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">自定义 AI 阵容，观看 AI 互相博弈</p>
 
   <!-- 棋盘大小 -->
@@ -1001,7 +1198,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 <!-- Local Lobby -->
 <div id="localLobby" class="screen">
   <button class="back" onclick="Router.back()">← 返回</button>
-  <h2>👥 本地对战</h2>
+  <h2>本地对战</h2>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">选择对局配置</p>
 
   <!-- 棋盘大小 -->
@@ -1044,7 +1241,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 <div id="game" class="screen">
   <div class="top">
     <div class="top-left">
-      <button onclick="undoLastMove()" id="undoBtn" disabled>↩ 悔棋</button>
+      <button onclick="undoLastMove()" id="undoBtn" disabled>悔棋</button>
       <button onclick="togglePause()" id="pauseBtn">⏸ 暂停</button>
     </div>
     <div class="top-right">
@@ -1053,11 +1250,11 @@ body{padding-top:env(safe-area-inset-top,20px)}
   </div>
   <div id="playerBar" class="player-bar"></div>
   <div class="board-wrap"><div id="board"></div></div>
-  <div id="skipChainBtn" onclick="chainSkipAll=true">▶ 跳过动画</div>
+  <div id="skipChainBtn" onclick="chainSkipAll=true">跳过动画</div>
 </div>
 
 <!-- Pause Overlay -->
-<div id="pauseOverlay" class="settlement" style="display:none;z-index:998">
+<div id="pauseOverlay" class="settlement" style="display:none !important;z-index:998">
   <h2>⏸ 游戏暂停</h2>
   <div class="settlement-inner">
     <div id="pauseStats" class="stats-grid"></div>
@@ -1066,7 +1263,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
       <button class="btn-primary" onclick="resumeGame()" style="flex:1;padding:12px;font-size:1rem">▶ 继续游戏</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:4px;width:100%">
-      <button class="btn-danger" onclick="endGameNow()" style="flex:1">⛳ 结束游戏</button>
+      <button class="btn-danger" onclick="endGameNow()" style="flex:1">结束游戏</button>
     </div>
   </div>
 </div>
@@ -1080,13 +1277,28 @@ body{padding-top:env(safe-area-inset-top,20px)}
 
 
 <script>
-/* ═══════ 系统颜色模式监听（自动切换浅色/深色） ═══════ */
+/* ═══════ 页面初始化：确保暂停层隐藏、欢迎页显示 ═══════ */
+(function(){
+  // 防止 Tauri Android WebView 恢复旧状态导致暂停层误显示
+  try{
+    var _po=document.getElementById('pauseOverlay');
+    if(_po)_po.style.display='none';
+  }catch(e){}
+  // 确保只有 welcome 页面 active
+  try{
+    document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
+    var _w=document.getElementById('welcome');
+    if(_w)_w.classList.add('active');
+  }catch(e){}
+})();
+
+/* ═══════ 跟随系统颜色模式（仅读取 prefers-color-scheme） ═══════ */
 (function(){
   const meta=document.getElementById('metaThemeColor');
   const mq=window.matchMedia('(prefers-color-scheme: light)');
-  function updateTheme(){meta.content=mq.matches?'#eae8e0':'#0f0f13'}
-  updateTheme();
-  mq.addEventListener('change',updateTheme);
+  function sync(){meta.content=mq.matches?'#eae8e0':'#0f0f13'}
+  sync();
+  mq.addEventListener('change',sync);
 })();
 
 /* ==================== CONSTANTS ==================== */
@@ -1223,6 +1435,8 @@ const Router = {
     if (!page || this._current === id) return;
 
     const doSwitch = () => {
+      // 按钮 active 状态清理
+      try{document.activeElement?.blur()}catch(e){}
       // Leave current page
       if (this._current && this._registry[this._current]?.leave) {
         this._registry[this._current].leave();
@@ -1307,6 +1521,27 @@ Router.register('game', {
   leave() { document.body.style.background='' }
 });
 
+Router.register('about', {
+  back: 'welcome',
+  enter() { document.body.style.background=''; },
+  leave() {}
+});
+Router.register('about-ai', {
+  back: 'about',
+  enter() { document.body.style.background=''; },
+  leave() {}
+});
+Router.register('about-changelog', {
+  back: 'about',
+  enter() { document.body.style.background=''; renderChangelogCards(); },
+  leave() { var cc=document.getElementById('changelogContainer');if(cc)cc.querySelectorAll('.cl-card').forEach(function(e){e.remove()}); }
+});
+Router.register('about-license', {
+  back: 'about',
+  enter() { document.body.style.background=''; },
+  leave() {}
+});
+
 Router.register('checkout', {
   back() { return Router._checkoutPrev || 'welcome'; },
   enter(prevPage) { document.body.style.background=''; Router._checkoutPrev = prevPage || 'welcome'; },
@@ -1322,7 +1557,7 @@ function goHome() {
   Router.navigate('welcome');
 }
 function exitApp(){
-  try { window.__TAURI_INTERNALS__?.invoke('exit_app').catch(()=>{}); } catch(e){}
+  try { window.__TAURI_INTERNALS__?.invoke('exit_app').catch(e=>console.warn('Exit app failed:', e)); } catch(e){console.warn('Exit app error:', e)}
   exitGame();
 }
 function generateEveConfig(){
@@ -1345,12 +1580,14 @@ function generateEveConfig(){
         algWrap.querySelectorAll('.am-btn').forEach(x=>x.classList.remove('selected'));
         this.classList.add('selected');
         algVal=this.dataset.value;
-        depWrap.style.display=algVal==='alphabeta'?'flex':'none';
+        depWrap.style.display=(algVal==='alphabeta'||algVal==='pvs'||algVal==='mcts')?'flex':'none';
       };
       return b;
     }
     algWrap.appendChild(makeAlgBtn('strategy','策略'));
     algWrap.appendChild(makeAlgBtn('alphabeta','A-B'));
+    algWrap.appendChild(makeAlgBtn('pvs','PVS'));
+    algWrap.appendChild(makeAlgBtn('mcts','MCTS'));
     // 深度迷你 +/- 
     let depWrap=document.createElement('div');depWrap.className='depth-mini hidden';
     let depVal=2;
@@ -1431,9 +1668,9 @@ function loadHistoryList(){
       div.style.cursor='pointer';
       div.onclick=function(){showHistoryDetail(r)};
       div.innerHTML=`
-        <div class="h-time">🕐 ${r.time}</div>
+        <div class="h-time">${r.time}</div>
         <div class="h-info">${modeLabel} · ${r.boardSize}×${r.boardSize} · ${r.playerCount}人${r.aiCount>0?(' · AI×'+r.aiCount):''}</div>
-        <div class="h-winner" style="color:${winnerColor}">🏆 ${winnerName}</div>
+        <div class="h-winner" style="color:${winnerColor}">${winnerName}</div>
         <div class="h-details">${r.aiAlgorithm?('算法: '+r.aiAlgorithm):''}${r.aiDepth>0?(' · 深度: '+r.aiDepth):''}</div>
       `;
       el.appendChild(div);
@@ -1453,8 +1690,13 @@ function exportHistory(){
       if(res){
         const isFallback = res.startsWith('fallback:');
         const bytes = isFallback ? res.slice(9) : res;
-        document.getElementById('historyList').insertAdjacentHTML('afterbegin',
-          '<div class="history-item" style="border-color:var(--accent2);animation:fadeIn .3s"><div class="h-time">✅ 导出成功</div><div class="h-info">' + bytes + ' 字节</div></div>');
+        const info = document.createElement('div');
+        info.className = 'history-item';
+        info.style.borderColor = 'var(--accent2)';
+        info.style.animation = 'fadeIn .3s';
+        info.innerHTML = '<div class="h-time">导出成功</div><div class="h-info"></div>';
+        info.querySelector('.h-info').textContent = bytes + ' 字节';
+        document.getElementById('historyList').insertAdjacentElement('afterbegin', info);
       }
     });
   }).catch(e=>{
@@ -1561,7 +1803,7 @@ function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
     }
   }).then(() => {
     // 保存成功后清理磁盘上的回合数据（不再需要）
-    tauriInvoke('clear_round_history').catch(()=>{});
+    tauriInvoke('clear_round_history').catch(e=>console.warn('Clear round history after save failed:', e));
   }).catch(e=>console.warn('Save history failed:', e));
 }
 
@@ -1569,7 +1811,7 @@ function toggleAIDepth(){
   let alg=getSelStr('aiAlgorithmCards');
   let row=document.getElementById('aiDepthRow');
   let slider=document.getElementById('aiDepthSlider');
-  if(alg==='alphabeta'){
+  if(alg==='alphabeta'||alg==='pvs'||alg==='mcts'){
     row.style.display='block';
     if(slider)slider.disabled=false;
   }else{
@@ -1688,7 +1930,7 @@ async function flushOverflowHistory(){
   try{existing=await tauriInvoke('load_round_history')}catch(e){}
   const merged=[...existing,...overflow];
   for(let i=0;i<merged.length;i++)merged[i].turn=i;
-  await tauriInvoke('save_round_history',{data:merged}).catch(()=>{});
+  await tauriInvoke('save_round_history',{data:merged}).catch(e=>console.warn('Flush overflow history failed:', e));
 }
 
 /// 把所有内存历史刷到磁盘，返回完整历史（磁盘+内存合并排序）
@@ -1699,7 +1941,7 @@ async function flushAndGetFullHistory(){
     const offset=existing.length;
     const memOff=gameHistory.map((h,i)=>({...h,turn:offset+i}));
     const merged=[...existing,...memOff];
-    await tauriInvoke('save_round_history',{data:merged}).catch(()=>{});
+    await tauriInvoke('save_round_history',{data:merged}).catch(e=>console.warn('Save full history failed:', e));
     gameHistory=[];
   }
   let disk=[];
@@ -1710,7 +1952,7 @@ async function flushAndGetFullHistory(){
 /// 新游戏时清空历史
 function resetRoundHistory(){
   gameHistory=[];
-  tauriInvoke('clear_round_history').catch(()=>{});
+  tauriInvoke('clear_round_history').catch(e=>console.warn('Clear round history failed:', e));
 }
 
 async function processClick(b,s,x,y,pl,anim,playerColor){
@@ -1839,6 +2081,7 @@ function processClickSync(b,s,x,y,pl){
 /* ==================== RENDER ==================== */
 // 棋盘状态缓存，用于增量更新
 let _boardCache=null;
+let _lastRenderPlayer=-1;
 
 function clearBoardDOM(){
   // 强制清空棋盘 DOM（用于游戏结束/重开时确保画面刷新）
@@ -1881,6 +2124,8 @@ function addParticles(el,color,count){
 }
 function renderBoard(force,popX,popY){
   let bd=document.getElementById('board');
+  bd.setAttribute('role','grid');
+  bd.setAttribute('aria-label','棋盘');
   if(force||cells.length!==size){
     bd.replaceChildren();
     void bd.offsetHeight;
@@ -1890,6 +2135,10 @@ function renderBoard(force,popX,popY){
       let row=[];
       for(let j=0;j<size;j++){
         let el=document.createElement('div');el.className='cell';
+        el.setAttribute('role','gridcell');
+        el.setAttribute('tabindex','-1');
+        const posLabel = `第${i+1}行第${j+1}列`;
+        el.setAttribute('aria-label', `${posLabel}，空位`);
         el.onclick=()=>handleClick(i,j);
         bd.appendChild(el);row.push(el);
       }
@@ -1902,8 +2151,17 @@ function renderBoard(force,popX,popY){
   for(let i=0;i<size;i++)for(let j=0;j<size;j++){
     let el=cells[i][j],d=board[i][j];
     let prev=_boardCache?.[i]?.[j];
+    // 更新 aria-label（仅当格子状态变化时）
+    const posLabel = `第${i+1}行第${j+1}列`;
+    if(force||!prev||prev.owner!==d.owner||prev.count!==d.count){
+      if(d.owner!==null){
+        el.setAttribute('aria-label', `${posLabel}，玩家${d.owner+1}的${d.count}级棋子`);
+      }else{
+        el.setAttribute('aria-label', `${posLabel}，空位`);
+      }
+    }
     // 只有变化或有动画时才更新
-    if(force||!prev||prev.owner!==d.owner||prev.count!==d.count||prev.curPlayer!==curPlayer){
+    if(force||!prev||prev.owner!==d.owner||prev.count!==d.count||_lastRenderPlayer!==curPlayer){
       el.innerHTML='';
       if(d.owner!==null){
         if(d.owner===curPlayer){
@@ -1917,8 +2175,9 @@ function renderBoard(force,popX,popY){
       }
     }
   }
-  // 缓存当前状态
-  _boardCache=board.map(row=>row.map(c=>({owner:c.owner,count:c.count,curPlayer})));
+  // 缓存当前状态（curPlayer 全局一致，不逐格存储以节省内存）
+  _boardCache=board.map(row=>row.map(c=>({owner:c.owner,count:c.count})));
+  _lastRenderPlayer=curPlayer;
 }
 function drawDots(p,n){
   let cx=50,cy=50,r=30;
@@ -2178,16 +2437,20 @@ async function triggerAI(){
   if(!aiPlayers.has(curPlayer))return;
   saveUndoState();
   aiThinking=true;
-  showMsg(`🤔 AI ${curPlayer+1} 思考中...`,'');
+  showMsg(`AI ${curPlayer+1} 思考中...`,'');
   await sleep(50);
   let move;
   // 获取当前 AI 的配置（eve 模式用 per-AI config，其他模式用全局配置）
   let alg = aiConfigs[curPlayer] ? aiConfigs[curPlayer].algorithm : aiAlgorithm;
   let dep = aiConfigs[curPlayer] ? aiConfigs[curPlayer].depth : aiDepth;
-  if(alg==='alphabeta'){
+  if(alg==='alphabeta'||alg==='pvs'||alg==='mcts'){
     // 调用 Rust 引擎（Rayon 多线程优化）
     try {
-      const result = await window.__TAURI_INTERNALS__.invoke('ai_move', {
+      let cmd;
+      if(alg==='mcts'){cmd='ai_move_mcts';}
+      else if(alg==='pvs'){cmd='ai_move_v2';}
+      else{cmd='ai_move';}
+      const args = {
         board: board,
         size: size,
         player: curPlayer,
@@ -2196,7 +2459,9 @@ async function triggerAI(){
         maxPlayers: maxPlayers,
         gameCount: gameCount,
         firstMovePos: firstMovePos,
-      });
+      };
+      if(cmd==='ai_move_v2')args.algorithm=alg;
+      const result = await window.__TAURI_INTERNALS__.invoke(cmd, args);
       if (result && result.length === 2) {
         move = [result[0], result[1]];
       }
@@ -2207,6 +2472,8 @@ async function triggerAI(){
   }else{
     move=aiFindMove(curPlayer,size,board);
   }
+  // 缓存 AI 走法到 undo 栈顶，悔棋时直接重放无需重算
+  if(undoStack.length>0)undoStack[undoStack.length-1].aiMove=move;
   if(!move){
     showMsg(`AI ${curPlayer+1} 无合法落子，跳过`,'error');
     aiThinking=false;
@@ -2400,15 +2667,18 @@ async function showPauseOverlay(){
   // 移动图表到 chartArea
   let chartBoxes=statsGrid.querySelectorAll('.chart-box');
   chartBoxes.forEach(b=>chartArea.appendChild(b));
-  // ⚠️ 强制重绘：避免 Canvas 在移动后尺寸变化导致拉伸
+  // 被动监听：ResizeObserver 替代 requestAnimationFrame 轮询
   chartBoxes.forEach(b=>{
     let cv=b.querySelector('canvas');
     if(cv&&cv.id&&_chartCtx[cv.id]){
-      (function repoll(){
+      let ro=new ResizeObserver(()=>{
         let r=cv.getBoundingClientRect();
-        if(r.width>0&&r.height>0)drawLineChart(cv,_chartCtx[cv.id].history,_chartCtx[cv.id].colorNames,_chartCtx[cv.id].colors,_chartCtx[cv.id].valueKey);
-        else requestAnimationFrame(repoll);
-      })();
+        if(r.width>0&&r.height>0){
+          drawLineChart(cv,_chartCtx[cv.id].history,_chartCtx[cv.id].colorNames,_chartCtx[cv.id].colors,_chartCtx[cv.id].valueKey);
+          ro.disconnect();
+        }
+      });
+      ro.observe(cv);
     }
   });
 }
@@ -2421,6 +2691,7 @@ function saveUndoState(){
     eliminatedPlayers: new Set(eliminatedPlayers),
     chainStats: JSON.parse(JSON.stringify(chainStats)),
     maxChainOverall: {...maxChainOverall},
+    aiMove: null,  // AI 缓存走法，悔棋时无需重算
   });
   // 最多保留 50 步防止内存溢出
   if(undoStack.length>50)undoStack.shift();
@@ -2442,8 +2713,56 @@ function undoLastMove(){
   setBg(curPlayer);
   updateUndoBtn();
   showMsg('已撤销上一步','');
-  // 如果当前轮到 AI，触发 AI
+  // 如果当前轮到 AI 且有缓存走法，直接重放无需重算
+  if(aiPlayers.has(curPlayer)&&!gameOver&&state.aiMove){
+    replayAiMove(state.aiMove);
+    return;
+  }
+  // 如果当前轮到 AI（无缓存），触发 AI
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),300);
+}
+
+/** 重放缓存 AI 走法（直接应用，节约 Rust 计算开销） */
+async function replayAiMove(move){
+  if(!move||move.length!==2)return;
+  // 给用户反应时间，看清悔棋后的局面
+  await sleep(300);
+  let[x,y]=move;
+  let el=cells?.[x]?.[y];
+  if(el)addRipple(el);
+  playClick();
+  let elim;
+  try{
+    let result=await tauriInvoke('process_move',{
+      board:board,size:size,x:x,y:y,
+      player:curPlayer,maxPlayers:maxPlayers
+    });
+    elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer]);
+    board=result.board;
+    elim=result.eliminated||[];
+  }catch(e){
+    elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer]);
+  }
+  for(let e of elim){eliminatedPlayers.add(e);playElim()}
+  recordHistory();
+  renderBoard(true);
+  let alive=[];
+  for(let p=0;p<maxPlayers;p++){
+    if(eliminatedPlayers.has(p))continue;
+    alive.push(p);
+  }
+  if(alive.length<=1){
+    gameOver=true;
+    playGameOver();
+    showSettlement(alive[0],COLOR_NAMES,gameHistory);
+    return;
+  }
+  let idx=alive.indexOf(curPlayer);
+  if(idx<0)idx=0;
+  curPlayer=alive[(idx+1)%alive.length];
+  renderPlayerBar();
+  setBg(curPlayer);
+  if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
 }
 function updateUndoBtn(){
   let btn=document.getElementById('undoBtn');
@@ -2470,10 +2789,14 @@ function resumeGame(){
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),300);
 }
 async function endGameNow(){
-  if(gameOver)return;
   // 关闭暂停覆盖层
   hidePauseOverlay();
   isPaused=false;
+  if(gameOver){
+    // 如果游戏已经结束，直接回到主菜单
+    exitGame();
+    return;
+  }
   gameOver=true;
   updateUndoBtn();
   let bestP = 0, bestCnt = -1;
@@ -2670,10 +2993,10 @@ function renderGameCharts(container, history, opts){
   const lastSnap=history.length>0?history[history.length-1].snapshot:{};
   if(showTitle&&winner!==null&&winner!==undefined){
     let t=document.createElement('h2');
-    t.innerHTML=`🏆 <span class="winner-color" style="background:${colors[winner]||'#888'}"></span>${cNames[winner]||getPlayerLabel(winner)} 获胜`;
+    t.innerHTML=`<span class="winner-color" style="background:${colors[winner]||'#888'}"></span>${cNames[winner]||getPlayerLabel(winner)} 获胜`;
     container.appendChild(t);
   }else if(showTitle&&winner===undefined){
-    let t=document.createElement('h2');t.textContent='📊 对局统计';container.appendChild(t);
+    let t=document.createElement('h2');t.textContent='对局统计';container.appendChild(t);
   }
   let grid=document.createElement('div');grid.className='stats-grid';
   let active=[];
@@ -2688,8 +3011,8 @@ function renderGameCharts(container, history, opts){
     let card=document.createElement('div');card.className='stat-card';
     if(pid===winner)card.style.border=`1px solid ${colors[pid]||'#888'}`;
     let cs=chainStats&&chainStats[pid];
-    let csStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">💥 连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
-    card.innerHTML=`<div class="name"><span class="color-dot" style="background:${colors[pid]||'#888'}"></span>${cNames[pid]||getPlayerLabel(pid)} ${pid===winner?'👑':''}</div>
+    let csStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
+    card.innerHTML=`<div class="name"><span class="color-dot" style="background:${colors[pid]||'#888'}"></span>${cNames[pid]||getPlayerLabel(pid)} ${pid===winner?' ★':''}</div>
       <div class="num" style="color:${colors[pid]||'#888'}">${pieces}</div><div class="lbl">棋子</div>
       <div class="num" style="color:${colors[pid]||'#888'}">${points}</div><div class="lbl">点数</div>${csStr}`;
     grid.appendChild(card);
@@ -2698,17 +3021,24 @@ function renderGameCharts(container, history, opts){
   if(maxChain&&maxChain.player!==null&&maxChain.length>0){
     let ci=document.createElement('p');
     ci.style.cssText='font-size:.75rem;color:var(--dim);margin:4px 0;text-align:center;';
-    ci.innerHTML=`🔥 最高连爆：<span style="color:${colors[maxChain.player]||'#888'}">${cNames[maxChain.player]||getPlayerLabel(maxChain.player)}</span> 触发 <strong>${maxChain.length}</strong> 连爆`;
+    // 使用 DOM 方法避免 XSS
+    ci.innerHTML='最高连爆：<span id="maxChainColor"></span> 触发 <strong></strong> 连爆';
+    const colorSpan=ci.querySelector('span');
+    if(colorSpan)colorSpan.style.color=colors[maxChain.player]||'#888';
+    const strongEl=ci.querySelector('strong');
+    if(strongEl)strongEl.textContent=String(maxChain.length);
+    const nameText=document.createTextNode(cNames[maxChain.player]||getPlayerLabel(maxChain.player));
+    if(colorSpan)colorSpan.appendChild(nameText);
     container.appendChild(ci);
   }
   if(history&&history.length>=2){
     let id1='cP_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     let id2='cPt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     let b1=document.createElement('div');b1.className='chart-box';
-    b1.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id1}')">📊 棋子数变化 🔍</h4><canvas id="${id1}" onclick="showFullscreenChart('${id1}')" style="cursor:pointer"></canvas>`;
+    b1.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id1}')">棋子数变化 🔍</h4><canvas id="${id1}" onclick="showFullscreenChart('${id1}')" style="cursor:pointer"></canvas>`;
     container.appendChild(b1);
     let b2=document.createElement('div');b2.className='chart-box';
-    b2.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id2}')">📊 点数变化 🔍</h4><canvas id="${id2}" onclick="showFullscreenChart('${id2}')" style="cursor:pointer"></canvas>`;
+    b2.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id2}')">点数变化 🔍</h4><canvas id="${id2}" onclick="showFullscreenChart('${id2}')" style="cursor:pointer"></canvas>`;
     container.appendChild(b2);
     // 等待 Canvas 可见后再绘制（兼容 Router 页面过渡延迟）
     function drawWhenReady(cid,h,cn,co,k){
@@ -2819,9 +3149,9 @@ async function showSettlement(winner,colorNames,history){
   // 设置外框标题（放在玻璃框上方，作为页面固定标题）
   const titleEl = document.getElementById('chkOuterTitle');
   if(winner!==null&&winner!==undefined){
-    titleEl.innerHTML = `🏆 <span class="winner-color" style="background:${COLORS[winner]||'#888'}"></span> ${colorNames?.[winner]||getPlayerLabel(winner)} 获胜`;
+    titleEl.innerHTML = `<span class="winner-color" style="background:${COLORS[winner]||'#888'}"></span> ${colorNames?.[winner]||getPlayerLabel(winner)} 获胜`;
   }else{
-    titleEl.textContent = '📊 对局统计';
+    titleEl.textContent = '对局统计';
   }
   // 渲染到 #checkout 页面（包 settlement 容器使 CSS 选择器生效）
   const prevPage = 'welcome';
@@ -2849,9 +3179,14 @@ function showHistoryDetail(r){
   // 设置外框标题
   const titleEl = document.getElementById('chkOuterTitle');
   if(r.winner!==null&&r.winner!==undefined){
-    titleEl.innerHTML = `🏆 <span class="winner-color" style="background:${COLORS[r.winner]||'#888'}"></span> ${r.colorNames?.[r.winner]||'玩家 '+(r.winner+1)} 获胜`;
+    // 使用 DOM 方法避免 XSS：用户数据只通过 textContent 插入
+    titleEl.innerHTML = '<span class="winner-color"></span> 获胜';
+    const wSpan = titleEl.querySelector('.winner-color');
+    if(wSpan) wSpan.style.background = COLORS[r.winner]||'#888';
+    const wName = document.createTextNode(r.colorNames?.[r.winner]||'玩家 '+(r.winner+1));
+    titleEl.insertBefore(wName, titleEl.lastChild);
   }else{
-    titleEl.textContent = '📊 对局统计';
+    titleEl.textContent = '对局统计';
   }
   const content = document.getElementById('checkoutContent');
   content.innerHTML = '<div class="settlement"><div class="settlement-inner" id="chkInner"></div></div>';
@@ -2959,18 +3294,23 @@ function showFullscreenChart(canvasId){
       overlay.remove();
     }
   };
-  // ------- 双指缩放（touch）-------
+  // ------- 双指缩放 + 单指平移（touch）-------
   bigCanvas.addEventListener('touchstart',e=>{
+    e.preventDefault();
     if(e.touches.length===2){
-      e.preventDefault();
       let dx=e.touches[0].clientX-e.touches[1].clientX;
       let dy=e.touches[0].clientY-e.touches[1].clientY;
       lastDist=Math.sqrt(dx*dx+dy*dy);
+    }else if(e.touches.length===1&&scale>1){
+      let t=e.touches[0];
+      isDragging=true;
+      dragStartX=t.clientX;dragStartY=t.clientY;
+      panStartX=tx;panStartY=ty;
     }
   },{passive:false});
   bigCanvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
     if(e.touches.length===2){
-      e.preventDefault();
       let dx=e.touches[0].clientX-e.touches[1].clientX;
       let dy=e.touches[0].clientY-e.touches[1].clientY;
       let dist=Math.sqrt(dx*dx+dy*dy);
@@ -2980,20 +3320,17 @@ function showFullscreenChart(canvasId){
         applyTransform();
       }
       lastDist=dist;
-    }else if(e.touches.length===1&&scale>1){
-      // 单指平移（缩放后才可拖动）
+    }else if(e.touches.length===1&&isDragging&&scale>1){
       let t=e.touches[0];
-      if(!isDragging){
-        isDragging=true;
-        dragStartX=t.clientX;dragStartY=t.clientY;
-        panStartX=tx;panStartY=ty;
-      }
       tx=panStartX+(t.clientX-dragStartX);
       ty=panStartY+(t.clientY-dragStartY);
       applyTransform();
     }
   },{passive:false});
-  bigCanvas.addEventListener('touchend',()=>{lastDist=0;isDragging=false});
+  bigCanvas.addEventListener('touchend',e=>{
+    e.preventDefault();
+    lastDist=0;isDragging=false
+  },{passive:false});
   // ------- 鼠标滚轮缩放 -------
   overlay.addEventListener('wheel',e=>{
     e.preventDefault();
@@ -3006,7 +3343,7 @@ function showFullscreenChart(canvasId){
 /* ==================== GAME ACTIONS ==================== */
 function exitGame(){
   // 刷盘残留历史再退出，清理磁盘回合数据
-  if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(()=>{})}
+  if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(e=>console.warn('Clear round history on exit failed:', e))}
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
   aiPlayers=new Set();eliminatedPlayers=new Set();gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;undoStack=[];
@@ -3023,6 +3360,30 @@ function exitGame(){
   Router.navigate('welcome');
 }
 
+/* ==================== ABOUT ==================== */
+function renderChangelogCards(){
+  var container=document.getElementById('changelogContainer');
+  if(!container)return;
+  var versions=[
+    {v:'v2.3.0-beta · 第 9 版',desc:'Liquid Glass 主题优化：虹彩渐变玻璃、流体动画曲线、统一圆角与阴影体系、环境光晕背景'},
+    {v:'v2.3.0-beta · 第 8 版',desc:'关于页重构：行内显示版本信息，长内容改为二级页面导航，统一玻璃主题'},
+    {v:'v2.3.0-beta · 第 7 版',desc:'界面精简：减少 emoji 使用量（33 处替换），保留品牌标识和标准 UI 符号'},
+    {v:'v2.3.0-beta · 第 6 版',desc:'暂停页显示修复：防止 Android WebView 恢复旧状态，新增返回主菜单按钮'},
+    {v:'v2.3.0-beta · 第 5 版',desc:'UI/CSS 修复：补全缺失 CSS 变量 --glass-w-015，模态框背景适配浅色模式'},
+    {v:'v2.3.0-beta · 第 4 版',desc:'无障碍优化：移除禁止缩放，新增 prefers-reduced-motion，触摸达标，屏幕阅读器支持'},
+    {v:'v2.3.0-beta · 第 3 版',desc:'前端优化：消除 7 处静默错误吞噬，优化棋盘缓存内存使用'},
+    {v:'v2.3.0-beta · 第 2 版',desc:'安全性增强：密码移除硬编码、启用 CSP、修复 3 处 XSS 向量'},
+    {v:'v2.3.0-beta · 第 1 版',desc:'Rust 后端：修复 unset 空实现、u8 溢出防护、文件写入原子化、版本号统一'}
+  ];
+  for(var i=0;i<versions.length;i++){
+    var card=document.createElement('div');card.className='cl-card';
+    var vEl=document.createElement('div');vEl.className='cl-version';vEl.textContent=versions[i].v;
+    var dEl=document.createElement('div');dEl.className='cl-desc';dEl.textContent=versions[i].desc;
+    card.appendChild(vEl);card.appendChild(dEl);
+    container.appendChild(card);
+  }
+}
+
 /* ==================== UTILS ==================== */
 function openModal(id){document.getElementById(id).classList.add('show')}
 function closeModal(id){document.getElementById(id).classList.remove('show')}
@@ -3033,13 +3394,16 @@ function showMsg(t,c){
 
 window.addEventListener('popstate',()=>{
   const cur = Router._current;
-  // 在结算/详情页: 使用 Router.back() 回到前一页（checkout 的 back 返回 _checkoutPrev）
-  if(cur === 'checkout'){ Router.back(); return; }
+  // 全屏图表覆盖层关闭（如果存在）
+  var fsOverlay=document.querySelector('div[style*="z-index:2000"]');
+  if(fsOverlay){ fsOverlay.remove(); return; }
+  // 所有二级详情页: 使用 Router.back() 回退
+  if(cur === 'checkout'||cur === 'about-ai'||cur === 'about-changelog'||cur === 'about-license'){ Router.back(); return; }
   // 游戏中按返回键 → 退出游戏
   if(gameMode && gameMode !== 'welcome' && cur === 'game'){ exitGame(); return; }
-  // 其他页面: 根据 hash 导航
+  // 其他页面（about, history, lobbies）: 根据 hash 导航
   const h=location.hash.slice(1);
-  if(h&&document.getElementById(h))Router.navigate(h);else Router.navigate('welcome');
+  if(h&&document.getElementById(h)&&h!==cur)Router.navigate(h);else if(cur!=='welcome')Router.navigate('welcome');
 });
 </script>
 </body>
