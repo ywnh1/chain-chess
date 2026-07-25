@@ -1,6 +1,6 @@
 [package]
 name = "chain-chess"
-version = "2.3.5-beta"
+version = "2.3.7-beta"
 description = "连锁棋 - AI & 本地对战"
 authors = ["ywnh1"]
 edition = "2021"
@@ -11,6 +11,13 @@ crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = 3
+strip = true
 
 [dependencies]
 tauri = { version = "2", features = ["custom-protocol"] }

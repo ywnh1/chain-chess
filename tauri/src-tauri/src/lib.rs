@@ -13,7 +13,7 @@ use alpha_beta_pruning::{AlphaBeta, Grade};
 
 // ─── Board types ───
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct Cell {
     pub owner: Option<usize>,
     pub count: u8,
@@ -185,12 +185,34 @@ async fn ai_move_v2(
     let result = tauri::async_runtime::spawn_blocking(move || {
         if algorithm == "pvs" {
             // PVS (NegaMax) + Killer/History + QSearch
-            let mut searcher = PvsSearcher::new();
+            let mut searcher = PvsSearcher::new(player);
             searcher.find_best(&board, size, player, max_players, &eliminated, depth)
         } else {
             // 默认使用 Alpha-Beta（原 find_best_move）
             find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos)
         }
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?;
+
+    match result {
+        Some((x, y)) => Ok([x, y]),
+        None => Err("No valid move".into()),
+    }
+}
+
+#[tauri::command]
+async fn ai_move_strategy(
+    board: GameBoard,
+    size: usize,
+    player: usize,
+    eliminated: Vec<usize>,
+    max_players: usize,
+    game_count: u32,
+    first_move_pos: Option<[usize; 2]>,
+) -> Result<[usize; 2], String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        find_best_move_strategy(&board, size, player, &eliminated, max_players, game_count, first_move_pos)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -309,6 +331,26 @@ async fn clear_game_history(
     if path.exists() {
         fs::remove_file(&*path).map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+/// 批量删除历史记录（多选删除）
+#[tauri::command]
+async fn delete_game_history_records(
+    state: tauri::State<'_, AppState>,
+    record_ids: Vec<u64>,
+) -> Result<(), String> {
+    let path = state.history_file.lock().map_err(|e| e.to_string())?;
+    let mut history: Vec<HistoryRecord> = if path.exists() {
+        let content = fs::read_to_string(&*path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        return Ok(());
+    };
+    let ids_set: std::collections::HashSet<u64> = record_ids.into_iter().collect();
+    history.retain(|r| !ids_set.contains(&r.id));
+    let json = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
+    atomic_write(&*path, &json)?;
     Ok(())
 }
 
@@ -481,6 +523,7 @@ pub fn run() {
             ai_move,
             ai_move_v2,
             ai_move_mcts,
+            ai_move_strategy,
             process_move,
             save_game_history,
             load_game_history,
@@ -488,6 +531,7 @@ pub fn run() {
             export_game_history_dialog,
             clear_game_history,
             delete_game_history_record,
+            delete_game_history_records,
             save_game_state,
             load_game_state,
             clear_game_state,
@@ -616,12 +660,12 @@ fn eval_board(board: &GameBoard, player: usize, game_count: u32) -> i32 {
 
     let base = (my_score - opp_score) * 2 + (my_territory - opp_territory);
 
-    // 早期游戏（<7局）加入随机值，增加探索性
-    // 游戏开始时随机值较大，逐渐减小，5-7局后归零
-    let random_scale = if game_count < 5 {
-        (5 - game_count) as f64 * 8.0
-    } else if game_count < 7 {
-        (7 - game_count) as f64 * 2.0
+    // 开场（前几局）增加随机性，探索不同的走法
+    // 游戏场次数越少随机值越大，5局后归零
+    let random_scale = if game_count < 3 {
+        (3 - game_count) as f64 * 20.0   // 第1局~40, 第2局~20
+    } else if game_count < 5 {
+        (5 - game_count) as f64 * 5.0    // 第3局~10, 第4局~5
     } else {
         0.0
     };
@@ -709,9 +753,19 @@ struct GameState {
 
 impl AlphaBeta<(usize, usize)> for GameState {
     fn evaluate(&self) -> Grade {
+        // 终局判断：自己被淘汰→Min，自己获胜→Max
+        if self.eliminated.contains(&self.ai_player) {
+            return Grade::Min;
+        }
+        let alive: Vec<usize> = (0..self.max_players)
+            .filter(|p| !self.eliminated.contains(p) && has_pieces(&self.board, *p))
+            .collect();
+        if alive.len() == 1 && alive[0] == self.ai_player {
+            return Grade::Max;
+        }
+        // 非终局：按点数和棋子数打分
         Grade::Score(eval_board(&self.board, self.ai_player, self.game_count) as i64)
     }
-
     fn get_moves(&self) -> Vec<(usize, usize)> {
         get_moves(&self.board, self.sz, self.player, None)
     }
@@ -854,13 +908,15 @@ impl ElimSet {
 struct PvsSearcher {
     killers: [[Option<(usize, usize)>; PVS_MAX_DEPTH]; 2],
     history: [[i32; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
+    ai_player: usize,
 }
 
 impl PvsSearcher {
-    fn new() -> Self {
+    fn new(ai_player: usize) -> Self {
         Self {
             killers: [[None; PVS_MAX_DEPTH]; 2],
             history: [[0; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
+            ai_player,
         }
     }
 
@@ -879,13 +935,11 @@ impl PvsSearcher {
                 if c.owner == Some(player) && c.count < 4 {
                     let mut score = c.count as i64 * 10;
                     if c.count >= 3 { score += 100; }
-                    // 邻居对手分数
-                    for &(ni, nj) in &nbrs(i, j, sz) {
-                        let nc = &board[ni][nj];
-                        if nc.owner.is_some() && nc.owner != Some(player) {
-                            score += nc.count as i64 * 5;
-                        }
-                    }
+                    // 邻居对手分数（手动展开，避免 Vec 分配）
+                    if i > 0 { let nc = &board[i-1][j]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
+                    if i + 1 < sz { let nc = &board[i+1][j]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
+                    if j > 0 { let nc = &board[i][j-1]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
+                    if j + 1 < sz { let nc = &board[i][j+1]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
                     // Killer bonus
                     if Some((i, j)) == k0 { score += 1_000_000; }
                     else if Some((i, j)) == k1 { score += 500_000; }
@@ -900,13 +954,11 @@ impl PvsSearcher {
             for i in 0..sz { for j in 0..sz {
                 if board[i][j].owner.is_none() && !is_in_any_restricted_zone(board, sz, i, j) {
                     let mut score = 0i64;
-                    // 邻居对手分数
-                    for &(ni, nj) in &nbrs(i, j, sz) {
-                        let nc = &board[ni][nj];
-                        if nc.owner.is_some() && nc.owner != Some(player) {
-                            score += nc.count as i64 * 5;
-                        }
-                    }
+                    // 邻居对手分数（手动展开，避免 Vec 分配）
+                    if i > 0 { let nc = &board[i-1][j]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
+                    if i + 1 < sz { let nc = &board[i+1][j]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
+                    if j > 0 { let nc = &board[i][j-1]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
+                    if j + 1 < sz { let nc = &board[i][j+1]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
                     moves.push((score, (i, j)));
                 }
             }}
@@ -927,7 +979,17 @@ impl PvsSearcher {
         beta: i32,
         depth: i32,
     ) -> i32 {
-        if depth >= 20 { return eval_board(board, player, 0); }
+        // 终局判断
+        if elim.contains(self.ai_player) {
+            return if player == self.ai_player { i32::MIN + 1000 } else { i32::MAX - 1000 };
+        }
+        let alive_cnt = (0..max_players)
+            .filter(|p| !elim.contains(*p) && has_pieces(board, *p))
+            .count();
+        if alive_cnt <= 1 {
+            return if player == self.ai_player { i32::MAX - 1000 } else { i32::MIN + 1000 };
+        }
+        if depth >= 8 { return eval_board(board, player, 0); }
         let stand_pat = eval_board(board, player, 0);
         if stand_pat >= beta { return beta; }
         let mut alpha = if stand_pat > alpha { stand_pat } else { alpha };
@@ -966,9 +1028,24 @@ impl PvsSearcher {
         depth: usize,
         mut alpha: i32,
         beta: i32,
+        use_qsearch: bool,
     ) -> i32 {
+        // 终局判断：AI被淘汰→大负，AI获胜→大正
+        if elim.contains(self.ai_player) {
+            return if player == self.ai_player { i32::MIN + 1000 } else { i32::MAX - 1000 };
+        }
+        let alive_cnt = (0..max_players)
+            .filter(|p| !elim.contains(*p) && has_pieces(board, *p))
+            .count();
+        if alive_cnt <= 1 {
+            return if player == self.ai_player { i32::MAX - 1000 } else { i32::MIN + 1000 };
+        }
         if depth == 0 {
-            return self.quiescence(board, sz, player, max_players, elim, alpha, beta, 0);
+            if use_qsearch {
+                return self.quiescence(board, sz, player, max_players, elim, alpha, beta, 0);
+            } else {
+                return eval_board(board, player, 0);
+            }
         }
 
         let moves = self.get_moves_ordered(board, sz, player, depth);
@@ -985,11 +1062,11 @@ impl PvsSearcher {
             let next = next_live_player_es(&child, sz, player, child_elim, max_players);
 
             let score = if idx == 0 {
-                -self.pvs(&child, sz, next, max_players, child_elim, depth - 1, -beta, -alpha)
+                -self.pvs(&child, sz, next, max_players, child_elim, depth - 1, -beta, -alpha, true)
             } else {
-                let s = -self.pvs(&child, sz, next, max_players, child_elim, depth - 1, -alpha - 1, -alpha);
+                let s = -self.pvs(&child, sz, next, max_players, child_elim, depth - 1, -alpha - 1, -alpha, false);
                 if s > alpha && s < beta {
-                    -self.pvs(&child, sz, next, max_players, child_elim, depth - 1, -beta, -alpha)
+                    -self.pvs(&child, sz, next, max_players, child_elim, depth - 1, -beta, -alpha, true)
                 } else { s }
             };
 
@@ -1036,7 +1113,7 @@ impl PvsSearcher {
                 let mut child_elim = elim_root;
                 for &e in &new_elim { child_elim.add(e); }
                 let next = next_live_player_es(&child, sz, player, child_elim, max_players);
-                self.pvs(&child, sz, next, max_players, child_elim, warm_depth, i32::MIN + 1, i32::MAX - 1);
+                self.pvs(&child, sz, next, max_players, child_elim, warm_depth, i32::MIN + 1, i32::MAX - 1, false);
             }
         }
 
@@ -1057,9 +1134,10 @@ impl PvsSearcher {
                 let mut searcher = PvsSearcher {
                     killers: base_killers,
                     history: base_history,
+                    ai_player: player,
                 };
                 let score = if depth > 0 {
-                    -searcher.pvs(&child, sz, next, max_players, child_elim, depth - 1, i32::MIN + 1, i32::MAX - 1)
+                    -searcher.pvs(&child, sz, next, max_players, child_elim, depth - 1, i32::MIN + 1, i32::MAX - 1, true)
                 } else {
                     eval_board(&child, player, 0)
                 };
@@ -1462,4 +1540,198 @@ pub fn find_best_move(
         game_count,
     };
     state.run(depth)
+}
+
+// ─── 策略算法（纯启发式规则，无需搜索） ───
+
+/// 统计 (i,j) 周围指定等级的对手棋子数量
+fn count_opponent_level_around(board: &GameBoard, sz: usize, i: usize, j: usize, player: usize, level: u8) -> i32 {
+    let mut cnt = 0;
+    for (ni, nj) in nbrs(i, j, sz) {
+        let nc = &board[ni][nj];
+        if nc.owner.is_some() && nc.owner != Some(player) && nc.count == level {
+            cnt += 1;
+        }
+    }
+    cnt
+}
+
+/// 检查 (i,j) 周围是否有指定等级的对手棋子
+fn has_opponent_level_near(board: &GameBoard, sz: usize, i: usize, j: usize, player: usize, level: u8) -> bool {
+    for (ni, nj) in nbrs(i, j, sz) {
+        let nc = &board[ni][nj];
+        if nc.owner.is_some() && nc.owner != Some(player) && nc.count == level {
+            return true;
+        }
+    }
+    false
+}
+
+/// 策略算法入口：纯启发式规则，无需搜索
+pub fn find_best_move_strategy(
+    board: &GameBoard,
+    sz: usize,
+    player: usize,
+    _eliminated: &[usize],
+    _max_players: usize,
+    _game_count: u32,
+    _first_move_pos: Option<[usize; 2]>,
+) -> Option<(usize, usize)> {
+    // 收集己方棋子
+    let mut mine: Vec<(usize, usize)> = Vec::new();
+    for i in 0..sz {
+        for j in 0..sz {
+            if board[i][j].owner == Some(player) {
+                mine.push((i, j));
+            }
+        }
+    }
+
+    // 首步：居中偏好（复用已有逻辑）
+    if mine.is_empty() {
+        return first_move_center(board, sz);
+    }
+
+    // 确定性伪随机（基于棋盘哈希），保持每次调用结果一致
+    let hash: u64 = board.iter().enumerate().flat_map(|(i, row)| {
+        row.iter().enumerate().map(move |(j, c)| {
+            ((i as u64).wrapping_mul(31).wrapping_add(j as u64))
+                .wrapping_mul(7)
+                .wrapping_add(c.owner.unwrap_or(99) as u64)
+                .wrapping_mul(c.count as u64)
+        })
+    }).fold(0u64, |a, b| a.wrapping_mul(6364136223846793005).wrapping_add(b));
+
+    let rnd = |seed: u64| -> f64 {
+        let h = hash.wrapping_mul(seed.wrapping_add(1)).wrapping_add(seed ^ 0x9e3779b97f4a7c15);
+        ((h % 100) as f64) / 100.0
+    };
+    let rnd_idx = |seed: u64, n: usize| -> usize {
+        if n <= 1 { return 0; }
+        let h = hash.wrapping_mul(seed.wrapping_add(1)).wrapping_add(seed ^ 0x9e3779b97f4a7c15);
+        (h as usize) % n
+    };
+
+    // 1. 三级棋子（count == 3）
+    // 优先引爆接近对手三级的棋子（触发连锁反应的起点）
+    let lv3: Vec<(usize, usize)> = mine.iter()
+        .filter(|&&(i, j)| board[i][j].count == 3)
+        .copied()
+        .collect();
+    if !lv3.is_empty() {
+        let mut best = Vec::new();
+        let mut best_cnt = -1i32;
+        for &(i, j) in &lv3 {
+            let cnt = count_opponent_level_around(board, sz, i, j, player, 3);
+            if cnt > best_cnt {
+                best_cnt = cnt;
+                best = vec![(i, j)];
+            } else if cnt == best_cnt {
+                best.push((i, j));
+            }
+        }
+        if best_cnt >= 1 {
+            return Some(best[rnd_idx(1, best.len())]);
+        }
+    }
+
+    // 2. 安全二级（count == 2，且附近没有对手三级）
+    let lv2: Vec<(usize, usize)> = mine.iter()
+        .filter(|&&(i, j)| board[i][j].count == 2)
+        .copied()
+        .collect();
+    let safe_lv2: Vec<(usize, usize)> = lv2.iter()
+        .filter(|&&(i, j)| !has_opponent_level_near(board, sz, i, j, player, 3))
+        .copied()
+        .collect();
+    if !safe_lv2.is_empty() {
+        let mut best = Vec::new();
+        let mut best_score = f64::NEG_INFINITY;
+        for &(i, j) in &safe_lv2 {
+            let edge = if i == 0 || i == sz - 1 || j == 0 || j == sz - 1 { 3.0 } else { 0.0 };
+            let corner = if (i == 0 || i == sz - 1) && (j == 0 || j == sz - 1) { 5.0 } else { 0.0 };
+            let mut near_any_opp = 0i32;
+            for &(ni, nj) in &nbrs(i, j, sz) {
+                let nc = &board[ni][nj];
+                if nc.owner.is_some() && nc.owner != Some(player) {
+                    near_any_opp += 1;
+                }
+            }
+            let score = edge + corner - near_any_opp as f64 * 5.0 + rnd(2);
+            if score > best_score + 0.01 {
+                best_score = score;
+                best = vec![(i, j)];
+            } else if (score - best_score).abs() < 0.01 {
+                best.push((i, j));
+            }
+        }
+        if !best.is_empty() {
+            return Some(best[rnd_idx(3, best.len())]);
+        }
+    }
+
+    // 3. 一进二（升级一级棋子 count == 1）
+    let lv1: Vec<(usize, usize)> = mine.iter()
+        .filter(|&&(i, j)| board[i][j].count == 1)
+        .copied()
+        .collect();
+    if !lv1.is_empty() {
+        let mut best = Vec::new();
+        let mut best_score = f64::NEG_INFINITY;
+        for &(i, j) in &lv1 {
+            let mut near_opp = 0i32;
+            for &(ni, nj) in &nbrs(i, j, sz) {
+                let nc = &board[ni][nj];
+                if nc.owner.is_some() && nc.owner != Some(player) {
+                    near_opp += 1;
+                }
+            }
+            let score = -near_opp as f64 * 3.0 + rnd(4) * 2.0;
+            if score > best_score + 0.01 {
+                best_score = score;
+                best = vec![(i, j)];
+            } else if (score - best_score).abs() < 0.01 {
+                best.push((i, j));
+            }
+        }
+        if !best.is_empty() {
+            return Some(best[rnd_idx(5, best.len())]);
+        }
+    }
+
+    // 4. 下三级（将二级棋子升为三级 count == 2）
+    if !lv2.is_empty() {
+        let mut best = None;
+        let mut best_score = f64::NEG_INFINITY;
+        for &(i, j) in &lv2 {
+            let mut near_opp = 0i32;
+            for &(ni, nj) in &nbrs(i, j, sz) {
+                let nc = &board[ni][nj];
+                if nc.owner.is_some() && nc.owner != Some(player) {
+                    near_opp += 5;
+                }
+            }
+            let edge = if i == 0 || i == sz - 1 || j == 0 || j == sz - 1 { 2.0 } else { 0.0 };
+            let score = near_opp as f64 + edge + rnd(6);
+            if score > best_score + 0.01 {
+                best_score = score;
+                best = Some((i, j));
+            }
+        }
+        if let Some(m) = best {
+            return Some(m);
+        }
+    }
+
+    // 5. 随机选一个可下的棋子（count < 4）
+    let available: Vec<(usize, usize)> = mine.iter()
+        .filter(|&&(i, j)| board[i][j].count < 4)
+        .copied()
+        .collect();
+    if !available.is_empty() {
+        return Some(available[rnd_idx(7, available.len())]);
+    }
+
+    // 6. 保底：返回第一个棋子
+    mine.first().copied()
 }
