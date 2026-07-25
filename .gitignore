@@ -52,6 +52,9 @@ Thumbs.db
 release/
 release.keystore
 
+# --- 字体（避免大文件进仓库） ---
+tauri/public/fonts/font.ttf
+
 # --- ai ---
 .skills/
 .skill/

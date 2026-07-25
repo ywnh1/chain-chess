@@ -225,21 +225,50 @@ body::after{content:'';position:fixed;inset:0;
 /* game */
 #game{max-width:520px;gap:8px;width:100%}
 #game .top{
-  display:flex;justify-content:center;align-items:center;
-  width:100%;padding:8px 0 10px;position:relative;
+  display:flex;justify-content:space-between;align-items:center;
+  width:100%;padding:8px 0 10px;gap:6px;
 }
-#game .top-left{display:flex;gap:8px;align-items:center;width:100%;justify-content:center}
+#game .top-left{display:flex;gap:8px;align-items:center;justify-content:center;flex:1;min-width:0}
+/* ═══ 自动跳过连爆动画开关（玻璃风格切换） ═══ */
+.auto-skip-tg{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:.72rem;color:var(--dim);cursor:pointer;user-select:none;
+  padding:7px 12px;border-radius:8px;transition:all .2s ease;white-space:nowrap;
+  font-family:var(--font);
+  background:var(--glass-w-08);border:1px solid var(--glass-w-08);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  letter-spacing:.3px;
+}
+.auto-skip-tg:hover{background:var(--glass-w-12);border-color:var(--glass-w-12)}
+.auto-skip-tg:active{transform:scale(.96)}
+.auto-skip-tg .sw-tr{
+  width:34px;height:18px;border-radius:9px;
+  background:var(--glass-w-12);position:relative;transition:.3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.2);
+}
+.auto-skip-tg .sw-tr.on{background:rgba(240,179,75,.5);box-shadow:inset 0 1px 3px rgba(0,0,0,.15),0 0 10px rgba(240,179,75,.18)}
+.auto-skip-tg .sw-kn{
+  width:14px;height:14px;border-radius:50%;
+  background:var(--dim);position:absolute;top:2px;left:2px;transition:.3s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 1px 3px rgba(0,0,0,.3);
+}
+.auto-skip-tg .sw-tr.on .sw-kn{left:18px;background:var(--accent);box-shadow:0 1px 4px rgba(240,179,75,.35)}
+.auto-skip-tg .auto-skip-icon{font-size:.82rem;line-height:1}
+/* 激活态 — 整体高亮 */
+.auto-skip-tg.on{color:var(--accent);border-color:rgba(240,179,75,.2);background:rgba(240,179,75,.08)}
 #game .top-left button:not(#pauseBtn){
   background:var(--glass-w-08);color:var(--dim);
-  border:none;padding:7px 12px;border-radius:8px;font-size:.72rem;
+  border:1px solid var(--glass-w-08);padding:7px 12px;border-radius:8px;font-size:.72rem;
   cursor:pointer;transition:.15s;font-weight:500;letter-spacing:.3px;
+  font-family:var(--font);
 }
+#game .top-left button:not(#pauseBtn):hover{background:var(--glass-w-12);border-color:var(--glass-w-12)}
 #game .top-left button:not(#pauseBtn):active{background:var(--glass-w-12);transform:scale(.97);transition:all .06s ease}
 /* ═══ 暂停按钮（醒目大按钮+呼吸发光） ═══ */
 #pauseBtn{
   padding:12px 28px;font-size:.95rem;font-weight:700;letter-spacing:1px;
   background:rgba(240,179,75,.12);color:var(--accent);
-  border:1.5px solid rgba(240,179,75,.25);border-radius:14px;
+  border:1.5px solid rgba(240,179,75,.25);border-radius:12px;
   cursor:pointer;transition:all .25s ease;
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   box-shadow:0 0 20px rgba(240,179,75,.08),inset 0 1px 0 rgba(240,179,75,.1);
@@ -255,16 +284,8 @@ body::after{content:'';position:fixed;inset:0;
   0%,100%{box-shadow:0 0 20px rgba(240,179,75,.08),inset 0 1px 0 rgba(240,179,75,.1);border-color:rgba(240,179,75,.25)}
   50%{box-shadow:0 0 35px rgba(240,179,75,.18),inset 0 1px 0 rgba(240,179,75,.15);border-color:rgba(240,179,75,.4)}
 }
-/* ═══ 悔棋按钮 ═══ */
-#undoBtn{
-  background:rgba(95,195,195,.12);color:var(--accent2);
-  border:1px solid rgba(95,195,195,.2);padding:7px 12px;border-radius:8px;font-size:.72rem;
-  cursor:pointer;transition:.15s;font-weight:500;letter-spacing:.3px;
-  font-family:var(--font);
-}
-#undoBtn:hover{background:rgba(95,195,195,.2);border-color:rgba(95,195,195,.3)}
-#undoBtn:active{transform:scale(.97);transition:all .08s ease}
-#undoBtn:disabled{opacity:.3;cursor:not-allowed;transform:none}
+/* ═══ 悔棋按钮（继承 #game .top-left button:not(#pauseBtn) 基础样式） ═══ */
+#undoBtn:disabled{opacity:.35;cursor:not-allowed;transform:none}
 /* 跳过动画按钮 */
 #skipChainBtn{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:500;
@@ -276,7 +297,7 @@ body::after{content:'';position:fixed;inset:0;
 }
 #skipChainBtn:hover{background:rgba(240,179,75,.3);box-shadow:0 4px 24px rgba(240,179,75,.25)}
 #skipChainBtn:active{transform:translateX(-50%) scale(.95)}
-#game .top-right{position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;gap:4px;align-items:center}
+#game .game-msg{width:100%;text-align:center;min-height:1.6rem;display:flex;align-items:center;justify-content:center}
 .turn-badge{
   display:inline-flex;align-items:center;gap:5px;
   font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:6px;
@@ -542,6 +563,11 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* 二级页公共样式 */
 #about-ai .about-card ul{margin:4px 0 0;padding-left:16px}
 #about-ai .about-card ul li{font-size:.82rem;line-height:1.6;color:var(--text);margin-bottom:3px}
+/* AI 算法卡片标题/描述/详情 */
+.ai-alg-title{font-size:.88rem;font-weight:600;margin:16px 0 6px}
+.ai-alg-title:first-of-type{margin-top:0}
+.ai-alg-desc{font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px}
+.ai-alg-detail{margin:6px 0 10px 0;padding:8px 12px;border-radius:8px;font-size:.82rem;line-height:1.6}
 
 /* 更新详情卡片 */
 #about-changelog .about-scroll{gap:10px}
@@ -551,11 +577,10 @@ body{padding-top:env(safe-area-inset-top,20px)}
 
 /* msg */
 #msg{
-  font-size:.75rem;padding:4px 10px;border-radius:6px;
-  transition:.2s;min-height:1.5rem;
+  font-size:.85rem;padding:4px 12px;border-radius:6px;
+  transition:.2s;
 }
 #msg.error{background:#c0392b;color:#fff}
-#msg.success{background:#27ae60;color:#fff}
 
 /* modal — 简洁现代 */
 .modal{
@@ -934,6 +959,7 @@ body.light-mode{
   </div>
   <div style="display:flex;gap:8px;align-items:center;margin-top:.8rem">
     <button onclick="Router.navigate('about')" class="glass-btn" style="padding:8px 28px;border-radius:18px;font-size:.78rem;letter-spacing:1px">关于</button>
+    <button onclick="showExitConfirm()" class="glass-btn" style="padding:8px 18px;border-radius:18px;font-size:.78rem;letter-spacing:1px;border-color:rgba(232,100,90,.2);color:rgba(232,100,90,.9)">退出</button>
   </div>
 </div>
 
@@ -945,7 +971,7 @@ body.light-mode{
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v2.3.0-beta</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v2.3.5-beta</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-info-row" style="cursor:pointer" onclick="Router.navigate('about-license')"><span class="info-key">许可证</span><span class="info-val" style="color:var(--accent2)">MIT License →</span></div>
@@ -953,8 +979,8 @@ body.light-mode{
 
     <!-- 游戏介绍（短卡片） -->
     <div class="about-card">
-      <h3>游戏介绍</h3>
-      <p>连锁棋是一款基于「爆裂棋 / Chain Reaction」玩法改进的多人策略棋盘游戏。支持本地多人、AI 对战和 AI 斗蛐蛐三种模式，棋子数量超过棋盘格容量时会发生连锁爆裂，扩散到相邻格子。纯客户端应用，无需服务器。</p>
+      <h3>为什么玩连锁棋</h3>
+      <p>每步落子都可能引爆连锁反应。你点下的棋子不仅填满一个格子——它决定下一个爆炸从哪开始，谁被吞没，谁活到最后。本地对战、AI 挑战、斗蛐蛐观战三种模式，2~10 名玩家同台博弈。纯客户端，无需服务器。</p>
     </div>
 
     <!-- 游戏规则（短卡片） -->
@@ -967,6 +993,18 @@ body.light-mode{
         <li><strong>淘汰</strong> — 当某玩家的所有棋子被吞噬时该玩家被淘汰</li>
         <li><strong>胜利</strong> — 最后存活的一位玩家获胜</li>
       </ol>
+    </div>
+
+    <!-- 功能亮点 -->
+    <div class="about-card">
+      <h3>功能亮点</h3>
+      <p style="font-size:.82rem;line-height:1.7;margin:0">
+        🦀 <strong>Rust AI 引擎</strong> — Alpha-Beta、PVS、MCTS 三款搜索算法，Rayon 多核并行<br>
+        💾 <strong>中断恢复</strong> — 游戏异常退出后自动保存进度，历史页面一键继续<br>
+        📊 <strong>结算图表</strong> — 棋子数和点数双折线图，支持全屏缩放<br>
+        🔊 <strong>合成音效</strong> — 落子、爆炸、淘汰每种事件都有独立音频反馈<br>
+        🎨 <strong>液态玻璃主题</strong> — 深色虹彩渐变 UI，护眼舒适
+      </p>
     </div>
 
     <!-- AI 介绍 → 二级页 -->
@@ -991,38 +1029,39 @@ body.light-mode{
     <h2>AI 介绍</h2>
 
     <div class="about-card">
-      <p style="margin-bottom:12px">连锁棋内置 <strong>四款 AI 算法</strong>，覆盖启发式规则、树搜索剪枝和随机模拟三大搜索范式。PVE、本地AI、斗蛐蛐模式均可自由切换。Alpha-Beta、PVS NegaMax、MCTS 使用 <strong>Rust + Rayon</strong> 多核并行加速。</p>
+      <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋内置 <strong>四款 AI 算法</strong>，覆盖启发式规则、树搜索剪枝和随机模拟三大搜索范式。PVE、AI 对战、斗蛐蛐模式均可自由切换。除策略算法外，其余三款使用 <strong>Rust + Rayon</strong> 多核并行加速。</p>
 
-      <h3 style="font-size:.88rem;font-weight:600;color:var(--accent);margin:0 0 6px">⚡ 策略算法 · 启发式规则</h3>
-      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">纯 JavaScript 实现，基于人工设计的优先级规则快速决策。无需 Rust 引擎，响应最快，适合新手入门和低算力设备。</p>
-      <div style="margin:6px 0 10px 0;padding:8px 12px;background:rgba(240,179,75,.06);border-radius:8px;font-size:.82rem;line-height:1.6">
-        <strong style="color:var(--accent)">三级优先</strong> → 优先走 count=3 即将爆裂的棋子<br>
-        <strong style="color:var(--accent)">安全升级</strong> → 避开对手三级棋子附近的二级棋子<br>
-        <strong style="color:var(--accent)">一进二 / 下三级</strong> → 逐步升级，控制棋盘<br>
-        <strong style="color:var(--accent)">首子中心</strong> → 首回合落子优选棋盘中央
+      <h3 class="ai-alg-title" style="color:var(--accent)">⚡ 策略算法 · 启发式规则</h3>
+      <p class="ai-alg-desc">纯 JavaScript，基于人工优先级规则快速决策。无需 Rust 引擎，响应最快，适合新手入门和低算力设备。</p>
+      <div class="ai-alg-detail" style="background:rgba(240,179,75,.06)">
+        <strong style="color:var(--accent)">三级优先</strong> → 优先走即将爆裂的棋子（count=3）<br>
+        <strong style="color:var(--accent)">安全升级</strong> → 避开对手三级附近的二级棋子<br>
+        <strong style="color:var(--accent)">渐进控制</strong> → 一进二、下三级，逐步扩大地盘<br>
+        <strong style="color:var(--accent)">首子中心</strong> → 第一手落子在棋盘中央附近
       </div>
 
-      <h3 style="font-size:.88rem;font-weight:600;color:var(--accent);margin:16px 0 6px">🧠 Alpha-Beta 剪枝 · 经典搜索</h3>
-      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">标准 Alpha-Beta 剪枝搜索，Rust 实现 + Rayon 多线程根级并行。采用 <strong>克隆式搜索</strong>（每次走法复制棋盘而非撤销操作），天然适配连锁反应的多玩家轮换逻辑。</p>
-      <div style="margin:6px 0 10px 0;padding:8px 12px;background:rgba(95,195,195,.06);border-radius:8px;font-size:.82rem;line-height:1.6">
-        <strong style="color:var(--accent2)">搜索深度</strong> 1~10 层 | <strong style="color:var(--accent2)">分支限制</strong> top 15 | <strong style="color:var(--accent2)">走法排序</strong> 三级优先、对手多优先 | <strong style="color:var(--accent2)">随机化</strong> 早期探索
+      <h3 class="ai-alg-title" style="color:var(--accent2)">🧠 Alpha-Beta 剪枝 · 经典搜索</h3>
+      <p class="ai-alg-desc">标准 Alpha-Beta 剪枝搜索，Rust 实现 + Rayon 根级并行。采用 <strong>克隆式搜索</strong>（每次走法复制棋盘而非撤销），天然适配多玩家连锁反应。</p>
+      <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
+        <strong style="color:var(--accent2)">搜索深度</strong> 1~10 层 · <strong style="color:var(--accent2)">分支限制</strong> top 15 · <strong style="color:var(--accent2)">走法排序</strong> 三级优先<br>
+        <strong style="color:var(--accent2)">随机化探索</strong> 早期对局加入随机扰动，增加走法多样性
       </div>
-      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">剪枝效率高，对局面评估准确。配合走法排序和分支限制，能在有限深度内找到高质量走法。</p>
 
-      <h3 style="font-size:.88rem;font-weight:600;color:var(--accent);margin:16px 0 6px">🔬 PVS NegaMax · 精炼剪枝</h3>
-      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">Principal Variation Search（主变例搜索）是 Alpha-Beta 的进一步优化：假设第一个走法就是最优，后续走法用<strong>零窗口（Null Window）</strong>试探来快速证明或证伪，大幅减少搜索量。</p>
-      <div style="margin:6px 0 10px 0;padding:8px 12px;background:rgba(95,195,195,.06);border-radius:8px;font-size:.82rem;line-height:1.6">
-        <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录杀招 | <strong style="color:var(--accent2)">History 启发</strong> 全局走法评分 | <strong style="color:var(--accent2)">QSearch</strong> 静止搜索防水平线效应
+      <h3 class="ai-alg-title" style="color:var(--accent2)">🔬 PVS NegaMax · 精炼剪枝</h3>
+      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设首走法即最优，后续走法用<strong>零窗口（Null Window）</strong>试探快速证明或证伪，减少搜索量。</p>
+      <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
+        <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录两条杀招 · <strong style="color:var(--accent2)">History 启发</strong> 全局走法评分<br>
+        <strong style="color:var(--accent2)">QSearch（静止搜索）</strong> 到底层只搜爆炸性走法，防水平线效应
       </div>
-      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">相比标准 Alpha-Beta，PVS 在搜索深度相同时探索更高效，同等时间内等效深度更高。适合需要更强棋力的场景。</p>
+      <p class="ai-alg-desc">同等深度下比标准 Alpha-Beta 探索更高效，适合需要更强棋力的竞技场景。</p>
 
-      <h3 style="font-size:.88rem;font-weight:600;color:var(--accent);margin:16px 0 6px">🎲 MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
-      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">与前三种算法截然不同的搜索范式——<strong>不依赖任何评估函数</strong>，而是通过大量随机模拟来评估走法优劣。四步循环迭代：</p>
-      <div style="margin:6px 0 10px 0;padding:8px 12px;background:rgba(200,140,255,.06);border-radius:8px;font-size:.82rem;line-height:1.6">
+      <h3 class="ai-alg-title" style="color:#c88cff">🎲 MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
+      <p class="ai-alg-desc"><strong>不依赖评估函数</strong>，通过大量随机模拟来评估走法优劣。四步循环迭代：</p>
+      <div class="ai-alg-detail" style="background:rgba(200,140,255,.06)">
         <strong style="color:#c88cff">SELECT</strong> 🡒 <strong style="color:#c88cff">EXPAND</strong> 🡒 <strong style="color:#c88cff">PLAYOUT</strong> 🡒 <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
-        <span style="font-size:.78rem">UCB1 平衡探索与利用 · 优先展开最有希望的走法 · 随机走子直到终局 · 反向传播更新统计</span>
+        UCB1 平衡探索与利用 · 随机走子直到终局 · 反向传播更新节点统计
       </div>
-      <p style="font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px">完整树搜索：每棵子树独立存储棋盘状态，内层 UCB1 引导搜索聚焦最优分支，无需人为设计的评估函数就能发现 Alpha-Beta 不易察觉的非直觉走法。Rust + Rayon 根级并行，depth=1~10 对应 1200~12000 次迭代，树节点上限 3000 防内存暴涨。</p>
+      <p class="ai-alg-desc">Rust + Rayon 根级并行，depth=1~10 对应 1200~12000 次迭代，树节点上限 3000。无需人为设计的评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
     </div>
   </div>
 </div>
@@ -1239,14 +1278,13 @@ body.light-mode{
 
 <!-- Game Screen -->
 <div id="game" class="screen">
+  <div class="game-msg"><span id="msg"></span></div>
   <div class="top">
     <div class="top-left">
       <button onclick="undoLastMove()" id="undoBtn" disabled>悔棋</button>
       <button onclick="togglePause()" id="pauseBtn">⏸ 暂停</button>
-    </div>
-    <div class="top-right">
-      <span id="msg"></span>
-    </div>
+      <span class="auto-skip-tg" id="autoSkipTg" onclick="toggleAutoSkip()" title="自动跳过连爆动画"><span class="sw-tr" id="autoSkipTr"><span class="sw-kn"></span></span><span class="auto-skip-icon">⏩</span>自动跳过</span>
+</div>
   </div>
   <div id="playerBar" class="player-bar"></div>
   <div class="board-wrap"><div id="board"></div></div>
@@ -1274,7 +1312,17 @@ body.light-mode{
   <div id="checkoutContent" class="chk-scroll"></div>
 </div>
 
-
+<!-- Modal: Exit Confirmation (page 14) -->
+<div id="exitConfirm" class="modal">
+  <div class="modal-inner">
+    <h3>退出应用</h3>
+    <p style="text-align:center;font-size:.88rem;color:var(--dim);margin-bottom:4px">确定要退出连锁棋吗？</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal('exitConfirm')">取消</button>
+      <button class="btn-primary" onclick="confirmExitApp()">确认退出</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ═══════ 页面初始化：确保暂停层隐藏、欢迎页显示 ═══════ */
@@ -1358,6 +1406,8 @@ let maxChainOverall={player:null,length:0};
 
 // 连炸跳过标志
 let chainSkipAll=false;
+// 自动跳过连爆动画（持久开关，true=跳过所有连爆动画，false=行为不变）
+let autoSkipChain=false;
 
 // 首子落位（用于限制其他玩家落子）
 let firstMovePos=null;
@@ -1454,8 +1504,9 @@ const Router = {
       // Enter new page
       if (page.enter) page.enter(...args);
 
-      // Sync hash
+      // Sync hash（双 pushState 保证侧滑时始终有历史条目可 pop）
       if (location.hash !== '#' + id) {
+        history.pushState(null, '', '#' + id);
         history.pushState(null, '', '#' + id);
       }
     };
@@ -1466,6 +1517,38 @@ const Router = {
       currentEl.classList.add('leaving');
       currentEl.addEventListener('animationend', () => { doSwitch(); }, { once: true });
       // 超时保护
+      setTimeout(() => { if (currentEl.classList.contains('leaving')) doSwitch(); }, 400);
+    } else {
+      doSwitch();
+    }
+  },
+
+  // 侧滑/返回导航专用（使用 replaceState，不会创建新历史条目）
+  switchPage(id, ...args) {
+    const page = this._registry[id];
+    if (!page || this._current === id) return;
+
+    const doSwitch = () => {
+      try{document.activeElement?.blur()}catch(e){}
+      if (this._current && this._registry[this._current]?.leave) {
+        this._registry[this._current].leave();
+      }
+      this._prev = this._current;
+      this._current = id;
+      document.querySelectorAll('.screen').forEach(e => e.classList.remove('leaving','active'));
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active');
+      if (page.enter) page.enter(...args);
+      if (location.hash !== '#' + id) {
+        history.pushState(null, "", "#" + id);
+        history.pushState(null, "", "#" + id);
+      }
+    };
+
+    const currentEl = this._current ? document.getElementById(this._current) : null;
+    if (currentEl) {
+      currentEl.classList.add('leaving');
+      currentEl.addEventListener('animationend', () => { doSwitch(); }, { once: true });
       setTimeout(() => { if (currentEl.classList.contains('leaving')) doSwitch(); }, 400);
     } else {
       doSwitch();
@@ -1560,6 +1643,13 @@ function exitApp(){
   try { window.__TAURI_INTERNALS__?.invoke('exit_app').catch(e=>console.warn('Exit app failed:', e)); } catch(e){console.warn('Exit app error:', e)}
   exitGame();
 }
+function showExitConfirm(){
+  openModal('exitConfirm');
+}
+function confirmExitApp(){
+  closeModal('exitConfirm');
+  exitApp();
+}
 function generateEveConfig(){
   let cnt=getSel('eveCountGroup')||3;
   if(cnt<2)cnt=2;if(cnt>10)cnt=10;
@@ -1607,6 +1697,7 @@ function generateEveConfig(){
   }
 }
 function startEveGame(){
+  clearSavedGameState();
   clearBoardDOM();
   location.hash='#game';
   resetRoundHistory();
@@ -1658,11 +1749,41 @@ function loadHistoryList(){
       return;
     }
     el.innerHTML='';
-    // 倒序显示（最新的在前）
+    // 倒序显示（最新的在前），未完成的排在前面
+    let unfinishedRecords = [];
+    let finishedRecords = [];
     for(let i=list.length-1;i>=0;i--){
-      let r=list[i];
+      if(list[i].finished === false){
+        unfinishedRecords.push(list[i]);
+      }else{
+        finishedRecords.push(list[i]);
+      }
+    }
+    // 先渲染未完成的（可继续）
+    for(let r of unfinishedRecords){
       let div=document.createElement('div');div.className='history-item';
-      let modeLabel=r.mode==='ai'?'AI对战':'本地对战';
+      div.style.cssText = 'border-color:var(--accent2);cursor:default';
+      let modeLabel=r.mode==='ai'?'AI对战':(r.mode==='eve'?'AI斗蛐蛐':'本地对战');
+      let innerHtml=`
+        <div class="h-time" style="color:var(--accent2)">进行中</div>
+        <div class="h-info">${modeLabel} · ${r.boardSize}×${r.boardSize} · ${r.playerCount}人${r.aiCount>0?(' · AI×'+r.aiCount):''}</div>
+        <div class="h-winner" style="color:var(--accent2)">进行中 · ${r.playerCount} 人模式</div>
+        <div style="margin-top:4px;display:flex;gap:6px">
+          <button class="glass-btn primary" id="continueFromHistoryBtn" style="flex:1;padding:6px 8px;font-size:.78rem">▶ 继续游戏</button>
+        </div>
+      `;
+      div.innerHTML = innerHtml;
+      let btn = div.querySelector('#continueFromHistoryBtn');
+      if(btn){
+        btn.id = '';
+        btn.onclick = function(){ continueFromHistory(r); };
+      }
+      el.appendChild(div);
+    }
+    // 已完成的历史记录
+    for(let r of finishedRecords){
+      let div=document.createElement('div');div.className='history-item';
+      let modeLabel=r.mode==='ai'?'AI对战':(r.mode==='eve'?'AI斗蛐蛐':'本地对战');
       let winnerName=(r.colorNames&&r.colorNames[r.winner])||(r.winner!==null&&r.winner!==undefined?`玩家 ${r.winner+1}`:'平局');
       let winnerColor=r.winner!==null&&r.winner!==undefined?COLORS[r.winner]||'#888':'#888';
       div.style.cursor='pointer';
@@ -1676,8 +1797,71 @@ function loadHistoryList(){
       el.appendChild(div);
     }
   }).catch(()=>{
-    el.innerHTML='<div class="empty">暂无可用的历史记录</div>';
+    el.innerHTML='<div class="empty">暂无历史记录</div>';
+  }).finally(() => {
+    // 检查是否有已保存的未完成游戏（可继续）
+    // 优先读取同步 localStorage（可靠，不依赖异步 IPC）
+    let backupState = null;
+    try {
+      const raw = localStorage.getItem('unfinishedGameState');
+      if(raw) backupState = JSON.parse(raw);
+    } catch(e) {}
+    // 尝试从 Tauri 后端加载
+    loadSavedGameState().then(saved => {
+      const effectiveState = saved || backupState;
+      if(!effectiveState) return;
+      const el = document.getElementById('historyList');
+      if(!el) return;
+      const sep = document.createElement('div');
+      sep.style.cssText = 'border-top:1px solid var(--glass-w-08);margin:12px 0 8px;width:100%';
+      el.appendChild(sep);
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.style.cssText = 'border-color:var(--accent2);cursor:default';
+      const modeLabel = effectiveState.gameMode === 'ai' ? 'AI对战' : (effectiveState.gameMode === 'eve' ? 'AI斗蛐蛐' : '本地对战');
+      const elimArr = effectiveState.eliminatedPlayers;
+      const liveCount = effectiveState.maxPlayers - (elimArr ? (Array.isArray(elimArr) ? elimArr.length : (elimArr.size || 0)) : 0);
+      div.innerHTML = `
+        <div class="h-time" style="color:var(--accent2)">进行中</div>
+        <div class="h-info">${modeLabel} · ${effectiveState.size}×${effectiveState.size} · ${effectiveState.maxPlayers}人${(effectiveState.aiCount||0)>0?(' · AI×'+effectiveState.aiCount):''}</div>
+        <div class="h-winner" style="color:var(--accent2)">存活 ${liveCount} 人 · 轮到 ${(effectiveState.colorNames&&effectiveState.colorNames[effectiveState.curPlayer])||'玩家 '+(effectiveState.curPlayer+1)}</div>
+        <div style="margin-top:4px;display:flex;gap:6px">
+          <button class="glass-btn primary" onclick="continueGame()" style="flex:1;padding:6px 8px;font-size:.78rem">▶ 继续游戏</button>
+          <button class="glass-btn danger" onclick="discardSavedGame(event)" style="padding:6px 10px;font-size:.78rem">放弃</button>
+        </div>
+      `;
+      el.appendChild(div);
+    }).catch(() => {
+      if(!backupState) return;
+      const el = document.getElementById('historyList');
+      if(!el) return;
+      const sep = document.createElement('div');
+      sep.style.cssText = 'border-top:1px solid var(--glass-w-08);margin:12px 0 8px;width:100%';
+      el.appendChild(sep);
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.style.cssText = 'border-color:var(--accent2);cursor:default';
+      const modeLabel = backupState.gameMode === 'ai' ? 'AI对战' : (backupState.gameMode === 'eve' ? 'AI斗蛐蛐' : '本地对战');
+      const elimArr = backupState.eliminatedPlayers;
+      const liveCount = backupState.maxPlayers - (elimArr ? (Array.isArray(elimArr) ? elimArr.length : (elimArr.size || 0)) : 0);
+      div.innerHTML = `
+        <div class="h-time" style="color:var(--accent2)">进行中</div>
+        <div class="h-info">${modeLabel} · ${backupState.size}×${backupState.size} · ${backupState.maxPlayers}人${(backupState.aiCount||0)>0?(' · AI×'+backupState.aiCount):''}</div>
+        <div class="h-winner" style="color:var(--accent2)">存活 ${liveCount} 人 · 轮到 ${(backupState.colorNames&&backupState.colorNames[backupState.curPlayer])||'玩家 '+(backupState.curPlayer+1)}</div>
+        <div style="margin-top:4px;display:flex;gap:6px">
+          <button class="glass-btn primary" onclick="continueGame()" style="flex:1;padding:6px 8px;font-size:.78rem">▶ 继续游戏</button>
+          <button class="glass-btn danger" onclick="discardSavedGame(event)" style="padding:6px 10px;font-size:.78rem">放弃</button>
+        </div>
+      `;
+      el.appendChild(div);
+    });
   });
+}
+function discardSavedGame(e){
+  if(e)e.stopPropagation();
+  if(!confirm('确定要放弃这个未完成的游戏吗？'))return;
+  clearSavedGameState();
+  loadHistoryList();
 }
 function exportHistory(){
   tauriInvoke('load_game_history').then(list=>{
@@ -1799,13 +1983,206 @@ function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
       colorNames: COLOR_NAMES,
       chainStats: chainStats,
       maxChain: maxChainOverall,
+      finished: true,
       history: compact,
     }
   }).then(() => {
     // 保存成功后清理磁盘上的回合数据（不再需要）
     tauriInvoke('clear_round_history').catch(e=>console.warn('Clear round history after save failed:', e));
   }).catch(e=>console.warn('Save history failed:', e));
+}// ─── 保存未完成游戏历史记录（用于异常退出后继续游戏） ───
+function saveUnfinishedGameHistory(){
+  if(!gameMode||gameOver)return;
+  saveCurrentGameState();
+  const state = {
+    board: board,
+    size: size,
+    maxPlayers: maxPlayers,
+    curPlayer: curPlayer,
+    firstMovePos: firstMovePos,
+    gameMode: gameMode,
+    aiPlayers: Array.from(aiPlayers),
+    aiConfigs: aiConfigs || {},
+    eliminatedPlayers: Array.from(eliminatedPlayers),
+    chainStats: JSON.parse(JSON.stringify(chainStats || {})),
+    maxChainOverall: maxChainOverall ? {...maxChainOverall} : {player:null,length:0},
+    gameCount: gameCount || 0,
+    aiAlgorithm: aiAlgorithm || "",
+    aiDepth: aiDepth || 0,
+    colorNames: COLOR_NAMES,
+    aiCount: (aiPlayers && aiPlayers.size) || 0,
+    undoStack: [],
+    savedHistory: gameHistory.length > 0 ? compactHistory(gameHistory, maxPlayers) : null,
+  };
+  const stateJson = JSON.stringify(state);
+  const compact = compactHistory(gameHistory, maxPlayers);
+  const liveCount = maxPlayers - eliminatedPlayers.size;
+  if(liveCount < 2) return;
+  tauriInvoke("save_game_history", {
+    record: {
+      id: Date.now(),
+      time: formatTime(new Date()),
+      mode: gameMode || "local",
+      aiAlgorithm: aiAlgorithm || "",
+      aiDepth: aiDepth || 0,
+      gameCount: gameCount,
+      playerCount: maxPlayers,
+      aiCount: aiPlayers.size,
+      boardSize: size,
+      winner: null,
+      colorNames: COLOR_NAMES,
+      chainStats: chainStats,
+      maxChain: maxChainOverall,
+      finished: false,
+      history: compact || {},
+      gameState: stateJson,
+    }
+  }).catch(e => console.warn("Save unfinished history failed:", e));
 }
+
+// ─── 从未完成历史记录继续游戏 ───
+async function continueFromHistory(record){
+  if(!record || !record.gameState){
+    showMsg("该记录缺少游戏状态，无法继续","");
+    return;
+  }
+  let saved;
+  try { saved = JSON.parse(record.gameState); } catch(e) {
+    showMsg("游戏状态解析失败","");
+    return;
+  }
+  if(!saved || !saved.board || !saved.size){
+    showMsg("未找到可继续的游戏记录","");
+    return;
+  }
+  // 消耗此历史记录（从磁盘删除，避免重复恢复）
+  if(record.id){
+    tauriInvoke("delete_game_history_record", {recordId: record.id}).catch(()=>{});
+  }
+  clearSavedGameState();
+  loadGameFromState(saved);
+}
+
+// ─── 从状态对象恢复游戏（内部函数，continueGame 和 continueFromHistory 共用） ───
+function loadGameFromState(saved){
+  if(!saved || !saved.board || !saved.size) return;
+  clearBoardDOM();
+  location.hash = "#game";
+  resetRoundHistory();
+  undoStack = [];
+
+  size = saved.size;
+  maxPlayers = saved.maxPlayers;
+  curPlayer = saved.curPlayer;
+  firstMovePos = saved.firstMovePos || null;
+  gameMode = saved.gameMode || "local";
+  gameOver = false;
+  isPaused = false;
+  aiThinking = false;
+  gameCount = (saved.gameCount || 0) + 1;
+  aiAlgorithm = saved.aiAlgorithm || "";
+  aiDepth = saved.aiDepth || 0;
+
+  document.getElementById("pauseBtn").textContent = "⏸ 暂停";
+  _originPage = gameMode === "ai" ? "aiLobby" : (gameMode === "eve" ? "eveLobby" : "localLobby");
+
+  board = saved.board;
+
+  aiPlayers = new Set();
+  if(saved.aiPlayers && saved.aiPlayers.length > 0){
+    saved.aiPlayers.forEach(p => aiPlayers.add(p));
+  }
+
+  aiConfigs = saved.aiConfigs || {};
+
+  eliminatedPlayers = new Set();
+  if(saved.eliminatedPlayers && saved.eliminatedPlayers.length > 0){
+    saved.eliminatedPlayers.forEach(p => eliminatedPlayers.add(p));
+  }
+
+  chainStats = saved.chainStats || {};
+  maxChainOverall = saved.maxChainOverall || {player:null,length:0};
+
+  gameHistory = [];
+  if(saved.savedHistory){
+    const expanded = expandHistory(saved.savedHistory, maxPlayers);
+    if(expanded && expanded.length > 0){
+      gameHistory = expanded;
+    }
+  }
+  recordHistory();
+
+  renderBoard(true);
+  show("game");
+  document.body.style.background = "";
+  renderPlayerBar();
+  if(aiPlayers.has(curPlayer) && !gameOver) setTimeout(() => triggerAI(), 400);
+}
+
+
+// ─── 已保存游戏状态管理（用于继续游戏） ───
+function saveCurrentGameState(){
+  if(!gameMode||gameOver)return;
+  // 构建用于恢复的完整游戏状态
+  const state = {
+    board: board,
+    size: size,
+    maxPlayers: maxPlayers,
+    curPlayer: curPlayer,
+    firstMovePos: firstMovePos,
+    gameMode: gameMode,
+    aiPlayers: Array.from(aiPlayers),
+    aiConfigs: aiConfigs || {},
+    eliminatedPlayers: Array.from(eliminatedPlayers),
+    chainStats: JSON.parse(JSON.stringify(chainStats || {})),
+    maxChainOverall: maxChainOverall ? {...maxChainOverall} : {player:null,length:0},
+    gameCount: gameCount || 0,
+    aiAlgorithm: aiAlgorithm || '',
+    aiDepth: aiDepth || 0,
+    colorNames: COLOR_NAMES,
+    aiCount: (aiPlayers && aiPlayers.size) || 0,
+    undoStack: [],
+    // 保存回合历史（紧凑格式，用于图表渲染）
+    savedHistory: gameHistory.length > 0 ? compactHistory(gameHistory, maxPlayers) : null,
+  };
+  const json = JSON.stringify(state);
+  tauriInvoke('save_game_state', {stateJson: json}).catch(e => console.warn('Save game state failed:', e));
+}
+function loadSavedGameState(){
+  return tauriInvoke('load_game_state').then(json => {
+    if(!json) return null;
+    try { return JSON.parse(json); } catch(e) { return null; }
+  }).catch(() => null);
+}
+function clearSavedGameState(){
+  _unfinishedHistorySaved = false;
+  // 清除 localStorage 中的未完成游戏备份
+  try {
+    localStorage.removeItem('unfinishedGameRecord');
+    localStorage.removeItem('unfinishedGameState');
+  } catch(e) {}
+  tauriInvoke('clear_game_state').catch(e => console.warn('Clear game state failed:', e));
+}
+// 自动保存：页面隐藏/关闭时保存当前游戏状态
+// 标记当前游戏是否已经保存过未完成历史（避免重复保存）
+let _unfinishedHistorySaved = false;
+function setupAutoSave(){
+  if(typeof document !== 'undefined'){
+    document.addEventListener('visibilitychange', function(){
+      if(document.hidden && !gameOver && gameMode && !_unfinishedHistorySaved){
+        _unfinishedHistorySaved = true;
+        saveUnfinishedGameHistory();
+      }
+    });
+    window.addEventListener('beforeunload', function(){
+      if(!gameOver && gameMode && !_unfinishedHistorySaved){
+        _unfinishedHistorySaved = true;
+        saveUnfinishedGameHistory();
+      }
+    });
+  }
+}
+setupAutoSave();
 
 function toggleAIDepth(){
   let alg=getSelStr('aiAlgorithmCards');
@@ -1921,6 +2298,8 @@ function recordHistory(){
   if(gameHistory.length>HISTORY_MEM_MAX){
     setTimeout(()=>flushOverflowHistory(),0);
   }
+  // 每步落子后保存游戏状态，确保异常退出时可继续
+  saveCurrentGameState();
 }
 
 async function flushOverflowHistory(){
@@ -1975,7 +2354,8 @@ async function processClick(b,s,x,y,pl,anim,playerColor){
   if(anim==='explode'){
     // ★ 逐格爆炸动画：每次只炸一个格子，用户可跳过
     chainSkipAll=false;
-    showSkipBtn(true);
+    if(autoSkipChain)chainSkipAll=true;
+    if(!autoSkipChain)showSkipBtn(true);
     while(chain.length){
       if(chainSkipAll){
         // 跳过剩余动画 → 一口气处理完
@@ -2024,11 +2404,15 @@ async function processClick(b,s,x,y,pl,anim,playerColor){
         for(let[nx,ny]of nbrs(cx,cy,s)){
           let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
         }
-        if(anim){
+        if(anim&&!autoSkipChain){
           let el=cells?.[cx]?.[cy];if(el)el.classList.add('explode');
           renderBoard(false,anim==='pop'?cx:undefined);
           await sleep(180);
           if(el)el.classList.remove('explode');
+        }
+        else if(autoSkipChain&&anim){
+          // 自动跳过也要渲染棋盘
+          renderBoard(false);
         }
       }
     }
@@ -2050,6 +2434,15 @@ async function processClick(b,s,x,y,pl,anim,playerColor){
 function showSkipBtn(v){
   const el=document.getElementById('skipChainBtn');
   if(el)el.style.display=v?'block':'none';
+}
+
+function toggleAutoSkip(){
+  autoSkipChain=!autoSkipChain;
+  const tr=document.getElementById('autoSkipTr');
+  const tg=document.getElementById('autoSkipTg');
+  if(tr)tr.classList.toggle('on',autoSkipChain);
+  if(tg)tg.classList.toggle('on',autoSkipChain);
+  if(autoSkipChain)chainSkipAll=true;
 }
 
 /* 同步版落子（不含动画/音效，专供搜索使用） */
@@ -2538,6 +2931,7 @@ async function triggerAI(){
 
 /* ==================== LOCAL GAME ==================== */
 function startLocalGame(){
+  clearSavedGameState();
   clearBoardDOM();
   location.hash='#game';
   resetRoundHistory();
@@ -2584,6 +2978,7 @@ function toggleAIColorPicker(){
   }
 }
 function startAIGame(){
+  clearSavedGameState();
   location.hash='#game';
   resetRoundHistory();
   undoStack=[];
@@ -2792,11 +3187,26 @@ async function endGameNow(){
   // 关闭暂停覆盖层
   hidePauseOverlay();
   isPaused=false;
+  clearSavedGameState();
   if(gameOver){
-    // 如果游戏已经结束，直接回到主菜单
     exitGame();
     return;
   }
+  // 统计存活人数
+  let survivorCount = 0;
+  for(let p=0;p<maxPlayers;p++){
+    if(!eliminatedPlayers.has(p) && hasPieces(p, board)){
+      survivorCount++;
+    }
+  }
+  if(survivorCount >= 2){
+    // 2+ 存活 → 保存未完成记录，退回主菜单
+    saveUnfinishedGameHistory();
+    gameOver = true;
+    exitGame();
+    return;
+  }
+  // 仅 1 人存活 → 正常结束，结算
   gameOver=true;
   updateUndoBtn();
   let bestP = 0, bestCnt = -1;
@@ -2808,8 +3218,6 @@ async function endGameNow(){
   }
   recordHistory();
   playGameOver();
-  // 暂停界面已经刷盘（flushAndGetFullHistory），gameHistory 被清空，
-  // 需要从磁盘获取完整历史才能绘制图表
   const fullHistory = await flushAndGetFullHistory();
   showSettlement(bestCnt>0?bestP:null, COLOR_NAMES, fullHistory);
 }
@@ -2825,6 +3233,7 @@ async function animateBoardDiff(oldBoard, newBoard, sz){
   }
   if(changed.length===0){renderBoard(true);return}
   chainSkipAll=false;
+  if(autoSkipChain){renderBoard(true);return}
   showSkipBtn(true);
   for(let[cx,cy]of changed){
     if(chainSkipAll)break;
@@ -3142,9 +3551,39 @@ function replayGame(){
   }
 }
 
+// ─── 继续未完成的游戏 ───
+async function continueGame(){
+  let saved = await loadSavedGameState();
+  if(!saved || !saved.board || !saved.size){
+    try {
+      const raw = localStorage.getItem('unfinishedGameState');
+      if(raw) saved = JSON.parse(raw);
+    } catch(e) {}
+  }
+  if(!saved || !saved.board || !saved.size){
+    showMsg('未找到可继续的游戏记录','');
+    return;
+  }
+  // 消耗旧记录（清除 localStorage + 后端，标记历史记录为已用）
+  let recordIdToDelete = null;
+  try {
+    const rawRec = localStorage.getItem('unfinishedGameRecord');
+    if(rawRec){
+      const rec = JSON.parse(rawRec);
+      if(rec && rec.id) recordIdToDelete = rec.id;
+    }
+  } catch(e) {}
+  clearSavedGameState();
+  if(recordIdToDelete){
+    tauriInvoke('delete_game_history_record', {recordId: recordIdToDelete}).catch(()=>{});
+  }
+  loadGameFromState(saved);
+}
+
 async function showSettlement(winner,colorNames,history){
   // 清理动态 settlement overlay（如果有残留）
   document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
+  clearSavedGameState();
   const fullHistory = history&&history.length>0 ? history : await flushAndGetFullHistory();
   // 设置外框标题（放在玻璃框上方，作为页面固定标题）
   const titleEl = document.getElementById('chkOuterTitle');
@@ -3154,7 +3593,7 @@ async function showSettlement(winner,colorNames,history){
     titleEl.textContent = '对局统计';
   }
   // 渲染到 #checkout 页面（包 settlement 容器使 CSS 选择器生效）
-  const prevPage = 'welcome';
+  const prevPage = _originPage || 'welcome';
   const content = document.getElementById('checkoutContent');
   content.innerHTML = '<div class="settlement"><div class="settlement-inner" id="chkInner"></div></div>';
   const inner = document.getElementById('chkInner');
@@ -3220,7 +3659,11 @@ function showFullscreenChart(canvasId){
   if(!ctx)return;
   // ---------- 创建全屏覆盖层 ----------
   let overlay=document.createElement('div');
+  overlay.dataset.fschart='1';
   overlay.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.93);display:flex;justify-content:center;align-items:center;padding:48px 20px 20px;animation:fadeIn .2s ease';
+  // 压入一条虚拟历史，确保安卓侧滑/返回键触发 popstate 时先关闭预览（12 => 7,8,9）
+  history.pushState(null,'');
+  window._chartFsState=1;
   // 上方多留空间，避免图标紧贴边缘
   // overflow 不设 hidden，缩放后的内容可溢出显示
   let closeBtn=document.createElement('button');
@@ -3228,7 +3671,6 @@ function showFullscreenChart(canvasId){
   closeBtn.style.cssText='position:fixed;top:16px;right:16px;z-index:2002;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.5);color:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s';
   closeBtn.onmouseover=()=>{closeBtn.style.background='rgba(255,255,255,.15)'};
   closeBtn.onmouseout=()=>{closeBtn.style.background='rgba(0,0,0,.5)'};
-  overlay.onclick=(e)=>{if(e.target===overlay||e.target===closeBtn)overlay.remove()};
   // 容器：初始无 max 限制（transform 会让视觉尺寸变化）
   let container=document.createElement('div');
   container.style.cssText='display:flex;justify-content:center;align-items:center;transform-origin:center center';
@@ -3239,6 +3681,39 @@ function showFullscreenChart(canvasId){
   container.appendChild(bigCanvas);
   overlay.appendChild(closeBtn);
   document.body.appendChild(overlay);
+
+  // ----- 侧滑/触摸：阻止事件穿透到下层页面 -----
+  let swipeStartX=null;
+  overlay.addEventListener('touchstart',e=>{
+    // 阻止 touch 事件穿透到下方页面
+    e.stopPropagation();
+    // 记录背景区域的触摸起点用于侧滑关闭检测
+    if(e.target===overlay||e.target===closeBtn){
+      swipeStartX=e.touches[0].clientX;
+    }else{
+      swipeStartX=null;
+    }
+  },{passive:true});
+
+  overlay.addEventListener('touchmove',e=>{
+    // 阻止 touch 事件穿透
+    e.stopPropagation();
+  },{passive:true});
+
+  overlay.addEventListener('touchend',e=>{
+    e.stopPropagation();
+    // 检测水平侧滑关闭（背景区域或关闭按钮上的滑动）
+    if(swipeStartX!==null){
+      const endX=e.changedTouches[0].clientX;
+      const dx=endX-swipeStartX;
+      // 向右滑动超过 40px 视为侧滑关闭
+      if(dx>40){
+        closeFsOverlay();
+      }
+    }
+    swipeStartX=null;
+  },{passive:true});
+
   // ---------- 从数据重绘 ----------
   let baseW=0,baseH=0;
   setTimeout(()=>{
@@ -3259,6 +3734,18 @@ function showFullscreenChart(canvasId){
   let lastDist=0;
   function applyTransform(){
     container.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
+  }
+  // ----- 统一关闭函数（清理所有事件监听） -----
+  function closeFsOverlay(){
+    document.removeEventListener('mousemove',onMouseMove);
+    document.removeEventListener('mouseup',onMouseUp);
+    if(overlay.parentNode)overlay.remove();
+    // 弹回虚拟历史，并标记下次 popstate 跳过页面导航
+    if(window._chartFsState){
+      window._chartFsState=0;
+      window._chartFsManualClose=1;  // 标记手动关闭，防止 popstate 误导航
+      history.back();
+    }
   }
   // ------- 鼠标拖拽平移（缩放后才可拖动） -------
   function onMouseDown(e){
@@ -3285,13 +3772,10 @@ function showFullscreenChart(canvasId){
   bigCanvas.addEventListener('mousedown',onMouseDown);
   document.addEventListener('mousemove',onMouseMove);
   document.addEventListener('mouseup',onMouseUp);
-  // 关闭时清理 document 事件监听
-  const origClose=overlay.onclick;
+  // 背景点击或关闭按钮 -> 关闭
   overlay.onclick=function(e){
     if(e.target===overlay||e.target===closeBtn){
-      document.removeEventListener('mousemove',onMouseMove);
-      document.removeEventListener('mouseup',onMouseUp);
-      overlay.remove();
+      closeFsOverlay();
     }
   };
   // ------- 双指缩放 + 单指平移（touch）-------
@@ -3342,6 +3826,8 @@ function showFullscreenChart(canvasId){
 
 /* ==================== GAME ACTIONS ==================== */
 function exitGame(){
+  // 退出时清理已保存状态（不再自动保存，由 endGameNow 管理）
+  clearSavedGameState();
   // 刷盘残留历史再退出，清理磁盘回合数据
   if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(e=>console.warn('Clear round history on exit failed:', e))}
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
@@ -3365,6 +3851,10 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v2.3.6-beta · 第 14 版',desc:'中断游戏持久化：异常/暂停退出自动存为历史记录，历史页可继续未完成对局'},
+    {v:'v2.3.4-beta · 第 12 版',desc:'安卓侧滑手势优化 & 退出确认：图表预览侧滑关闭、游戏暂停切换、退出确认弹窗'},
+    {v:'v2.3.3-beta · 第 11 版',desc:'UI 统一：动画开关与悔棋/暂停按钮样式统一，版本号更新至 2.3.3-beta'},
+    {v:'v2.3.1-alpha · 第 10 版',desc:'版本号更新至 2.3.1-alpha'},
     {v:'v2.3.0-beta · 第 9 版',desc:'Liquid Glass 主题优化：虹彩渐变玻璃、流体动画曲线、统一圆角与阴影体系、环境光晕背景'},
     {v:'v2.3.0-beta · 第 8 版',desc:'关于页重构：行内显示版本信息，长内容改为二级页面导航，统一玻璃主题'},
     {v:'v2.3.0-beta · 第 7 版',desc:'界面精简：减少 emoji 使用量（33 处替换），保留品牌标识和标准 UI 符号'},
@@ -3384,6 +3874,7 @@ function renderChangelogCards(){
   }
 }
 
+
 /* ==================== UTILS ==================== */
 function openModal(id){document.getElementById(id).classList.add('show')}
 function closeModal(id){document.getElementById(id).classList.remove('show')}
@@ -3394,16 +3885,75 @@ function showMsg(t,c){
 
 window.addEventListener('popstate',()=>{
   const cur = Router._current;
-  // 全屏图表覆盖层关闭（如果存在）
-  var fsOverlay=document.querySelector('div[style*="z-index:2000"]');
-  if(fsOverlay){ fsOverlay.remove(); return; }
-  // 所有二级详情页: 使用 Router.back() 回退
-  if(cur === 'checkout'||cur === 'about-ai'||cur === 'about-changelog'||cur === 'about-license'){ Router.back(); return; }
-  // 游戏中按返回键 → 退出游戏
-  if(gameMode && gameMode !== 'welcome' && cur === 'game'){ exitGame(); return; }
-  // 其他页面（about, history, lobbies）: 根据 hash 导航
-  const h=location.hash.slice(1);
-  if(h&&document.getElementById(h)&&h!==cur)Router.navigate(h);else if(cur!=='welcome')Router.navigate('welcome');
+  let handled = false;  // 标记是否处理了图层/模态（未切换页面）
+
+  // ── 手动关闭图表预览的 popstate 回弹 ──
+  if(window._chartFsManualClose){
+    window._chartFsManualClose=0;
+    handled = true;
+  }
+
+  // ── 图层/模态优先检查 ──
+  if(!handled){
+    // 1) 全屏图表覆盖层 (ChartPreview · 12) — 关闭预览
+    var fsOverlay=document.querySelector('[data-fschart="1"]');
+    if(fsOverlay){
+      window._chartFsState=0;
+      fsOverlay.remove();
+      handled = true;
+    }
+  }
+
+  if(!handled){
+    // 2) 暂停覆盖层 (PausePage · 9) — 回到游戏 (13)
+    var pauseLayer=document.getElementById('pauseOverlay');
+    if(pauseLayer && pauseLayer.style.display==='flex'){
+      if(typeof resumeGame==='function') resumeGame();
+      handled = true;
+    }
+  }
+
+  if(!handled){
+    // 3) 退出确认弹窗 (ConfirmPopUp · 14) — 取消操作
+    var exitModal=document.getElementById('exitConfirm');
+    if(exitModal && exitModal.classList.contains('show')){
+      closeModal('exitConfirm');
+      handled = true;
+    }
+  }
+
+  // ── 页面导航（查表跳转） ──
+  if(!handled){
+    const SWIPE_TABLE = {
+      'welcome':       () => showExitConfirm(),                     // 1 => 14
+      'aiLobby':       () => Router.switchPage('welcome'),          // 2 => 1
+      'localLobby':    () => Router.switchPage('welcome'),          // 3 => 1
+      'eveLobby':      () => Router.switchPage('welcome'),          // 4 => 1
+      'history':       () => Router.switchPage('welcome'),          // 5 => 1
+      'about':         () => Router.switchPage('welcome'),          // 6 => 1
+      'about-ai':      () => Router.switchPage('about'),            // 10 => 6
+      'about-changelog': () => Router.switchPage('about'),          // 11 => 6
+      'about-license': () => Router.switchPage('about'),            // 11 => 6
+      'checkout':      () => {                                      // 7 => 5, 8 => 2/3/4
+        const prev = Router._checkoutPrev;
+        if(prev === 'history') Router.switchPage('history');        // EachHistoryPage => history
+        else Router.switchPage(prev || 'welcome');                  // CheckoutPage => 对应大厅
+      },
+      'game':          () => {                                      // 13 => 9
+        if(gameOver) exitGame(true);
+        else if(isPaused) resumeGame();
+        else togglePause();
+      },
+    };
+    const action = SWIPE_TABLE[cur];
+    if(action) action();
+  }
+
+  // ── 历史栈永不枯竭 ──
+  // 每次触发侧滑，不论是否切换页面，都压入两条历史状态。
+  // 消耗一条补充两条，确保栈始终有足够条目，安卓不会因无历史记录而退出应用。
+  history.pushState(null, '');
+  history.pushState(null, '');
 });
 </script>
 </body>

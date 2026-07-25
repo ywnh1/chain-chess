@@ -70,6 +70,12 @@ pub struct HistoryRecord {
     pub max_chain: MaxChain,
     #[serde(default)]
     pub history: serde_json::Value,
+    /// 游戏是否已完成。false 表示未完成（可继续），true/finished: null 表示已完成
+    #[serde(default)]
+    pub finished: Option<bool>,
+    /// 未完成游戏的完整状态 JSON（用于继续游戏），仅 finished=false 时有值
+    #[serde(default)]
+    pub game_state: Option<String>,
 }
 
 // ─── Process move result ───
@@ -278,12 +284,73 @@ async fn import_game_history(
 }
 
 #[tauri::command]
+async fn delete_game_history_record(
+    state: tauri::State<'_, AppState>,
+    record_id: u64,
+) -> Result<(), String> {
+    let path = state.history_file.lock().map_err(|e| e.to_string())?;
+    let mut history: Vec<HistoryRecord> = if path.exists() {
+        let content = fs::read_to_string(&*path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        return Ok(());
+    };
+    history.retain(|r| r.id != record_id);
+    let json = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
+    atomic_write(&*path, &json)?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn clear_game_history(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let path = state.history_file.lock().map_err(|e| e.to_string())?;
     if path.exists() {
         fs::remove_file(&*path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// 保存游戏状态（未完成游戏，用于继续游戏功能）
+#[tauri::command]
+async fn save_game_state(
+    app_handle: tauri::AppHandle,
+    state_json: String,
+) -> Result<(), String> {
+    let data_dir = app_handle.path().app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+    fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    let path = data_dir.join("saved_game.json");
+    atomic_write(&path, &state_json)?;
+    Ok(())
+}
+
+/// 加载已保存的游戏状态
+#[tauri::command]
+async fn load_game_state(
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    let data_dir = app_handle.path().app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+    let path = data_dir.join("saved_game.json");
+    if path.exists() {
+        fs::read_to_string(&path).map_err(|e| e.to_string())
+    } else {
+        Ok(String::new())
+    }
+}
+
+/// 清除已保存的游戏状态
+#[tauri::command]
+async fn clear_game_state(
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let data_dir = app_handle.path().app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+    let path = data_dir.join("saved_game.json");
+    if path.exists() {
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -420,6 +487,10 @@ pub fn run() {
             import_game_history,
             export_game_history_dialog,
             clear_game_history,
+            delete_game_history_record,
+            save_game_state,
+            load_game_state,
+            clear_game_state,
             exit_app,
             save_round_history,
             load_round_history,
