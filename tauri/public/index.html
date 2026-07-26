@@ -19,7 +19,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @font-face{
   font-family:'CustomFont';
   src:local('FiraCode Nerd Font'),
-       url('fonts/aaa_FiraCodeNerdFont_白桃乌龙甜茶.ttf') format('truetype');
+       url('fonts/font.ttf') format('truetype');
   font-display:swap;
 }
 :root{
@@ -524,7 +524,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .p5{background:#E91E63}
 .p6{background:#1ABC9C}
 .p7{background:#F39C12}
-.p8{background:#FFF0D0}
+.p8{background:#8B5E3C}
 .p9{background:#5D6D7E}
 
 /* about screen — 一级页 */
@@ -1369,9 +1369,9 @@ body.light-mode{
 })();
 
 /* ==================== CONSTANTS ==================== */
-const COLORS=['#E74C3C','#F1C40F','#3498DB','#2ECC71','#9B59B6','#E91E63','#1ABC9C','#F39C12','#FFF0D0','#5D6D7E'];
-const COLORS_LIGHT=['rgba(231,76,60,.08)','rgba(241,196,15,.08)','rgba(52,152,219,.08)','rgba(46,204,113,.08)','rgba(155,89,182,.08)','rgba(233,30,99,.08)','rgba(26,188,156,.08)','rgba(243,156,18,.08)','rgba(255,240,208,.08)','rgba(93,109,126,.08)'];
-const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色','橙色','奶白色','深灰色'];
+const COLORS=['#E74C3C','#F1C40F','#3498DB','#2ECC71','#9B59B6','#E91E63','#1ABC9C','#F39C12','#8B5E3C','#5D6D7E'];
+const COLORS_LIGHT=['rgba(231,76,60,.08)','rgba(241,196,15,.08)','rgba(52,152,219,.08)','rgba(46,204,113,.08)','rgba(155,89,182,.08)','rgba(233,30,99,.08)','rgba(26,188,156,.08)','rgba(243,156,18,.08)','rgba(139,94,60,.08)','rgba(93,109,126,.08)'];
+const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色','橙色','棕色','深灰色'];
 // 根据棋盘大小返回最大允许玩家人数
 function getMaxPlayersBySize(boardSize){
   if(boardSize===5)return 5;
@@ -2799,7 +2799,7 @@ function renderBoard(force,popX,popY){
         }
         let p=document.createElement('div');p.className='piece p'+d.owner;
         el.appendChild(p);
-        drawDots(p,d.count,d.owner);
+        drawDots(p,d.count);
         if(popX!==undefined&&i===popX&&j===popY)p.classList.add('pop');
       }
     }
@@ -2808,20 +2808,14 @@ function renderBoard(force,popX,popY){
   _boardCache=board.map(row=>row.map(c=>({owner:c.owner,count:c.count})));
   _lastRenderPlayer=curPlayer;
 }
-function dotColorForPlayer(pl){
-  const h=COLORS[pl]||'#888';
-  const r=parseInt(h.substr(1,2),16),g=parseInt(h.substr(3,2),16),b=parseInt(h.substr(5,2),16);
-  return (r*299+g*587+b*114)/1000>150?'rgba(0,0,0,.75)':'rgba(255,255,255,.88)';
-}
-function drawDots(p,n,pl){
-  const dc=dotColorForPlayer(pl);
+function drawDots(p,n){
   let cx=50,cy=50,r=30;
-  if(n===1)addDot(p,cx,cy,dc);
-  else if(n===2){addDot(p,cx-20,cy,dc);addDot(p,cx+20,cy,dc)}
-  else if(n===3){let h=Math.sqrt(3)/2;addDot(p,cx,cy-r*h/2,dc);addDot(p,cx-r/2,cy+r*h/2,dc);addDot(p,cx+r/2,cy+r*h/2,dc)}
-  else{addDot(p,34,34,dc);addDot(p,66,34,dc);addDot(p,34,66,dc);addDot(p,66,66,dc)}
+  if(n===1)addDot(p,cx,cy);
+  else if(n===2){addDot(p,cx-20,cy);addDot(p,cx+20,cy)}
+  else if(n===3){let h=Math.sqrt(3)/2;addDot(p,cx,cy-r*h/2);addDot(p,cx-r/2,cy+r*h/2);addDot(p,cx+r/2,cy+r*h/2)}
+  else{addDot(p,34,34);addDot(p,66,34);addDot(p,34,66);addDot(p,66,66)}
 }
-function addDot(p,x,y,c){let d=document.createElement('div');d.className='dot';d.style.left=x+'%';d.style.top=y+'%';d.style.background=c;p.appendChild(d)}
+function addDot(p,x,y){let d=document.createElement('div');d.className='dot';d.style.left=x+'%';d.style.top=y+'%';p.appendChild(d)}
 function setBg(pl){let h=COLORS[pl];let r=parseInt(h.substr(1,2),16)*.85,g=parseInt(h.substr(3,2),16)*.85,b=parseInt(h.substr(5,2),16)*.85;document.body.style.background=`radial-gradient(ellipse 80% 50% at 50% -20%, rgba(240,179,75,.04) 0%, transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%, rgba(95,195,195,.03) 0%, transparent 70%),rgb(${r|0},${g|0},${b|0})`}
 function renderPlayerBar(){
   let el=document.getElementById('playerBar');el.innerHTML='';
