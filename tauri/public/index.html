@@ -45,7 +45,42 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   --liquid-blur:24px;
   --overlay-bg:linear-gradient(135deg,rgba(15,15,19,.38) 0%,rgba(22,24,30,.30) 50%,rgba(20,18,24,.25) 100%);
   --checkout-bg:rgba(15,15,19,.65);
-  --font:'CustomFont','Inter','SF Pro','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+  /* --- Font stacks --- */
+  --font:'CustomFont','PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,-apple-system,sans-serif;
+  --font-display:'CustomFont','PingFang SC','Microsoft YaHei','Noto Sans SC','Inter',system-ui,sans-serif;
+  --font-mono:'CustomFont','SF Mono','Fira Code','JetBrains Mono',monospace;
+  --font-brand:'CustomFont','Inter','PingFang SC',sans-serif;
+
+  /* --- Typographic scale --- */
+  --text-xs:.70rem;
+  --text-sm:.78rem;
+  --text-base:.85rem;
+  --text-md:.92rem;
+  --text-lg:1.0rem;
+  --text-xl:1.15rem;
+  --text-2xl:1.3rem;
+  --text-3xl:1.5rem;
+  --text-4xl:3rem;
+
+  /* --- Line heights --- */
+  --leading-tight:1.2;
+  --leading-snug:1.35;
+  --leading-normal:1.5;
+  --leading-relaxed:1.6;
+  --leading-loose:1.7;
+
+  /* --- Letter spacing --- */
+  --tracking-tight:-.02em;
+  --tracking-normal:0;
+  --tracking-wide:.02em;
+  --tracking-wider:.05em;
+  --tracking-widest:.1em;
+
+  /* --- Font weights --- */
+  --weight-normal:400;
+  --weight-medium:500;
+  --weight-semibold:600;
+  --weight-bold:700;
 
   /* ─── 玻璃色阶（浅色/深色模式自动切换） ─── */
   --glass-w-004:rgba(255,255,255,.004);
@@ -77,7 +112,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   body::before{animation:none!important}
 }
-html{font-size:clamp(14px,3.5vw,17px)}
+html{font-size:clamp(15px,3.8vw,18px);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{
   font-family:var(--font);
   background:var(--bg-solid);
@@ -97,7 +132,7 @@ body{
   -webkit-tap-highlight-color:transparent;
   -webkit-touch-callout:none;
   overflow-x:hidden;
-  line-height:1.5;
+  line-height:var(--leading-relaxed);
   overscroll-behavior:none;
 }
 body::before{content:'';position:fixed;inset:-25%;width:150%;height:150%;background:
@@ -146,9 +181,9 @@ body::after{content:'';position:fixed;inset:0;
 
 /* welcome */
 #welcome{gap:2rem;text-align:center}
-.logo{font-size:3rem;letter-spacing:2px}
+.logo{font-size:3rem;letter-spacing:2px;font-family:var(--font-display);font-weight:700}
 .logo span{color:var(--accent)}
-.tagline{color:var(--dim);font-size:.9rem;margin-top:-.5rem}
+.tagline{color:var(--dim);font-size:var(--text-sm);margin-top:-.5rem}
 .mode-cards{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px}
 .mode-card{
   background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;
@@ -164,8 +199,8 @@ body::after{content:'';position:fixed;inset:0;
 .mode-card:active{transform:scale(.97);transition:all .08s ease}
 .mode-card .icon{font-size:1.8rem;flex-shrink:0}
 .mode-card .body{flex:1}
-.mode-card .body h3{font-size:1rem;font-weight:600}
-.mode-card .body p{font-size:.8rem;color:var(--dim);margin-top:2px}
+.mode-card .body h3{font-size:var(--text-lg);font-weight:var(--weight-semibold)}
+.mode-card .body p{font-size:var(--text-sm);color:var(--dim);margin-top:2px}
 
 /* lobby */
 #aiLobby,#localLobby,#eveLobby{max-width:480px;gap:.75rem;width:100%}
@@ -173,14 +208,14 @@ body::after{content:'';position:fixed;inset:0;
   align-self:flex-start;cursor:pointer;
   display:inline-flex;align-items:center;gap:6px;
 }
-#aiLobby h2,#localLobby h2,#history h2,#eveLobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
+#aiLobby h2,#localLobby h2,#history h2,#eveLobby h2{font-size:var(--text-2xl);font-weight:var(--weight-semibold);margin-bottom:4px}
 .form-row{margin:8px 0;display:flex;flex-direction:column;gap:4px;width:100%}
-.form-row label{font-size:.78rem;color:var(--dim);font-weight:500}
+.form-row label{font-size:var(--text-sm);color:var(--dim);font-weight:var(--weight-medium)}
 .form-row input,.form-row select{
   width:100%;padding:10px 12px;
   border:1px solid var(--border);border-radius:8px;
   background:var(--glass-w-04);color:var(--text);
-  font-size:.9rem;outline:none;transition:.15s;
+  font-size:var(--text-base);outline:none;transition:.15s;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   -webkit-appearance:none;appearance:none;
 }
@@ -200,9 +235,9 @@ body::after{content:'';position:fixed;inset:0;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
 }
 .eve-ai-row .color-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;border:1px solid var(--glass-w-10);box-shadow:0 0 6px rgba(0,0,0,.2)}
-.eve-ai-row .eve-label{font-size:.8rem;font-weight:600;min-width:44px;color:var(--text)}
+.eve-ai-row .eve-label{font-size:var(--text-sm);font-weight:var(--weight-semibold);min-width:44px;color:var(--text)}
 .eve-ai-row select{flex:1;padding:5px 6px;border:1px solid var(--border);border-radius:6px;
-  background:var(--glass-w-04);color:var(--text);font-size:.75rem;outline:none;
+  background:var(--glass-w-04);color:var(--text);font-size:var(--text-sm);outline:none;
   -webkit-appearance:none;appearance:none;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 12 8'%3E%3Cpath fill='%237a7885' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 8px center;padding-right:22px;}
@@ -216,32 +251,15 @@ body::after{content:'';position:fixed;inset:0;
   width:100%;padding:8px 0 10px;gap:6px;
 }
 #game .top-left{display:flex;gap:6px;align-items:center;justify-content:center;flex:1;min-width:0}
-/* ═══ 游戏控制按钮组（悔棋、暂停、跳过，统一风格） ═══ */
-.auto-skip-tg{
-  display:inline-flex;align-items:center;gap:5px;
-  font-size:.75rem;color:var(--dim);cursor:pointer;user-select:none;
-  padding:7px 10px;border-radius:10px;transition:all .2s ease;white-space:nowrap;
-  font-family:var(--font);
-  background:var(--glass-w-08);border:1px solid var(--glass-w-08);
+/* 跳过动画按钮（与悔棋/暂停统一尺寸风格） */
+#autoSkipBtn{padding:7px 16px;font-size:.75rem;font-weight:600;letter-spacing:.5px;
+  border:1px solid var(--glass-w-08);border-radius:10px;
+  background:var(--glass-w-08);color:var(--dim);cursor:pointer;transition:all .2s ease;
   backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
-  letter-spacing:.3px;
-}
-.auto-skip-tg:hover{background:var(--glass-w-12);border-color:var(--glass-w-12)}
-.auto-skip-tg:active{transform:scale(.96)}
-.auto-skip-tg .sw-tr{
-  width:18px;height:12px;border-radius:6px;
-  background:var(--glass-w-12);position:relative;transition:.3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.2);
-}
-.auto-skip-tg .sw-tr.on{background:rgba(240,179,75,.5);box-shadow:inset 0 1px 3px rgba(0,0,0,.15),0 0 10px rgba(240,179,75,.18)}
-.auto-skip-tg .sw-kn{
-  width:8px;height:8px;border-radius:50%;
-  background:var(--dim);position:absolute;top:2px;left:2px;transition:.3s cubic-bezier(.34,1.56,.64,1);
-  box-shadow:0 1px 3px rgba(0,0,0,.3);
-}
-.auto-skip-tg .sw-tr.on .sw-kn{left:8px;background:var(--accent);box-shadow:0 1px 4px rgba(240,179,75,.35)}
-/* 激活态 — 整体高亮 */
-.auto-skip-tg.on{color:var(--accent);border-color:rgba(240,179,75,.2);background:rgba(240,179,75,.08)}
+  font-family:var(--font);touch-action:manipulation}
+#autoSkipBtn:hover{background:var(--glass-w-12);border-color:var(--glass-w-12)}
+#autoSkipBtn:active{transform:scale(.96)}
+#autoSkipBtn.on{color:var(--accent);border-color:rgba(240,179,75,.2);background:rgba(240,179,75,.08)}
 /* ═══ 暂停按钮（与悔棋统一的金色调小按钮） ═══ */
 #pauseBtn{
   padding:7px 16px;font-size:.75rem;font-weight:600;letter-spacing:.5px;
@@ -380,7 +398,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
   box-shadow:0 8px 32px rgba(0,0,0,.4);
 }
 /* 统一玻璃小按钮（历史页、各处操作按钮） */
-.glass-btn{border:1px solid var(--glass-border);background-image:var(--liquid-iris),var(--glass-w-06);background-origin:padding-box;color:var(--text);padding:6px 12px;border-radius:var(--radius-sm);font-size:.75rem;cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);font-weight:500;font-family:var(--font);touch-action:manipulation;min-height:36px;display:inline-flex;align-items:center;justify-content:center;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow)}
+.glass-btn{border:1px solid var(--glass-border);background-image:var(--liquid-iris),var(--glass-w-06);background-origin:padding-box;color:var(--text);padding:6px 12px;border-radius:var(--radius-sm);font-size:var(--text-sm);cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);font-weight:var(--weight-medium);font-family:var(--font);touch-action:manipulation;min-height:36px;display:inline-flex;align-items:center;justify-content:center;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow)}
 .glass-btn:hover{border-color:var(--glass-w-16);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
 .glass-btn:active{transform:scale(.95);transition:all .06s ease}
 .glass-btn.primary{border-color:rgba(95,195,195,.2);background:rgba(95,195,195,.12);color:var(--accent2)}
@@ -457,7 +475,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 #checkout .chk-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
 #checkout .chk-scroll::-webkit-scrollbar{width:3px}
 #checkout .chk-scroll::-webkit-scrollbar-thumb{background:var(--glass-w-10);border-radius:3px}
-#chkOuterTitle{width:100%;text-align:center;font-size:1.05rem;font-weight:600;padding:4px 0 2px;flex-shrink:0}
+#chkOuterTitle{width:100%;text-align:center;font-size:var(--text-xl);font-weight:var(--weight-semibold);padding:4px 0 2px;flex-shrink:0}
 #checkout .settlement{
   position:relative;inset:auto;padding:18px 14px 10px;animation:none;z-index:auto;
   background:var(--checkout-bg);background-image:var(--liquid-iris);background-origin:padding-box;
@@ -466,15 +484,15 @@ body{padding-top:env(safe-area-inset-top,20px)}
   box-shadow:var(--glass-shadow);
 }
 #checkout .settlement-inner{gap:10px}
-#checkout .settlement h2{font-size:1.15rem;margin:6px 0 4px;width:100%}
+#checkout .settlement h2{font-size:var(--text-xl);margin:6px 0 4px;width:100%}
 #checkout .stats-grid{gap:5px;width:100%}
 #checkout .stat-card{padding:7px 5px}
-#checkout .stat-card .num{font-size:.95rem}
+#checkout .stat-card .num{font-size:var(--text-md)}
 #checkout .chart-box{padding:8px 10px;border-radius:10px}
 #checkout .chart-box canvas{height:100px;border-radius:4px}
-#checkout .chart-box h4{font-size:.78rem;margin-bottom:5px}
+#checkout .chart-box h4{font-size:var(--text-sm);margin-bottom:5px}
 
-#checkout .glass-btn.primary{padding:9px 24px;font-size:.85rem;margin:14px 0 6px;width:auto}
+#checkout .glass-btn.primary{padding:9px 24px;font-size:var(--text-base);margin:14px 0 6px;width:auto}
 
 /* player colours (与 COLORS 数组同步) */
 .p0{background:#E74C3C}
@@ -492,51 +510,53 @@ body{padding-top:env(safe-area-inset-top,20px)}
 #about.screen,#about-ai.screen,#about-changelog.screen,#about-license.screen{max-width:520px;gap:10px;padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(32px + env(safe-area-inset-bottom, 0px));height:100dvh;overflow:hidden;width:100%}
 #about.screen.active,#about-ai.screen.active,#about-changelog.screen.active,#about-license.screen.active{display:flex;flex-direction:column;align-items:center}
 #about .back,#about-ai .back,#about-changelog .back,#about-license .back{align-self:flex-start;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
-#about h2,#about-ai h2,#about-license h2{font-size:1.15rem;font-weight:600;text-align:center;padding:4px 0 6px;flex-shrink:0;letter-spacing:1px}
-#about .about-scroll,#about-ai .about-scroll,#about-changelog .about-scroll,#about-license .about-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:14px}
-#about .about-scroll::-webkit-scrollbar,#about-ai .about-scroll::-webkit-scrollbar,#about-changelog .about-scroll::-webkit-scrollbar,#about-license .about-scroll::-webkit-scrollbar{width:3px}
+#about h2,#about-ai h2,#about-license h2{font-size:var(--text-2xl);font-weight:var(--weight-semibold);text-align:center;padding:4px 0 6px;flex-shrink:0;letter-spacing:1px}
+#about .about-scroll,#about-ai .about-scroll,#about-changelog .about-scroll,#about-license .about-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
+#about .about-scroll > * + *,#about-ai .about-scroll > * + *,#about-changelog .about-scroll > * + *,#about-license .about-scroll > * + *{margin-top:10px}
+#about .about-scroll::-webkit-scrollbar,#about-ai .about-scroll::-webkit-scrollbar,#about-changelog .about-scroll::-webkit-scrollbar,#about-license .about-scroll::-webkit-scrollbar{width:4px}
+#about .about-scroll::-webkit-scrollbar-track,#about-ai .about-scroll::-webkit-scrollbar-track,#about-changelog .about-scroll::-webkit-scrollbar-track,#about-license .about-scroll::-webkit-scrollbar-track{background:var(--glass-w-04);border-radius:2px}
 #about .about-scroll::-webkit-scrollbar-thumb,#about-ai .about-scroll::-webkit-scrollbar-thumb,#about-changelog .about-scroll::-webkit-scrollbar-thumb,#about-license .about-scroll::-webkit-scrollbar-thumb{background:var(--glass-w-10);border-radius:3px}
 
 /* 信息行（键值对齐） */
-#about .about-info{background-image:var(--liquid-iris),var(--glass-w-10);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:16px 20px;display:flex;flex-direction:column;gap:8px;backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);box-shadow:var(--glass-shadow);position:relative}
-#about .about-info-row{display:flex;align-items:center;font-size:.85rem;color:var(--text);line-height:1.6;padding:5px 0}
+#about .about-info{background-image:var(--liquid-iris),var(--glass-w-10);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);box-shadow:var(--glass-shadow);position:relative}
+#about .about-info-row{display:flex;align-items:center;font-size:var(--text-base);color:var(--text);line-height:var(--leading-relaxed);padding:5px 0}
 #about .about-info-row+.about-info-row{border-top:1px solid var(--glass-w-06)}
-#about .info-key{color:var(--accent);width:64px;flex-shrink:0;font-weight:500}
+#about .info-key{color:var(--accent);width:64px;flex-shrink:0;font-weight:var(--weight-medium)}
 #about .info-val{color:var(--text)}
 
 /* 短内容卡片 */
-#about .about-card,#about-ai .about-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:16px 18px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1)}
-#about .about-card h3{font-size:.95rem;font-weight:700;margin:0 0 8px;color:var(--accent);letter-spacing:.5px}
-#about .about-card p{font-size:.85rem;line-height:1.7;color:var(--text);margin:0}
+#about .about-card,#about-ai .about-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1)}
+#about .about-card h3{font-size:var(--text-lg);font-weight:var(--weight-bold);margin:0 0 8px;color:var(--accent);letter-spacing:.5px}
+#about .about-card p{font-size:var(--text-base);line-height:var(--leading-loose);color:var(--text);margin:0}
 #about .about-card ol{margin:4px 0 0;padding-left:16px}
-#about .about-card li{font-size:.82rem;line-height:1.6;color:var(--text);margin-bottom:3px}
+#about .about-card li{font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text);margin-bottom:3px}
 #about .about-card li:last-child{margin-bottom:0}
 
 /* 导航条目（指向二级页面，统一为 mode-card 风格） */
 #about .about-nav{background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:20px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:.35s cubic-bezier(.22,1,.36,1);touch-action:manipulation;min-height:56px}
 #about .about-nav:hover{border-color:var(--glass-w-16);transform:translateY(-2px);box-shadow:0 12px 48px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
 #about .about-nav:active{transform:scale(.97);transition:all .08s ease}
-#about .about-nav .nav-label{font-size:1rem;font-weight:600;color:var(--text)}
-#about .about-nav .nav-arrow{font-size:.7rem;color:var(--dim)}
+#about .about-nav .nav-label{font-size:var(--text-lg);font-weight:var(--weight-semibold);color:var(--text)}
+#about .about-nav .nav-arrow{font-size:var(--text-xs);color:var(--dim)}
 
 /* 二级页公共样式 */
 #about-ai .about-card ul{margin:4px 0 0;padding-left:16px}
-#about-ai .about-card ul li{font-size:.82rem;line-height:1.6;color:var(--text);margin-bottom:3px}
+#about-ai .about-card ul li{font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text);margin-bottom:3px}
 /* AI 算法卡片标题/描述/详情 */
-.ai-alg-title{font-size:.88rem;font-weight:600;margin:16px 0 6px}
+.ai-alg-title{font-size:var(--text-md);font-weight:var(--weight-semibold);margin:16px 0 6px}
 .ai-alg-title:first-of-type{margin-top:0}
-.ai-alg-desc{font-size:.82rem;line-height:1.6;color:var(--text);margin:0 0 4px}
-.ai-alg-detail{margin:6px 0 10px 0;padding:8px 12px;border-radius:8px;font-size:.82rem;line-height:1.6}
+.ai-alg-desc{font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text);margin:0 0 4px}
+.ai-alg-detail{margin:6px 0 10px 0;padding:8px 12px;border-radius:8px;font-size:var(--text-base);line-height:var(--leading-relaxed)}
 
 /* 更新详情卡片 */
 #about-changelog .about-scroll{gap:10px}
 #about-changelog .cl-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow)}
-#about-changelog .cl-version{font-size:.82rem;font-weight:600;color:var(--accent);margin-bottom:4px}
-#about-changelog .cl-desc{font-size:.78rem;line-height:1.5;color:var(--dim)}
+#about-changelog .cl-version{font-size:var(--text-base);font-weight:var(--weight-semibold);color:var(--accent);margin-bottom:4px}
+#about-changelog .cl-desc{font-size:var(--text-sm);line-height:var(--leading-normal);color:var(--dim)}
 
 /* msg */
 #msg{
-  font-size:.85rem;padding:4px 12px;border-radius:6px;
+  font-size:var(--text-base);padding:4px 12px;border-radius:6px;
   transition:.2s;
 }
 #msg.error{background:#c0392b;color:#fff}
@@ -562,14 +582,14 @@ body{padding-top:env(safe-area-inset-top,20px)}
   from{opacity:0;transform:translateY(20px) scale(.95)}
   to{opacity:1;transform:translateY(0) scale(1)}
 }
-.modal-inner h3{font-size:1.1rem;font-weight:600;text-align:center;margin-bottom:20px;color:var(--text)}
+.modal-inner h3{font-size:var(--text-lg);font-weight:var(--weight-semibold);text-align:center;margin-bottom:20px;color:var(--text)}
 .form-row{margin:12px 0;display:flex;flex-direction:column;gap:6px}
-.form-row label{font-size:.78rem;color:var(--dim);font-weight:500;letter-spacing:.3px}
+.form-row label{font-size:var(--text-sm);color:var(--dim);font-weight:var(--weight-medium);letter-spacing:.3px}
 .form-row input,.form-row select{
   width:100%;padding:11px 14px;
   border:1px solid var(--glass-w-10);border-radius:10px;
   background:var(--glass-w-05);color:var(--text);
-  font-size:.9rem;outline:none;transition:.15s;
+  font-size:var(--text-base);outline:none;transition:.15s;
   -webkit-appearance:none;appearance:none;
 }
 .form-row input:focus,.form-row select:focus{
@@ -583,7 +603,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .modal-actions{display:flex;gap:10px;margin-top:20px}
 .modal-actions button{
   flex:1;padding:11px;border:none;border-radius:10px;
-  font-size:.88rem;font-weight:600;cursor:pointer;transition:.15s;
+  font-size:var(--text-base);font-weight:var(--weight-semibold);cursor:pointer;transition:.15s;
 }
 .modal-actions button:active{transform:scale(.97)}
 
@@ -603,7 +623,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .player-tag .cnt{
   display:inline-block;min-width:1.2em;
   text-align:center;margin-left:4px;
-  font-size:.82rem;font-weight:700;
+  font-size:var(--text-base);font-weight:var(--weight-bold);
 }
 .player-tag.active{opacity:1;border-color:var(--glass-w-15);transform:scale(1.06);box-shadow:0 0 12px var(--glass-w-06)}
 .player-tag.elim{opacity:.15;text-decoration:line-through}
@@ -624,7 +644,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
   width:100%;max-width:520px;
   display:flex;flex-direction:column;align-items:center;gap:16px;
 }
-.settlement h2{font-size:1.5rem;margin:16px 0 8px;text-align:center}
+.settlement h2{font-size:var(--text-3xl);font-weight:var(--weight-bold);margin:16px 0 8px;text-align:center}
 .settlement .winner-color{
   display:inline-block;width:14px;height:14px;
   border-radius:50%;vertical-align:middle;margin-right:6px;
@@ -643,16 +663,16 @@ body{padding-top:env(safe-area-inset-top,20px)}
   display:inline-block;width:10px;height:10px;
   border-radius:50%;margin-right:4px;vertical-align:middle;
 }
-.settlement .stat-card .name{font-size:.82rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px}
-.settlement .stat-card .num{font-size:1.2rem;font-weight:700;margin-top:4px}
-.settlement .stat-card .lbl{font-size:.65rem;color:var(--dim);margin-top:2px}
+.settlement .stat-card .name{font-size:var(--text-base);font-weight:var(--weight-semibold);display:flex;align-items:center;justify-content:center;gap:4px}
+.settlement .stat-card .num{font-size:var(--text-xl);font-weight:var(--weight-bold);margin-top:4px}
+.settlement .stat-card .lbl{font-size:var(--text-xs);color:var(--dim);margin-top:2px}
 .settlement .chart-box{
   width:100%;background:var(--glass-w-04);
   border-radius:10px;padding:12px 14px;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   border:1px solid var(--glass-border);
 }
-.settlement .chart-box h4{font-size:.85rem;font-weight:600;margin-bottom:8px;text-align:center;color:var(--text)}
+.settlement .chart-box h4{font-size:var(--text-base);font-weight:var(--weight-semibold);margin-bottom:8px;text-align:center;color:var(--text)}
 .settlement .chart-box canvas{width:100%;height:150px;display:block;border-radius:6px}
 
 .settlement .glass-btn.primary{
@@ -674,11 +694,11 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 .history-item:hover{border-color:var(--glass-w-16);transform:translateY(-2px);box-shadow:0 12px 48px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
 .history-item:active{transform:scale(.97);transition:all .08s ease}
-.history-item .h-time{font-size:.7rem;color:var(--dim)}
-.history-item .h-info{font-size:.8rem;margin:4px 0}
+.history-item .h-time{font-size:var(--text-xs);color:var(--dim)}
+.history-item .h-info{font-size:var(--text-sm);margin:4px 0}
 .history-item .h-info strong{color:var(--accent2)}
-.history-item .h-details{font-size:.7rem;color:var(--dim)}
-.history-item .h-winner{display:inline-block;font-size:.75rem;font-weight:600;margin-top:4px}
+.history-item .h-details{font-size:var(--text-xs);color:var(--dim)}
+.history-item .h-winner{display:inline-block;font-size:var(--text-sm);font-weight:var(--weight-semibold);margin-top:4px}
 /* 多选模式 */
 .history-item .sel-chk{position:absolute;top:6px;left:6px;width:18px;height:18px;border-radius:50%;border:2px solid var(--glass-w-20);background:var(--glass-w-06);display:none;align-items:center;justify-content:center;transition:.15s;cursor:pointer;z-index:2;font-size:.6rem;color:transparent;pointer-events:auto}
 .history-item .sel-chk.checked{background:var(--accent);border-color:var(--accent);color:#0f0f13}
@@ -772,6 +792,13 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .eve-ai-row .depth-mini .dm-btn:hover{background:var(--glass-w-10)}
 .eve-ai-row .depth-mini .dm-val{min-width:20px;text-align:center;font-size:.8rem;font-weight:600;color:var(--text)}
 .eve-ai-row .depth-mini.hidden{display:none}
+
+/* 全局 am-btn（支持 eve 行和 modal 弹窗） */
+.am-btn{flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--glass-w-08);
+  background:var(--glass-w-04);color:var(--dim);font-size:.72rem;font-weight:500;
+  cursor:pointer;transition:.1s;text-align:center;font-family:var(--font);white-space:nowrap}
+.am-btn:hover{background:var(--glass-w-08)}
+.am-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
 
 /* ═══════ 浅色模式 ═══════ */
 @media (prefers-color-scheme: light){
@@ -922,11 +949,11 @@ body.light-mode{
 /* ═══════ 新欢迎页 ═══════ */
 #welcome{gap:1.5rem;text-align:center}
 #welcome .welcome-content{display:flex;flex-direction:column;align-items:center;width:100%;max-width:300px;gap:1.2rem}
-#welcome .welcome-content .logo{font-size:3.2rem;letter-spacing:2px}
+#welcome .welcome-content .logo{font-size:3.2rem;letter-spacing:2px;font-family:var(--font-display);font-weight:700}
 #welcome .welcome-content .logo span{color:var(--accent)}
-#welcome .welcome-content .tagline{color:var(--dim);font-size:.9rem;margin-top:-.8rem}
+#welcome .welcome-content .tagline{color:var(--dim);font-size:var(--text-sm);margin-top:-.8rem}
 .start-btn{
-  width:100%;max-width:260px;padding:12px 0;font-size:1.15rem;font-weight:700;
+  width:100%;max-width:260px;padding:12px 0;font-size:var(--text-xl);font-weight:var(--weight-bold);
   border-radius:var(--radius);letter-spacing:4px;
   background-image:linear-gradient(135deg,rgba(240,179,75,.2) 0%,rgba(200,140,240,.1) 50%,rgba(95,195,195,.15) 100%),var(--glass-w-06);
   background-origin:padding-box;
@@ -1126,13 +1153,13 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
       <input type="text" id="playerNameInput" maxlength="16" placeholder="输入玩家名称（可选）" autocomplete="off">
     </div>
     <div class="form-row"><label>类型</label>
-      <select id="playerTypeSelect">
-        <option value="human">人类</option>
-        <option value="strategy">AI · 策略</option>
-        <option value="alphabeta">AI · Alpha-Beta</option>
-        <option value="pvs">AI · PVS</option>
-        <option value="mcts">AI · MCTS</option>
-      </select>
+      <div id="playerTypeBtns" class="alg-mini" style="flex-wrap:wrap;gap:4px">
+        <button class="am-btn" data-value="human">人类</button>
+        <button class="am-btn" data-value="strategy">AI 策略</button>
+        <button class="am-btn" data-value="alphabeta">A-B</button>
+        <button class="am-btn" data-value="pvs">PVS</button>
+        <button class="am-btn" data-value="mcts">MCTS</button>
+      </div>
     </div>
     <div class="form-row" id="playerDepthRow">
       <label>搜索深度</label>
@@ -1174,7 +1201,7 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
     <!-- 游戏介绍（短卡片） -->
     <div class="about-card">
       <h3>为什么玩连锁棋</h3>
-      <p>每步落子都可能引爆连锁反应。你点下的棋子不仅填满一个格子——它决定下一个爆炸从哪开始，谁被吞没，谁活到最后。本地对战、AI 挑战、斗蛐蛐观战三种模式，2~10 名玩家同台博弈。纯客户端，无需服务器。</p>
+      <p>你点下的每一颗棋子，都可能引爆整张棋盘。不是简单填满格子——它决定下一轮爆炸从哪开始、谁被吞没、谁能活到最后。本地热座、人机对战、AI 斗蛐蛐三种模式，2~10 人同台博弈。纯客户端，无需服务器。</p>
     </div>
 
     <!-- 游戏规则（短卡片） -->
@@ -1252,7 +1279,7 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
       <h3 class="ai-alg-title" style="color:#c88cff">🎲 MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
       <p class="ai-alg-desc"><strong>不依赖评估函数</strong>，通过大量随机模拟来评估走法优劣。四步循环迭代：</p>
       <div class="ai-alg-detail" style="background:rgba(200,140,255,.06)">
-        <strong style="color:#c88cff">SELECT</strong> 🡒 <strong style="color:#c88cff">EXPAND</strong> 🡒 <strong style="color:#c88cff">PLAYOUT</strong> 🡒 <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
+        <strong style="color:#c88cff">SELECT</strong> → <strong style="color:#c88cff">EXPAND</strong> → <strong style="color:#c88cff">PLAYOUT</strong> → <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
         UCB1 平衡探索与利用 · 随机走子直到终局 · 反向传播更新节点统计
       </div>
       <p class="ai-alg-desc">Rust + Rayon 根级并行，depth=1~10 对应 1200~12000 次迭代，树节点上限 3000。无需人为设计的评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
@@ -1458,7 +1485,7 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
     <div class="top-left">
       <button onclick="undoLastMove()" id="undoBtn" disabled>悔棋</button>
       <button onclick="togglePause()" id="pauseBtn">暂停</button>
-      <span class="auto-skip-tg" id="autoSkipTg" onclick="toggleAutoSkip()" title="自动跳过连爆动画"><span class="sw-tr" id="autoSkipTr"><span class="sw-kn"></span></span>跳过</span>
+      <button id="autoSkipBtn" onclick="toggleAutoSkip()" title="自动跳过连爆动画">跳过</button>
 </div>
   </div>
   <div id="playerBar" class="player-bar"></div>
@@ -1915,7 +1942,7 @@ function goHome() {
   Router.navigate('welcome');
 }
 function exitApp(){
-  try { window.__TAURI_INTERNALS__?.invoke('exit_app').catch(e=>console.warn('Exit app failed:', e)); } catch(e){console.warn('Exit app error:', e)}
+  try { window.__TAURI_INTERNALS__?.invoke('exit_app').catch(e=>logWarn('Exit app failed:', e)); } catch(e){logWarn('Exit app error:', e)}
   exitGame();
 }
 function showExitConfirm(){
@@ -2010,6 +2037,10 @@ function startEveGame(){
 }
 function showHistory(){ Router.navigate('history'); }
 // Tauri invoke helper
+/* debug: set DEBUG=false to silence all console */
+const DEBUG = true;
+function logWarn(){if(DEBUG)console.warn.apply(console,arguments)}
+
 function tauriInvoke(cmd, args){
   return window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke 
     ? window.__TAURI_INTERNALS__.invoke(cmd, args || {})
@@ -2163,7 +2194,7 @@ function discardHistoryRecord(record){
   if(record.id){
     tauriInvoke("delete_game_history_record", {recordId: record.id})
       .then(() => loadHistoryList())
-      .catch(e => console.warn("Delete history record failed:", e));
+      .catch(e => logWarn("Delete history record failed:", e));
   }
   delete _historyRecords[record.id];
 }
@@ -2188,7 +2219,7 @@ function exportHistory(){
       }
     });
   }).catch(e=>{
-    console.warn('Export failed:', e);
+    logWarn('Export failed:', e);
     alert('导出失败: ' + (e||'未知错误'));
   });
 }
@@ -2326,7 +2357,7 @@ async function exportSelectedRecords(){
       exitMultiSelect();
     }
   }catch(e){
-    console.warn('Export selected failed:',e);
+    logWarn('Export selected failed:',e);
     alert('导出失败: '+(e||'未知错误'));
   }
 }
@@ -2340,7 +2371,7 @@ async function deleteSelectedRecords(){
     exitMultiSelect();
     loadHistoryList();
   }catch(e){
-    console.warn('Delete selected failed:',e);
+    logWarn('Delete selected failed:',e);
     alert('删除失败: '+(e||'未知错误'));
   }
 }
@@ -2350,7 +2381,7 @@ function clearHistory(){
     document.getElementById('historyList').innerHTML='<div class="empty">历史记录已清空</div>';
     exitMultiSelect();
   }).catch(e=>{
-    console.warn('Clear history failed:', e);
+    logWarn('Clear history failed:', e);
     alert('清空历史失败');
   });
 }
@@ -2418,8 +2449,8 @@ function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
     }
   }).then(() => {
     // 保存成功后清理磁盘上的回合数据（不再需要）
-    tauriInvoke('clear_round_history').catch(e=>console.warn('Clear round history after save failed:', e));
-  }).catch(e=>console.warn('Save history failed:', e));
+    tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history after save failed:', e));
+  }).catch(e=>logWarn('Save history failed:', e));
 }// ─── 保存未完成游戏历史记录（用于异常退出后继续游戏） ───
 async function saveUnfinishedGameHistory(){
   if(!gameMode||gameOver)return;
@@ -2455,7 +2486,7 @@ async function saveUnfinishedGameHistory(){
       fullHistory = [...merged, ...memAdjusted];
     }
   } catch(e) {
-    console.warn('Load round history for save failed:', e);
+    logWarn('Load round history for save failed:', e);
   }
   // 用之前捕获的局部快照构建 state（避免 exitGame 重置全局变量后的空值问题）
   const state = {
@@ -2499,7 +2530,7 @@ async function saveUnfinishedGameHistory(){
       history: compact,
       gameState: stateJson,
     }
-  }).catch(e => console.warn("Save unfinished history failed:", e));
+  }).catch(e => logWarn("Save unfinished history failed:", e));
 }
 
 // ─── 从未完成历史记录继续游戏 ───
@@ -2610,7 +2641,7 @@ function saveCurrentGameState(historyOverride){
     savedHistory: hist.length > 0 ? compactHistory(hist, maxPlayers) : null,
   };
   const json = JSON.stringify(state);
-  tauriInvoke('save_game_state', {stateJson: json}).catch(e => console.warn('Save game state failed:', e));
+  tauriInvoke('save_game_state', {stateJson: json}).catch(e => logWarn('Save game state failed:', e));
 }
 function loadSavedGameState(){
   return tauriInvoke('load_game_state').then(json => {
@@ -2625,7 +2656,7 @@ function clearSavedGameState(){
     localStorage.removeItem('unfinishedGameRecord');
     localStorage.removeItem('unfinishedGameState');
   } catch(e) {}
-  tauriInvoke('clear_game_state').catch(e => console.warn('Clear game state failed:', e));
+  tauriInvoke('clear_game_state').catch(e => logWarn('Clear game state failed:', e));
 }
 // 自动保存：页面隐藏/关闭时保存当前游戏状态
 // 标记当前游戏是否已经保存过未完成历史（避免重复保存）
@@ -2760,7 +2791,7 @@ async function flushOverflowHistory(){
   try{existing=await tauriInvoke('load_round_history')}catch(e){}
   const merged=[...existing,...overflow];
   for(let i=0;i<merged.length;i++)merged[i].turn=i;
-  await tauriInvoke('save_round_history',{data:merged}).catch(e=>console.warn('Flush overflow history failed:', e));
+  await tauriInvoke('save_round_history',{data:merged}).catch(e=>logWarn('Flush overflow history failed:', e));
 }
 
 /// 把所有内存历史刷到磁盘，返回完整历史（磁盘+内存合并排序）
@@ -2771,7 +2802,7 @@ async function flushAndGetFullHistory(){
     const offset=existing.length;
     const memOff=gameHistory.map((h,i)=>({...h,turn:offset+i}));
     const merged=[...existing,...memOff];
-    await tauriInvoke('save_round_history',{data:merged}).catch(e=>console.warn('Save full history failed:', e));
+    await tauriInvoke('save_round_history',{data:merged}).catch(e=>logWarn('Save full history failed:', e));
     gameHistory=[];
   }
   let disk=[];
@@ -2782,7 +2813,7 @@ async function flushAndGetFullHistory(){
 /// 新游戏时清空历史
 function resetRoundHistory(){
   gameHistory=[];
-  tauriInvoke('clear_round_history').catch(e=>console.warn('Clear round history failed:', e));
+  tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history failed:', e));
 }
 
 async function processClick(b,s,x,y,pl,anim,playerColor){
@@ -2889,10 +2920,8 @@ function showSkipBtn(v){
 
 function toggleAutoSkip(){
   autoSkipChain=!autoSkipChain;
-  const tr=document.getElementById('autoSkipTr');
-  const tg=document.getElementById('autoSkipTg');
-  if(tr)tr.classList.toggle('on',autoSkipChain);
-  if(tg)tg.classList.toggle('on',autoSkipChain);
+  const btn=document.getElementById('autoSkipBtn');
+  if(btn)btn.classList.toggle('on',autoSkipChain);
   if(autoSkipChain)chainSkipAll=true;
 }
 
@@ -3048,21 +3077,21 @@ async function triggerAI(){
     board: board,
     size: size,
     player: curPlayer,
+    depth: dep,
     eliminated: [...eliminatedPlayers],
     maxPlayers: maxPlayers,
     gameCount: gameCount,
     firstMovePos: firstMovePos,
+    randomScale: randomScale,
   };
-  if(alg==='alphabeta')args.depth=dep;
-  if(alg==='pvs'){args.depth=dep;args.algorithm=alg;}
-  if(alg==='mcts')args.depth=dep;
+  if(alg==='pvs')args.algorithm=alg;
   try {
     const result = await window.__TAURI_INTERNALS__.invoke(cmd, args);
     if (result && result.length === 2) {
       move = [result[0], result[1]];
     }
   } catch(e) {
-    console.warn('AI move failed:', e);
+    logWarn('AI move failed:', e);
   }
   // 缓存 AI 走法到 undo 栈顶，悔棋时直接重放无需重算
   if(undoStack.length>0)undoStack[undoStack.length-1].aiMove=move;
@@ -3896,8 +3925,8 @@ function showHistoryDetail(r){
     titleEl.textContent = '对局统计';
   }
   const content = document.getElementById('checkoutContent');
-  content.innerHTML = '<div class="settlement"><div class="settlement-inner" id="chkInner"></div></div>';
-  const inner = document.getElementById('chkInner');
+  content.innerHTML = '<div class="settlement"><div class="settlement-inner" id="chkHistoryInner"></div></div>';
+  const inner = document.getElementById('chkHistoryInner');
   // 展开紧凑格式（若为旧版全量格式则原样返回）
   const historyData = expandHistory(r.history, r.playerCount||maxPlayers);
   if(!historyData||historyData.length<2){
@@ -4097,7 +4126,7 @@ function exitGame(){
   // 退出时清理已保存状态（不再自动保存，由 endGameNow 管理）
   clearSavedGameState();
   // 刷盘残留历史再退出，清理磁盘回合数据
-  if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(e=>console.warn('Clear round history on exit failed:', e))}
+  if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history on exit failed:', e))}
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
   aiPlayers=new Set();eliminatedPlayers=new Set();gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;undoStack=[];
@@ -4166,29 +4195,35 @@ function openPlayerModal(idx){
   const cfg=playerConfigs[idx];
   document.getElementById('playerModalTitle').textContent='玩家 '+(idx+1)+' 设置';
   document.getElementById('playerNameInput').value=cfg.name||'';
-  document.getElementById('playerTypeSelect').value=cfg.type;
   document.getElementById('depthValue').textContent=String(cfg.depth);
   updateModalRows();
   document.getElementById('randomScaleSlider').value=String(cfg.randomScale);
   document.getElementById('randomValueLabel').textContent=cfg.randomScale+'%';
-  document.getElementById('playerTypeSelect').onchange=updateModalRows;
+  // 初始化类型按钮
+  var btns=document.getElementById('playerTypeBtns');
+  btns.querySelectorAll('.am-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===cfg.type)});
+  btns.querySelectorAll('.am-btn').forEach(function(b){b.onclick=function(){btns.querySelectorAll('.am-btn').forEach(function(x){x.classList.remove('selected')});this.classList.add('selected');updateModalRows();}});
   document.getElementById('depthDecBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v>1){v--;e.textContent=v}};
   document.getElementById('depthIncBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v<10){v++;e.textContent=v}};
   document.getElementById('randomScaleSlider').oninput=function(){document.getElementById('randomValueLabel').textContent=this.value+'%'};
   openModal('playerConfigModal');
 }
 function updateModalRows(){
-  var sel=document.getElementById('playerTypeSelect');
-  if(!sel)return;
-  var isAI=sel.value!=='human';
-  document.getElementById('playerDepthRow').style.display=isAI?'block':'none';
-  document.getElementById('playerRandomRow').style.display=isAI&&sel.value!=='strategy'?'block':'none';
+  var btns=document.getElementById('playerTypeBtns');
+  if(!btns)return;
+  var sel=btns.querySelector('.am-btn.selected');
+  var val=sel?sel.dataset.value:'human';
+  var isAI=val!=='human';
+  var needDepth=val==='alphabeta'||val==='pvs'||val==='mcts';
+  document.getElementById('playerDepthRow').style.display=needDepth?'block':'none';
+  document.getElementById('playerRandomRow').style.display=needDepth?'block':'none';
 }
 function closePlayerModal(){closeModal('playerConfigModal')}
 function savePlayerConfig(){
   const cfg=playerConfigs[editingPlayerIdx];
   cfg.name=document.getElementById('playerNameInput').value.trim();
-  cfg.type=document.getElementById('playerTypeSelect').value;
+  var selBtn=document.querySelector('#playerTypeBtns .am-btn.selected');
+  cfg.type=selBtn?selBtn.dataset.value:'human';
   cfg.depth=parseInt(document.getElementById('depthValue').textContent)||2;
   cfg.randomScale=parseInt(document.getElementById('randomScaleSlider').value)||10;
   closePlayerModal();

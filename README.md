@@ -1,22 +1,24 @@
 <div align="center">
   <h1>♟ 连锁棋 · Chain Chess</h1>
   <p>
-    <strong>棋盘策略游戏 · 支持桌面 / Android</strong>
+    <strong>棋盘策略游戏 · 桌面 / Android</strong>
   </p>
   <p>
     <img src="https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=fff" alt="Tauri">
     <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=fff" alt="Android">
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/badge/version-3.0.0--alpha-orange" alt="v3.0.0-alpha">
+    <img src="https://img.shields.io/badge/version-3.0.0--beta-orange" alt="v3.0.0-beta">
   </p>
 </div>
 
 ---
 
-**连锁棋** 是一款基于「爆裂棋 / Chain Reaction」玩法改进的多人策略棋盘游戏。支持本地多人和 AI 对战，棋子数量超过棋盘格容量时会发生连锁爆裂，扩散到相邻格子。
+你点下一个棋子，它可能引爆整张棋盘。
 
-当前版本为纯客户端应用（Tauri + 纯前端），无需服务器。
+**连锁棋** 是基于 Chain Reaction / 爆裂棋玩法改进的多人策略游戏。2~10 人对战，棋子数攒满格子就炸——炸出去的棋子会触发下一轮爆炸，直到一方被吞没为止。
+
+纯客户端应用（Tauri + Rust），无需服务器，本地启动即玩。
 
 ## 🎮 游戏规则
 

@@ -6,6 +6,7 @@ use std::collections::{HashSet, VecDeque};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use rand::Rng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -186,7 +187,7 @@ async fn ai_move_v2(
     let result = tauri::async_runtime::spawn_blocking(move || {
         if algorithm == "pvs" {
             // PVS (NegaMax) + Killer/History + QSearch
-            let mut searcher = PvsSearcher::new(player);
+            let mut searcher = PvsSearcher::new(player, game_count);
             searcher.find_best(&board, size, player, max_players, &eliminated, depth)
         } else {
             // 默认使用 Alpha-Beta（原 find_best_move）
@@ -916,14 +917,16 @@ impl ElimSet {
 }
 
 struct PvsSearcher {
+    game_count: u32,
     killers: [[Option<(usize, usize)>; PVS_MAX_DEPTH]; 2],
     history: [[i32; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
     ai_player: usize,
 }
 
 impl PvsSearcher {
-    fn new(ai_player: usize) -> Self {
+    fn new(ai_player: usize, game_count: u32) -> Self {
         Self {
+            game_count,
             killers: [[None; PVS_MAX_DEPTH]; 2],
             history: [[0; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
             ai_player,
@@ -1143,6 +1146,7 @@ impl PvsSearcher {
                 let next = next_live_player_es(&child, sz, player, child_elim, max_players);
 
                 let mut searcher = PvsSearcher {
+                    game_count: self.game_count,
                     killers: base_killers,
                     history: base_history,
                     ai_player: player,
@@ -1454,9 +1458,7 @@ fn mcts_search(
 
         // 构建子树
         let mut tree = MctsTree::new(b, elim, next_p, sz, max_players, ai_player, max_nodes);
-        let mut rng = XorShift::seed(
-            mx as u64 * 6364136223846793005 + my as u64 * 1442695040888963407 + 12345,
-        );
+        let mut rng = XorShift::seed(rand::thread_rng().gen::<u64>());
 
         for _ in 0..iters_per {
             tree.iterate(&mut rng);
@@ -1603,6 +1605,7 @@ pub fn find_best_move_strategy(
         return first_move_center(board, sz);
     }
 
+        let mut rng = rand::thread_rng();
     // 确定性伪随机（基于棋盘哈希），保持每次调用结果一致
     let hash: u64 = board.iter().enumerate().flat_map(|(i, row)| {
         row.iter().enumerate().map(move |(j, c)| {
@@ -1642,7 +1645,7 @@ pub fn find_best_move_strategy(
             }
         }
         if best_cnt >= 1 {
-            return Some(best[rnd_idx(1, best.len())]);
+            return Some(best[rng.gen_range(0..best.len())]);
         }
     }
 
@@ -1668,7 +1671,7 @@ pub fn find_best_move_strategy(
                     near_any_opp += 1;
                 }
             }
-            let score = edge + corner - near_any_opp as f64 * 5.0 + rnd(2);
+            let score = edge + corner - near_any_opp as f64 * 5.0 + rng.gen_range(0.0..1.0)*0.5;
             if score > best_score + 0.01 {
                 best_score = score;
                 best = vec![(i, j)];
@@ -1677,7 +1680,7 @@ pub fn find_best_move_strategy(
             }
         }
         if !best.is_empty() {
-            return Some(best[rnd_idx(3, best.len())]);
+            return Some(best[rng.gen_range(0..best.len())]);
         }
     }
 
@@ -1697,7 +1700,7 @@ pub fn find_best_move_strategy(
                     near_opp += 1;
                 }
             }
-            let score = -near_opp as f64 * 3.0 + rnd(4) * 2.0;
+            let score = -near_opp as f64 * 3.0 + rng.gen_range(0.0..1.0)*0.5 * 2.0;
             if score > best_score + 0.01 {
                 best_score = score;
                 best = vec![(i, j)];
@@ -1706,7 +1709,7 @@ pub fn find_best_move_strategy(
             }
         }
         if !best.is_empty() {
-            return Some(best[rnd_idx(5, best.len())]);
+            return Some(best[rng.gen_range(0..best.len())]);
         }
     }
 
@@ -1723,7 +1726,7 @@ pub fn find_best_move_strategy(
                 }
             }
             let edge = if i == 0 || i == sz - 1 || j == 0 || j == sz - 1 { 2.0 } else { 0.0 };
-            let score = near_opp as f64 + edge + rnd(6);
+            let score = near_opp as f64 + edge + rng.gen_range(0.0..1.0)*0.5;
             if score > best_score + 0.01 {
                 best_score = score;
                 best = Some((i, j));
@@ -1740,7 +1743,7 @@ pub fn find_best_move_strategy(
         .copied()
         .collect();
     if !available.is_empty() {
-        return Some(available[rnd_idx(7, available.len())]);
+        return Some(available[rng.gen_range(0..available.len())]);
     }
 
     // 6. 保底：返回第一个棋子
