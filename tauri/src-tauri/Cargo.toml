@@ -1,6 +1,6 @@
 [package]
 name = "chain-chess"
-version = "3.0.0-alpha"
+version = "3.0.0-beta"
 description = "连锁棋 - AI & 本地对战"
 authors = ["ywnh1"]
 edition = "2021"

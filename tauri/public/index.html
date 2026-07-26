@@ -1192,7 +1192,7 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.0.0-alpha</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.0.0-beta</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -4148,9 +4148,9 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-    {v:'v3.0.0-alpha · 第 20 版',desc:'首页UI重构(背景光球+玻璃质感+按钮简化)+统一游戏设置(棋盘5~19/人数2~10/每人独立配置)+PVS/MCTS AI引擎优化+新增随机刻度选项'},
+    {v:'v3.0.0-beta · 第 21 版',desc:'排版变量体系重构，自定义AI选择弹窗，rand库随机化AI引擎，跳过按钮纯按钮化，README+About重写'},
     {v:'v2.3.9-beta · 第 19 版',desc:'开始游戏卡片和按钮放大、进行中游戏可放弃、历史图表修复、版本号回退 2.3.9-beta'},
-  {v:'v3.0.0-alpha · 第 18 版',desc:'v3.0 全新架构重写：全按钮统一 glass-btn 风格、可点击块统一 mode-card 风格、AI 对战支持逐个 AI 独立配置算法/深度、颜色选择排除 AI 使用'},
+  {v:'v3.0.0-beta · 第 18 版',desc:'v3.0 全新架构重写：全按钮统一 glass-btn 风格、可点击块统一 mode-card 风格、AI 对战支持逐个 AI 独立配置算法/深度、颜色选择排除 AI 使用'},
     {v:'v2.3.8 · 第 17 版',desc:'配色优化（奶白/深灰色）、震动反馈、双向棋盘人数限制、Cargo 编译优化'},
     {v:'v2.3.8 · 第 17 版',desc:'PVS 搜索性能优化：QSearch 深度收窄、Cell Copy、邻域展开去 Vec 分配、Null Window 跳过 QSearch'},
     {v:'v2.3.6-beta · 第 15 版',desc:'AI 代码全量迁移至 Rust 引擎，终局判断优化，开场随机性调整'},
