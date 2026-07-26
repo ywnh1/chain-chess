@@ -982,7 +982,7 @@ body.light-mode{
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v2.3.8-beta</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v2.3.8</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-info-row" style="cursor:pointer" onclick="Router.navigate('about-license')"><span class="info-key">许可证</span><span class="info-val" style="color:var(--accent2)">MIT License →</span></div>
@@ -3860,8 +3860,8 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-    {v:'v2.3.8-beta · 第 17 版',desc:'配色优化（奶白/深灰色）、震动反馈、双向棋盘人数限制、Cargo 编译优化'},
-    {v:'v2.3.8-beta · 第 17 版',desc:'PVS 搜索性能优化：QSearch 深度收窄、Cell Copy、邻域展开去 Vec 分配、Null Window 跳过 QSearch'},
+    {v:'v2.3.8 · 第 17 版',desc:'配色优化（奶白/深灰色）、震动反馈、双向棋盘人数限制、Cargo 编译优化'},
+    {v:'v2.3.8 · 第 17 版',desc:'PVS 搜索性能优化：QSearch 深度收窄、Cell Copy、邻域展开去 Vec 分配、Null Window 跳过 QSearch'},
     {v:'v2.3.6-beta · 第 15 版',desc:'AI 代码全量迁移至 Rust 引擎，终局判断优化，开场随机性调整'},
     {v:'v2.3.6-beta · 第 14 版',desc:'中断游戏持久化：异常/暂停退出自动存为历史记录，历史页可继续未完成对局'},
     {v:'v2.3.4-beta · 第 12 版',desc:'安卓侧滑手势优化 & 退出确认：图表预览侧滑关闭、游戏暂停切换、退出确认弹窗'},
