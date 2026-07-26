@@ -170,14 +170,9 @@ body::after{content:'';position:fixed;inset:0;
 /* lobby */
 #aiLobby,#localLobby,#eveLobby{max-width:480px;gap:.75rem;width:100%}
 #aiLobby .back,#localLobby .back,#history .back,#eveLobby .back{
-  align-self:flex-start;
-  background:var(--glass-w-06);border:1px solid var(--glass-w-10);color:var(--dim);
-  font-size:.82rem;cursor:pointer;padding:7px 16px;border-radius:16px;
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  display:flex;align-items:center;gap:4px;transition:.2s;
+  align-self:flex-start;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;
 }
-#aiLobby .back:hover,#localLobby .back:hover,#history .back:hover,#eveLobby .back:hover{background:var(--glass-w-10);border-color:var(--glass-w-20);color:var(--text)}
-#aiLobby .back:active,#localLobby .back:active,#history .back:active,#eveLobby .back:active{transform:scale(.97)}
 #aiLobby h2,#localLobby h2,#history h2,#eveLobby h2{font-size:1.2rem;font-weight:600;margin-bottom:4px}
 .form-row{margin:8px 0;display:flex;flex-direction:column;gap:4px;width:100%}
 .form-row label{font-size:.78rem;color:var(--dim);font-weight:500}
@@ -204,8 +199,8 @@ body::after{content:'';position:fixed;inset:0;
   border-radius:8px;padding:6px 10px;margin:4px 0;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
 }
-.eve-ai-row .color-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.eve-ai-row .eve-label{font-size:.78rem;font-weight:600;min-width:44px}
+.eve-ai-row .color-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;border:1px solid var(--glass-w-10);box-shadow:0 0 6px rgba(0,0,0,.2)}
+.eve-ai-row .eve-label{font-size:.8rem;font-weight:600;min-width:44px;color:var(--text)}
 .eve-ai-row select{flex:1;padding:5px 6px;border:1px solid var(--border);border-radius:6px;
   background:var(--glass-w-04);color:var(--text);font-size:.75rem;outline:none;
   -webkit-appearance:none;appearance:none;
@@ -213,14 +208,6 @@ body::after{content:'';position:fixed;inset:0;
   background-repeat:no-repeat;background-position:right 8px center;padding-right:22px;}
 .eve-ai-row select:focus{border-color:var(--accent)}
 .eve-ai-row select option{background:var(--surface);color:var(--text)}
-.btn-primary{
-  width:100%;padding:12px;background:var(--accent);color:#0f0f13;
-  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;transition:.2s;
-  box-shadow:0 4px 20px rgba(240,179,75,.25);
-  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
-}
-.btn-primary:hover{opacity:.92;box-shadow:0 4px 20px rgba(240,179,75,.3);transform:translateY(-1px)}
-.btn-primary:active{opacity:.9;transform:scale(.97);transition:all .08s ease}
 
 /* game */
 #game{max-width:520px;gap:8px;width:100%}
@@ -228,12 +215,12 @@ body::after{content:'';position:fixed;inset:0;
   display:flex;justify-content:space-between;align-items:center;
   width:100%;padding:8px 0 10px;gap:6px;
 }
-#game .top-left{display:flex;gap:8px;align-items:center;justify-content:center;flex:1;min-width:0}
-/* ═══ 自动跳过连爆动画开关（玻璃风格切换） ═══ */
+#game .top-left{display:flex;gap:6px;align-items:center;justify-content:center;flex:1;min-width:0}
+/* ═══ 游戏控制按钮组（悔棋、暂停、跳过，统一风格） ═══ */
 .auto-skip-tg{
-  display:inline-flex;align-items:center;gap:7px;
-  font-size:.72rem;color:var(--dim);cursor:pointer;user-select:none;
-  padding:7px 12px;border-radius:8px;transition:all .2s ease;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.75rem;color:var(--dim);cursor:pointer;user-select:none;
+  padding:7px 10px;border-radius:10px;transition:all .2s ease;white-space:nowrap;
   font-family:var(--font);
   background:var(--glass-w-08);border:1px solid var(--glass-w-08);
   backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
@@ -242,50 +229,44 @@ body::after{content:'';position:fixed;inset:0;
 .auto-skip-tg:hover{background:var(--glass-w-12);border-color:var(--glass-w-12)}
 .auto-skip-tg:active{transform:scale(.96)}
 .auto-skip-tg .sw-tr{
-  width:34px;height:18px;border-radius:9px;
+  width:18px;height:12px;border-radius:6px;
   background:var(--glass-w-12);position:relative;transition:.3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;
   box-shadow:inset 0 1px 3px rgba(0,0,0,.2);
 }
 .auto-skip-tg .sw-tr.on{background:rgba(240,179,75,.5);box-shadow:inset 0 1px 3px rgba(0,0,0,.15),0 0 10px rgba(240,179,75,.18)}
 .auto-skip-tg .sw-kn{
-  width:14px;height:14px;border-radius:50%;
+  width:8px;height:8px;border-radius:50%;
   background:var(--dim);position:absolute;top:2px;left:2px;transition:.3s cubic-bezier(.34,1.56,.64,1);
   box-shadow:0 1px 3px rgba(0,0,0,.3);
 }
-.auto-skip-tg .sw-tr.on .sw-kn{left:18px;background:var(--accent);box-shadow:0 1px 4px rgba(240,179,75,.35)}
-.auto-skip-tg .auto-skip-icon{font-size:.82rem;line-height:1}
+.auto-skip-tg .sw-tr.on .sw-kn{left:8px;background:var(--accent);box-shadow:0 1px 4px rgba(240,179,75,.35)}
 /* 激活态 — 整体高亮 */
 .auto-skip-tg.on{color:var(--accent);border-color:rgba(240,179,75,.2);background:rgba(240,179,75,.08)}
-#game .top-left button:not(#pauseBtn){
-  background:var(--glass-w-08);color:var(--dim);
-  border:1px solid var(--glass-w-08);padding:7px 12px;border-radius:8px;font-size:.72rem;
-  cursor:pointer;transition:.15s;font-weight:500;letter-spacing:.3px;
+/* ═══ 暂停按钮（与悔棋统一的金色调小按钮） ═══ */
+#pauseBtn{
+  padding:7px 16px;font-size:.75rem;font-weight:600;letter-spacing:.5px;
+  background:rgba(240,179,75,.08);color:var(--accent);
+  border:1px solid rgba(240,179,75,.18);border-radius:10px;
+  cursor:pointer;transition:all .2s ease;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 0 12px rgba(240,179,75,.04),inset 0 1px 0 rgba(240,179,75,.06);
   font-family:var(--font);
 }
-#game .top-left button:not(#pauseBtn):hover{background:var(--glass-w-12);border-color:var(--glass-w-12)}
-#game .top-left button:not(#pauseBtn):active{background:var(--glass-w-12);transform:scale(.97);transition:all .06s ease}
-/* ═══ 暂停按钮（醒目大按钮+呼吸发光） ═══ */
-#pauseBtn{
-  padding:12px 28px;font-size:.95rem;font-weight:700;letter-spacing:1px;
-  background:rgba(240,179,75,.12);color:var(--accent);
-  border:1.5px solid rgba(240,179,75,.25);border-radius:12px;
-  cursor:pointer;transition:all .25s ease;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  box-shadow:0 0 20px rgba(240,179,75,.08),inset 0 1px 0 rgba(240,179,75,.1);
-  animation:pausePulse 3s ease-in-out infinite;
-  text-shadow:0 0 8px rgba(240,179,75,.1);
+#pauseBtn:hover{background:rgba(240,179,75,.16);box-shadow:0 0 20px rgba(240,179,75,.1),inset 0 1px 0 rgba(240,179,75,.1);border-color:rgba(240,179,75,.3)}
+#pauseBtn:active{transform:scale(.96);transition:all .06s ease}
+/* ═══ 悔棋按钮（暂停主题风格 — 金色调，无脉冲） ═══ */
+#undoBtn{
+  padding:7px 16px;font-size:.75rem;font-weight:600;letter-spacing:.5px;
+  background:rgba(240,179,75,.08);color:var(--accent);
+  border:1px solid rgba(240,179,75,.18);border-radius:10px;
+  cursor:pointer;transition:all .2s ease;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 0 12px rgba(240,179,75,.04),inset 0 1px 0 rgba(240,179,75,.06);
+  font-family:var(--font);
 }
-#pauseBtn:hover{
-  background:rgba(240,179,75,.2);box-shadow:0 0 30px rgba(240,179,75,.2),inset 0 1px 0 rgba(240,179,75,.15);
-  transform:translateY(-1px);
-}
-#pauseBtn:active{transform:scale(.96);transition:all .08s ease}
-@keyframes pausePulse{
-  0%,100%{box-shadow:0 0 20px rgba(240,179,75,.08),inset 0 1px 0 rgba(240,179,75,.1);border-color:rgba(240,179,75,.25)}
-  50%{box-shadow:0 0 35px rgba(240,179,75,.18),inset 0 1px 0 rgba(240,179,75,.15);border-color:rgba(240,179,75,.4)}
-}
-/* ═══ 悔棋按钮（继承 #game .top-left button:not(#pauseBtn) 基础样式） ═══ */
-#undoBtn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+#undoBtn:hover{background:rgba(240,179,75,.16);box-shadow:0 0 20px rgba(240,179,75,.1),inset 0 1px 0 rgba(240,179,75,.1);border-color:rgba(240,179,75,.3)}
+#undoBtn:active{transform:scale(.96);transition:all .06s ease}
+#undoBtn:disabled{opacity:.3;cursor:not-allowed;transform:none;background:var(--glass-w-04);border-color:var(--glass-w-06);color:var(--dim);box-shadow:none}
 /* 跳过动画按钮 */
 #skipChainBtn{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:500;
@@ -398,26 +379,6 @@ body{padding-top:env(safe-area-inset-top,20px)}
   border-color:var(--glass-w-18);
   box-shadow:0 8px 32px rgba(0,0,0,.4);
 }
-.btn-primary,.settlement .btn-again{
-  background:var(--accent);color:#0f0f13;
-  border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;
-  transition:.2s;box-shadow:0 4px 20px rgba(240,179,75,.25);
-  touch-action:manipulation;
-  min-height:44px;
-}
-.btn-primary:hover{opacity:.9;box-shadow:0 4px 20px rgba(240,179,75,.3);transform:translateY(-1px)}
-.btn-primary:active{opacity:.85;transform:scale(.97);transition:all .08s ease}
-/* 危险按钮 — 暂停界面的结束游戏 */
-.btn-danger{
-  width:100%;padding:10px;
-  background:rgba(255,80,80,.15);color:#ff6b6b;
-  border:1px solid rgba(255,80,80,.25);
-  border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;
-  transition:.2s;
-  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
-}
-.btn-danger:hover{background:rgba(255,80,80,.22);border-color:rgba(255,80,80,.4)}
-.btn-danger:active{opacity:.7;transform:scale(.97);transition:all .08s ease}
 /* 统一玻璃小按钮（历史页、各处操作按钮） */
 .glass-btn{border:1px solid var(--glass-border);background-image:var(--liquid-iris),var(--glass-w-06);background-origin:padding-box;color:var(--text);padding:6px 12px;border-radius:var(--radius-sm);font-size:.75rem;cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);font-weight:500;font-family:var(--font);touch-action:manipulation;min-height:36px;display:inline-flex;align-items:center;justify-content:center;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow)}
 .glass-btn:hover{border-color:var(--glass-w-16);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
@@ -487,7 +448,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 #pauseOverlay #pauseCharts{display:flex;flex-direction:column;gap:14px;width:100%}
 #pauseOverlay .stats-grid{gap:10px}
-#pauseOverlay .btn-primary{margin-top:6px}
+#pauseOverlay .glass-btn.primary{margin-top:6px}
 #pauseOverlay .chart-box canvas{height:200px}
 
 /* checkout screen — 结算/历史详情页（复用 settlement 样式，但作为 .screen） */
@@ -513,7 +474,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 #checkout .chart-box canvas{height:100px;border-radius:4px}
 #checkout .chart-box h4{font-size:.78rem;margin-bottom:5px}
 
-#checkout .btn-again{padding:9px 24px;font-size:.85rem;margin:14px 0 6px;width:auto}
+#checkout .glass-btn.primary{padding:9px 24px;font-size:.85rem;margin:14px 0 6px;width:auto}
 
 /* player colours (与 COLORS 数组同步) */
 .p0{background:#E74C3C}
@@ -530,9 +491,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* about screen — 一级页 */
 #about.screen,#about-ai.screen,#about-changelog.screen,#about-license.screen{max-width:520px;gap:10px;padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(32px + env(safe-area-inset-bottom, 0px));height:100dvh;overflow:hidden;width:100%}
 #about.screen.active,#about-ai.screen.active,#about-changelog.screen.active,#about-license.screen.active{display:flex;flex-direction:column;align-items:center}
-#about .back,#about-ai .back,#about-changelog .back,#about-license .back{align-self:flex-start;background:var(--glass-w-06);border:1px solid var(--glass-w-10);color:var(--dim);font-size:.82rem;cursor:pointer;padding:7px 16px;border-radius:16px;display:flex;align-items:center;gap:4px;transition:.2s;flex-shrink:0;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-#about .back:hover,#about-ai .back:hover,#about-changelog .back:hover,#about-license .back:hover{background:var(--glass-w-10);border-color:var(--glass-w-20);color:var(--text)}
-#about .back:active,#about-ai .back:active,#about-changelog .back:active,#about-license .back:active{transform:scale(.97)}
+#about .back,#about-ai .back,#about-changelog .back,#about-license .back{align-self:flex-start;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
 #about h2,#about-ai h2,#about-license h2{font-size:1.15rem;font-weight:600;text-align:center;padding:4px 0 6px;flex-shrink:0;letter-spacing:1px}
 #about .about-scroll,#about-ai .about-scroll,#about-changelog .about-scroll,#about-license .about-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:14px}
 #about .about-scroll::-webkit-scrollbar,#about-ai .about-scroll::-webkit-scrollbar,#about-changelog .about-scroll::-webkit-scrollbar,#about-license .about-scroll::-webkit-scrollbar{width:3px}
@@ -553,11 +512,11 @@ body{padding-top:env(safe-area-inset-top,20px)}
 #about .about-card li{font-size:.82rem;line-height:1.6;color:var(--text);margin-bottom:3px}
 #about .about-card li:last-child{margin-bottom:0}
 
-/* 导航条目（指向二级页面） */
-#about .about-nav{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1);touch-action:manipulation}
-#about .about-nav:hover{background:var(--glass-w-08);border-color:var(--glass-w-14)}
-#about .about-nav:active{transform:scale(.99)}
-#about .about-nav .nav-label{font-size:.85rem;font-weight:500;color:var(--text)}
+/* 导航条目（指向二级页面，统一为 mode-card 风格） */
+#about .about-nav{background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:20px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:.35s cubic-bezier(.22,1,.36,1);touch-action:manipulation;min-height:56px}
+#about .about-nav:hover{border-color:var(--glass-w-16);transform:translateY(-2px);box-shadow:0 12px 48px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
+#about .about-nav:active{transform:scale(.97);transition:all .08s ease}
+#about .about-nav .nav-label{font-size:1rem;font-weight:600;color:var(--text)}
 #about .about-nav .nav-arrow{font-size:.7rem;color:var(--dim)}
 
 /* 二级页公共样式 */
@@ -627,8 +586,6 @@ body{padding-top:env(safe-area-inset-top,20px)}
   font-size:.88rem;font-weight:600;cursor:pointer;transition:.15s;
 }
 .modal-actions button:active{transform:scale(.97)}
-.btn-ghost{background:var(--glass-w-08);color:var(--dim)}
-.btn-ghost:hover{background:var(--glass-w-12)}
 
 /* player bar */
 .player-bar{
@@ -698,24 +655,25 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .settlement .chart-box h4{font-size:.85rem;font-weight:600;margin-bottom:8px;text-align:center;color:var(--text)}
 .settlement .chart-box canvas{width:100%;height:150px;display:block;border-radius:6px}
 
-.settlement .btn-again{
-  padding:12px 32px;background:var(--accent);color:#0f0f13;
-  border:none;border-radius:10px;font-size:.95rem;font-weight:600;
-  cursor:pointer;margin:8px 0 16px;transition:.2s;
-  box-shadow:0 4px 20px rgba(240,179,75,.25);
+.settlement .glass-btn.primary{
+  padding:12px 32px;margin:8px 0 16px;
 }
-.settlement .btn-again:active{opacity:.8}
 /* history */
 #history.screen{height:100dvh;overflow:hidden;padding:calc(12px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px))}
 #history .back,#history>div,#history>p{flex-shrink:0}
 .history-list{width:100%;overflow-y:auto;flex:1;min-height:0}
 .history-item{
-  background:var(--glass-w-04);border-radius:10px;padding:12px;margin:8px 0;
-  border:1px solid var(--border);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  transition:.15s;
+  background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;
+  border:1px solid var(--glass-border);border-radius:var(--radius);
+  backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
+  box-shadow:var(--glass-shadow);
+  padding:20px 16px;cursor:pointer;
+  transition:.35s cubic-bezier(.22,1,.36,1);
+  touch-action:manipulation;
+  margin:8px 0;
 }
-.history-item:hover{border-color:var(--glass-w-15);background:var(--glass-w-06)}
+.history-item:hover{border-color:var(--glass-w-16);transform:translateY(-2px);box-shadow:0 12px 48px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
+.history-item:active{transform:scale(.97);transition:all .08s ease}
 .history-item .h-time{font-size:.7rem;color:var(--dim)}
 .history-item .h-info{font-size:.8rem;margin:4px 0}
 .history-item .h-info strong{color:var(--accent2)}
@@ -738,91 +696,65 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* 棋盘大小网格 */
 .size-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%}
 .size-btn{
-  padding:10px 4px;border-radius:8px;border:1px solid var(--glass-w-08);
-  background:var(--glass-w-04);color:var(--dim);font-size:.78rem;font-weight:500;
-  cursor:pointer;transition:.15s;text-align:center;font-family:var(--font);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  padding:10px 4px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);
+  background-image:var(--liquid-iris),var(--glass-w-06);background-origin:padding-box;
+  color:var(--text);font-size:.78rem;font-weight:500;
+  cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);text-align:center;font-family:var(--font);
+  backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
+  box-shadow:var(--glass-shadow);touch-action:manipulation;
 }
-.size-btn:hover{background:var(--glass-w-08);border-color:var(--glass-w-14)}
-.size-btn:active{transform:scale(.95);transition:all .06s ease}
+.size-btn:hover{border-color:var(--glass-w-16);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
+.size-btn:active{transform:scale(.93);transition:all .06s ease}
 .size-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
 
 /* 按钮组（AI 数量、玩家数量） */
 .btn-group{display:flex;gap:6px;flex-wrap:wrap;width:100%}
 .btn-group .gb{
-  flex:1;min-width:44px;padding:9px 6px;border-radius:8px;border:1px solid var(--glass-w-08);
-  background:var(--glass-w-04);color:var(--dim);font-size:.78rem;font-weight:500;
-  cursor:pointer;transition:.15s;text-align:center;font-family:var(--font);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  flex:1;min-width:44px;padding:9px 6px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);
+  background-image:var(--liquid-iris),var(--glass-w-06);background-origin:padding-box;
+  color:var(--text);font-size:.78rem;font-weight:500;
+  cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);text-align:center;font-family:var(--font);
+  backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
+  box-shadow:var(--glass-shadow);touch-action:manipulation;
 }
-.btn-group .gb:hover{background:var(--glass-w-08);border-color:var(--glass-w-14)}
-.btn-group .gb:active{transform:scale(.95);transition:all .06s ease}
+.btn-group .gb:hover{border-color:var(--glass-w-16);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
+.btn-group .gb:active{transform:scale(.93);transition:all .06s ease}
 .btn-group .gb.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
 
 /* 算法选择卡片 */
-.alg-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
-.alg-card{
-  padding:16px 12px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);
-  background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;
-  cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);text-align:center;
-  backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
-  box-shadow:var(--glass-shadow);
-}
-.alg-card:hover{background:var(--glass-w-08);border-color:var(--glass-w-16);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.04)}
-.alg-card:active{transform:scale(.97);transition:all .06s ease}
-.alg-card.selected{background:rgba(240,179,75,.12);border-color:var(--accent);box-shadow:0 0 16px rgba(240,179,75,.12)}
-.alg-card .alg-name{font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:4px}
-.alg-card .alg-desc{font-size:.78rem;color:var(--dim);line-height:1.5;padding:0 4px}
-.alg-card.selected .alg-name{color:var(--accent)}
 
 /* 深度滑块 */
-.depth-slider-wrap{display:flex;align-items:center;gap:12px;width:100%}
-.depth-slider{
-  flex:1;-webkit-appearance:none;appearance:none;height:6px;
-  background:var(--glass-w-10);border-radius:3px;outline:none;transition:.15s;
-}
-.depth-slider::-webkit-slider-thumb{
-  -webkit-appearance:none;appearance:none;width:22px;height:22px;
-  border-radius:50%;background:var(--accent);cursor:pointer;
-  box-shadow:0 2px 8px rgba(240,179,75,.3);transition:.1s;
-  border:2px solid var(--glass-w-15);
-}
-.depth-slider::-webkit-slider-thumb:active{transform:scale(1.15)}
-.depth-slider::-moz-range-thumb{
-  width:22px;height:22px;border-radius:50%;background:var(--accent);
-  cursor:pointer;border:2px solid var(--glass-w-15);
-  box-shadow:0 2px 8px rgba(240,179,75,.3);
-}
-.depth-value{
-  min-width:32px;text-align:center;font-size:1.1rem;font-weight:700;
-  color:var(--accent);font-variant-numeric:tabular-nums;
-}
-.depth-labels{display:flex;justify-content:space-between;width:100%;font-size:.65rem;color:var(--dim);margin-top:2px}
-.depth-labels span:last-child{text-align:right}
+
 
 /* 颜色选择器 */
-.color-picker{display:flex;gap:8px;flex-wrap:wrap;width:100%;justify-content:center}
+.color-picker{display:flex;gap:10px;flex-wrap:wrap;width:100%;justify-content:center}
 .color-opt{
-  width:44px;height:44px;border-radius:50%;border:2px solid transparent;
-  cursor:pointer;transition:.15s;position:relative;
+  width:48px;height:48px;border-radius:50%;border:2px solid var(--glass-w-10);
+  cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);position:relative;
+  box-shadow:var(--glass-shadow);touch-action:manipulation;
 }
-.color-opt:hover{transform:scale(1.12);box-shadow:0 0 12px var(--glass-w-12)}
-.color-opt:active{transform:scale(.95)}
-.color-opt.selected{border-color:#fff;box-shadow:0 0 16px var(--glass-w-20),0 0 0 3px var(--glass-w-08)}
+.color-opt:hover{transform:scale(1.15);border-color:var(--glass-w-20);box-shadow:0 0 20px rgba(0,0,0,.3)}
+.color-opt:active{transform:scale(.93);transition:all .06s ease}
+.color-opt.selected{border-color:#fff;box-shadow:0 0 20px var(--glass-w-20),0 0 0 4px rgba(255,255,255,.3)}
 .color-opt .color-label{
-  position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
-  font-size:.6rem;color:var(--dim);white-space:nowrap;display:none;
+  position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);
+  font-size:.62rem;color:var(--dim);white-space:nowrap;display:none;
+  font-weight:500;
 }
-.color-opt.selected .color-label{display:block}
+.color-opt.selected .color-label{display:block;color:var(--text)}
 
 /* Eve 配置行优化 */
 .eve-config-grid{display:flex;flex-direction:column;gap:6px;width:100%;max-height:260px;overflow-y:auto}
 .eve-ai-row{
-  display:flex;align-items:center;gap:8px;background:var(--glass-w-04);
-  border-radius:8px;padding:6px 10px;
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  border:1px solid var(--glass-w-06);
+  display:flex;align-items:center;gap:8px;
+  background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;
+  border-radius:var(--radius-sm);padding:8px 12px;
+  backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
+  border:1px solid var(--glass-border);
+  box-shadow:var(--glass-shadow);
+  transition:border-color .25s ease,box-shadow .25s ease;
 }
+.eve-ai-row:hover{border-color:var(--glass-w-14);box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .eve-ai-row .alg-mini{display:flex;gap:4px;flex:1}
 .eve-ai-row .alg-mini .am-btn{
   flex:1;padding:4px 6px;border-radius:6px;border:1px solid var(--glass-w-08);
@@ -976,7 +908,7 @@ body.light-mode{
 
 <!-- About Screen -->
 <div id="about" class="screen">
-  <button class="back" onclick="Router.back()">← 返回</button>
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll">
     <h2>关于连锁棋</h2>
 
@@ -985,7 +917,7 @@ body.light-mode{
       <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v2.3.8</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
-      <div class="about-info-row" style="cursor:pointer" onclick="Router.navigate('about-license')"><span class="info-key">许可证</span><span class="info-val" style="color:var(--accent2)">MIT License →</span></div>
+      <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
     </div>
 
     <!-- 游戏介绍（短卡片） -->
@@ -1019,13 +951,13 @@ body.light-mode{
     </div>
 
     <!-- AI 介绍 → 二级页 -->
-    <div class="about-nav" onclick="Router.navigate('about-ai')">
+    <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-ai')">
       <span class="nav-label">AI 介绍</span>
       <span class="nav-arrow">→</span>
     </div>
 
     <!-- 更新详情 → 二级页 -->
-    <div class="about-nav" onclick="Router.navigate('about-changelog')">
+    <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-changelog')">
       <span class="nav-label">更新详情</span>
       <span class="nav-arrow">→</span>
     </div>
@@ -1035,7 +967,7 @@ body.light-mode{
 
 <!-- About AI page (二级) -->
 <div id="about-ai" class="screen">
-  <button class="back" onclick="Router.back()">← 返回</button>
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll">
     <h2>AI 介绍</h2>
 
@@ -1079,7 +1011,7 @@ body.light-mode{
 
 <!-- About Changelog page (二级) -->
 <div id="about-changelog" class="screen">
-  <button class="back" onclick="Router.back()">← 返回</button>
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll" id="changelogContainer">
     <h2>更新详情</h2>
   </div>
@@ -1087,7 +1019,7 @@ body.light-mode{
 
 <!-- About License page (二级) -->
 <div id="about-license" class="screen">
-  <button class="back" onclick="Router.back()">← 返回</button>
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll">
     <h2>许可证</h2>
     <div class="about-card">
@@ -1102,7 +1034,7 @@ body.light-mode{
 
 <!-- History Screen -->
 <div id="history" class="screen">
-  <button class="back" onclick="Router.back()">← 返回</button>
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
     <h2 style="margin:0">历史记录</h2>
       <div style="display:flex;gap:6px;align-items:center">
@@ -1128,7 +1060,7 @@ body.light-mode{
 
 <!-- AI Lobby -->
 <div id="aiLobby" class="screen">
-  <button class="back" onclick="Router.back()">← 返回</button>
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <h2>AI 对战</h2>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">选择对局配置</p>
 
@@ -1170,44 +1102,17 @@ body.light-mode{
     <div id="aiColorOptions" class="color-picker"></div>
   </div>
 
-  <!-- AI 算法 -->
-  <div class="form-row"><label>AI 算法</label>
-    <div id="aiAlgorithmCards" class="alg-cards">
-      <div class="alg-card selected" data-value="strategy">
-        <div class="alg-name">策略算法</div>
-        <div class="alg-desc">快速启发式搜索，推荐新手使用</div>
-      </div>
-      <div class="alg-card" data-value="alphabeta">
-        <div class="alg-name">Alpha-Beta 剪枝</div>
-        <div class="alg-desc">Rust + Rayon 多核加速，深度可调棋力更强</div>
-      </div>
-      <div class="alg-card" data-value="pvs">
-        <div class="alg-name">PVS NegaMax</div>
-        <div class="alg-desc">Principal Variation Search + Killer/History + 静止搜索</div>
-      </div>
-      <div class="alg-card" data-value="mcts">
-        <div class="alg-name">MCTS 蒙特卡洛</div>
-        <div class="alg-desc">基于随机模拟的树搜索，探索性强且无需评估函数</div>
-      </div>
-    </div>
+  <!-- 每个 AI 独立配置（已移除全局算法选择，每个 AI 行自行配置） -->
+  <div id="aiConfigArea" class="form-eve-config">
+    <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">配置每个 AI 对手</p>
   </div>
 
-  <!-- 搜索深度 -->
-  <div id="aiDepthRow" class="form-row">
-    <label>搜索深度</label>
-    <div class="depth-slider-wrap">
-      <input type="range" id="aiDepthSlider" class="depth-slider" min="1" max="10" value="2" step="1">
-      <span class="depth-value" id="aiDepthDisplay">2</span>
-    </div>
-    <div class="depth-labels"><span>浅层 · 快速</span><span>深层 · 精准</span></div>
-  </div>
-
-  <button class="btn-primary" onclick="startAIGame()" style="margin-top:12px">开始游戏</button>
+  <button class="glass-btn primary" onclick="startAIGame()" style="margin-top:12px">开始游戏</button>
 </div>
 
 <!-- Eve Lobby -->
 <div id="eveLobby" class="screen">
-  <button class="back" onclick="Router.back()">← 返回</button>
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <h2>AI 斗蛐蛐</h2>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">自定义 AI 阵容，观看 AI 互相博弈</p>
 
@@ -1250,12 +1155,12 @@ body.light-mode{
   <div id="eveConfigArea" class="form-eve-config">
     <p style="font-size:.8rem;color:var(--dim);margin:8px 0 4px">配置每个 AI</p>
   </div>
-  <button class="btn-primary" onclick="startEveGame()" style="margin-top:8px">开始观战</button>
+  <button class="glass-btn primary" onclick="startEveGame()" style="margin-top:8px">开始观战</button>
 </div>
 
 <!-- Local Lobby -->
 <div id="localLobby" class="screen">
-  <button class="back" onclick="Router.back()">← 返回</button>
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <h2>本地对战</h2>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">选择对局配置</p>
 
@@ -1292,7 +1197,7 @@ body.light-mode{
     </div>
   </div>
 
-  <button class="btn-primary" onclick="startLocalGame()" style="margin-top:12px">开始游戏</button>
+  <button class="glass-btn primary" onclick="startLocalGame()" style="margin-top:12px">开始游戏</button>
 </div>
 
 <!-- Game Screen -->
@@ -1301,8 +1206,8 @@ body.light-mode{
   <div class="top">
     <div class="top-left">
       <button onclick="undoLastMove()" id="undoBtn" disabled>悔棋</button>
-      <button onclick="togglePause()" id="pauseBtn">⏸ 暂停</button>
-      <span class="auto-skip-tg" id="autoSkipTg" onclick="toggleAutoSkip()" title="自动跳过连爆动画"><span class="sw-tr" id="autoSkipTr"><span class="sw-kn"></span></span><span class="auto-skip-icon">⏩</span>自动跳过</span>
+      <button onclick="togglePause()" id="pauseBtn">暂停</button>
+      <span class="auto-skip-tg" id="autoSkipTg" onclick="toggleAutoSkip()" title="自动跳过连爆动画"><span class="sw-tr" id="autoSkipTr"><span class="sw-kn"></span></span>跳过</span>
 </div>
   </div>
   <div id="playerBar" class="player-bar"></div>
@@ -1317,10 +1222,10 @@ body.light-mode{
     <div id="pauseStats" class="stats-grid"></div>
     <div id="pauseCharts" style="width:100%"></div>
     <div style="display:flex;gap:10px;margin-top:10px;width:100%">
-      <button class="btn-primary" onclick="resumeGame()" style="flex:1;padding:12px;font-size:1rem">▶ 继续游戏</button>
+      <button class="glass-btn primary" onclick="resumeGame()" style="flex:1;padding:12px;font-size:1rem">▶ 继续游戏</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:4px;width:100%">
-      <button class="btn-danger" onclick="endGameNow()" style="flex:1">结束游戏</button>
+      <button class="glass-btn danger" onclick="endGameNow()" style="flex:1">结束游戏</button>
     </div>
   </div>
 </div>
@@ -1337,8 +1242,8 @@ body.light-mode{
     <h3>退出应用</h3>
     <p style="text-align:center;font-size:.88rem;color:var(--dim);margin-bottom:4px">确定要退出连锁棋吗？</p>
     <div class="modal-actions">
-      <button class="btn-ghost" onclick="closeModal('exitConfirm')">取消</button>
-      <button class="btn-primary" onclick="confirmExitApp()">确认退出</button>
+      <button class="glass-btn" onclick="closeModal('exitConfirm')">取消</button>
+      <button class="glass-btn primary" onclick="confirmExitApp()">确认退出</button>
     </div>
   </div>
 </div>
@@ -1560,37 +1465,28 @@ function getSelStr(containerId){
 }
 // 设置选中状态
 function setSelected(container, target){
-  const sel = target.matches('.size-btn,.gb,.alg-card') ? '.size-btn,.gb,.alg-card' : '.' + target.className.split(' ')[0];
+  const sel = target.matches('.size-btn,.gb') ? '.size-btn,.gb' : '.' + target.className.split(' ')[0];
   container.querySelectorAll(sel).forEach(b=>b.classList.remove('selected'));
   target.classList.add('selected');
 }
 // 文档级委托：处理所有自定义控件点击（兼容 display:none 内的元素）
 document.addEventListener('click',function(e){
-  const t=e.target.closest('.size-btn,.gb,.alg-card');
+  const t=e.target.closest('.size-btn,.gb');
   if(!t)return;
   // 查找最近的自定义控件容器
-  const container=t.closest('.size-grid,.btn-group,.alg-cards');
+  const container=t.closest('.size-grid,.btn-group');
   if(!container)return;
   setSelected(container, t);
   // 触发副作用
-  if(container.id==='aiCountGroup')setTimeout(toggleAIColorPicker,10);
-  else if(container.id==='aiAlgorithmCards')setTimeout(toggleAIDepth,10);
+  if(container.id==='aiCountGroup'){setTimeout(toggleAIColorPicker,10);setTimeout(generateAIConfig,10);}
+
   else if(container.id==='eveCountGroup')setTimeout(generateEveConfig,10);
   // 棋盘大小或人数变更 → 更新双方按钮显示
   if(t.classList.contains('size-btn')||t.classList.contains('gb'))setTimeout(updateLobbyOptions,10);
 });
-// 深度滑块
-const aiDepthSlider=document.getElementById('aiDepthSlider');
-const aiDepthDisplay=document.getElementById('aiDepthDisplay');
-if(aiDepthSlider&&aiDepthDisplay){
-  aiDepthSlider.addEventListener('input',function(){
-    aiDepthDisplay.textContent=this.value;
-    toggleAIDepth();
-  });
-}
 // 初始触发
 setTimeout(toggleAIColorPicker,20);
-setTimeout(toggleAIDepth,50);
+setTimeout(generateAIConfig,100);
 
 /* ==================== ROUTER ==================== */
 const Router = {
@@ -1704,7 +1600,7 @@ Router.register('history', {
 
 Router.register('aiLobby', {
   back: 'welcome',
-  enter() { document.body.style.background=''; setTimeout(toggleAIDepth, 10); setTimeout(updateLobbyOptions, 20); },
+  enter() { document.body.style.background=''; setTimeout(updateLobbyOptions, 20); },
   leave() {}
 });
 
@@ -1776,7 +1672,7 @@ function generateEveConfig(){
   let cnt=getSel('eveCountGroup')||3;
   if(cnt<2)cnt=2;if(cnt>10)cnt=10;
   let area=document.getElementById('eveConfigArea');
-  area.innerHTML='<p style="font-size:.8rem;color:var(--dim);margin:8px 0 4px">配置每个 AI</p>';
+  area.innerHTML='<p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">配置每个 AI</p>';
   for(let i=0;i<cnt;i++){
     let row=document.createElement('div');row.className='eve-ai-row';
     let dot=document.createElement('span');dot.className='color-dot';dot.style.background=COLORS[i%COLORS.length]||'#888';
@@ -1828,7 +1724,7 @@ function startEveGame(){
   let aiCount=getSel('eveCountGroup')||3;
   maxPlayers=aiCount;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
-  document.getElementById('pauseBtn').textContent='⏸ 暂停';
+  document.getElementById('pauseBtn').textContent='暂停';
   gameMode='eve';_originPage='eveLobby';
   aiPlayers=new Set();
   aiConfigs={};
@@ -2345,7 +2241,7 @@ function loadGameFromState(saved){
   aiAlgorithm = saved.aiAlgorithm || "";
   aiDepth = saved.aiDepth || 0;
 
-  document.getElementById("pauseBtn").textContent = "⏸ 暂停";
+  document.getElementById("pauseBtn").textContent = "暂停";
   _originPage = gameMode === "ai" ? "aiLobby" : (gameMode === "eve" ? "eveLobby" : "localLobby");
 
   board = saved.board;
@@ -2446,19 +2342,6 @@ function setupAutoSave(){
 }
 setupAutoSave();
 
-function toggleAIDepth(){
-  let alg=getSelStr('aiAlgorithmCards');
-  let row=document.getElementById('aiDepthRow');
-  let slider=document.getElementById('aiDepthSlider');
-  if(alg==='alphabeta'||alg==='pvs'||alg==='mcts'){
-    row.style.display='block';
-    if(slider)slider.disabled=false;
-  }else{
-    row.style.display='none';
-  }
-}
-// 初始化时根据算法隐藏/显示深度设置
-toggleAIDepth();
 
 let selectedPlayerColor = 0;
 function toggleAISettings(){
@@ -2948,7 +2831,7 @@ function startLocalGame(){
   size=getSel('localSizeGrid')||7;
   maxPlayers=getSel('localPlayersGroup')||2;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
-  document.getElementById('pauseBtn').textContent='⏸ 暂停';
+  document.getElementById('pauseBtn').textContent='暂停';
   gameMode='local';_originPage='localLobby';
   aiPlayers=new Set();
   aiThinking=false;
@@ -2982,8 +2865,66 @@ function toggleAIColorPicker(){
       container.querySelectorAll('.color-opt').forEach(b=>b.classList.remove('selected'));
       this.classList.add('selected');
       selectedPlayerColor=parseInt(this.dataset.idx);
+      if(document.getElementById('aiConfigArea'))setTimeout(generateAIConfig,10);
     };
     container.appendChild(btn);
+  }
+}
+function generateAIConfig(){
+  let cnt=getSel('aiCountGroup')||1;
+  if(cnt<1)cnt=1;if(cnt>6)cnt=6;
+  let maxP=cnt+1;
+  let humanIdx=selectedPlayerColor;
+  // 构建 AI 玩家索引（排除人类选择的颜色）
+  let aiIndices=[];
+  for(let p=0;p<maxP;p++){
+    if(p!==humanIdx)aiIndices.push(p);
+  }
+  let area=document.getElementById('aiConfigArea');
+  area.innerHTML='<p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">配置每个 AI 对手</p>';
+  for(let i=0;i<cnt;i++){
+    let row=document.createElement('div');row.className='eve-ai-row';
+    let pIdx=aiIndices[i];
+    let dot=document.createElement('span');dot.className='color-dot';dot.style.background=COLORS[pIdx%COLORS.length]||'#888';
+    let label=document.createElement('span');label.className='eve-label';label.textContent='AI '+(i+1);
+    // 算法迷你切换
+    let algWrap=document.createElement('div');algWrap.className='alg-mini';
+    let algVal='strategy';
+    function makeAlgBtn(v,t){
+      let b=document.createElement('button');b.className='am-btn'+(v===algVal?' selected':'');
+      b.textContent=t;b.dataset.value=v;
+      b.onclick=function(e){
+        e.stopPropagation();
+        algWrap.querySelectorAll('.am-btn').forEach(x=>x.classList.remove('selected'));
+        this.classList.add('selected');
+        algVal=this.dataset.value;
+        depWrap.style.display=(algVal==='alphabeta'||algVal==='pvs'||algVal==='mcts')?'flex':'none';
+      };
+      return b;
+    }
+    algWrap.appendChild(makeAlgBtn('strategy','策略'));
+    algWrap.appendChild(makeAlgBtn('alphabeta','A-B'));
+    algWrap.appendChild(makeAlgBtn('pvs','PVS'));
+    algWrap.appendChild(makeAlgBtn('mcts','MCTS'));
+    // 深度迷你 +/-
+    let depWrap=document.createElement('div');depWrap.className='depth-mini hidden';
+    let defaultDepth=2;
+    let depVal=defaultDepth;
+    let depDisp=document.createElement('span');depDisp.className='dm-val';depDisp.textContent=String(depVal);
+    let decBtn=document.createElement('button');decBtn.className='dm-btn';decBtn.textContent='\u2212';
+    let incBtn=document.createElement('button');incBtn.className='dm-btn';incBtn.textContent='+';
+    decBtn.onclick=function(e){e.stopPropagation();if(depVal>1){depVal--;depDisp.textContent=depVal}};
+    incBtn.onclick=function(e){e.stopPropagation();if(depVal<10){depVal++;depDisp.textContent=depVal}};
+    depWrap.appendChild(decBtn);depWrap.appendChild(depDisp);depWrap.appendChild(incBtn);
+    // 根据默认算法决定深度是否可见
+    if(algVal==='alphabeta'||algVal==='pvs'||algVal==='mcts')depWrap.style.display='flex';
+    // 存储用于 startAIGame 读取
+    row.dataset.algKey='aiAlg_'+i;
+    row.dataset.depKey='aiDepth_'+i;
+    row._aiGetAlg=()=>algVal;
+    row._aiGetDep=()=>depVal;
+    row.appendChild(dot);row.appendChild(label);row.appendChild(algWrap);row.appendChild(depWrap);
+    area.appendChild(row);
   }
 }
 function startAIGame(){
@@ -2995,15 +2936,25 @@ function startAIGame(){
   let aiCount=getSel('aiCountGroup')||1;
   if(aiCount<1)aiCount=1;
   maxPlayers = aiCount + 1;
-  aiAlgorithm=getSelStr('aiAlgorithmCards');
-  aiDepth=parseInt(document.getElementById('aiDepthSlider')?.value)||2;
+  aiAlgorithm='strategy';
+  aiDepth=2;
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
-  document.getElementById('pauseBtn').textContent='⏸ 暂停';
+  document.getElementById('pauseBtn').textContent='暂停';
   gameMode='ai';_originPage='aiLobby';
   aiPlayers=new Set();
   let humanIdx = selectedPlayerColor;
+  aiConfigs={};
+  let aiRows=document.querySelectorAll('#aiConfigArea .eve-ai-row');
+  let rowIdx=0;
   for(let p=0;p<maxPlayers;p++){
-    if(p !== humanIdx) aiPlayers.add(p);
+    if(p !== humanIdx){
+      aiPlayers.add(p);
+      let row=aiRows[rowIdx];
+      let alg=row&&row._aiGetAlg?row._aiGetAlg():aiAlgorithm;
+      let dep=row&&row._aiGetDep?row._aiGetDep():aiDepth;
+      aiConfigs[p]={algorithm:alg,depth:dep};
+      rowIdx++;
+    }
   }
   aiThinking=false;
   eliminatedPlayers=new Set();
@@ -3018,7 +2969,7 @@ function startAIGame(){
   renderPlayerBar();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
   // 保存配置用于「再来一局」
-  _lastGameConfig={mode:'ai',size,aiCount:maxPlayers-1,aiAlgorithm,aiDepth,humanIdx};
+  _lastGameConfig={mode:'ai',size,aiCount:maxPlayers-1,aiAlgorithm,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs))};
 }
 
 function togglePause(){
@@ -3029,7 +2980,7 @@ function togglePause(){
     btn.textContent='▶ 继续';
     showPauseOverlay();
   } else {
-    btn.textContent='⏸ 暂停';
+    btn.textContent='暂停';
     hidePauseOverlay();
     updateUndoBtn();
   }
@@ -3186,7 +3137,7 @@ function hidePauseOverlay(){
 }
 function resumeGame(){
   isPaused=false;
-  document.getElementById('pauseBtn').textContent='⏸ 暂停';
+  document.getElementById('pauseBtn').textContent='暂停';
   hidePauseOverlay();
   updateUndoBtn();
   // 如果是 AI 回合，继续触发 AI
@@ -3471,9 +3422,9 @@ function renderGameCharts(container, history, opts){
     drawWhenReady(id1,history,cNames,colors,'pieces');
     drawWhenReady(id2,history,cNames,colors,'points');
   }
-  if(onReplay){let btn=document.createElement('button');btn.className='btn-again';btn.textContent='再来一局';btn.onclick=onReplay;container.appendChild(btn)}
+  if(onReplay){let btn=document.createElement('button');btn.className='glass-btn primary';btn.textContent='再来一局';btn.onclick=onReplay;container.appendChild(btn)}
   if(!_noBack){
-    let bh=document.createElement('button');bh.className='btn-again';bh.textContent='返回主界面';bh.style.marginTop='6px';bh.onclick=()=>Router.navigate('welcome');container.appendChild(bh);
+    let bh=document.createElement('button');bh.className='glass-btn primary';bh.textContent='返回主界面';bh.style.marginTop='6px';bh.onclick=()=>Router.navigate('welcome');container.appendChild(bh);
   }
 }
 
@@ -3488,13 +3439,13 @@ function replayGame(){
     undoStack=[];
     size=c.size;
     maxPlayers=c.aiCount+1;
-    aiAlgorithm=c.aiAlgorithm;
-    aiDepth=c.aiDepth;
+    aiAlgorithm=c.aiAlgorithm||'strategy';
     selectedPlayerColor=c.humanIdx;
     board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
-    document.getElementById('pauseBtn').textContent='⏸ 暂停';
+    document.getElementById('pauseBtn').textContent='暂停';
     gameMode='ai';
     aiPlayers=new Set();
+    aiConfigs=c.aiConfigs?JSON.parse(JSON.stringify(c.aiConfigs)):{};
     for(let p=0;p<maxPlayers;p++){if(p!==c.humanIdx)aiPlayers.add(p)}
     aiThinking=false;
     eliminatedPlayers=new Set();
@@ -3516,7 +3467,7 @@ function replayGame(){
     size=c.size;
     maxPlayers=c.maxPlayers;
     board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
-    document.getElementById('pauseBtn').textContent='⏸ 暂停';
+    document.getElementById('pauseBtn').textContent='暂停';
     gameMode='local';
     aiPlayers=new Set();
     aiThinking=false;
@@ -3537,7 +3488,7 @@ function replayGame(){
     size=c.size;
     maxPlayers=c.aiCount;
     board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
-    document.getElementById('pauseBtn').textContent='⏸ 暂停';
+    document.getElementById('pauseBtn').textContent='暂停';
     gameMode='eve';
     aiPlayers=new Set();
     aiConfigs={};
@@ -3613,7 +3564,7 @@ async function showSettlement(winner,colorNames,history){
   });
   // 返回主菜单按钮
   const homeBtn = document.createElement('button');
-  homeBtn.className = 'btn-again';
+  homeBtn.className = 'glass-btn primary';
   homeBtn.textContent = '返回主菜单';
   homeBtn.style.marginTop = '6px';
   homeBtn.onclick = () => { Router.navigate('welcome'); };
@@ -3656,7 +3607,7 @@ function showHistoryDetail(r){
   });
   // 添加"关闭"按钮（还原 maxPlayers）
   const closeBtn = document.createElement('button');
-  closeBtn.className = 'btn-again';
+  closeBtn.className = 'glass-btn primary';
   closeBtn.textContent = '关闭';
   closeBtn.onclick = () => { maxPlayers = origMax; Router.back(); };
   inner.appendChild(closeBtn);
@@ -3850,7 +3801,7 @@ function exitGame(){
   try{document.getElementById('pauseOverlay').style.display='none';}catch(e){}
   document.querySelectorAll('.modal').forEach(e=>e.classList.remove('show'));
   // ★ 重新显示 game screen 中的暂停按钮和消息，确保 DOM 干净
-  try{document.getElementById('pauseBtn').textContent='⏸ 暂停';}catch(e){}
+  try{document.getElementById('pauseBtn').textContent='暂停';}catch(e){}
   showMsg('','');
   Router.navigate('welcome');
 }
