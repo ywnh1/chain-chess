@@ -8,7 +8,7 @@ set -e
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="连锁棋"
-VERSION="3.0.0-alpha"
+VERSION="2.3.9-beta"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 

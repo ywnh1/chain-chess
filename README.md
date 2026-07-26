@@ -239,5 +239,5 @@ Copyright (c) 2026 ywnh1
 ---
 
 <div align="center">
-  <sub>Built with ♟ by <a href="https://github.com/nihao15900375400">ywnh1</a> · v3.0.0-alpha</sub>
+  <sub>Built with ♟ by <a href="https://github.com/nihao15900375400">ywnh1</a> · v2.3.9-beta</sub>
 </div>

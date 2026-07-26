@@ -149,23 +149,23 @@ body::after{content:'';position:fixed;inset:0;
 .logo{font-size:3rem;letter-spacing:2px}
 .logo span{color:var(--accent)}
 .tagline{color:var(--dim);font-size:.9rem;margin-top:-.5rem}
-.mode-cards{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px}
+.mode-cards{display:flex;flex-direction:column;gap:14px;width:100%;max-width:400px}
 .mode-card{
   background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;
   border:1px solid var(--glass-border);border-radius:var(--radius);
   backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
   box-shadow:var(--glass-shadow);
-  padding:20px 16px;cursor:pointer;
-  transition:.35s cubic-bezier(.22,1,.36,1);text-align:left;display:flex;align-items:center;gap:14px;
+  padding:26px 22px;cursor:pointer;
+  transition:.35s cubic-bezier(.22,1,.36,1);text-align:left;display:flex;align-items:center;gap:16px;
   touch-action:manipulation;
-  min-height:56px;
+  min-height:72px;
 }
 .mode-card:hover{border-color:var(--glass-w-16);transform:translateY(-2px);box-shadow:0 12px 48px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
 .mode-card:active{transform:scale(.97);transition:all .08s ease}
-.mode-card .icon{font-size:1.8rem;flex-shrink:0}
+.mode-card .icon{font-size:2.2rem;flex-shrink:0}
 .mode-card .body{flex:1}
-.mode-card .body h3{font-size:1rem;font-weight:600}
-.mode-card .body p{font-size:.8rem;color:var(--dim);margin-top:2px}
+.mode-card .body h3{font-size:1.15rem;font-weight:600}
+.mode-card .body p{font-size:.88rem;color:var(--dim);margin-top:3px}
 
 /* lobby */
 #aiLobby,#localLobby,#eveLobby{max-width:480px;gap:.75rem;width:100%}
@@ -914,7 +914,7 @@ body.light-mode{
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.0.0-alpha</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v2.3.9-beta</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -1107,7 +1107,7 @@ body.light-mode{
     <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">配置每个 AI 对手</p>
   </div>
 
-  <button class="glass-btn primary" onclick="startAIGame()" style="margin-top:12px">开始游戏</button>
+  <button class="glass-btn primary" onclick="startAIGame()" style="margin-top:12px;padding:14px 28px;font-size:1.1rem">开始游戏</button>
 </div>
 
 <!-- Eve Lobby -->
@@ -1155,7 +1155,7 @@ body.light-mode{
   <div id="eveConfigArea" class="form-eve-config">
     <p style="font-size:.8rem;color:var(--dim);margin:8px 0 4px">配置每个 AI</p>
   </div>
-  <button class="glass-btn primary" onclick="startEveGame()" style="margin-top:8px">开始观战</button>
+  <button class="glass-btn primary" onclick="startEveGame()" style="margin-top:10px;padding:14px 28px;font-size:1.1rem">开始观战</button>
 </div>
 
 <!-- Local Lobby -->
@@ -1197,7 +1197,7 @@ body.light-mode{
     </div>
   </div>
 
-  <button class="glass-btn primary" onclick="startLocalGame()" style="margin-top:12px">开始游戏</button>
+  <button class="glass-btn primary" onclick="startLocalGame()" style="margin-top:12px;padding:14px 28px;font-size:1.1rem">开始游戏</button>
 </div>
 
 <!-- Game Screen -->
@@ -1791,6 +1791,7 @@ function loadHistoryList(){
         <div class="h-winner" style="color:var(--accent2)">进行中 · ${r.playerCount} 人模式</div>
         <div style="margin-top:4px;display:flex;gap:6px">
           <button class="glass-btn primary" id="continueFromHistoryBtn" style="flex:1;padding:6px 8px;font-size:.78rem">▶ 继续游戏</button>
+          <button class="glass-btn danger" id="discardHistoryBtn" style="padding:6px 10px;font-size:.78rem">放弃</button>
         </div>
       `;
       div.innerHTML = innerHtml;
@@ -1798,6 +1799,11 @@ function loadHistoryList(){
       if(btn){
         btn.id = '';
         btn.onclick = function(e){e.stopPropagation(); continueFromHistory(r); };
+      }
+      let dbtn = div.querySelector('#discardHistoryBtn');
+      if(dbtn){
+        dbtn.id = '';
+        dbtn.onclick = function(e){e.stopPropagation(); discardHistoryRecord(r); };
       }
       // 复选框点击
       const chk=div.querySelector('.sel-chk');
@@ -1894,6 +1900,15 @@ function discardSavedGame(e){
   if(!confirm('确定要放弃这个未完成的游戏吗？'))return;
   clearSavedGameState();
   loadHistoryList();
+}
+function discardHistoryRecord(record){
+  if(!confirm('确定要放弃这个进行中的游戏记录吗？'))return;
+  if(record.id){
+    tauriInvoke("delete_game_history_record", {recordId: record.id})
+      .then(() => loadHistoryList())
+      .catch(e => console.warn("Delete history record failed:", e));
+  }
+  delete _historyRecords[record.id];
 }
 function exportHistory(){
   tauriInvoke('load_game_history').then(list=>{
@@ -2149,50 +2164,82 @@ function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
     tauriInvoke('clear_round_history').catch(e=>console.warn('Clear round history after save failed:', e));
   }).catch(e=>console.warn('Save history failed:', e));
 }// ─── 保存未完成游戏历史记录（用于异常退出后继续游戏） ───
-function saveUnfinishedGameHistory(){
+async function saveUnfinishedGameHistory(){
   if(!gameMode||gameOver)return;
+  // ★ 在 await 之前捕获所有全局变量的快照（避免 exitGame 在 await 期间重置全局变量后读取到空值）
+  const _board = board;
+  const _size = size;
+  const _maxPlayers = maxPlayers;
+  const _curPlayer = curPlayer;
+  const _firstMovePos = firstMovePos;
+  const _gameMode = gameMode;
+  const _aiPlayers = Array.from(aiPlayers);
+  const _aiConfigs = aiConfigs || {};
+  const _eliminatedPlayers = Array.from(eliminatedPlayers);
+  const _chainStats = JSON.parse(JSON.stringify(chainStats || {}));
+  const _maxChainOverall = maxChainOverall ? {...maxChainOverall} : {player:null,length:0};
+  const _gameCount = gameCount || 0;
+  const _aiAlgorithm = aiAlgorithm || "";
+  const _aiDepth = aiDepth || 0;
+  const _colorNames = COLOR_NAMES;
+  // 先同步保存当前游戏状态（确保 exitGame 等后续清理前已保存）
   saveCurrentGameState();
+  // 再检查存活人数（保持与原代码一致的顺序）
+  const _liveCount = _maxPlayers - _eliminatedPlayers.length;
+  if(_liveCount < 2) return;
+  // 再异步合并磁盘历史得到完整历史，专用于 history 记录的 gameState
+  let fullHistory = [...gameHistory];
+  try {
+    const disk = await tauriInvoke('load_round_history');
+    if (disk && Array.isArray(disk) && disk.length > 0) {
+      const merged = [...disk];
+      const offset = merged.length;
+      const memAdjusted = fullHistory.map((h, i) => ({...h, turn: offset + i}));
+      fullHistory = [...merged, ...memAdjusted];
+    }
+  } catch(e) {
+    console.warn('Load round history for save failed:', e);
+  }
+  // 用之前捕获的局部快照构建 state（避免 exitGame 重置全局变量后的空值问题）
   const state = {
-    board: board,
-    size: size,
-    maxPlayers: maxPlayers,
-    curPlayer: curPlayer,
-    firstMovePos: firstMovePos,
-    gameMode: gameMode,
-    aiPlayers: Array.from(aiPlayers),
-    aiConfigs: aiConfigs || {},
-    eliminatedPlayers: Array.from(eliminatedPlayers),
-    chainStats: JSON.parse(JSON.stringify(chainStats || {})),
-    maxChainOverall: maxChainOverall ? {...maxChainOverall} : {player:null,length:0},
-    gameCount: gameCount || 0,
-    aiAlgorithm: aiAlgorithm || "",
-    aiDepth: aiDepth || 0,
-    colorNames: COLOR_NAMES,
-    aiCount: (aiPlayers && aiPlayers.size) || 0,
+    board: _board,
+    size: _size,
+    maxPlayers: _maxPlayers,
+    curPlayer: _curPlayer,
+    firstMovePos: _firstMovePos,
+    gameMode: _gameMode,
+    aiPlayers: _aiPlayers,
+    aiConfigs: _aiConfigs,
+    eliminatedPlayers: _eliminatedPlayers,
+    chainStats: _chainStats,
+    maxChainOverall: _maxChainOverall,
+    gameCount: _gameCount,
+    aiAlgorithm: _aiAlgorithm,
+    aiDepth: _aiDepth,
+    colorNames: _colorNames,
+    aiCount: _aiPlayers.length,
     undoStack: [],
-    savedHistory: gameHistory.length > 0 ? compactHistory(gameHistory, maxPlayers) : null,
+    savedHistory: fullHistory.length > 0 ? compactHistory(fullHistory, _maxPlayers) : null,
   };
   const stateJson = JSON.stringify(state);
-  const compact = compactHistory(gameHistory, maxPlayers);
-  const liveCount = maxPlayers - eliminatedPlayers.size;
-  if(liveCount < 2) return;
+  const compact = fullHistory.length > 0 ? compactHistory(fullHistory, _maxPlayers) : {};
   tauriInvoke("save_game_history", {
     record: {
       id: Date.now(),
       time: formatTime(new Date()),
-      mode: gameMode || "local",
-      aiAlgorithm: aiAlgorithm || "",
-      aiDepth: aiDepth || 0,
-      gameCount: gameCount,
-      playerCount: maxPlayers,
-      aiCount: aiPlayers.size,
-      boardSize: size,
+      mode: _gameMode,
+      aiAlgorithm: _aiAlgorithm,
+      aiDepth: _aiDepth,
+      gameCount: _gameCount,
+      playerCount: _maxPlayers,
+      aiCount: _aiPlayers.length,
+      boardSize: _size,
       winner: null,
-      colorNames: COLOR_NAMES,
-      chainStats: chainStats,
-      maxChain: maxChainOverall,
+      colorNames: _colorNames,
+      chainStats: _chainStats,
+      maxChain: _maxChainOverall,
       finished: false,
-      history: compact || {},
+      history: compact,
       gameState: stateJson,
     }
   }).catch(e => console.warn("Save unfinished history failed:", e));
@@ -2279,8 +2326,10 @@ function loadGameFromState(saved){
 
 
 // ─── 已保存游戏状态管理（用于继续游戏） ───
-function saveCurrentGameState(){
+function saveCurrentGameState(historyOverride){
   if(!gameMode||gameOver)return;
+  // historyOverride 可选：外部传入完整历史（解决刷盘后 gameHistory 不全的问题）
+  const hist = historyOverride || gameHistory;
   // 构建用于恢复的完整游戏状态
   const state = {
     board: board,
@@ -2301,7 +2350,7 @@ function saveCurrentGameState(){
     aiCount: (aiPlayers && aiPlayers.size) || 0,
     undoStack: [],
     // 保存回合历史（紧凑格式，用于图表渲染）
-    savedHistory: gameHistory.length > 0 ? compactHistory(gameHistory, maxPlayers) : null,
+    savedHistory: hist.length > 0 ? compactHistory(hist, maxPlayers) : null,
   };
   const json = JSON.stringify(state);
   tauriInvoke('save_game_state', {stateJson: json}).catch(e => console.warn('Save game state failed:', e));
@@ -3811,7 +3860,8 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-    {v:'v3.0.0-alpha · 第 18 版',desc:'v3.0 全新架构重写：全按钮统一 glass-btn 风格、可点击块统一 mode-card 风格、AI 对战支持逐个 AI 独立配置算法/深度、颜色选择排除 AI 使用'},
+    {v:'v2.3.9-beta · 第 19 版',desc:'开始游戏卡片和按钮放大、进行中游戏可放弃、历史图表修复、版本号回退 2.3.9-beta'},
+  {v:'v3.0.0-alpha · 第 18 版',desc:'v3.0 全新架构重写：全按钮统一 glass-btn 风格、可点击块统一 mode-card 风格、AI 对战支持逐个 AI 独立配置算法/深度、颜色选择排除 AI 使用'},
     {v:'v2.3.8 · 第 17 版',desc:'配色优化（奶白/深灰色）、震动反馈、双向棋盘人数限制、Cargo 编译优化'},
     {v:'v2.3.8 · 第 17 版',desc:'PVS 搜索性能优化：QSearch 深度收窄、Cell Copy、邻域展开去 Vec 分配、Null Window 跳过 QSearch'},
     {v:'v2.3.6-beta · 第 15 版',desc:'AI 代码全量迁移至 Rust 引擎，终局判断优化，开场随机性调整'},
