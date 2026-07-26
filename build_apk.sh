@@ -27,20 +27,25 @@ fi
 
 START_EPOCH=$(date +%s)
 
-# ── 步骤 1: 编译 ──────────────────────────────────────────
+# ── 步骤 1: 编译 APK ─────────────────────────────────────
+# Tauri v2 的 android build 会一次性完成 Rust 交叉编译 + APK 打包。
+# TAURI_ANDROID_SKIP_RUST_BUILD 防止 Gradle 重复编译 Rust lib。
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  🔨 步骤 1/3: 编译 arm64 APK"
+echo "  🔨 编译 arm64 APK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  产物: ${OUTPUT}"
 echo ""
 
-npx tauri android build --target aarch64
+export TAURI_ANDROID_SKIP_RUST_BUILD=1
+cd tauri
+npx tauri android build --target aarch64 --apk
+cd ..
 
 # ── 步骤 2: 签名 ──────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  📝 步骤 2/3: 签名 APK"
+echo "  📝 签名 APK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  keystore: ${KEYSTORE}"
 echo ""
@@ -55,10 +60,10 @@ mkdir -p release
 cp "$UNSIGNED_APK" "$OUTPUT"
 apksigner sign --ks "$KEYSTORE" --ks-pass "pass:${PASSWORD}" --out "$OUTPUT" "$OUTPUT"
 
-# ── 步骤 3: 验证 ──────────────────────────────────────────
+# ── 步骤 3: 验证签名 ──────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  ✅ 步骤 3/3: 验证签名"
+echo "  ✅ 验证签名"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 

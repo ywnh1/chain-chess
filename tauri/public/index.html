@@ -515,17 +515,17 @@ body{padding-top:env(safe-area-inset-top,20px)}
 
 #checkout .btn-again{padding:9px 24px;font-size:.85rem;margin:14px 0 6px;width:auto}
 
-/* player colours */
-.p0{background:#e8645a}
-.p1{background:#f0c040}
-.p2{background:#40b8f0}
-.p3{background:#50d060}
-.p4{background:#c080f0}
-.p5{background:#f070c0}
-.p6{background:#50d0b0}
-.p7{background:#ff884d}
-.p8{background:#e868a0}
-.p9{background:#70c0e8}
+/* player colours (与 COLORS 数组同步) */
+.p0{background:#E74C3C}
+.p1{background:#F1C40F}
+.p2{background:#3498DB}
+.p3{background:#2ECC71}
+.p4{background:#9B59B6}
+.p5{background:#E91E63}
+.p6{background:#1ABC9C}
+.p7{background:#F39C12}
+.p8{background:#FFF0D0}
+.p9{background:#5D6D7E}
 
 /* about screen — 一级页 */
 #about.screen,#about-ai.screen,#about-changelog.screen,#about-license.screen{max-width:520px;gap:10px;padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(32px + env(safe-area-inset-bottom, 0px));height:100dvh;overflow:hidden;width:100%}
@@ -1369,8 +1369,8 @@ body.light-mode{
 })();
 
 /* ==================== CONSTANTS ==================== */
-const COLORS=['#E74C3C','#F1C40F','#3498DB','#2ECC71','#9B59B6','#E91E63','#1ABC9C','#F39C12','#F5ECD7','#5D6D7E'];
-const COLORS_LIGHT=['rgba(231,76,60,.08)','rgba(241,196,15,.08)','rgba(52,152,219,.08)','rgba(46,204,113,.08)','rgba(155,89,182,.08)','rgba(233,30,99,.08)','rgba(26,188,156,.08)','rgba(243,156,18,.08)','rgba(245,236,215,.08)','rgba(93,109,126,.08)'];
+const COLORS=['#E74C3C','#F1C40F','#3498DB','#2ECC71','#9B59B6','#E91E63','#1ABC9C','#F39C12','#FFF0D0','#5D6D7E'];
+const COLORS_LIGHT=['rgba(231,76,60,.08)','rgba(241,196,15,.08)','rgba(52,152,219,.08)','rgba(46,204,113,.08)','rgba(155,89,182,.08)','rgba(233,30,99,.08)','rgba(26,188,156,.08)','rgba(243,156,18,.08)','rgba(255,240,208,.08)','rgba(93,109,126,.08)'];
 const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色','橙色','奶白色','深灰色'];
 // 根据棋盘大小返回最大允许玩家人数
 function getMaxPlayersBySize(boardSize){
@@ -1699,7 +1699,7 @@ Router.register('welcome', {
 Router.register('history', {
   back: 'welcome',
   enter() { document.body.style.background=''; loadHistoryList(); },
-  leave() {}
+  leave() { if(_multiSelectActive)exitMultiSelect(); }
 });
 
 Router.register('aiLobby', {
@@ -2071,6 +2071,10 @@ function enterMultiSelect(){
     };
   });
   updateSelBar();
+  // 进入多选 → 禁用所有"继续游戏"按钮，避免误触
+  document.querySelectorAll('#historyList .glass-btn.primary').forEach(b=>{
+    b.style.pointerEvents='none';b.style.opacity='.35';
+  });
 }
 function exitMultiSelect(){
   _multiSelectActive=false;
@@ -2090,6 +2094,10 @@ function exitMultiSelect(){
     };
   });
   updateSelBar();
+  // 退出多选 → 恢复继续游戏按钮
+  document.querySelectorAll('#historyList .glass-btn.primary').forEach(b=>{
+    b.style.pointerEvents='';b.style.opacity='';
+  });
 }
 function toggleSelection(id){
   if(!_multiSelectActive)return;
@@ -2791,7 +2799,7 @@ function renderBoard(force,popX,popY){
         }
         let p=document.createElement('div');p.className='piece p'+d.owner;
         el.appendChild(p);
-        drawDots(p,d.count);
+        drawDots(p,d.count,d.owner);
         if(popX!==undefined&&i===popX&&j===popY)p.classList.add('pop');
       }
     }
@@ -2800,14 +2808,20 @@ function renderBoard(force,popX,popY){
   _boardCache=board.map(row=>row.map(c=>({owner:c.owner,count:c.count})));
   _lastRenderPlayer=curPlayer;
 }
-function drawDots(p,n){
-  let cx=50,cy=50,r=30;
-  if(n===1)addDot(p,cx,cy);
-  else if(n===2){addDot(p,cx-20,cy);addDot(p,cx+20,cy)}
-  else if(n===3){let h=Math.sqrt(3)/2;addDot(p,cx,cy-r*h/2);addDot(p,cx-r/2,cy+r*h/2);addDot(p,cx+r/2,cy+r*h/2)}
-  else{addDot(p,34,34);addDot(p,66,34);addDot(p,34,66);addDot(p,66,66)}
+function dotColorForPlayer(pl){
+  const h=COLORS[pl]||'#888';
+  const r=parseInt(h.substr(1,2),16),g=parseInt(h.substr(3,2),16),b=parseInt(h.substr(5,2),16);
+  return (r*299+g*587+b*114)/1000>150?'rgba(0,0,0,.75)':'rgba(255,255,255,.88)';
 }
-function addDot(p,x,y){let d=document.createElement('div');d.className='dot';d.style.left=x+'%';d.style.top=y+'%';p.appendChild(d)}
+function drawDots(p,n,pl){
+  const dc=dotColorForPlayer(pl);
+  let cx=50,cy=50,r=30;
+  if(n===1)addDot(p,cx,cy,dc);
+  else if(n===2){addDot(p,cx-20,cy,dc);addDot(p,cx+20,cy,dc)}
+  else if(n===3){let h=Math.sqrt(3)/2;addDot(p,cx,cy-r*h/2,dc);addDot(p,cx-r/2,cy+r*h/2,dc);addDot(p,cx+r/2,cy+r*h/2,dc)}
+  else{addDot(p,34,34,dc);addDot(p,66,34,dc);addDot(p,34,66,dc);addDot(p,66,66,dc)}
+}
+function addDot(p,x,y,c){let d=document.createElement('div');d.className='dot';d.style.left=x+'%';d.style.top=y+'%';d.style.background=c;p.appendChild(d)}
 function setBg(pl){let h=COLORS[pl];let r=parseInt(h.substr(1,2),16)*.85,g=parseInt(h.substr(3,2),16)*.85,b=parseInt(h.substr(5,2),16)*.85;document.body.style.background=`radial-gradient(ellipse 80% 50% at 50% -20%, rgba(240,179,75,.04) 0%, transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%, rgba(95,195,195,.03) 0%, transparent 70%),rgb(${r|0},${g|0},${b|0})`}
 function renderPlayerBar(){
   let el=document.getElementById('playerBar');el.innerHTML='';
