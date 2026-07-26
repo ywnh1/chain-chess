@@ -37,12 +37,12 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   --shadow:0 8px 40px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.25);
   --glow:0 0 60px rgba(240,179,75,.04);
   --glass:var(--glass-w-04);
-  --glass-border:var(--glass-w-12);
-  --glass-shadow:0 6px 36px rgba(0,0,0,.40),inset 0 1.5px 0 rgba(255,255,255,.06);
-  --glass-shine:var(--glass-w-06);
-  --glass-edge:var(--glass-w-12);
-  --liquid-iris:linear-gradient(135deg,rgba(180,140,255,.10) 0%,rgba(240,179,75,.08) 50%,rgba(95,195,195,.10) 100%);
-  --liquid-blur:24px;
+  --glass-border:var(--glass-w-08);
+  --glass-shadow:0 4px 28px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.03);
+  --glass-shine:var(--glass-w-04);
+  --glass-edge:var(--glass-w-08);
+  --liquid-iris:linear-gradient(135deg,rgba(160,120,255,.06) 0%,rgba(240,179,75,.04) 50%,rgba(95,195,195,.06) 100%);
+  --liquid-blur:16px;
   --overlay-bg:linear-gradient(135deg,rgba(15,15,19,.38) 0%,rgba(22,24,30,.30) 50%,rgba(20,18,24,.25) 100%);
   --checkout-bg:rgba(15,15,19,.65);
   --font:'CustomFont','Inter','SF Pro','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
@@ -862,298 +862,47 @@ body.light-mode{
     filter:blur(6px) saturate(1.05)}
   body.light-mode::after{background:rgba(0,0,0,.04)}
   body.light-mode .form-row select option{background:#fff;color:var(--text)}
-/* ═══════ 背景彩色光球动画 ═══════ */
-.orb-container{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden}
-.orb{
-  position:absolute;border-radius:50%;filter:blur(50px);opacity:.7;
-  mix-blend-mode:screen;will-change:transform;
-}
-.orb-1{width:320px;height:320px;background:radial-gradient(circle,rgba(255,210,90,.60) 0%,rgba(200,140,240,.35) 70%,transparent);top:8%;left:-8%;animation:orbFloat1 10s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-2{width:260px;height:260px;background:radial-gradient(circle,rgba(95,210,210,.55) 0%,rgba(170,130,255,.35) 60%,transparent);bottom:2%;right:-5%;animation:orbFloat2 14s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-3{width:240px;height:240px;background:radial-gradient(circle,rgba(210,150,255,.50) 0%,rgba(255,190,80,.25) 60%,transparent);top:45%;left:55%;animation:orbFloat3 12s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-4{width:200px;height:200px;background:radial-gradient(circle,rgba(255,110,100,.45) 0%,rgba(95,210,210,.25) 70%,transparent);top:25%;right:15%;animation:orbFloat4 9s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-5{width:220px;height:220px;background:radial-gradient(circle,rgba(170,130,255,.50) 0%,rgba(255,110,100,.20) 65%,transparent);bottom:15%;left:10%;animation:orbFloat5 15s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-6{width:180px;height:180px;background:radial-gradient(circle,rgba(110,210,255,.45) 0%,rgba(255,190,80,.20) 60%,transparent);top:70%;left:30%;animation:orbFloat6 11s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-7{width:150px;height:150px;background:radial-gradient(circle,rgba(255,110,160,.40) 0%,rgba(95,210,210,.20) 65%,transparent);top:15%;right:35%;animation:orbFloat7 10s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-8{width:190px;height:190px;background:radial-gradient(circle,rgba(180,230,100,.40) 0%,rgba(200,140,255,.15) 60%,transparent);top:5%;left:40%;animation:orbFloat8 12s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-9{width:170px;height:170px;background:radial-gradient(circle,rgba(255,200,100,.45) 0%,rgba(95,210,210,.18) 65%,transparent);bottom:30%;right:10%;animation:orbFloat9 11s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-10{width:140px;height:140px;background:radial-gradient(circle,rgba(200,150,255,.40) 0%,rgba(255,110,100,.15) 60%,transparent);top:60%;left:5%;animation:orbFloat10 9s cubic-bezier(.45,.05,.35,1) infinite}
-@keyframes orbFloat1{
-  0%,100%{transform:translate(0,0) scale(1)}
-  33%{transform:translate(120px,80px) scale(1.12)}
-  66%{transform:translate(60px,150px) scale(.92)}
-}
-@keyframes orbFloat2{
-  0%,100%{transform:translate(0,0) scale(1)}
-  33%{transform:translate(-100px,-60px) scale(1.08)}
-  66%{transform:translate(-50px,-140px) scale(.95)}
-}
-@keyframes orbFloat3{
-  0%,100%{transform:translate(0,0) scale(1)}
-  25%{transform:translate(-80px,40px) scale(1.1)}
-  50%{transform:translate(-40px,-60px) scale(.93)}
-  75%{transform:translate(60px,-20px) scale(1.05)}
-}
-@keyframes orbFloat4{
-  0%,100%{transform:translate(0,0) scale(1)}
-  50%{transform:translate(-70px,-50px) scale(1.15)}
-}
-@keyframes orbFloat5{
-  0%,100%{transform:translate(0,0) scale(1)}
-  33%{transform:translate(80px,-70px) scale(1.1)}
-  66%{transform:translate(40px,50px) scale(.9)}
-}
-/* 光球与玻璃元素互动 — 增强折射/反射效果 */
-.glass-btn,.mode-card,.play-config-item,.about-card,.about-info,.about-nav,.history-item,
-#playerConfigList .player-config-item,.size-btn,.gb{
-  transition:backdrop-filter .5s ease,box-shadow .5s ease,border-color .3s ease;
-  position:relative;
-  overflow:hidden;
-}
-.glass-btn::before,.mode-card::before,.player-config-item::before,.about-card::before{
-  content:"";position:absolute;inset:0;border-radius:inherit;
-  background:linear-gradient(135deg,rgba(255,255,255,.08) 0%,transparent 40%,rgba(255,255,255,.02) 80%);
-  pointer-events:none;z-index:1;
-}
-.glass-btn,.mode-card,.play-config-item,.about-card,.about-info,.about-nav,.history-item,
-#playerConfigList .player-config-item,.size-btn,.gb{
-  transition:backdrop-filter .5s ease,box-shadow .5s ease,border-color .3s ease;
-}
-/* ═══════ 新欢迎页 ═══════ */
-#welcome{gap:1.5rem;text-align:center}
-#welcome .welcome-content{display:flex;flex-direction:column;align-items:center;width:100%;max-width:300px;gap:1.2rem}
-#welcome .welcome-content .logo{font-size:3.2rem;letter-spacing:2px}
-#welcome .welcome-content .logo span{color:var(--accent)}
-#welcome .welcome-content .tagline{color:var(--dim);font-size:.9rem;margin-top:-.8rem}
-.start-btn{
-  width:100%;max-width:260px;padding:12px 0;font-size:1.15rem;font-weight:700;
-  border-radius:var(--radius);letter-spacing:4px;
-  background-image:linear-gradient(135deg,rgba(240,179,75,.2) 0%,rgba(200,140,240,.1) 50%,rgba(95,195,195,.15) 100%),var(--glass-w-06);
-  background-origin:padding-box;
-  border:1px solid var(--glass-border);
-  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
-  box-shadow:0 4px 32px rgba(240,179,75,.15),0 2px 8px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.06);
-  transition:all .4s cubic-bezier(.22,1,.36,1);
-}
-.start-btn:hover,.start-btn:active{
-  transform:scale(1.03);box-shadow:0 6px 40px rgba(240,179,75,.25),0 2px 12px rgba(0,0,0,.25);
-  border-color:rgba(240,179,75,.35);
-}
-.welcome-footer{display:flex;gap:8px;width:100%;max-width:260px;justify-content:center}
-.welcome-footer .glass-btn{
-  padding:12px 0;border-radius:var(--radius-sm);font-size:.85rem;letter-spacing:1px;
-  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
-  transition:all .35s cubic-bezier(.22,1,.36,1);
-}
-.about-foot-btn{flex:0 0 auto;min-width:64px;max-width:80px;flex:1}
-.history-foot-btn{flex:2;min-width:0}
-/* ═══════ 统一游戏设置页 ═══════ */
-#gameSetup{gap:.6rem;width:100%;max-width:480px}
-#gameSetup h2{font-size:1.2rem;font-weight:600;margin-bottom:4px;align-self:flex-start}
-#gameSetup .back{align-self:flex-start}
-/* 玩家配置列表 */
-.player-config-list{width:100%;display:flex;flex-direction:column;gap:6px;margin:4px 0;max-height:260px;overflow-y:auto}
-.player-config-item{
-  display:flex;align-items:center;gap:10px;
-  background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;
-  border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-sm);
-  padding:8px 12px;cursor:pointer;
-  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
-  box-shadow:var(--glass-shadow);
-  transition:all .3s cubic-bezier(.22,1,.36,1);
-  touch-action:manipulation;
-  min-height:44px;
-}
-.player-config-item:hover,.player-config-item:active{
-  border-color:var(--accent);background-image:var(--liquid-iris),var(--glass-w-06);
-  transform:translateY(-1px);
-}
-.player-config-item .color-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;border:1px solid var(--glass-w-12);box-shadow:0 0 8px rgba(0,0,0,.2)}
-.player-config-item .player-info{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
-.player-config-item .player-info strong{font-size:.82rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.player-config-item .player-info span{font-size:.72rem;color:var(--dim)}
-.player-config-item .edit-hint{font-size:.65rem;color:var(--dim);opacity:.6;flex-shrink:0}
-/* 玩家配置弹窗 */
-.player-modal{max-width:340px;width:90vw}
-.player-modal h3{font-size:1rem;font-weight:600;margin-bottom:10px;text-align:center}
-.player-modal .form-row{margin:6px 0}
-.player-modal .form-row label{font-size:.78rem;color:var(--dim);font-weight:500;display:flex;justify-content:space-between;align-items:center}
-.player-modal .form-row input[type="text"]{
-  width:100%;padding:10px 12px;
-  border:1px solid var(--border);border-radius:8px;
-  background:var(--glass-w-04);color:var(--text);
-  font-size:.9rem;outline:none;transition:.15s;
-  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
-}
-.player-modal .form-row input[type="text"]:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,179,75,.15)}
-.player-modal .form-row select{
-  width:100%;padding:10px 12px;
-  border:1px solid var(--border);border-radius:8px;
-  background:var(--glass-w-04);color:var(--text);
-  font-size:.85rem;outline:none;transition:.15s;
-  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
-  -webkit-appearance:none;appearance:none;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%237a7885' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 12px center;padding-right:30px;
-}
-.player-modal .form-row select option{background:#1a1a22;color:var(--text)}
-/* 深度调节 */
-.depth-adjust{display:flex;align-items:center;gap:8px;justify-content:center}
-.depth-adjust .dm-btn{
-  width:32px;height:32px;border-radius:50%;border:1px solid var(--glass-border);
-  background:var(--glass-w-04);color:var(--text);font-size:1.1rem;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  transition:.2s;touch-action:manipulation;
-}
-.depth-adjust .dm-btn:active{transform:scale(.92)}
-.depth-adjust .dm-val{font-size:1.1rem;font-weight:600;min-width:24px;text-align:center;color:var(--accent)}
-/* 随机刻度滑块 */
-.random-slider{
-  -webkit-appearance:none;appearance:none;width:100%;height:4px;
-  background:var(--glass-w-08);border-radius:2px;outline:none;margin:6px 0 2px;
-  transition:background .2s;
-}
-.random-slider::-webkit-slider-thumb{
-  -webkit-appearance:none;appearance:none;width:18px;height:18px;
-  border-radius:50%;background:var(--accent);cursor:pointer;
-  box-shadow:0 0 8px rgba(240,179,75,.3);border:2px solid rgba(255,255,255,.1);
-  transition:.15s;
-}
-.random-slider::-webkit-slider-thumb:active{transform:scale(1.15)}
-.random-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid rgba(255,255,255,.1)}
-.random-labels{display:flex;justify-content:space-between;font-size:.65rem;color:var(--dim);padding:0 2px}
-.player-modal .modal-actions{margin-top:12px;gap:8px}
-/* ═══ 浅色模式适配 ═══ */
-body.light-mode .orb{opacity:.3}
-body.light-mode .orb-1{background:radial-gradient(circle,rgba(217,119,6,.25) 0%,rgba(200,140,240,.08) 70%,transparent)}
-body.light-mode .orb-2{background:radial-gradient(circle,rgba(42,157,143,.2) 0%,rgba(160,120,255,.08) 60%,transparent)}
-body.light-mode .orb-3{background:radial-gradient(circle,rgba(160,120,255,.18) 0%,rgba(217,119,6,.05) 60%,transparent)}
-body.light-mode .orb-4{background:radial-gradient(circle,rgba(180,80,70,.15) 0%,rgba(42,157,143,.05) 70%,transparent)}
-body.light-mode .orb-5{background:radial-gradient(circle,rgba(160,120,255,.18) 0%,rgba(180,80,70,.04) 65%,transparent)}
-body.light-mode .orb-6{background:radial-gradient(circle,rgba(100,200,255,.15) 0%,rgba(240,179,75,.05) 60%,transparent)}
-body.light-mode .orb-7{background:radial-gradient(circle,rgba(255,100,150,.12) 0%,rgba(95,195,195,.05) 65%,transparent)}
-body.light-mode .orb-8{background:radial-gradient(circle,rgba(180,230,100,.18) 0%,rgba(200,140,255,.08) 60%,transparent)}
-body.light-mode .orb-9{background:radial-gradient(circle,rgba(255,200,100,.20) 0%,rgba(95,210,210,.08) 65%,transparent)}
-body.light-mode .orb-10{background:radial-gradient(circle,rgba(200,150,255,.18) 0%,rgba(255,110,100,.06) 60%,transparent)}
-body.light-mode .player-modal .form-row select option{background:#fff;color:var(--text)}
-body.light-mode .start-btn{background-image:linear-gradient(135deg,rgba(217,119,6,.12) 0%,rgba(160,120,255,.06) 50%,rgba(42,157,143,.1) 100%),var(--glass-w-10)}
-body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 </style>
 </head>
 <body>
-<!-- 背景彩色光球容器 -->
-<div class="orb-container" aria-hidden="true">
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-  <div class="orb orb-4"></div>
-  <div class="orb orb-5"></div>
-  <div class="orb orb-6"></div>
-  <div class="orb orb-7"></div>
-  <div class="orb orb-8"></div>
-  <div class="orb orb-9"></div>
-  <div class="orb orb-10"></div>
-</div>
 
 <!-- Welcome -->
 <div id="welcome" class="screen active">
-  <div class="welcome-content">
-    <div class="logo">♟<span>连锁棋</span></div>
-    <div class="tagline">多人联手，一触即发</div>
-    <button class="glass-btn primary start-btn" onclick="Router.navigate('gameSetup')">开始游戏</button>
-    <div class="welcome-footer">
-      <button onclick="Router.navigate('about')" class="glass-btn about-foot-btn">关于</button>
-      <button onclick="Router.navigate('history')" class="glass-btn history-foot-btn">历史记录</button>
-    </div>
-  </div>
-</div>
-
-<!-- Game Setup Screen -->
-<div id="gameSetup" class="screen">
-  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
-  <h2>开始游戏</h2>
-
-  <!-- 棋盘大小 -->
-  <div class="form-row"><label>棋盘大小</label>
-    <div id="setupSizeGrid" class="size-grid">
-      <button class="size-btn" data-value="5">5×5</button>
-      <button class="size-btn" data-value="6">6×6</button>
-      <button class="size-btn selected" data-value="7">7×7</button>
-      <button class="size-btn" data-value="8">8×8</button>
-      <button class="size-btn" data-value="9">9×9</button>
-      <button class="size-btn" data-value="10">10×10</button>
-      <button class="size-btn" data-value="11">11×11</button>
-      <button class="size-btn" data-value="12">12×12</button>
-      <button class="size-btn" data-value="13">13×13</button>
-      <button class="size-btn" data-value="14">14×14</button>
-      <button class="size-btn" data-value="15">15×15</button>
-      <button class="size-btn" data-value="16">16×16</button>
-      <button class="size-btn" data-value="17">17×17</button>
-      <button class="size-btn" data-value="18">18×18</button>
-      <button class="size-btn" data-value="19">19×19</button>
-    </div>
-  </div>
-
-  <!-- 玩家人数 -->
-  <div class="form-row"><label>玩家人数</label>
-    <div id="setupPlayersGroup" class="btn-group">
-      <button class="gb selected" data-value="2">2</button>
-      <button class="gb" data-value="3">3</button>
-      <button class="gb" data-value="4">4</button>
-      <button class="gb" data-value="5">5</button>
-      <button class="gb" data-value="6">6</button>
-      <button class="gb" data-value="7">7</button>
-      <button class="gb" data-value="8">8</button>
-      <button class="gb" data-value="9">9</button>
-      <button class="gb" data-value="10">10</button>
-    </div>
-  </div>
-
-  <!-- 玩家配置列表 -->
-  <div id="playerConfigList" class="player-config-list">
-    <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">点击玩家设置名称、类型和 AI 参数</p>
-  </div>
-
-  <button class="glass-btn primary" onclick="startUnifiedGame()" style="margin-top:12px;padding:14px 28px;font-size:1.1rem">开始游戏</button>
-</div>
-
-<!-- 玩家配置弹窗 Modal -->
-<div id="playerConfigModal" class="modal">
-  <div class="modal-inner player-modal">
-    <h3 id="playerModalTitle">玩家设置</h3>
-    <div class="form-row"><label>名称</label>
-      <input type="text" id="playerNameInput" maxlength="16" placeholder="输入玩家名称（可选）" autocomplete="off">
-    </div>
-    <div class="form-row"><label>类型</label>
-      <select id="playerTypeSelect">
-        <option value="human">人类</option>
-        <option value="strategy">AI · 策略</option>
-        <option value="alphabeta">AI · Alpha-Beta</option>
-        <option value="pvs">AI · PVS</option>
-        <option value="mcts">AI · MCTS</option>
-      </select>
-    </div>
-    <div class="form-row" id="playerDepthRow">
-      <label>搜索深度</label>
-      <div class="depth-adjust">
-        <button class="dm-btn" id="depthDecBtn">−</button>
-        <span class="dm-val" id="depthValue">2</span>
-        <button class="dm-btn" id="depthIncBtn">+</button>
+  <div class="logo">♟<span>连锁棋</span></div>
+  <div class="tagline">多人联手，一触即发</div>
+  <div class="mode-cards">
+    <div class="mode-card" onclick="Router.navigate('aiLobby')" style="border-color:rgba(240,179,75,.18)">
+      <div class="icon">🤖</div>
+      <div class="body">
+        <h3>AI 对战</h3>
+        <p>与电脑 AI 对决，挑战不同难度</p>
       </div>
     </div>
-    <div class="form-row" id="playerRandomRow">
-      <label>随机刻度 <span id="randomValueLabel">10%</span></label>
-      <input type="range" id="randomScaleSlider" min="0" max="30" value="10" class="random-slider">
-      <div class="random-labels">
-        <span>0%</span><span>15%</span><span>30%</span>
+    <div class="mode-card" onclick="Router.navigate('localLobby')" style="border-color:rgba(95,195,195,.18)">
+      <div class="icon">👥</div>
+      <div class="body">
+        <h3>本地对战</h3>
+        <p>同一设备，轮流落子，朋友面前大战</p>
       </div>
-      <p style="font-size:.7rem;color:var(--dim);margin-top:2px">游戏开始时随机值固定 40%，逐渐降至设定值（策略 AI 不受影响）</p>
     </div>
-    <div class="modal-actions">
-      <button class="glass-btn" onclick="closePlayerModal()">取消</button>
-      <button class="glass-btn primary" onclick="savePlayerConfig()">确认</button>
+    <div class="mode-card" onclick="Router.navigate('eveLobby')" style="border-color:rgba(192,128,240,.25)">
+      <div class="icon">⚔️</div>
+      <div class="body">
+        <h3>AI 斗蛐蛐</h3>
+        <p>自定义 AI 阵容，观看 AI 互相博弈</p>
+      </div>
     </div>
+    <div class="mode-card" onclick="Router.navigate('history')" style="border-color:rgba(95,195,195,.2)">
+      <div class="icon">📋</div>
+      <div class="body">
+        <h3>历史记录</h3>
+        <p>查看对局记录和统计数据</p>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:.8rem">
+    <button onclick="Router.navigate('about')" class="glass-btn" style="padding:8px 28px;border-radius:18px;font-size:.78rem;letter-spacing:1px">关于</button>
+    <button onclick="showExitConfirm()" class="glass-btn" style="padding:8px 18px;border-radius:18px;font-size:.78rem;letter-spacing:1px;border-color:rgba(232,100,90,.2);color:rgba(232,100,90,.9)">退出</button>
   </div>
 </div>
 
@@ -1729,11 +1478,11 @@ document.addEventListener('click',function(e){
   if(!container)return;
   setSelected(container, t);
   // 触发副作用
-  if(container.id==='setupSizeGrid'||container.id==='setupPlayersGroup'){
-    setTimeout(setupLobbySync,10);
-  }else if(container.id==='aiCountGroup'){setTimeout(toggleAIColorPicker,10);setTimeout(generateAIConfig,10);}
+  if(container.id==='aiCountGroup'){setTimeout(toggleAIColorPicker,10);setTimeout(generateAIConfig,10);}
+
   else if(container.id==='eveCountGroup')setTimeout(generateEveConfig,10);
-  else if(t.classList.contains('size-btn')||t.classList.contains('gb'))setTimeout(updateLobbyOptions,10);
+  // 棋盘大小或人数变更 → 更新双方按钮显示
+  if(t.classList.contains('size-btn')||t.classList.contains('gb'))setTimeout(updateLobbyOptions,10);
 });
 // 初始触发
 setTimeout(toggleAIColorPicker,20);
@@ -1840,12 +1589,6 @@ const Router = {
 Router.register('welcome', {
   back: null,
   enter() { document.body.style.background='' },
-  leave() {}
-});
-
-Router.register('gameSetup', {
-  back: 'welcome',
-  enter() { document.body.style.background=''; setTimeout(setupLobbySync, 20); },
   leave() {}
 });
 
@@ -3037,7 +2780,6 @@ async function triggerAI(){
   // 获取当前 AI 的配置（eve 模式用 per-AI config，其他模式用全局配置）
   let alg = aiConfigs[curPlayer] ? aiConfigs[curPlayer].algorithm : aiAlgorithm;
   let dep = aiConfigs[curPlayer] ? aiConfigs[curPlayer].depth : aiDepth;
-  let randomScale = aiConfigs[curPlayer] ? (aiConfigs[curPlayer].randomScale || 10) : 10;
   // 所有算法统一走 Rust 引擎
   let cmd;
   if(alg==='mcts'){cmd='ai_move_mcts';}
@@ -3072,7 +2814,7 @@ async function triggerAI(){
     let alive=[];
     for(let p=0;p<maxPlayers;p++){if(!eliminatedPlayers.has(p))alive.push(p);}
     if(alive.length<=1){
-      if(alive.length===1){gameOver=true;playGameOver();showSettlement(alive[0],_colorNames||COLOR_NAMES,gameHistory);}
+      if(alive.length===1){gameOver=true;playGameOver();showSettlement(alive[0],COLOR_NAMES,gameHistory);}
       return;
     }
     let idx=alive.indexOf(curPlayer);
@@ -3117,7 +2859,7 @@ async function triggerAI(){
   if(alive.length<=1){
     gameOver=true;
     playGameOver();
-    showSettlement(alive[0],_colorNames||COLOR_NAMES,gameHistory);
+    showSettlement(alive[0],COLOR_NAMES,gameHistory);
     return;
   }
   let idx=alive.indexOf(curPlayer);
@@ -3739,7 +3481,6 @@ function renderGameCharts(container, history, opts){
 function replayGame(){
   const c=_lastGameConfig;
   if(!c)return;
-  _colorNames=c.colorNames||null;
   if(c.mode==='ai'){
     clearBoardDOM();
     location.hash='#game';
@@ -3794,7 +3535,7 @@ function replayGame(){
     resetRoundHistory();
     undoStack=[];
     size=c.size;
-    maxPlayers=c.maxPlayers||c.aiCount;
+    maxPlayers=c.aiCount;
     board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
     document.getElementById('pauseBtn').textContent='暂停';
     gameMode='eve';
@@ -3802,7 +3543,7 @@ function replayGame(){
     aiConfigs={};
     for(let p=0;p<maxPlayers;p++){
       aiPlayers.add(p);
-      aiConfigs[p]={algorithm:(c.aiConfigs[p]||{}).algorithm||'strategy',depth:(c.aiConfigs[p]||{}).depth||2,randomScale:(c.aiConfigs[p]||{}).randomScale||10};
+      aiConfigs[p]={algorithm:(c.aiConfigs[p]||{}).algorithm||'strategy',depth:(c.aiConfigs[p]||{}).depth||2};
     }
     aiThinking=false;
     eliminatedPlayers=new Set();
@@ -4156,197 +3897,6 @@ function showMsg(t,c){
   if(t)setTimeout(()=>{el.textContent='';el.className=''},3000);
 }
 
-let playerConfigs=[];
-let editingPlayerIdx=-1;
-// 使用已有的 COLOR_NAMES 常量
-
-function openPlayerModal(idx){
-  editingPlayerIdx=idx;
-  const cfg=playerConfigs[idx];
-  document.getElementById('playerModalTitle').textContent='玩家 '+(idx+1)+' 设置';
-  document.getElementById('playerNameInput').value=cfg.name||'';
-  document.getElementById('playerTypeSelect').value=cfg.type;
-  document.getElementById('depthValue').textContent=String(cfg.depth);
-  updateModalRows();
-  document.getElementById('randomScaleSlider').value=String(cfg.randomScale);
-  document.getElementById('randomValueLabel').textContent=cfg.randomScale+'%';
-  document.getElementById('playerTypeSelect').onchange=updateModalRows;
-  document.getElementById('depthDecBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v>1){v--;e.textContent=v}};
-  document.getElementById('depthIncBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v<10){v++;e.textContent=v}};
-  document.getElementById('randomScaleSlider').oninput=function(){document.getElementById('randomValueLabel').textContent=this.value+'%'};
-  openModal('playerConfigModal');
-}
-function updateModalRows(){
-  var sel=document.getElementById('playerTypeSelect');
-  if(!sel)return;
-  var isAI=sel.value!=='human';
-  document.getElementById('playerDepthRow').style.display=isAI?'block':'none';
-  document.getElementById('playerRandomRow').style.display=isAI&&sel.value!=='strategy'?'block':'none';
-}
-function closePlayerModal(){closeModal('playerConfigModal')}
-function savePlayerConfig(){
-  const cfg=playerConfigs[editingPlayerIdx];
-  cfg.name=document.getElementById('playerNameInput').value.trim();
-  cfg.type=document.getElementById('playerTypeSelect').value;
-  cfg.depth=parseInt(document.getElementById('depthValue').textContent)||2;
-  cfg.randomScale=parseInt(document.getElementById('randomScaleSlider').value)||10;
-  closePlayerModal();
-  generatePlayerConfigs();
-}
-function generatePlayerConfigs(){
-  const cnt=getSel('setupPlayersGroup')||2;
-  const sz=getSel('setupSizeGrid')||7;
-  const maxP=getMaxPlayersBySize(sz);
-  const realCnt=Math.min(cnt,maxP);
-  while(playerConfigs.length<realCnt){
-    const i=playerConfigs.length;
-    playerConfigs.push({name:'',type:i===0?'human':'strategy',depth:2,randomScale:10});
-  }
-  if(playerConfigs.length>realCnt)playerConfigs.length=realCnt;
-  const container=document.getElementById('playerConfigList');
-  container.innerHTML='';
-  for(let i=0;i<realCnt;i++){
-    const cfg=playerConfigs[i];
-    const div=document.createElement('div');div.className='player-config-item';
-    const dot=document.createElement('span');dot.className='color-dot';dot.style.background=COLORS[i%COLORS.length];
-    const info=document.createElement('div');info.className='player-info';
-    const nameText=cfg.name||('玩家 '+(i+1));
-    const typeLabels={human:'人类',strategy:'AI·策略',alphabeta:'AI·A-B',pvs:'AI·PVS',mcts:'AI·MCTS'};
-    const typeText=typeLabels[cfg.type]||'人类';
-    let detail=typeText;
-    if(cfg.type!=='human')detail+=' · 深度 '+cfg.depth;
-    if(cfg.type!=='human'&&cfg.type!=='strategy')detail+=' · 随机 '+cfg.randomScale+'%';
-    info.innerHTML='<strong>'+nameText+'</strong><span>'+detail+'</span>';
-    const hint=document.createElement('span');hint.className='edit-hint';hint.textContent='编辑';
-    div.appendChild(dot);div.appendChild(info);div.appendChild(hint);
-    div.onclick=function(){openPlayerModal(i)};
-    container.appendChild(div);
-  }
-}
-function setupLobbySync(){
-  const sz=getSel('setupSizeGrid')||7;
-  const cnt=getSel('setupPlayersGroup')||2;
-  const maxP=getMaxPlayersBySize(sz);
-  const pg=document.getElementById('setupPlayersGroup');
-  if(pg){
-    pg.querySelectorAll('.gb').forEach(b=>{b.style.display=parseInt(b.dataset.value)<=maxP?'':'none'});
-    const sc=pg.querySelector('.selected');
-    if(sc&&parseInt(sc.dataset.value)>maxP){
-      const f=pg.querySelector('.gb:not([style*="display: none"])');
-      if(f)setSelected(pg,f);
-    }
-  }
-  const sg=document.getElementById('setupSizeGrid');
-  if(sg){
-    sg.querySelectorAll('.size-btn').forEach(b=>{b.style.display=cnt<=getMaxPlayersBySize(parseInt(b.dataset.value))?'':'none'});
-    const ss=sg.querySelector('.selected');
-    if(ss&&cnt>getMaxPlayersBySize(parseInt(ss.dataset.value))){
-      const f=sg.querySelector('.size-btn:not([style*="display: none"])');
-      if(f)setSelected(sg,f);
-    }
-  }
-  setTimeout(generatePlayerConfigs,10);
-}
-
-function startUnifiedGame(){
-  const sz=getSel('setupSizeGrid')||7;
-  const cnt=getSel('setupPlayersGroup')||2;
-  generatePlayerConfigs();
-  let aiCount=0;
-  for(let i=0;i<cnt;i++){
-    if(playerConfigs[i].type!=='human')aiCount++;
-  }
-  if(aiCount===0)startLocalFromSetup(sz,cnt);
-  else if(aiCount===cnt)startEveFromSetup(sz,cnt);
-  else startAIFromSetup(sz,cnt);
-}
-function startLocalFromSetup(sz,cnt){
-  clearSavedGameState();
-  location.hash='#game';
-  resetRoundHistory();
-  undoStack=[];
-  size=sz;maxPlayers=cnt;
-  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
-  document.getElementById('pauseBtn').textContent='暂停';
-  gameMode='local';_originPage='gameSetup';
-  aiPlayers=new Set();aiThinking=false;
-  eliminatedPlayers=new Set();gameHistory=[];chainStats={};
-  maxChainOverall={player:null,length:0};
-  let colorNames={};
-  for(let i=0;i<cnt;i++){
-    const cfg=playerConfigs[i];
-    colorNames[i]=cfg.name||COLOR_NAMES[i]||('玩家'+(i+1));
-  }
-  _colorNames=colorNames;
-  recordHistory();
-  renderBoard(true);
-  show('game');
-  document.body.style.background='';
-  renderPlayerBar();
-  _lastGameConfig={mode:'local',size,maxPlayers,colorNames};
-}
-function startAIFromSetup(sz,cnt){
-  clearSavedGameState();
-  location.hash='#game';
-  resetRoundHistory();
-  undoStack=[];
-  size=sz;maxPlayers=cnt;
-  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
-  document.getElementById('pauseBtn').textContent='暂停';
-  gameMode='ai';_originPage='gameSetup';
-  aiPlayers=new Set();aiConfigs={};aiThinking=false;
-  eliminatedPlayers=new Set();gameHistory=[];chainStats={};
-  maxChainOverall={player:null,length:0};
-  let colorNames={},humanIdx=-1;
-  for(let i=0;i<cnt;i++){
-    const cfg=playerConfigs[i];
-    colorNames[i]=cfg.name||COLOR_NAMES[i]||('玩家'+(i+1));
-    if(cfg.type==='human'){
-      if(humanIdx<0)humanIdx=i;
-    }else{
-      aiPlayers.add(i);
-      aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale||10};
-    }
-  }
-  if(humanIdx<0)humanIdx=0;
-  _colorNames=colorNames;
-  selectedPlayerColor=humanIdx;
-  recordHistory();
-  renderBoard(true);
-  show('game');
-  document.body.style.background='';
-  renderPlayerBar();
-  if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames};
-}
-function startEveFromSetup(sz,cnt){
-  clearSavedGameState();
-  location.hash='#game';
-  resetRoundHistory();
-  undoStack=[];
-  size=sz;maxPlayers=cnt;
-  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
-  document.getElementById('pauseBtn').textContent='暂停';
-  gameMode='eve';_originPage='gameSetup';
-  aiPlayers=new Set();aiConfigs={};aiThinking=false;
-  eliminatedPlayers=new Set();gameHistory=[];chainStats={};
-  maxChainOverall={player:null,length:0};
-  let colorNames={};
-  for(let i=0;i<cnt;i++){
-    const cfg=playerConfigs[i];
-    colorNames[i]=cfg.name||COLOR_NAMES[i]||('AI '+(i+1));
-    aiPlayers.add(i);
-    aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale||10};
-  }
-  _colorNames=colorNames;
-  recordHistory();
-  renderBoard(true);
-  show('game');
-  document.body.style.background='';
-  renderPlayerBar();
-  if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames};
-}
 window.addEventListener('popstate',()=>{
   const cur = Router._current;
   let handled = false;  // 标记是否处理了图层/模态（未切换页面）
@@ -4390,7 +3940,6 @@ window.addEventListener('popstate',()=>{
   if(!handled){
     const SWIPE_TABLE = {
       'welcome':       () => showExitConfirm(),                     // 1 => 14
-      'gameSetup':     () => Router.switchPage('welcome'),          // new => welcome
       'aiLobby':       () => Router.switchPage('welcome'),          // 2 => 1
       'localLobby':    () => Router.switchPage('welcome'),          // 3 => 1
       'eveLobby':      () => Router.switchPage('welcome'),          // 4 => 1

@@ -172,6 +172,7 @@ async fn ai_move(
 
 #[tauri::command]
 async fn ai_move_v2(
+    random_scale: u32,
     board: GameBoard,
     size: usize,
     player: usize,
@@ -225,6 +226,7 @@ async fn ai_move_strategy(
 
 #[tauri::command]
 async fn ai_move_mcts(
+    random_scale: u32,
     board: GameBoard,
     size: usize,
     player: usize,
@@ -641,6 +643,8 @@ fn eval_board(board: &GameBoard, player: usize, game_count: u32) -> i32 {
     let mut opp_score = 0i32;
     let mut my_territory = 0i32;
     let mut opp_territory = 0i32;
+    let mut my_chain_threat = 0i32;
+    let mut opp_chain_threat = 0i32;
 
     for row in board {
         for cell in row {
@@ -648,17 +652,23 @@ fn eval_board(board: &GameBoard, player: usize, game_count: u32) -> i32 {
                 Some(p) if p == player => {
                     my_score += cell.count as i32;
                     my_territory += 1;
+                    if cell.count >= 3 { my_chain_threat += (cell.count as i32) * 4; }
+                    else if cell.count >= 2 { my_chain_threat += 1; }
                 }
                 Some(_) => {
                     opp_score += cell.count as i32;
                     opp_territory += 1;
+                    if cell.count >= 3 { opp_chain_threat += (cell.count as i32) * 4; }
+                    else if cell.count >= 2 { opp_chain_threat += 1; }
                 }
                 None => {}
             }
         }
     }
 
-    let base = (my_score - opp_score) * 2 + (my_territory - opp_territory);
+    let base = (my_score - opp_score) * 2 
+        + (my_territory - opp_territory)
+        + (my_chain_threat - opp_chain_threat) * 3;
 
     // 开场（前几局）增加随机性，探索不同的走法
     // 游戏场次数越少随机值越大，5局后归零
@@ -889,7 +899,7 @@ impl AlphaBeta<(usize, usize)> for GameState {
 // ─── PVS (NegaMax) + Killer/History + QSearch ───
 
 const PVS_MAX_DEPTH: usize = 64;
-const PVS_HISTORY_SIZE: usize = 20;
+const PVS_HISTORY_SIZE: usize = 40;
 
 /// 紧凑 eliminated bitset（最多支持 32 位玩家）
 #[derive(Clone, Copy)]
@@ -1049,7 +1059,8 @@ impl PvsSearcher {
         }
 
         let moves = self.get_moves_ordered(board, sz, player, depth);
-        let max_branch = moves.len().min(10);
+        // 深层少分支，浅层多分支
+        let max_branch = moves.len().min(10 + (4usize).saturating_sub(depth) * 2);
         if max_branch == 0 { return eval_board(board, player, 0); }
 
         let mut best_score = i32::MIN + 1;
@@ -1100,12 +1111,12 @@ impl PvsSearcher {
             return first_move_center(board, sz);
         }
 
-        let max_branch = ordered.len().min(10);
+        let max_branch = ordered.len().min((sz as f64 * 1.8) as usize).min(16);
         let elim_root = ElimSet::from_slice(eliminated);
 
-        // ─── Warmup: 浅层搜索填充 killer/history 表 ───
-        let warmup_n = max_branch.min(3);
-        let warm_depth = if depth >= 3 { 2 } else { depth.saturating_sub(1) };
+        // ─── Warmup: 用搜索深度的一半做预热 ───
+        let warmup_n = max_branch.min(4);
+        let warm_depth = (depth / 2).max(1);
         if warm_depth > 0 {
             for &m in ordered[..warmup_n].iter() {
                 let mut child = board.clone();
@@ -1186,10 +1197,10 @@ impl XorShift {
 }
 
 /// MCTS 常量
-const UCB_C: f64 = 1.414;
-const MCTS_ITER_PER_DEPTH: usize = 1200; // depth=1 -> 1200, depth=10 -> 12000
-const MCTS_PLAYOUT_MAX: usize = 60;
-const MCTS_TREE_MAX_NODES: usize = 3000; // 每棵树最大节点数（防内存暴涨）
+const UCB_C: f64 = 2.0;
+const MCTS_ITER_PER_DEPTH: usize = 800; // depth=1 -> 1200, depth=10 -> 12000
+const MCTS_PLAYOUT_MAX: usize = 40;
+const MCTS_TREE_MAX_NODES: usize = 2000; // 每棵树最大节点数（防内存暴涨）
 
 /// ─── MCTS 树节点（扁平向量存储） ───
 
@@ -1315,8 +1326,8 @@ impl MctsTree {
         loop {
             if self.is_terminal(leaf) { break; }
             let untried = self.untried_moves(leaf);
-            if !untried.is_empty() {
-                // 有未试走法 → EXPAND
+            if !untried.is_empty() && self.visits[leaf] >= 3 {
+                // 访问足够次数后才展开（渐进展开，避免过早分裂）
                 if let Some(new_node) = self.expand(leaf, rng) {
                     path.push(new_node);
                     leaf = new_node;
