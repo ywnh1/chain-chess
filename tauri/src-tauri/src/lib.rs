@@ -172,7 +172,7 @@ async fn ai_move(
 
 #[tauri::command]
 async fn ai_move_v2(
-    random_scale: u32,
+    _random_scale: u32,
     board: GameBoard,
     size: usize,
     player: usize,
@@ -226,7 +226,7 @@ async fn ai_move_strategy(
 
 #[tauri::command]
 async fn ai_move_mcts(
-    random_scale: u32,
+    _random_scale: u32,
     board: GameBoard,
     size: usize,
     player: usize,
