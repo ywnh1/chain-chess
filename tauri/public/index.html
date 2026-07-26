@@ -149,23 +149,23 @@ body::after{content:'';position:fixed;inset:0;
 .logo{font-size:3rem;letter-spacing:2px}
 .logo span{color:var(--accent)}
 .tagline{color:var(--dim);font-size:.9rem;margin-top:-.5rem}
-.mode-cards{display:flex;flex-direction:column;gap:14px;width:100%;max-width:400px}
+.mode-cards{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px}
 .mode-card{
   background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;
   border:1px solid var(--glass-border);border-radius:var(--radius);
   backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
   box-shadow:var(--glass-shadow);
-  padding:26px 22px;cursor:pointer;
-  transition:.35s cubic-bezier(.22,1,.36,1);text-align:left;display:flex;align-items:center;gap:16px;
+  padding:20px 16px;cursor:pointer;
+  transition:.35s cubic-bezier(.22,1,.36,1);text-align:left;display:flex;align-items:center;gap:14px;
   touch-action:manipulation;
-  min-height:72px;
+  min-height:56px;
 }
 .mode-card:hover{border-color:var(--glass-w-16);transform:translateY(-2px);box-shadow:0 12px 48px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
 .mode-card:active{transform:scale(.97);transition:all .08s ease}
-.mode-card .icon{font-size:2.2rem;flex-shrink:0}
+.mode-card .icon{font-size:1.8rem;flex-shrink:0}
 .mode-card .body{flex:1}
-.mode-card .body h3{font-size:1.15rem;font-weight:600}
-.mode-card .body p{font-size:.88rem;color:var(--dim);margin-top:3px}
+.mode-card .body h3{font-size:1rem;font-weight:600}
+.mode-card .body p{font-size:.8rem;color:var(--dim);margin-top:2px}
 
 /* lobby */
 #aiLobby,#localLobby,#eveLobby{max-width:480px;gap:.75rem;width:100%}
