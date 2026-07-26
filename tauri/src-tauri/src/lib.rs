@@ -1616,11 +1616,11 @@ pub fn find_best_move_strategy(
         })
     }).fold(0u64, |a, b| a.wrapping_mul(6364136223846793005).wrapping_add(b));
 
-    let rnd = |seed: u64| -> f64 {
+    let _rnd = |seed: u64| -> f64 {
         let h = hash.wrapping_mul(seed.wrapping_add(1)).wrapping_add(seed ^ 0x9e3779b97f4a7c15);
         ((h % 100) as f64) / 100.0
     };
-    let rnd_idx = |seed: u64, n: usize| -> usize {
+    let _rnd_idx = |seed: u64, n: usize| -> usize {
         if n <= 1 { return 0; }
         let h = hash.wrapping_mul(seed.wrapping_add(1)).wrapping_add(seed ^ 0x9e3779b97f4a7c15);
         (h as usize) % n
