@@ -192,6 +192,6 @@ fn main() {
     eprintln!("  总耗时: {:.1}s, 平均 {:.1}s/局", elapsed.as_secs_f64(), avg_time);
     eprintln!();
 
-    println!("RESULT: {}={} {}={} DRAW={} TOTAL={} TIME={:.1}s",
-        name0, wins[0], name1, wins[1], draws, num_games, elapsed.as_secs_f64());
+    println!("RESULT: P0={} P1={} DRAW={} TOTAL={} TIME={:.1}s",
+        wins[0], wins[1], draws, num_games, elapsed.as_secs_f64());
 }
