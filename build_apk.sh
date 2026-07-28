@@ -91,7 +91,7 @@ if [ ! -f "$ANDROID_MAIN_ACTIVITY" ]; then
   echo "  (若因 tauri.conf.json identifier 变更导致)"
   echo ""
   rm -rf tauri/src-tauri/gen/android
-  cd tauri && npx tauri android init && cd ..
+  (cd tauri && npx tauri android init)
   echo "  ✅ Android 项目已重新初始化"
   echo ""
 fi
@@ -111,22 +111,19 @@ fi
 
 # ── 步骤 1: 编译 APK ─────────────────────────────────────
 # TAURI_ANDROID_SKIP_RUST_BUILD 让 Gradle 跳过 Rust 重编译
-# native 模式：Rust 已在上一步编译好，此处只走打包
-# 普通模式：让 tauri 自行处理 Rust 编译
+# Tauri CLI 已负责 Rust 编译，Gradle 无需重复
+export TAURI_ANDROID_SKIP_RUST_BUILD=1
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  🔨 编译 arm64 APK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  产物: ${OUTPUT}"
 echo ""
-
-if [ "$NATIVE" != true ]; then
-  export TAURI_ANDROID_SKIP_RUST_BUILD=1
-fi
-
-cd tauri
-npx tauri android build --target aarch64 --apk
-cd ..
+(
+  cd tauri
+  npx tauri android build --target aarch64 --apk
+)
 
 # ── 步骤 2: 签名 ──────────────────────────────────────────
 echo ""
@@ -170,7 +167,7 @@ echo ""
 
 # 尝试复制到 Android 设备（仅当路径存在时）
 if [ -d "/storage/emulated/0/用户" ]; then
-  cp release /storage/emulated/0/用户/ -r
+  cp "$OUTPUT" /storage/emulated/0/用户/
   echo "  📱 已复制到 /storage/emulated/0/用户/"
 fi
 

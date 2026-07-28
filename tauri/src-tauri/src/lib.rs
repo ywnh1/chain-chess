@@ -158,9 +158,10 @@ async fn ai_move(
     max_players: usize,
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
+    use_ml_eval: bool,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos)
+        find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -183,15 +184,16 @@ async fn ai_move_v2(
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
     algorithm: String,
+    use_ml_eval: bool,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         if algorithm == "pvs" {
             // PVS (NegaMax) + Killer/History + QSearch
-            let mut searcher = PvsSearcher::new(player, game_count);
+            let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval);
             searcher.find_best(&board, size, player, max_players, &eliminated, depth)
         } else {
             // 默认使用 Alpha-Beta（原 find_best_move）
-            find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos)
+            find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval)
         }
     })
     .await
@@ -505,16 +507,6 @@ async fn export_game_history_dialog(
 }
 
 
-#[tauri::command]
-fn set_ml_eval(enabled: bool) {
-    USE_ML_EVAL.store(enabled, std::sync::atomic::Ordering::Relaxed);
-}
-
-#[tauri::command]
-fn get_ml_eval() -> bool {
-    USE_ML_EVAL.load(std::sync::atomic::Ordering::Relaxed)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -553,8 +545,6 @@ pub fn run() {
             save_round_history,
             load_round_history,
             clear_round_history,
-            set_ml_eval,
-            get_ml_eval,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -590,9 +580,14 @@ struct XGBoostEngine { trees: Vec<Vec<XgbNode>>, base_score: f32, }
 use std::sync::OnceLock;
 
 impl XGBoostEngine {
+    #[allow(dead_code)]
     fn load(path: &str) -> Result<Self, String> {
         let c = fs::read_to_string(path).map_err(|e| format!("读模型: {}", e))?;
-        let m: XgbModel = serde_json::from_str(&c).map_err(|e| format!("JSON: {}", e))?;
+        Self::load_from_str(&c)
+    }
+
+    fn load_from_str(json: &str) -> Result<Self, String> {
+        let m: XgbModel = serde_json::from_str(json).map_err(|e| format!("JSON: {}", e))?;
         let base_score: f32 = m.learner.learner_model_param.base_score
             .trim_matches(|c| c == '[' || c == ']').parse().map_err(|_| "base_score".to_string())?;
         let mut trees = Vec::new();
@@ -631,10 +626,7 @@ impl XGBoostEngine {
 fn xgb_engine() -> &'static XGBoostEngine {
     static ENG: OnceLock<XGBoostEngine> = OnceLock::new();
     ENG.get_or_init(|| {
-        let path = std::env::current_exe()
-            .ok().and_then(|p| p.parent().map(|d| d.join("xgb_model_board.json")))
-            .or_else(|| Some(std::path::PathBuf::from("xgb_model_board.json"))).unwrap();
-        XGBoostEngine::load(&path.to_string_lossy()).expect("加载 xgb_model_board.json 失败")
+        XGBoostEngine::load_from_str(include_str!("../xgb_model_board.json")).expect("加载 xgb_model_board.json 失败")
     })
 }
 
@@ -672,12 +664,9 @@ fn extract_features_xgb(board: &GameBoard, cur: usize, max_players: usize) -> [f
     feats
 }
 
-use std::sync::atomic::{AtomicBool, Ordering};
-static USE_ML_EVAL: AtomicBool = AtomicBool::new(true);
-
-/// 调度器：根据用户选择调用 ML 或手写评估
-fn eval_board(board: &GameBoard, player: usize, game_count: u32) -> i32 {
-    if USE_ML_EVAL.load(Ordering::Relaxed) {
+/// 调度器：根据 per-AI 配置调用 ML 或手写评估
+fn eval_board(board: &GameBoard, player: usize, game_count: u32, use_ml_eval: bool) -> i32 {
+    if use_ml_eval {
         eval_board_ml(board, player, game_count)
     } else {
         eval_board_handcraft(board, player, game_count)
@@ -903,6 +892,7 @@ struct GameState {
     eliminated: Vec<usize>,
     max_players: usize,
     game_count: u32,
+    use_ml_eval: bool,
 }
 
 impl AlphaBeta<(usize, usize)> for GameState {
@@ -918,7 +908,7 @@ impl AlphaBeta<(usize, usize)> for GameState {
             return Grade::Max;
         }
         // 非终局：按点数和棋子数打分
-        Grade::Score(eval_board(&self.board, self.ai_player, self.game_count) as i64)
+        Grade::Score(eval_board(&self.board, self.ai_player, self.game_count, self.use_ml_eval) as i64)
     }
     fn get_moves(&self) -> Vec<(usize, usize)> {
         get_moves(&self.board, self.sz, self.player, None)
@@ -1064,15 +1054,17 @@ struct PvsSearcher {
     killers: [[Option<(usize, usize)>; PVS_MAX_DEPTH]; 2],
     history: [[i32; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
     ai_player: usize,
+    use_ml_eval: bool,
 }
 
 impl PvsSearcher {
-    fn new(ai_player: usize, game_count: u32) -> Self {
+    fn new(ai_player: usize, game_count: u32, use_ml_eval: bool) -> Self {
         Self {
             game_count,
             killers: [[None; PVS_MAX_DEPTH]; 2],
             history: [[0; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
             ai_player,
+            use_ml_eval,
         }
     }
 
@@ -1145,8 +1137,8 @@ impl PvsSearcher {
         if alive_cnt <= 1 {
             return if player == self.ai_player { i32::MAX - 1000 } else { i32::MIN + 1000 };
         }
-        if depth >= 8 { return eval_board(board, player, 0); }
-        let stand_pat = eval_board(board, player, 0);
+        if depth >= 8 { return eval_board(board, player, 0, self.use_ml_eval); }
+        let stand_pat = eval_board(board, player, 0, self.use_ml_eval);
         if stand_pat >= beta { return beta; }
         let mut alpha = if stand_pat > alpha { stand_pat } else { alpha };
 
@@ -1200,14 +1192,14 @@ impl PvsSearcher {
             if use_qsearch {
                 return self.quiescence(board, sz, player, max_players, elim, alpha, beta, 0);
             } else {
-                return eval_board(board, player, 0);
+                return eval_board(board, player, 0, self.use_ml_eval);
             }
         }
 
         let moves = self.get_moves_ordered(board, sz, player, depth);
         // 深层少分支，浅层多分支
         let max_branch = moves.len().min(10 + (4usize).saturating_sub(depth) * 2);
-        if max_branch == 0 { return eval_board(board, player, 0); }
+        if max_branch == 0 { return eval_board(board, player, 0, self.use_ml_eval); }
 
         let mut best_score = i32::MIN + 1;
 
@@ -1293,11 +1285,12 @@ impl PvsSearcher {
                     killers: base_killers,
                     history: base_history,
                     ai_player: player,
+                    use_ml_eval: self.use_ml_eval,
                 };
                 let score = if depth > 0 {
                     -searcher.pvs(&child, sz, next, max_players, child_elim, depth - 1, i32::MIN + 1, i32::MAX - 1, true)
                 } else {
-                    eval_board(&child, player, 0)
+                    eval_board(&child, player, 0, self.use_ml_eval)
                 };
                 (score, m)
             })
@@ -1685,6 +1678,7 @@ pub fn find_best_move(
     max_players: usize,
     game_count: u32,
     _first_move_pos: Option<[usize; 2]>,
+    use_ml_eval: bool,
 ) -> Option<(usize, usize)> {
     let state = GameState {
         board: board.clone(),
@@ -1694,6 +1688,7 @@ pub fn find_best_move(
         eliminated: eliminated.to_vec(),
         max_players,
         game_count,
+        use_ml_eval,
     };
     state.run(depth)
 }
@@ -1900,7 +1895,11 @@ pub fn find_best_move_strategy(
 pub struct PlayerAiConfig {
     pub algorithm: String,
     pub depth: usize,
+    #[serde(default = "default_true")]
+    pub use_ml_eval: bool,
 }
+
+fn default_true() -> bool { true }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct StepRecord {
@@ -1926,8 +1925,9 @@ pub fn find_best_move_pvs(
     eliminated: &[usize],
     max_players: usize,
     game_count: u32,
+    use_ml_eval: bool,
 ) -> Option<(usize, usize)> {
-    let mut searcher = PvsSearcher::new(player, game_count);
+    let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval);
     searcher.find_best(board, sz, player, max_players, eliminated, depth)
 }
 
@@ -1943,10 +1943,10 @@ pub fn find_best_move_by_alg(
 ) -> Option<(usize, usize)> {
     match config.algorithm.as_str() {
         "alphabeta" => {
-            find_best_move(board, sz, player, config.depth, eliminated, max_players, game_count, first_move_pos)
+            find_best_move(board, sz, player, config.depth, eliminated, max_players, game_count, first_move_pos, config.use_ml_eval)
         }
         "pvs" => {
-            find_best_move_pvs(board, sz, player, config.depth, eliminated, max_players, game_count)
+            find_best_move_pvs(board, sz, player, config.depth, eliminated, max_players, game_count, config.use_ml_eval)
         }
         "mcts" => {
             find_best_move_mcts(board, sz, player, config.depth, eliminated, max_players)

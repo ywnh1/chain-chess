@@ -74,6 +74,7 @@ fn main() {
         configs.push(PlayerAiConfig {
             algorithm: alg.to_string(),
             depth,
+            use_ml_eval: true,
         });
         eprintln!("  玩家 {}: {} depth={}", i, alg, depth);
     }

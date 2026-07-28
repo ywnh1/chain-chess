@@ -1153,14 +1153,7 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
     <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">点击玩家设置名称、类型和 AI 参数</p>
   </div>
 
-  <!-- 评估函数切换 -->
-  <div class="form-row" style="margin-top:8px" id="setupEvalRow">
-    <label style="flex:1">AI 评估函数</label>
-    <div id="mlEvalToggleSetup" class="toggle-group">
-      <button class="tg-btn selected" data-value="true" onclick="setMlEval(true)">ML 模型</button>
-      <button class="tg-btn" data-value="false" onclick="setMlEval(false)">手写规则</button>
-    </div>
-  </div>
+
 
   <button class="glass-btn primary" onclick="startUnifiedGame()" style="margin-top:12px;padding:14px 28px;font-size:1.1rem">开始游戏</button>
 </div>
@@ -1196,6 +1189,13 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
         <span>0%</span><span>15%</span><span>30%</span>
       </div>
       <p style="font-size:.7rem;color:var(--dim);margin-top:2px">游戏开始时随机值固定 40%，逐渐降至设定值（策略 AI 不受影响）</p>
+    </div>
+    <div class="form-row" id="playerEvalRow" style="display:none">
+      <label style="flex:1">评估函数</label>
+      <div id="playerEvalToggle" class="toggle-group">
+        <button class="tg-btn selected" data-value="true">ML 模型</button>
+        <button class="tg-btn" data-value="false">手写规则</button>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="glass-btn" onclick="closePlayerModal()">取消</button>
@@ -1405,15 +1405,6 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
     <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">配置每个 AI 对手</p>
   </div>
 
-  <!-- 评估函数切换 -->
-  <div class="form-row" style="margin-top:8px">
-    <label style="flex:1">AI 评估函数</label>
-    <div id="mlEvalToggle" class="toggle-group">
-      <button class="tg-btn selected" data-value="true" onclick="setMlEval(true)">ML 模型</button>
-      <button class="tg-btn" data-value="false" onclick="setMlEval(false)">手写规则</button>
-    </div>
-  </div>
-
   <button class="glass-btn primary" onclick="startAIGame()" style="margin-top:12px;padding:14px 28px;font-size:1.1rem">开始游戏</button>
 </div>
 
@@ -1461,15 +1452,6 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 
   <div id="eveConfigArea" class="form-eve-config">
     <p style="font-size:.8rem;color:var(--dim);margin:8px 0 4px">配置每个 AI</p>
-  </div>
-
-  <!-- 评估函数切换 -->
-  <div class="form-row" style="margin-top:8px">
-    <label style="flex:1">AI 评估函数</label>
-    <div id="mlEvalToggleEve" class="toggle-group">
-      <button class="tg-btn selected" data-value="true" onclick="setMlEval(true)">ML 模型</button>
-      <button class="tg-btn" data-value="false" onclick="setMlEval(false)">手写规则</button>
-    </div>
   </div>
 
   <button class="glass-btn primary" onclick="startEveGame()" style="margin-top:10px;padding:14px 28px;font-size:1.1rem">开始观战</button>
@@ -2028,12 +2010,40 @@ function generateEveConfig(){
     decBtn.onclick=function(e){e.stopPropagation();if(depVal>1){depVal--;depDisp.textContent=depVal}};
     incBtn.onclick=function(e){e.stopPropagation();if(depVal<10){depVal++;depDisp.textContent=depVal}};
     depWrap.appendChild(decBtn);depWrap.appendChild(depDisp);depWrap.appendChild(incBtn);
+    // 评估函数切换（仅 alphabeta/pvs 显示）
+    let evalWrap=document.createElement('div');evalWrap.className='alg-mini';
+    let evalVal=true;
+    function makeEveBtn(v,t){
+      let b=document.createElement('button');b.className='am-btn'+(v===true?' selected':'');
+      b.textContent=t;b.dataset.value=String(v);
+      b.onclick=function(e){
+        e.stopPropagation();
+        evalWrap.querySelectorAll('.am-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+        evalVal=this.dataset.value==='true';
+      };
+      return b;
+    }
+    evalWrap.appendChild(makeEveBtn(true,'ML'));
+    evalWrap.appendChild(makeEveBtn(false,'手写'));
+    evalWrap.style.display=(algVal==='alphabeta'||algVal==='pvs')?'':'none';
+    // 算法切换时更新 eval 可见性
+    (function(algW,evalW){
+      algW.querySelectorAll('.am-btn').forEach(function(b){
+        var _orig=b.onclick;
+        b.onclick=function(e){
+          if(_orig)_orig.call(this,e);
+          evalW.style.display=(algVal==='alphabeta'||algVal==='pvs')?'':'none';
+        };
+      });
+    })(algWrap,evalWrap);
     // 存储用于 startEveGame 读取
     row.dataset.algKey='eveAlg_'+i;
     row.dataset.depKey='eveDepth_'+i;
     row._eveGetAlg=()=>algVal;
     row._eveGetDep=()=>depVal;
-    row.appendChild(dot);row.appendChild(label);row.appendChild(algWrap);row.appendChild(depWrap);
+    row._eveGetEval=()=>evalVal;
+    row.appendChild(dot);row.appendChild(label);row.appendChild(algWrap);row.appendChild(depWrap);row.appendChild(evalWrap);
     area.appendChild(row);
   }
 }
@@ -2057,7 +2067,8 @@ function startEveGame(){
     let row=eveRows[p];
     let alg=row&&row._eveGetAlg?row._eveGetAlg():'strategy';
     let dep=row&&row._eveGetDep?row._eveGetDep():2;
-    aiConfigs[p]={algorithm:alg,depth:dep};
+    let evalVal=row&&row._eveGetEval?row._eveGetEval():true;
+    aiConfigs[p]={algorithm:alg,depth:dep,randomScale:10,useMlEval:evalVal};
   }
   aiThinking=false;
   eliminatedPlayers=new Set();
@@ -3106,6 +3117,7 @@ async function triggerAI(){
   let alg = aiConfigs[curPlayer] ? aiConfigs[curPlayer].algorithm : aiAlgorithm;
   let dep = aiConfigs[curPlayer] ? aiConfigs[curPlayer].depth : aiDepth;
   let randomScale = aiConfigs[curPlayer] ? (aiConfigs[curPlayer].randomScale ?? 10) : 10;
+  let useMlEval = aiConfigs[curPlayer] ? (aiConfigs[curPlayer].useMlEval ?? true) : true;
   // 所有算法统一走 Rust 引擎
   let cmd;
   if(alg==='mcts'){cmd='ai_move_mcts';}
@@ -3122,6 +3134,7 @@ async function triggerAI(){
     gameCount: gameCount,
     firstMovePos: firstMovePos,
     randomScale: randomScale,
+    useMlEval: useMlEval,
   };
   if(alg==='pvs')args.algorithm=alg;
   try {
@@ -3293,25 +3306,45 @@ function generateAIConfig(){
     depWrap.appendChild(decBtn);depWrap.appendChild(depDisp);depWrap.appendChild(incBtn);
     // 根据默认算法决定深度是否可见
     if(algVal==='alphabeta'||algVal==='pvs'||algVal==='mcts')depWrap.style.display='flex';
+    // 评估函数切换（仅 alphabeta/pvs 显示）
+    let evalWrap=document.createElement('div');evalWrap.className='alg-mini';
+    let evalVal=true;
+    function makeEvalBtn(v,t){
+      let b=document.createElement('button');b.className='am-btn'+(v===true?' selected':'');
+      b.textContent=t;b.dataset.value=String(v);
+      b.onclick=function(e){
+        e.stopPropagation();
+        evalWrap.querySelectorAll('.am-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+        evalVal=this.dataset.value==='true';
+      };
+      return b;
+    }
+    evalWrap.appendChild(makeEvalBtn(true,'ML'));
+    evalWrap.appendChild(makeEvalBtn(false,'手写'));
+    evalWrap.style.display=(algVal==='alphabeta'||algVal==='pvs')?'':'none';
+    // 算法切换时也更新 eval 可见性
+    var _origBtns=algWrap.querySelectorAll('.am-btn');
+    for(var _bi=0;_bi<_origBtns.length;_bi++){
+      (function(b){
+        var _orig=b.onclick;
+        b.onclick=function(e){
+          if(_orig)_orig.call(this,e);
+          evalWrap.style.display=(algVal==='alphabeta'||algVal==='pvs')?'':'none';
+        };
+      })(_origBtns[_bi]);
+    }
     // 存储用于 startAIGame 读取
     row.dataset.algKey='aiAlg_'+i;
     row.dataset.depKey='aiDepth_'+i;
     row._aiGetAlg=()=>algVal;
     row._aiGetDep=()=>depVal;
-    row.appendChild(dot);row.appendChild(label);row.appendChild(algWrap);row.appendChild(depWrap);
+    row._aiGetEval=()=>evalVal;
+    row.appendChild(dot);row.appendChild(label);row.appendChild(algWrap);row.appendChild(depWrap);row.appendChild(evalWrap);
     area.appendChild(row);
   }
 }
 // 设置 ML/手写评估函数
-function setMlEval(enabled){
-  const tg=document.getElementById('mlEvalToggle');
-  if(tg){tg.querySelectorAll('.tg-btn').forEach(b=>b.classList.toggle('selected',b.dataset.value===String(enabled)))}
-  if(window.__TAURI_INTERNALS__){
-    window.__TAURI_INTERNALS__.invoke('set_ml_eval',{enabled:enabled}).catch(e=>console.warn('set_ml_eval:',e))
-  }
-}
-
-
 function startAIGame(){
   clearSavedGameState();
   location.hash='#game';
@@ -3337,7 +3370,8 @@ function startAIGame(){
       let row=aiRows[rowIdx];
       let alg=row&&row._aiGetAlg?row._aiGetAlg():aiAlgorithm;
       let dep=row&&row._aiGetDep?row._aiGetDep():aiDepth;
-      aiConfigs[p]={algorithm:alg,depth:dep};
+      let evalVal=row&&row._aiGetEval?row._aiGetEval():true;
+      aiConfigs[p]={algorithm:alg,depth:dep,randomScale:10,useMlEval:evalVal};
       rowIdx++;
     }
   }
@@ -4256,6 +4290,11 @@ function openPlayerModal(idx){
   document.getElementById('depthDecBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v>1){v--;e.textContent=v}};
   document.getElementById('depthIncBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v<10){v++;e.textContent=v}};
   document.getElementById('randomScaleSlider').oninput=function(){document.getElementById('randomValueLabel').textContent=this.value+'%'};
+  // 初始化评估函数按钮
+  var evalBtns=document.getElementById('playerEvalToggle');
+  if(evalBtns){
+    evalBtns.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===String(cfg.useMlEval!==false))});
+  }
   openModal('playerConfigModal');
 }
 function updateModalRows(){
@@ -4265,8 +4304,10 @@ function updateModalRows(){
   var val=sel?sel.dataset.value:'human';
   var isAI=val!=='human';
   var needDepth=val==='alphabeta'||val==='pvs'||val==='mcts';
+  var needEval=val==='alphabeta'||val==='pvs';
   document.getElementById('playerDepthRow').style.display=needDepth?'block':'none';
   document.getElementById('playerRandomRow').style.display=needDepth?'block':'none';
+  document.getElementById('playerEvalRow').style.display=needEval?'block':'none';
 }
 function closePlayerModal(){closeModal('playerConfigModal')}
 function savePlayerConfig(){
@@ -4276,6 +4317,8 @@ function savePlayerConfig(){
   cfg.type=selBtn?selBtn.dataset.value:'human';
   cfg.depth=parseInt(document.getElementById('depthValue').textContent)||2;
   cfg.randomScale=parseInt(document.getElementById('randomScaleSlider').value)??10;
+  var evalSel=document.querySelector('#playerEvalToggle .tg-btn.selected');
+  cfg.useMlEval=evalSel?evalSel.dataset.value==='true':true;
   closePlayerModal();
   generatePlayerConfigs();
 }
@@ -4286,7 +4329,7 @@ function generatePlayerConfigs(){
   const realCnt=Math.min(cnt,maxP);
   while(playerConfigs.length<realCnt){
     const i=playerConfigs.length;
-    playerConfigs.push({name:'',type:i===0?'human':'strategy',depth:2,randomScale:10});
+    playerConfigs.push({name:'',type:i===0?'human':'strategy',depth:2,randomScale:10,useMlEval:true});
   }
   if(playerConfigs.length>realCnt)playerConfigs.length=realCnt;
   const container=document.getElementById('playerConfigList');
@@ -4302,6 +4345,7 @@ function generatePlayerConfigs(){
     let detail=typeText;
     if(cfg.type!=='human'&&cfg.type!=='strategy')detail+=' · 深度 '+cfg.depth;
     if(cfg.type!=='human'&&cfg.type!=='strategy')detail+=' · 随机 '+cfg.randomScale+'%';
+    if(cfg.type==='alphabeta'||cfg.type==='pvs')detail+=' · '+(cfg.useMlEval!==false?'ML模型':'手写');
     info.innerHTML='<strong>'+nameText+'</strong><span>'+detail+'</span>';
     const hint=document.createElement('span');hint.className='edit-hint';hint.textContent='编辑';
     div.appendChild(dot);div.appendChild(info);div.appendChild(hint);
@@ -4395,7 +4439,7 @@ function startAIFromSetup(sz,cnt){
       if(humanIdx<0)humanIdx=i;
     }else{
       aiPlayers.add(i);
-      aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10};
+      aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10,useMlEval:cfg.useMlEval!==false};
     }
   }
   if(humanIdx<0)humanIdx=0;
@@ -4426,7 +4470,7 @@ function startEveFromSetup(sz,cnt){
     const cfg=playerConfigs[i];
     colorNames[i]=cfg.name||COLOR_NAMES[i]||('AI '+(i+1));
     aiPlayers.add(i);
-    aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10};
+    aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10,useMlEval:cfg.useMlEval!==false};
   }
   _colorNames=colorNames;
   recordHistory();

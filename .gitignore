@@ -55,6 +55,9 @@ release.keystore
 # --- 字体（避免大文件进仓库） ---
 tauri/public/fonts/font.ttf
 
+# --- ML 训练数据（1.2GB，避免进仓库） ---
+data/
+
 # --- ai ---
 .skills/
 .skill/
