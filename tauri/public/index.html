@@ -1193,8 +1193,8 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
     <div class="form-row" id="playerEvalRow" style="display:none">
       <label style="flex:1">评估函数</label>
       <div id="playerEvalToggle" class="toggle-group">
-        <button class="tg-btn selected" data-value="true">ML 模型</button>
-        <button class="tg-btn" data-value="false">手写规则</button>
+        <button class="tg-btn selected" data-value="true" onclick="var p=this.parentNode;p.querySelectorAll('.tg-btn').forEach(function(b){b.classList.remove('selected')});this.classList.add('selected')">ML 模型</button>
+        <button class="tg-btn" data-value="false" onclick="var p=this.parentNode;p.querySelectorAll('.tg-btn').forEach(function(b){b.classList.remove('selected')});this.classList.add('selected')">手写规则</button>
       </div>
     </div>
     <div class="modal-actions">

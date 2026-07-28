@@ -644,7 +644,7 @@ fn extract_features_xgb(board: &GameBoard, cur: usize, max_players: usize) -> [f
             for (j, c) in row.iter().enumerate() {
                 if c.owner == Some(p) {
                     terr += 1.0;
-                    match c.count { 1 => c1 += 1.0, 2 => { c2 += 1.0; threat += 1.0; } 3 => { c3 += 1.0; threat += 12.0; } _ => {} }
+                    match c.count { 1 => c1 += 1.0, 2 => c2 += 1.0, 3 => { c3 += 1.0; threat += 12.0; } _ => {} }
                     cdist += (i as f32 - center).abs() + (j as f32 - center).abs();
                 }
             }
