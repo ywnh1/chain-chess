@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=fff" alt="Android">
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/badge/version-3.0.0--beta-orange" alt="v3.0.0-beta">
+    <img src="https://img.shields.io/badge/version-3.1.0--beta-orange" alt="v3.1.0-beta">
   </p>
 </div>
 
@@ -44,6 +44,7 @@
 | 🎯 **搜索深度可调** | Alpha-Beta / PVS / MCTS 深度 1~10 可配置 |
 | 🎲 **PVS 增强搜索** | 动态分支控制、连锁威胁评分、Killer/History 启发、QSearch 静止搜索 |
 | ♻️ **MCTS 策略偏置** | 启发式评分引导 Playout（不再纯随机），渐进展开，UCB 调参 |
+| 🤖 **ML 评估引擎** | XGBoost 盘面评估，支持 ML/手写评估函数切换，自对弈数据生成管线 |
 | 🎲 **随机化走法** | 早期对局加入随机探索，同等走法随机选择 |
 | 🎯 **第一轮限制区域** | 每位玩家首步需避开所有已有棋子周围 12 格 |
 | ⏸ **暂停功能** | 游戏暂停时查看实时统计和折线图 |
@@ -106,6 +107,7 @@ cd ..
 | Alpha-Beta 剪枝 | 搜索剪枝 | Rust + Rayon | 日常对局、标准棋力 |
 | PVS NegaMax | 精炼剪枝 | Rust + Rayon | 竞技对局、更强棋力 |
 | MCTS 蒙特卡洛 | 随机模拟 | Rust + Rayon | 探索非直觉走法、特殊局面 |
+| ML 评估增强 | ML 盘面评估 | Rust | 替换手写启发式，可切换 ML/手写 |
 
 ### ⚡ 策略算法（Strategy）
 
