@@ -16,6 +16,12 @@ UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/releas
 CARGO_CONFIG="tauri/src-tauri/.cargo/config.toml"
 RUST_DIR="tauri/src-tauri"
 
+# ── 环境检测 ──────────────────────────────────────────
+if [ -z "${ANDROID_HOME}" ] && [ -d "$HOME/Android/Sdk" ]; then
+  export ANDROID_HOME="$HOME/Android/Sdk"
+  echo "  📋 ANDROID_HOME 自动设为: $ANDROID_HOME"
+fi
+
 # ── 参数解析 ──────────────────────────────────────────────
 NATIVE=false
 case "$1" in
