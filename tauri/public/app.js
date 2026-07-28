@@ -2391,7 +2391,7 @@ let editingPlayerIdx=-1;
 function openPlayerModal(idx){
   editingPlayerIdx=idx;
   const cfg=playerConfigs[idx];
-  const pName=playerConfigs[idx]?.name||COLOR_NAMES[idx]||('玩家'+(idx+1));
+  const pName=playerConfigs[idx]?.name||('玩家'+(idx+1));
   document.getElementById('playerModalTitle').textContent=pName+' 设置';
   document.getElementById('playerNameInput').value=cfg.name||'';
   document.getElementById('depthValue').textContent=String(cfg.depth);
@@ -2524,7 +2524,7 @@ function startLocalFromSetup(sz,cnt){
   let colorNames={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
-    colorNames[i]=cfg.name||COLOR_NAMES[i]||('玩家'+(i+1));
+    colorNames[i]=cfg.name||('玩家'+(i+1));
   }
   _colorNames=colorNames;
   recordHistory();
@@ -2549,7 +2549,7 @@ function startAIFromSetup(sz,cnt){
   let colorNames={},humanIdx=-1;
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
-    colorNames[i]=cfg.name||COLOR_NAMES[i]||('玩家'+(i+1));
+    colorNames[i]=cfg.name||('玩家'+(i+1));
     if(cfg.type==='human'){
       if(humanIdx<0)humanIdx=i;
     }else{
@@ -2583,7 +2583,7 @@ function startEveFromSetup(sz,cnt){
   let colorNames={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
-    colorNames[i]=cfg.name||COLOR_NAMES[i]||('AI '+(i+1));
+    colorNames[i]=cfg.name||('AI '+(i+1));
     aiPlayers.add(i);
     aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10,useMlEval:cfg.useMlEval!==false};
   }

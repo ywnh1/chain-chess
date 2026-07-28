@@ -837,11 +837,11 @@ fn eval_board_ml(board: &GameBoard, player: usize, game_count: u32) -> i32 {
     let engine = xgb_engine();
     let feats = extract_features_improved(board, player, max_players_for(board));
     let (raw_score, _prob) = engine.predict(&feats);
-    // XGBoost 输出 log-odds (约 -5~5)，缩放到与 handcraft eval 相近的量级 (~-200~200)
-    let ml_score = (raw_score * 40.0) as i32;
-    // 与手写评估混合，保证稳定性
+    // XGBoost log-odds (~[-30,30]) 缩放到搜索敏感量级
+    let ml_score = (raw_score * 12.0) as i32;
+    // 与手写评估混合（2/3 ML + 1/3 手写），兼顾 ML 的深度学习与手写的稳定边界
     let hand_score = eval_board_improved(board, player, game_count);
-    (ml_score + hand_score) / 2
+    (ml_score * 2 + hand_score) / 3
 }
 
 /// 获取当前棋盘的玩家数
