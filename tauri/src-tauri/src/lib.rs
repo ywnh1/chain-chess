@@ -563,6 +563,7 @@ pub fn run() {
 // ─── XGBoost Engine (pure Rust, no external deps) ───
 
 #[derive(Clone, Deserialize)]
+#[allow(dead_code)]
 struct XgbTreeModel {
     base_weights: Vec<f32>, default_left: Vec<i32>,
     left_children: Vec<i32>, right_children: Vec<i32>,
@@ -570,6 +571,7 @@ struct XgbTreeModel {
     tree_param: XgbTreeParam,
 }
 #[derive(Clone, Deserialize)]
+#[allow(dead_code)]
 struct XgbTreeParam { num_nodes: String, }
 #[derive(Clone, Deserialize)]
 struct XgbGradientBoosterModel { trees: Vec<XgbTreeModel>, }
