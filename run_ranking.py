@@ -15,9 +15,9 @@ COMPETITORS = [
     {"id": "strategy",   "alg": "strategy",  "depth": None, "ml": False, "label": "策略算法"},
     {"id": "ab_hand",    "alg": "alphabeta", "depth": 2,    "ml": False, "label": "Alpha-Beta 手写"},
     {"id": "ab_ml",      "alg": "alphabeta", "depth": 2,    "ml": True,  "label": "Alpha-Beta ML"},
-    {"id": "pvs_hand",   "alg": "pvs",       "depth": 2,    "ml": False, "label": "PVS 手写"},
-    {"id": "pvs_ml",     "alg": "pvs",       "depth": 2,    "ml": True,  "label": "PVS ML"},
-    {"id": "mcts",       "alg": "mcts",      "depth": 2,    "ml": False, "label": "MCTS"},
+    {"id": "ab_hand_d1", "alg": "alphabeta", "depth": 1,    "ml": False, "label": "Alpha-Beta 手写 d1"},
+    {"id": "ab_ml_d1",   "alg": "alphabeta", "depth": 1,    "ml": True,  "label": "Alpha-Beta ML d1"},
+    {"id": "mcts",       "alg": "mcts",      "depth": 2,    "ml": False, "label": "MCTS d2"},
 ]
 
 GAMES_PER_MATCHUP = 10
@@ -222,10 +222,10 @@ def main():
 
     # 算法比较
     ab_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "alphabeta")
-    pvs_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "pvs")
-    strat_wins = wins[0]  # strategy is index 0
-    mcts_wins = wins[5]  # mcts is index 5
-    lines.append(f"- Alpha-Beta 总胜场 {ab_wins}，PVS 总胜场 {pvs_wins}，MCTS 总胜场 {mcts_wins}，策略算法总胜场 {strat_wins}。")
+    d1_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "alphabeta" and c["depth"] == 1)
+    d2_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "alphabeta" and c["depth"] == 2)
+    mcts_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "mcts")
+    lines.append(f"- Alpha-Beta 总胜场 {ab_wins}（d1: {d1_wins}，d2: {d2_wins}），MCTS 总胜场 {mcts_wins}，策略算法总胜场 {strat_wins}。")
 
     lines.append("")
     lines.append("> 生成时间: " + __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M"))

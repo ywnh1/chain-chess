@@ -26,7 +26,7 @@ echo "🏟  开始排位赛..."
 echo "    6 个选手 × 15 组对战 × 10 局 = 150 局"
 echo ""
 cd "${ROOT}"
-python3 run_ranking.py 2>&1
+python3 run_ranking.py | tee run_ranking.out
 
 echo ""
 echo "✅ 排位赛结束！报告文件: AI_RANKING.md"
