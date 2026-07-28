@@ -291,6 +291,12 @@ Router.register('about-license', {
   back: 'about',
   enter() { document.body.style.background=''; },
   leave() {}
+Router.register('about-benchmark', {
+  back: 'about',
+  enter() { document.body.style.background='' },
+  leave() {}
+});
+
 });
 
 Router.register('checkout', {
@@ -2644,6 +2650,7 @@ window.addEventListener('popstate',()=>{
       'about':         () => Router.switchPage('welcome'),          // 6 => 1
       'about-ai':      () => Router.switchPage('about'),            // 10 => 6
       'about-changelog': () => Router.switchPage('about'),          // 11 => 6
+      'about-benchmark': () => Router.switchPage('about'),            // 12 => 6
       'about-license': () => Router.switchPage('about'),            // 11 => 6
       'checkout':      () => {                                      // 7 => 5, 8 => 2/3/4
         const prev = Router._checkoutPrev;

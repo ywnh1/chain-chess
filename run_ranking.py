@@ -212,8 +212,8 @@ def main():
     lines.append(f"- **{top['label']}** 以 {top_pct:.0f}% 胜率排名第一，是当前最强 AI。")
 
     # ML vs 手写
-    ml_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["ml"])
-    hand_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if not c["ml"] and c["alg"] != "strategy")
+    ml_wins = sum(sum(wins[i] for i, c in enumerate(COMPETITORS) if c["ml"])
+    hand_wins = sum(sum(wins[i] for i, c in enumerate(COMPETITORS) if not c["ml"] and c["alg"] != "strategy")
     lines.append(f"- ML 评估（含 alphabeta/pvs × ML）总胜场 {ml_wins}，手写评估总胜场 {hand_wins}。")
     if ml_wins > hand_wins:
         lines.append("- ML 评估显著优于手写评估。")
@@ -221,9 +221,9 @@ def main():
         lines.append("- 手写评估仍具竞争力。")
 
     # 算法比较
-    ab_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "alphabeta")
-    d1_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "alphabeta" and c["depth"] == 1)
-    d2_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "alphabeta" and c["depth"] == 2)
+    ab_wins = sum(sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "alphabeta")
+    d1_wins = sum(sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "alphabeta" and c["depth"] == 1)
+    d2_wins = sum(sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "alphabeta" and c["depth"] == 2)
     mcts_wins = sum(wins[i] for i, c in enumerate(COMPETITORS) if c["alg"] == "mcts")
     lines.append(f"- Alpha-Beta 总胜场 {ab_wins}（d1: {d1_wins}，d2: {d2_wins}），MCTS 总胜场 {mcts_wins}，策略算法总胜场 {strat_wins}。")
 

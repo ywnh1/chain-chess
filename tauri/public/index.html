@@ -187,6 +187,11 @@
       <span class="nav-arrow">→</span>
     </div>
 
+    <!-- AI 性能评测 → 二级页 -->
+    <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-benchmark')">
+      <span class="nav-label">AI 性能评测</span>
+      <span class="nav-arrow">→</span>
+    </div>
     <!-- 更新详情 → 二级页 -->
     <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-changelog')">
       <span class="nav-label">更新详情</span>
@@ -242,6 +247,37 @@
 </div>
 
 <!-- About Changelog page (二级) -->
+<div id="about-benchmark" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">&larr; 返回</button>
+  <div class="about-scroll">
+    <h2>AI 性能评测</h2>
+    <div class="about-card">
+      <h3 style="font-size:1.05rem;margin-bottom:8px">&#x1F3DF;  AI 战力排行</h3>
+      <p style="font-size:.82rem;color:var(--dim);margin-bottom:10px">循环赛 10 局制 · 7×7 棋盘 · 先手交替 · 共 150 局</p>
+      <table style="width:100%;font-size:.82rem;border-collapse:collapse">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.08)"><th style="text-align:left;padding:4px 6px">排名</th><th style="text-align:left;padding:4px 6px">选手</th><th style="text-align:right;padding:4px 6px">胜率</th><th style="text-align:right;padding:4px 6px">积分</th></tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">&#x1F947;</td><td style="padding:3px 6px"><strong>AB ML d2</strong></td><td style="padding:3px 6px;text-align:right">98%</td><td style="padding:3px 6px;text-align:right">147</td></tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">&#x1F948;</td><td style="padding:3px 6px"><strong>AB 手写 d2</strong></td><td style="padding:3px 6px;text-align:right">82%</td><td style="padding:3px 6px;text-align:right">123</td></tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">&#x1F949;</td><td style="padding:3px 6px"><strong>AB ML d1</strong></td><td style="padding:3px 6px;text-align:right">52%</td><td style="padding:3px 6px;text-align:right">78</td></tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">4</td><td style="padding:3px 6px">策略算法</td><td style="padding:3px 6px;text-align:right">28%</td><td style="padding:3px 6px;text-align:right">42</td></tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">5</td><td style="padding:3px 6px">AB 手写 d1</td><td style="padding:3px 6px;text-align:right">26%</td><td style="padding:3px 6px;text-align:right">39</td></tr>
+        <tr><td style="padding:3px 6px">6</td><td style="padding:3px 6px">MCTS d2</td><td style="padding:3px 6px;text-align:right">14%</td><td style="padding:3px 6px;text-align:right">21</td></tr>
+      </table>
+      <h4 style="margin-top:14px;margin-bottom:6px">关键分析</h4>
+      <ul style="font-size:.8rem;line-height:1.6;padding-left:16px">
+        <li><strong>AB ML d2</strong> 以 98% 胜率碾压所有对手</li>
+        <li>同深度下，ML 评估 vs 手写评估约 <strong>9:1</strong></li>
+        <li>深度翻倍带来约 2 倍的棋力提升</li>
+      </ul>
+      <h4 style="margin-top:14px;margin-bottom:6px">评估函数影响</h4>
+      <p style="font-size:.8rem;line-height:1.6">ML 评估在 Alpha-Beta 框架下的优势显著：同深度同算法，ML 版以 9:1 碾压手写版。浅深度下 ML 版仍保持 52%，手写版仅 26%。</p>
+      <p style="font-size:.75rem;color:var(--dim);margin-top:10px">测试时间: 2026-07-28</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- About changelog (二级) -->
 <div id="about-changelog" class="screen">
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll" id="changelogContainer">
