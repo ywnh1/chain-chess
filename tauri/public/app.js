@@ -2344,7 +2344,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-    {v:'v3.1.0-beta · 第 22 版',desc:'集成 XGBoost ML 评估引擎，支持评估函数切换（ML/手写），新增自对弈数据生成管线'},
+    {v:'v3.1.1-beta · 第 23 版',desc:'增强版 AI 评估函数（位置权重+威胁评分+爆发势能），nbrs() 零分配性能优化，死代码清理，AI 首子由玩家放置，README/About 页面重写'},
     {v:'v3.0.0-beta · 第 21 版',desc:'排版变量体系重构，自定义AI选择弹窗，rand库随机化AI引擎，跳过按钮纯按钮化，README+About重写'},
     {v:'v2.3.9-beta · 第 19 版',desc:'开始游戏卡片和按钮放大、进行中游戏可放弃、历史图表修复、版本号回退 2.3.9-beta'},
   {v:'v3.0.0-beta · 第 18 版',desc:'v3.0 全新架构重写：全按钮统一 glass-btn 风格、可点击块统一 mode-card 风格、AI 对战支持逐个 AI 独立配置算法/深度、颜色选择排除 AI 使用'},

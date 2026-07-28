@@ -144,16 +144,16 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.1.0-beta</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.1.1-beta</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
     </div>
 
-    <!-- 游戏介绍（短卡片） -->
+    <!-- 游戏介绍 -->
     <div class="about-card">
       <h3>为什么玩连锁棋</h3>
-      <p>你点下的每一颗棋子，都可能引爆整张棋盘。不是简单填满格子——它决定下一轮爆炸从哪开始、谁被吞没、谁能活到最后。本地热座、人机对战、AI 斗蛐蛐三种模式，2~10 人同台博弈。纯客户端，无需服务器。</p>
+      <p>你点下的每一颗棋子，都可能引爆整张棋盘。每一次落子，都是在引爆点、扩散范围和对手布局之间做取舍。本地热座、人机对战、AI 斗蛐蛐三种模式，2~10 人同台博弈。纯客户端应用，无需服务器。</p>
     </div>
 
     <!-- 游戏规则（短卡片） -->
@@ -172,11 +172,12 @@
     <div class="about-card">
       <h3>功能亮点</h3>
       <p style="font-size:.82rem;line-height:1.7;margin:0">
-        🦀 <strong>Rust AI 引擎</strong> — Alpha-Beta、PVS、MCTS 三款搜索算法，Rayon 多核并行<br>
-        💾 <strong>中断恢复</strong> — 游戏异常退出后自动保存进度，历史页面一键继续<br>
-        📊 <strong>结算图表</strong> — 棋子数和点数双折线图，支持全屏缩放<br>
-        🔊 <strong>合成音效</strong> — 落子、爆炸、淘汰每种事件都有独立音频反馈<br>
-        🎨 <strong>液态玻璃主题</strong> — 深色虹彩渐变 UI，护眼舒适
+        🦀 <strong>Rust AI 引擎</strong> — 四款搜索算法（策略 / A-B / PVS / MCTS），Rayon 多核并行<br>
+        🎯 <strong>增强版 AI 评估</strong> — 位置权重 + 邻居威胁评分 + 爆发势能，7/10 胜率击败经典手写评估<br>
+        💾 <strong>中断恢复</strong> — 异常退出自动保存，历史页面一键继续上次对局<br>
+        📊 <strong>结算图表</strong> — 棋子数和点数双折线图，支持全屏缩放与双指缩放<br>
+        🔊 <strong>合成音效</strong> — 落子、爆炸、淘汰、获胜各有独立音频反馈（Web Audio API）<br>
+        🎨 <strong>液态玻璃主题</strong> — 深色虹彩渐变玻璃 UI，背景 10 个彩色光球浮动
       </p>
     </div>
 
@@ -202,7 +203,7 @@
     <h2>AI 介绍</h2>
 
     <div class="about-card">
-      <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋内置 <strong>四款 AI 算法</strong>，覆盖启发式规则、树搜索剪枝和随机模拟三大搜索范式。PVE、AI 对战、斗蛐蛐模式均可自由切换。除策略算法外，其余三款使用 <strong>Rust + Rayon</strong> 多核并行加速。</p>
+      <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋内置 <strong>四款 AI 算法</strong>，覆盖启发式规则、树搜索剪枝和随机模拟三大搜索范式。PVE、AI 对战、斗蛐蛐模式均可自由切换。除策略算法（JavaScript）外，其余三款使用 <strong>Rust + Rayon</strong> 多核并行加速。</p>
 
       <h3 class="ai-alg-title" style="color:var(--accent)">⚡ 策略算法 · 启发式规则</h3>
       <p class="ai-alg-desc">纯 JavaScript，基于人工优先级规则快速决策。无需 Rust 引擎，响应最快，适合新手入门和低算力设备。</p>
@@ -214,27 +215,28 @@
       </div>
 
       <h3 class="ai-alg-title" style="color:var(--accent2)">🧠 Alpha-Beta 剪枝 · 经典搜索</h3>
-      <p class="ai-alg-desc">标准 Alpha-Beta 剪枝搜索，Rust 实现 + Rayon 根级并行。采用 <strong>克隆式搜索</strong>（每次走法复制棋盘而非撤销），天然适配多玩家连锁反应。</p>
+      <p class="ai-alg-desc">标准 Alpha-Beta 剪枝搜索，Rust + Rayon 根级并行。采用 <strong>克隆式搜索</strong>——每次走法复制棋盘而非撤销，天然适配多玩家连锁反应。</p>
       <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
         <strong style="color:var(--accent2)">搜索深度</strong> 1~10 层 · <strong style="color:var(--accent2)">分支限制</strong> top 15 · <strong style="color:var(--accent2)">走法排序</strong> 三级优先<br>
-        <strong style="color:var(--accent2)">随机化探索</strong> 早期对局加入随机扰动，增加走法多样性
+        <strong style="color:var(--accent2)">随机化探索</strong> 早期对局加入随机扰动，增加走法多样性<br>
+        <strong style="color:var(--accent2)">评估函数</strong> 支持增强版（位置+威胁评分）或手写规则评估
       </div>
 
       <h3 class="ai-alg-title" style="color:var(--accent2)">🔬 PVS NegaMax · 精炼剪枝</h3>
-      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设首走法即最优，后续走法用<strong>零窗口（Null Window）</strong>试探快速证明或证伪，减少搜索量。</p>
+      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设最优走法已被首先搜索，后续走法用<strong>零窗口（Null Window）</strong>快速试探——要么迅速证明不比首走法好，要么触发重搜索。同等时间下比标准 Alpha-Beta 探索更高效。</p>
       <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
-        <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录两条杀招 · <strong style="color:var(--accent2)">History 启发</strong> 全局走法评分<br>
-        <strong style="color:var(--accent2)">QSearch（静止搜索）</strong> 到底层只搜爆炸性走法，防水平线效应
+        <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录两条杀招走法 · <strong style="color:var(--accent2)">History 启发</strong> 全局走法成功率表<br>
+        <strong style="color:var(--accent2)">QSearch 静止搜索</strong> 到底层只评估爆炸性走法，消除水平线效应<br>
+        <strong style="color:var(--accent2)">动态分支</strong> 浅层多搜深层少搜 · <strong style="color:var(--accent2)">自适应预热</strong> 预热 killer/history 表
       </div>
-      <p class="ai-alg-desc">同等深度下比标准 Alpha-Beta 探索更高效，适合需要更强棋力的竞技场景。</p>
 
       <h3 class="ai-alg-title" style="color:#c88cff">🎲 MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
-      <p class="ai-alg-desc"><strong>不依赖评估函数</strong>，通过大量随机模拟来评估走法优劣。四步循环迭代：</p>
+      <p class="ai-alg-desc"><strong>不依赖评估函数</strong>——不猜哪个走法好，直接大量随机模拟直到终局，用胜负统计数据做决策。</p>
       <div class="ai-alg-detail" style="background:rgba(200,140,255,.06)">
         <strong style="color:#c88cff">SELECT</strong> → <strong style="color:#c88cff">EXPAND</strong> → <strong style="color:#c88cff">PLAYOUT</strong> → <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
-        UCB1 平衡探索与利用 · 随机走子直到终局 · 反向传播更新节点统计
+        UCB1 平衡探索与利用 · 策略偏置 Playout（80% 选好走法）· 渐进展开（≥3 次访问才展新分支）
       </div>
-      <p class="ai-alg-desc">Rust + Rayon 根级并行，depth=1~10 对应 1200~12000 次迭代，树节点上限 3000。无需人为设计的评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
+      <p class="ai-alg-desc">Rust + Rayon 根级并行，depth=1~10 对应 1200~12000 次迭代，树节点上限 3000。无需人为设计评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
     </div>
   </div>
 </div>
