@@ -574,8 +574,8 @@ struct XgbLearner { gradient_booster: XgbGradientBooster, learner_model_param: X
 #[derive(Clone, Deserialize)]
 struct XgbModel { learner: XgbLearner, }
 
-struct XgbNode { split_feat: usize, split_cond: f32, left: i32, right: i32, leaf: f32, is_leaf: bool, }
-struct XGBoostEngine { trees: Vec<Vec<XgbNode>>, base_score: f32, }
+pub struct XgbNode { pub split_feat: usize, pub split_cond: f32, pub left: i32, pub right: i32, pub leaf: f32, pub is_leaf: bool, }
+pub struct XGBoostEngine { pub trees: Vec<Vec<XgbNode>>, base_score: f32, }
 
 use std::sync::OnceLock;
 
@@ -618,7 +618,9 @@ impl XGBoostEngine {
                 i = if feats[n.split_feat] <= n.split_cond { n.left } else { n.right };
             }
         }
-        let raw = sum + self.base_score;
+        // JSON 中 base_score 是概率值，需要转为 log-odds
+        let bs_logodds = (self.base_score / (1.0 - self.base_score + 1e-10)).ln();
+        let raw = sum + bs_logodds;
         (raw, 1.0 / (1.0 + (-raw).exp()))
     }
 }
@@ -671,6 +673,14 @@ fn eval_board(board: &GameBoard, player: usize, game_count: u32, use_ml_eval: bo
     } else {
         eval_board_handcraft(board, player, game_count)
     }
+}
+
+// 诊断测试用
+pub fn get_xgb_engine_for_test(path: &str) -> XGBoostEngine {
+    XGBoostEngine::load(path).expect("加载模型失败")
+}
+pub fn xgb_predict(engine: &XGBoostEngine, feats: &[f32; 29]) -> (f32, f32) {
+    engine.predict(feats)
 }
 
 fn eval_board_ml(board: &GameBoard, player: usize, _game_count: u32) -> i32 {
