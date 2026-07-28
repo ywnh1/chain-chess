@@ -504,6 +504,17 @@ async fn export_game_history_dialog(
     }
 }
 
+
+#[tauri::command]
+fn set_ml_eval(enabled: bool) {
+    USE_ML_EVAL.store(enabled, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[tauri::command]
+fn get_ml_eval() -> bool {
+    USE_ML_EVAL.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -542,9 +553,139 @@ pub fn run() {
             save_round_history,
             load_round_history,
             clear_round_history,
+            set_ml_eval,
+            get_ml_eval,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// ─── XGBoost Engine (pure Rust, no external deps) ───
+
+#[derive(Clone, Deserialize)]
+struct XgbTreeModel {
+    base_weights: Vec<f32>, default_left: Vec<i32>,
+    left_children: Vec<i32>, right_children: Vec<i32>,
+    split_conditions: Vec<f32>, split_indices: Vec<u32>,
+    tree_param: XgbTreeParam,
+}
+#[derive(Clone, Deserialize)]
+struct XgbTreeParam { num_nodes: String, }
+#[derive(Clone, Deserialize)]
+struct XgbGradientBoosterModel { trees: Vec<XgbTreeModel>, }
+#[derive(Clone, Deserialize)]
+struct XgbGradientBooster { model: XgbGradientBoosterModel, }
+#[derive(Clone, Deserialize)]
+struct XgbLearnerModelParam { base_score: String, }
+#[derive(Clone, Deserialize)]
+struct XgbLearner { gradient_booster: XgbGradientBooster, learner_model_param: XgbLearnerModelParam, }
+#[derive(Clone, Deserialize)]
+struct XgbModel { learner: XgbLearner, }
+
+struct XgbNode { split_feat: usize, split_cond: f32, left: i32, right: i32, leaf: f32, is_leaf: bool, }
+struct XGBoostEngine { trees: Vec<Vec<XgbNode>>, base_score: f32, }
+
+use std::sync::OnceLock;
+
+impl XGBoostEngine {
+    fn load(path: &str) -> Result<Self, String> {
+        let c = fs::read_to_string(path).map_err(|e| format!("读模型: {}", e))?;
+        let m: XgbModel = serde_json::from_str(&c).map_err(|e| format!("JSON: {}", e))?;
+        let base_score: f32 = m.learner.learner_model_param.base_score
+            .trim_matches(|c| c == '[' || c == ']').parse().map_err(|_| "base_score".to_string())?;
+        let mut trees = Vec::new();
+        for t in &m.learner.gradient_booster.model.trees {
+            let n = t.left_children.len();
+            let mut ns = Vec::with_capacity(n);
+            for i in 0..n {
+                let leaf = t.left_children[i] == -1 && t.right_children[i] == -1;
+                ns.push(XgbNode {
+                    split_feat: if leaf { 0 } else { t.split_indices[i] as usize },
+                    split_cond: t.split_conditions[i],
+                    left: t.left_children[i], right: t.right_children[i],
+                    leaf: if leaf { t.base_weights[i] } else { 0.0 }, is_leaf: leaf,
+                });
+            }
+            trees.push(ns);
+        }
+        Ok(Self { trees, base_score })
+    }
+
+    fn predict(&self, feats: &[f32; 29]) -> (f32, f32) {
+        let mut sum = 0.0f32;
+        for tree in &self.trees {
+            let mut i = 0i32;
+            loop {
+                let n = &tree[i as usize];
+                if n.is_leaf { sum += n.leaf; break; }
+                i = if feats[n.split_feat] <= n.split_cond { n.left } else { n.right };
+            }
+        }
+        let raw = sum + self.base_score;
+        (raw, 1.0 / (1.0 + (-raw).exp()))
+    }
+}
+
+fn xgb_engine() -> &'static XGBoostEngine {
+    static ENG: OnceLock<XGBoostEngine> = OnceLock::new();
+    ENG.get_or_init(|| {
+        let path = std::env::current_exe()
+            .ok().and_then(|p| p.parent().map(|d| d.join("xgb_model_board.json")))
+            .or_else(|| Some(std::path::PathBuf::from("xgb_model_board.json"))).unwrap();
+        XGBoostEngine::load(&path.to_string_lossy()).expect("加载 xgb_model_board.json 失败")
+    })
+}
+
+fn extract_features_xgb(board: &GameBoard, cur: usize, max_players: usize) -> [f32; 29] {
+    let sz = board.len() as f32;
+    let center = (sz - 1.0) / 2.0;
+    let mut feats = [0.0f32; 29];
+    let mut total: f32 = 0.0;
+    for row in board { for c in row { if c.owner.is_some() { total += 1.0; } } }
+    feats[0] = total / (sz * sz);
+    let mut fi = 1;
+    for p in 0..max_players {
+        let (mut c1, mut c2, mut c3, mut terr, mut threat, mut cdist) = (0.0,0.0,0.0,0.0,0.0,0.0);
+        for (i, row) in board.iter().enumerate() {
+            for (j, c) in row.iter().enumerate() {
+                if c.owner == Some(p) {
+                    terr += 1.0;
+                    match c.count { 1 => c1 += 1.0, 2 => { c2 += 1.0; threat += 1.0; } 3 => { c3 += 1.0; threat += 12.0; } _ => {} }
+                    cdist += (i as f32 - center).abs() + (j as f32 - center).abs();
+                }
+            }
+        }
+        let tp = total.max(1.0);
+        feats[fi] = c1/tp; feats[fi+1] = c2/tp; feats[fi+2] = c3/tp;
+        feats[fi+3] = terr/(sz*sz); feats[fi+4] = threat/(tp*4.0);
+        feats[fi+5] = cdist/(sz*2.0*terr.max(1.0));
+        fi += 6;
+    }
+    let cur_total = board.iter().flatten().filter(|c| c.owner == Some(cur)).count() as f32;
+    let cur_lv3 = board.iter().flatten().filter(|c| c.owner == Some(cur) && c.count == 3).count() as f32;
+    feats[25] = cur_total / total.max(1.0);
+    feats[26] = cur_lv3 / cur_total.max(1.0);
+    feats[27] = cur_total / (sz * sz);
+    feats[28] = feats[0];
+    feats
+}
+
+use std::sync::atomic::{AtomicBool, Ordering};
+static USE_ML_EVAL: AtomicBool = AtomicBool::new(true);
+
+/// 调度器：根据用户选择调用 ML 或手写评估
+fn eval_board(board: &GameBoard, player: usize, game_count: u32) -> i32 {
+    if USE_ML_EVAL.load(Ordering::Relaxed) {
+        eval_board_ml(board, player, game_count)
+    } else {
+        eval_board_handcraft(board, player, game_count)
+    }
+}
+
+fn eval_board_ml(board: &GameBoard, player: usize, _game_count: u32) -> i32 {
+    let feats = extract_features_xgb(board, player, 4);
+    let (raw, _prob) = xgb_engine().predict(&feats);
+    (raw * 20.0) as i32
 }
 
 // ─── Neighbors ───
@@ -639,7 +780,7 @@ fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: u
     (before.difference(&after).copied().collect(), chain_count)
 }
 
-fn eval_board(board: &GameBoard, player: usize, game_count: u32) -> i32 {
+fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32) -> i32 {
     let mut my_score = 0i32;
     let mut opp_score = 0i32;
     let mut my_territory = 0i32;
@@ -1748,4 +1889,171 @@ pub fn find_best_move_strategy(
 
     // 6. 保底：返回第一个棋子
     mine.first().copied()
+}
+
+// ─── 自对弈数据生成 (XGBoost 训练用) ───
+
+/// 玩家 AI 配置
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct PlayerAiConfig {
+    pub algorithm: String,
+    pub depth: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct StepRecord {
+    game_id: u32,
+    turn: u32,
+    size: usize,
+    max_players: usize,
+    board: GameBoard,
+    cur_player: usize,
+    move_x: usize,
+    move_y: usize,
+    live_players: Vec<usize>,
+    eliminated: Vec<usize>,
+    winner: Option<usize>,
+    game_over: bool,
+}
+
+pub fn find_best_move_pvs(
+    board: &GameBoard,
+    sz: usize,
+    player: usize,
+    depth: usize,
+    eliminated: &[usize],
+    max_players: usize,
+    game_count: u32,
+) -> Option<(usize, usize)> {
+    let mut searcher = PvsSearcher::new(player, game_count);
+    searcher.find_best(board, sz, player, max_players, eliminated, depth)
+}
+
+pub fn find_best_move_by_alg(
+    board: &GameBoard,
+    sz: usize,
+    player: usize,
+    config: &PlayerAiConfig,
+    eliminated: &[usize],
+    max_players: usize,
+    game_count: u32,
+    first_move_pos: Option<[usize; 2]>,
+) -> Option<(usize, usize)> {
+    match config.algorithm.as_str() {
+        "alphabeta" => {
+            find_best_move(board, sz, player, config.depth, eliminated, max_players, game_count, first_move_pos)
+        }
+        "pvs" => {
+            find_best_move_pvs(board, sz, player, config.depth, eliminated, max_players, game_count)
+        }
+        "mcts" => {
+            find_best_move_mcts(board, sz, player, config.depth, eliminated, max_players)
+        }
+        _ => {
+            find_best_move_strategy(board, sz, player, eliminated, max_players, game_count, first_move_pos)
+        }
+    }
+}
+
+pub fn generate_selfplay_data(
+    board_size: usize,
+    max_players: usize,
+    num_games: u32,
+    player_configs: &[PlayerAiConfig],
+    output_path: &str,
+) -> Result<u64, String> {
+    use std::io::Write;
+    use rand::Rng;
+
+    assert_eq!(player_configs.len(), max_players, "config count must match player count");
+
+    let file = std::fs::File::create(output_path)
+        .map_err(|e| format!("cannot create output {}: {}", output_path, e))?;
+    let mut writer = std::io::BufWriter::new(file);
+    let mut total_steps: u64 = 0;
+    let mut rng = rand::thread_rng();
+
+    for game_id in 0..num_games {
+        let mut board = vec![
+            vec![Cell { owner: None, count: 0 }; board_size];
+            board_size
+        ];
+        let mut eliminated: Vec<usize> = Vec::new();
+        let mut cur_player: usize = 0;
+        let game_count: u32 = game_id;
+        let first_move_pos: Option<[usize; 2]> = None;
+        let mut turn: u32 = 0;
+
+        loop {
+            let legal_moves = get_moves(&board, board_size, cur_player, None);
+
+            if legal_moves.is_empty() {
+                let alive: Vec<usize> = (0..max_players)
+                    .filter(|p| !eliminated.contains(p))
+                    .collect();
+                if alive.len() <= 1 { break; }
+                let idx = alive.iter().position(|&p| p == cur_player).unwrap_or(0);
+                cur_player = alive[(idx + 1) % alive.len()];
+                continue;
+            }
+
+            let config = &player_configs[cur_player];
+            let first_move_arr = first_move_pos.map(|[x, y]| [x, y]);
+            let chosen = find_best_move_by_alg(
+                &board, board_size, cur_player, config,
+                &eliminated, max_players, game_count, first_move_arr,
+            );
+
+            let (mx, my) = chosen.unwrap_or_else(|| {
+                let idx = rng.gen_range(0..legal_moves.len());
+                legal_moves[idx]
+            });
+
+            // 记录走法前的存活玩家
+            let live_before: Vec<usize> = (0..max_players)
+                .filter(|p| !eliminated.contains(p) && has_pieces(&board, *p))
+                .collect();
+
+            let (new_elim, _chain_count) = process_click(&mut board, board_size, mx, my, cur_player, max_players);
+            for &e in &new_elim {
+                if !eliminated.contains(&e) { eliminated.push(e); }
+            }
+
+            // 存活玩家 = 未被淘汰的玩家（不管当前有没有棋子）
+            let alive_now: Vec<usize> = (0..max_players)
+                .filter(|p| !eliminated.contains(p))
+                .collect();
+            let game_over = alive_now.len() <= 1;
+            let winner = if game_over {
+                alive_now.first().copied()
+            } else {
+                None
+            };
+
+            let record = StepRecord {
+                game_id, turn, size: board_size, max_players,
+                board: board.clone(),
+                cur_player, move_x: mx, move_y: my,
+                live_players: live_before,
+                eliminated: eliminated.clone(),
+                winner, game_over,
+            };
+
+            let line = serde_json::to_string(&record)
+                .map_err(|e| format!("serialize failed: {}", e))?;
+            writeln!(writer, "{}", line)
+                .map_err(|e| format!("write failed: {}", e))?;
+            total_steps += 1;
+
+            if game_over { break; }
+
+            let idx = alive_now.iter().position(|&p| p == cur_player).unwrap_or(0);
+            cur_player = alive_now[(idx + 1) % alive_now.len()];
+            turn += 1;
+        }
+    }
+
+    writer.flush().map_err(|e| format!("flush failed: {}", e))?;
+    eprintln!("  [done] {} games, {} steps -> {}", num_games, total_steps, output_path);
+    Ok(total_steps)
 }

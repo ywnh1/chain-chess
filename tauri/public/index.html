@@ -741,6 +741,17 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .btn-group .gb:active{transform:scale(.93);transition:all .06s ease}
 .btn-group .gb.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
 
+/* 评估函数切换按钮 */
+.toggle-group{display:flex;gap:4px;flex-wrap:wrap}
+.toggle-group .tg-btn{
+  background:var(--glass-w-04);border:1px solid var(--glass-w-08);
+  border-radius:var(--radius-sm);padding:6px 14px;font-size:.8rem;
+  color:var(--dim);cursor:pointer;transition:all .15s ease;
+}
+.toggle-group .tg-btn:hover{background:var(--glass-w-08);color:var(--text)}
+.toggle-group .tg-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
+.toggle-group .tg-btn:active{transform:scale(.93)}
+
 /* 算法选择卡片 */
 
 /* 深度滑块 */
@@ -1052,17 +1063,17 @@ body.light-mode{
 .random-labels{display:flex;justify-content:space-between;font-size:.65rem;color:var(--dim);padding:0 2px}
 .player-modal .modal-actions{margin-top:12px;gap:8px}
 /* ═══ 浅色模式适配 ═══ */
-body.light-mode .orb{opacity:.3}
-body.light-mode .orb-1{background:radial-gradient(circle,rgba(217,119,6,.25) 0%,rgba(200,140,240,.08) 70%,transparent)}
-body.light-mode .orb-2{background:radial-gradient(circle,rgba(42,157,143,.2) 0%,rgba(160,120,255,.08) 60%,transparent)}
-body.light-mode .orb-3{background:radial-gradient(circle,rgba(160,120,255,.18) 0%,rgba(217,119,6,.05) 60%,transparent)}
-body.light-mode .orb-4{background:radial-gradient(circle,rgba(180,80,70,.15) 0%,rgba(42,157,143,.05) 70%,transparent)}
-body.light-mode .orb-5{background:radial-gradient(circle,rgba(160,120,255,.18) 0%,rgba(180,80,70,.04) 65%,transparent)}
-body.light-mode .orb-6{background:radial-gradient(circle,rgba(100,200,255,.15) 0%,rgba(240,179,75,.05) 60%,transparent)}
-body.light-mode .orb-7{background:radial-gradient(circle,rgba(255,100,150,.12) 0%,rgba(95,195,195,.05) 65%,transparent)}
-body.light-mode .orb-8{background:radial-gradient(circle,rgba(180,230,100,.18) 0%,rgba(200,140,255,.08) 60%,transparent)}
-body.light-mode .orb-9{background:radial-gradient(circle,rgba(255,200,100,.20) 0%,rgba(95,210,210,.08) 65%,transparent)}
-body.light-mode .orb-10{background:radial-gradient(circle,rgba(200,150,255,.18) 0%,rgba(255,110,100,.06) 60%,transparent)}
+body.light-mode .orb{opacity:.65}
+body.light-mode .orb-1{background:radial-gradient(circle,rgba(217,119,6,.45) 0%,rgba(200,140,240,.15) 70%,transparent)}
+body.light-mode .orb-2{background:radial-gradient(circle,rgba(42,157,143,.4) 0%,rgba(160,120,255,.15) 60%,transparent)}
+body.light-mode .orb-3{background:radial-gradient(circle,rgba(160,120,255,.35) 0%,rgba(217,119,6,.12) 60%,transparent)}
+body.light-mode .orb-4{background:radial-gradient(circle,rgba(180,80,70,.3) 0%,rgba(42,157,143,.12) 70%,transparent)}
+body.light-mode .orb-5{background:radial-gradient(circle,rgba(160,120,255,.35) 0%,rgba(180,80,70,.1) 65%,transparent)}
+body.light-mode .orb-6{background:radial-gradient(circle,rgba(100,200,255,.3) 0%,rgba(240,179,75,.12) 60%,transparent)}
+body.light-mode .orb-7{background:radial-gradient(circle,rgba(255,100,150,.25) 0%,rgba(95,195,195,.12) 65%,transparent)}
+body.light-mode .orb-8{background:radial-gradient(circle,rgba(180,230,100,.35) 0%,rgba(200,140,255,.15) 60%,transparent)}
+body.light-mode .orb-9{background:radial-gradient(circle,rgba(255,200,100,.4) 0%,rgba(95,210,210,.15) 65%,transparent)}
+body.light-mode .orb-10{background:radial-gradient(circle,rgba(200,150,255,.35) 0%,rgba(255,110,100,.12) 60%,transparent)}
 body.light-mode .player-modal .form-row select option{background:#fff;color:var(--text)}
 body.light-mode .start-btn{background-image:linear-gradient(135deg,rgba(217,119,6,.12) 0%,rgba(160,120,255,.06) 50%,rgba(42,157,143,.1) 100%),var(--glass-w-10)}
 body.light-mode .random-slider{background:rgba(0,0,0,.1)}
@@ -1140,6 +1151,15 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
   <!-- 玩家配置列表 -->
   <div id="playerConfigList" class="player-config-list">
     <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">点击玩家设置名称、类型和 AI 参数</p>
+  </div>
+
+  <!-- 评估函数切换 -->
+  <div class="form-row" style="margin-top:8px" id="setupEvalRow">
+    <label style="flex:1">AI 评估函数</label>
+    <div id="mlEvalToggleSetup" class="toggle-group">
+      <button class="tg-btn selected" data-value="true" onclick="setMlEval(true)">ML 模型</button>
+      <button class="tg-btn" data-value="false" onclick="setMlEval(false)">手写规则</button>
+    </div>
   </div>
 
   <button class="glass-btn primary" onclick="startUnifiedGame()" style="margin-top:12px;padding:14px 28px;font-size:1.1rem">开始游戏</button>
@@ -1380,9 +1400,18 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
     <div id="aiColorOptions" class="color-picker"></div>
   </div>
 
-  <!-- 每个 AI 独立配置（已移除全局算法选择，每个 AI 行自行配置） -->
+  <!-- 每个 AI 独立配置 -->
   <div id="aiConfigArea" class="form-eve-config">
     <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">配置每个 AI 对手</p>
+  </div>
+
+  <!-- 评估函数切换 -->
+  <div class="form-row" style="margin-top:8px">
+    <label style="flex:1">AI 评估函数</label>
+    <div id="mlEvalToggle" class="toggle-group">
+      <button class="tg-btn selected" data-value="true" onclick="setMlEval(true)">ML 模型</button>
+      <button class="tg-btn" data-value="false" onclick="setMlEval(false)">手写规则</button>
+    </div>
   </div>
 
   <button class="glass-btn primary" onclick="startAIGame()" style="margin-top:12px;padding:14px 28px;font-size:1.1rem">开始游戏</button>
@@ -1433,6 +1462,16 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
   <div id="eveConfigArea" class="form-eve-config">
     <p style="font-size:.8rem;color:var(--dim);margin:8px 0 4px">配置每个 AI</p>
   </div>
+
+  <!-- 评估函数切换 -->
+  <div class="form-row" style="margin-top:8px">
+    <label style="flex:1">AI 评估函数</label>
+    <div id="mlEvalToggleEve" class="toggle-group">
+      <button class="tg-btn selected" data-value="true" onclick="setMlEval(true)">ML 模型</button>
+      <button class="tg-btn" data-value="false" onclick="setMlEval(false)">手写规则</button>
+    </div>
+  </div>
+
   <button class="glass-btn primary" onclick="startEveGame()" style="margin-top:10px;padding:14px 28px;font-size:1.1rem">开始观战</button>
 </div>
 
@@ -3066,7 +3105,7 @@ async function triggerAI(){
   // 获取当前 AI 的配置（eve 模式用 per-AI config，其他模式用全局配置）
   let alg = aiConfigs[curPlayer] ? aiConfigs[curPlayer].algorithm : aiAlgorithm;
   let dep = aiConfigs[curPlayer] ? aiConfigs[curPlayer].depth : aiDepth;
-  let randomScale = aiConfigs[curPlayer] ? (aiConfigs[curPlayer].randomScale || 10) : 10;
+  let randomScale = aiConfigs[curPlayer] ? (aiConfigs[curPlayer].randomScale ?? 10) : 10;
   // 所有算法统一走 Rust 引擎
   let cmd;
   if(alg==='mcts'){cmd='ai_move_mcts';}
@@ -3263,6 +3302,16 @@ function generateAIConfig(){
     area.appendChild(row);
   }
 }
+// 设置 ML/手写评估函数
+function setMlEval(enabled){
+  const tg=document.getElementById('mlEvalToggle');
+  if(tg){tg.querySelectorAll('.tg-btn').forEach(b=>b.classList.toggle('selected',b.dataset.value===String(enabled)))}
+  if(window.__TAURI_INTERNALS__){
+    window.__TAURI_INTERNALS__.invoke('set_ml_eval',{enabled:enabled}).catch(e=>console.warn('set_ml_eval:',e))
+  }
+}
+
+
 function startAIGame(){
   clearSavedGameState();
   location.hash='#game';
@@ -3831,7 +3880,7 @@ function replayGame(){
     aiConfigs={};
     for(let p=0;p<maxPlayers;p++){
       aiPlayers.add(p);
-      aiConfigs[p]={algorithm:(c.aiConfigs[p]||{}).algorithm||'strategy',depth:(c.aiConfigs[p]||{}).depth||2,randomScale:(c.aiConfigs[p]||{}).randomScale||10};
+      aiConfigs[p]={algorithm:(c.aiConfigs[p]||{}).algorithm||'strategy',depth:(c.aiConfigs[p]||{}).depth||2,randomScale:(c.aiConfigs[p]||{}).randomScale??10};
     }
     aiThinking=false;
     eliminatedPlayers=new Set();
@@ -3881,7 +3930,7 @@ async function showSettlement(winner,colorNames,history){
   // 清理动态 settlement overlay（如果有残留）
   document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
   clearSavedGameState();
-  const fullHistory = history&&history.length>0 ? history : await flushAndGetFullHistory();
+  const fullHistory = await flushAndGetFullHistory();
   // 设置外框标题（放在玻璃框上方，作为页面固定标题）
   const titleEl = document.getElementById('chkOuterTitle');
   if(winner!==null&&winner!==undefined){
@@ -4225,7 +4274,7 @@ function savePlayerConfig(){
   var selBtn=document.querySelector('#playerTypeBtns .am-btn.selected');
   cfg.type=selBtn?selBtn.dataset.value:'human';
   cfg.depth=parseInt(document.getElementById('depthValue').textContent)||2;
-  cfg.randomScale=parseInt(document.getElementById('randomScaleSlider').value)||10;
+  cfg.randomScale=parseInt(document.getElementById('randomScaleSlider').value)??10;
   closePlayerModal();
   generatePlayerConfigs();
 }
@@ -4250,7 +4299,7 @@ function generatePlayerConfigs(){
     const typeLabels={human:'人类',strategy:'AI·策略',alphabeta:'AI·A-B',pvs:'AI·PVS',mcts:'AI·MCTS'};
     const typeText=typeLabels[cfg.type]||'人类';
     let detail=typeText;
-    if(cfg.type!=='human')detail+=' · 深度 '+cfg.depth;
+    if(cfg.type!=='human'&&cfg.type!=='strategy')detail+=' · 深度 '+cfg.depth;
     if(cfg.type!=='human'&&cfg.type!=='strategy')detail+=' · 随机 '+cfg.randomScale+'%';
     info.innerHTML='<strong>'+nameText+'</strong><span>'+detail+'</span>';
     const hint=document.createElement('span');hint.className='edit-hint';hint.textContent='编辑';
@@ -4258,7 +4307,11 @@ function generatePlayerConfigs(){
     div.onclick=function(){openPlayerModal(i)};
     container.appendChild(div);
   }
+  // 显示/隐藏评估函数行（有 AI 时显示）
+  const er=document.getElementById('setupEvalRow');
+  if(er){er.style.display=playerConfigs.some(c=>c.type!=='human')?'flex':'none'}
 }
+
 function setupLobbySync(){
   const sz=getSel('setupSizeGrid')||7;
   const cnt=getSel('setupPlayersGroup')||2;
@@ -4341,7 +4394,7 @@ function startAIFromSetup(sz,cnt){
       if(humanIdx<0)humanIdx=i;
     }else{
       aiPlayers.add(i);
-      aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale||10};
+      aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10};
     }
   }
   if(humanIdx<0)humanIdx=0;
@@ -4372,7 +4425,7 @@ function startEveFromSetup(sz,cnt){
     const cfg=playerConfigs[i];
     colorNames[i]=cfg.name||COLOR_NAMES[i]||('AI '+(i+1));
     aiPlayers.add(i);
-    aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale||10};
+    aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10};
   }
   _colorNames=colorNames;
   recordHistory();
