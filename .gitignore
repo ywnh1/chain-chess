@@ -58,6 +58,11 @@ tauri/public/fonts/font.ttf
 # --- ML 训练数据（1.2GB，避免进仓库） ---
 data/
 
+# --- XGBoost 训练生成的模型文件（可由 data/train_xgb.py 重新生成） ---
+xgb_model.json
+xgb_model_fast.json
+xgb_model_board.json
+
 # --- ai ---
 .skills/
 .skill/
