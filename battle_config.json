@@ -1,0 +1,8 @@
+{
+  "size": 7,
+  "times": 10,
+  "ai": [
+    {"type": "alphabeta", "depth": 2, "use_ml_eval": true, "name": "ML"},
+    {"type": "alphabeta", "depth": 2, "use_ml_eval": false, "name": "手写"}
+  ]
+}
