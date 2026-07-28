@@ -78,6 +78,31 @@ CONFIG_EOF
   echo ""
 fi
 
+# ── 检查 Android 项目结构 ──────────────────────────────
+ANDROID_MAIN_ACTIVITY="tauri/src-tauri/gen/android/app/src/main/java/com/ywnh1/chainchess/MainActivity.kt"
+if [ ! -f "$ANDROID_MAIN_ACTIVITY" ]; then
+  echo "  ⚠️  Android 项目结构不匹配，正在重新初始化..."
+  echo "  (若因 tauri.conf.json identifier 变更导致)"
+  echo ""
+  rm -rf tauri/src-tauri/gen/android
+  cd tauri && npx tauri android init && cd ..
+  echo "  ✅ Android 项目已重新初始化"
+  echo ""
+fi
+
+# 确保 tauri.properties 存在
+TAURI_PROPERTIES="tauri/src-tauri/gen/android/app/tauri.properties"
+if [ -f "$TAURI_PROPERTIES" ]; then
+  # 更新版本号
+  sed -i "s/^tauri.android.versionName=.*/tauri.android.versionName=${VERSION%-beta}/" "$TAURI_PROPERTIES"
+  # versionCode: 3.1.0 → 3001000 (major*1e6 + minor*1e3 + patch)
+  VC_MAJOR=$(echo "$VERSION" | cut -d. -f1)
+  VC_MINOR=$(echo "$VERSION" | cut -d. -f2)
+  VC_PATCH=$(echo "$VERSION" | cut -d. -f3 | cut -d- -f1)
+  VC=$(( VC_MAJOR * 1000000 + VC_MINOR * 1000 + VC_PATCH ))
+  sed -i "s/^tauri.android.versionCode=.*/tauri.android.versionCode=${VC}/" "$TAURI_PROPERTIES"
+fi
+
 # ── 步骤 1: 编译 APK ─────────────────────────────────────
 # TAURI_ANDROID_SKIP_RUST_BUILD 让 Gradle 跳过 Rust 重编译
 # native 模式：Rust 已在上一步编译好，此处只走打包
@@ -134,13 +159,13 @@ echo "  🎉 构建完成！"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  文件: ${OUTPUT}"
 echo "  大小: ${FILESIZE}"
-echo "  耗时: ${ELAPSED}s"
+  echo "  耗时: ${ELAPSED}s"
 echo ""
 
-cp release /storage/emulated/0/用户/ -r
+# 尝试复制到 Android 设备（仅当路径存在时）
+if [ -d "/storage/emulated/0/用户" ]; then
+  cp release /storage/emulated/0/用户/ -r
+  echo "  📱 已复制到 /storage/emulated/0/用户/"
+fi
 
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  🎉 复制完成！"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
