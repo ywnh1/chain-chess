@@ -552,6 +552,9 @@ pub fn run() {
 
 // ─── XGBoost Engine (pure Rust, no external deps) ───
 
+/// 改进版特征维度（用 eval_board_improved 的中间值做特征）
+const FEAT_DIM: usize = 16;
+
 #[derive(Clone, Deserialize)]
 #[allow(dead_code)]
 struct XgbTreeModel {
@@ -608,14 +611,16 @@ impl XGBoostEngine {
         Ok(Self { trees, base_score })
     }
 
-    fn predict(&self, feats: &[f32; 29]) -> (f32, f32) {
+    fn predict(&self, feats: &[f32; FEAT_DIM]) -> (f32, f32) {
         let mut sum = 0.0f32;
         for tree in &self.trees {
             let mut i = 0i32;
             loop {
                 let n = &tree[i as usize];
                 if n.is_leaf { sum += n.leaf; break; }
-                i = if feats[n.split_feat] <= n.split_cond { n.left } else { n.right };
+                // 越界保护：模型特征维度与代码不匹配时用 0.0，防止 panic
+                let feat_val = if (n.split_feat as usize) < feats.len() { feats[n.split_feat] } else { 0.0 };
+                i = if feat_val <= n.split_cond { n.left } else { n.right };
             }
         }
         // JSON 中 base_score 是概率值，需要转为 log-odds
@@ -633,38 +638,93 @@ fn xgb_engine() -> &'static XGBoostEngine {
     })
 }
 
-pub fn extract_features_xgb(board: &GameBoard, cur: usize, max_players: usize) -> [f32; 29] {
-    let sz = board.len() as f32;
-    let center = (sz - 1.0) / 2.0;
-    let mut feats = [0.0f32; 29];
-    let mut total: f32 = 0.0;
-    for row in board { for c in row { if c.owner.is_some() { total += 1.0; } } }
-    feats[0] = total / (sz * sz);
-    let mut fi = 1;
-    for p in 0..max_players {
-        let (mut c1, mut c2, mut c3, mut terr, mut threat, mut cdist) = (0.0,0.0,0.0,0.0,0.0,0.0);
-        for (i, row) in board.iter().enumerate() {
-            for (j, c) in row.iter().enumerate() {
-                if c.owner == Some(p) {
-                    terr += 1.0;
-                    match c.count { 1 => c1 += 1.0, 2 => c2 += 1.0, 3 => { c3 += 1.0; threat += 12.0; } _ => {} }
-                    cdist += (i as f32 - center).abs() + (j as f32 - center).abs();
+/// 改进版特征提取：用 eval_board_improved 中间值做特征
+/// 兼容所有棋盘大小（5-19）和玩家人数（2-10）
+pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usize) -> [f32; FEAT_DIM] {
+    let sz = board.len();
+    let total_cells = (sz * sz) as f32;
+    let cx = (sz as f32 - 1.0) * 0.5;
+
+    let mut total_pieces = 0;
+    let mut my_score = 0i32; let mut opp_score = 0i32;
+    let mut my_territory = 0i32; let mut opp_territory = 0i32;
+    let mut my_chain_threat = 0i32; let mut opp_chain_threat = 0i32;
+    let mut my_pos_bonus = 0i32; let mut opp_pos_bonus = 0i32;
+    let mut my_threat_prox = 0i32; let mut opp_threat_prox = 0i32;
+    let mut my_pieces = 0i32; let mut opp_pieces = 0i32;
+    let mut my_c2 = 0i32; let mut my_c3 = 0i32;
+    let mut opp_c3 = 0i32;
+    let mut my_cdist = 0.0f32; let mut opp_cdist = 0.0f32;
+    let mut alive_count = 0i32;
+
+    for (i, row) in board.iter().enumerate() {
+        let dist_center = ((i as f32 - cx).abs() * 0.5) as i32;
+        for (j, c) in row.iter().enumerate() {
+            if let Some(owner) = c.owner {
+                total_pieces += 1;
+                let d = dist_center + ((j as f32 - cx).abs() * 0.5) as i32;
+                let pos_val = 4i32.saturating_sub(d).max(0);
+                if owner == cur {
+                    my_score += c.count as i32;
+                    my_territory += 1;
+                    my_pos_bonus += pos_val;
+                    my_cdist += (i as f32 - cx).abs() + (j as f32 - cx).abs();
+                    my_pieces += 1;
+                    if c.count == 2 { my_c2 += 1; }
+                    if c.count >= 3 { my_c3 += 1; my_chain_threat += (c.count as i32) * 5; }
+                    else if c.count >= 2 { my_chain_threat += 2; }
+                    for &(ni, nj) in &nbrs(i, j, sz) {
+                        let nc = &board[ni][nj];
+                        if nc.owner.is_some() && nc.owner != Some(cur) {
+                            my_threat_prox += c.count as i32;
+                        }
+                    }
+                } else {
+                    opp_score += c.count as i32;
+                    opp_territory += 1;
+                    opp_pos_bonus += pos_val;
+                    opp_cdist += (i as f32 - cx).abs() + (j as f32 - cx).abs();
+                    opp_pieces += 1;
+                    if c.count >= 3 { opp_c3 += 1; opp_chain_threat += (c.count as i32) * 5; }
+                    else if c.count >= 2 { opp_chain_threat += 2; }
+                    for &(ni, nj) in &nbrs(i, j, sz) {
+                        let nc = &board[ni][nj];
+                        if nc.owner == Some(cur) {
+                            opp_threat_prox += c.count as i32;
+                        }
+                    }
                 }
             }
         }
-        let tp = total.max(1.0);
-        feats[fi] = c1/tp; feats[fi+1] = c2/tp; feats[fi+2] = c3/tp;
-        feats[fi+3] = terr/(sz*sz); feats[fi+4] = threat/(tp*4.0);
-        feats[fi+5] = cdist/(sz*2.0*terr.max(1.0));
-        fi += 6;
     }
-    let cur_total = board.iter().flatten().filter(|c| c.owner == Some(cur)).count() as f32;
-    let cur_lv3 = board.iter().flatten().filter(|c| c.owner == Some(cur) && c.count == 3).count() as f32;
-    feats[25] = cur_total / total.max(1.0);
-    feats[26] = cur_lv3 / cur_total.max(1.0);
-    feats[27] = cur_total / (sz * sz);
-    feats[28] = feats[0];
-    feats
+    // 统计存活玩家
+    for p in 0..max_players {
+        if board.iter().flatten().any(|c| c.owner == Some(p)) {
+            alive_count += 1;
+        }
+    }
+
+    let total = total_pieces.max(1) as f32;
+    let sz_f = sz as f32;
+
+    let mut f = [0.0f32; FEAT_DIM];
+    f[0] = total_pieces as f32 / total_cells;                            // density
+    f[1] = alive_count as f32 / max_players.max(1) as f32;               // alive_ratio
+    f[2] = my_pieces as f32 / total;                                     // my_share
+    f[3] = my_c3 as f32 / my_pieces.max(1) as f32;                       // c3_share
+    f[4] = my_c2 as f32 / my_pieces.max(1) as f32;                       // c2_share
+    f[5] = my_territory as f32 / total_cells;                            // territory_share
+    f[6] = (my_score - opp_score) as f32 / total_cells;                  // score_diff
+    f[7] = (my_chain_threat - opp_chain_threat) as f32 / total_cells;    // chain_threat_diff
+    f[8] = (my_pos_bonus - opp_pos_bonus) as f32 / total_cells;          // pos_bonus_diff
+    f[9] = (my_threat_prox - opp_threat_prox) as f32 / total_cells;      // threat_prox_diff
+    f[10] = my_score as f32 / opp_score.max(1) as f32;                   // my_score_norm
+    f[11] = opp_score as f32 / my_score.max(1) as f32;                   // opp_score_norm
+    f[12] = (my_cdist / my_pieces.max(1) as f32 - opp_cdist / opp_pieces.max(1) as f32) / (sz_f * 0.5);  // center_dist_balance
+    f[13] = (my_territory - opp_territory) as f32 / total_cells;         // territory_balance
+    f[14] = my_c3 as f32 / my_pieces.max(1) as f32;                      // my_threat_ratio (same as c3_share)
+    f[15] = opp_c3 as f32 / opp_pieces.max(1) as f32;                    // opp_threat_ratio
+    f
 }
 
 /// 调度器：根据 per-AI 配置调用 ML 或手写评估
@@ -680,7 +740,7 @@ pub fn eval_board(board: &GameBoard, player: usize, game_count: u32, use_ml_eval
 pub fn get_xgb_engine_for_test(path: &str) -> XGBoostEngine {
     XGBoostEngine::load(path).expect("加载模型失败")
 }
-pub fn xgb_predict(engine: &XGBoostEngine, feats: &[f32; 29]) -> (f32, f32) {
+pub fn xgb_predict(engine: &XGBoostEngine, feats: &[f32; FEAT_DIM]) -> (f32, f32) {
     engine.predict(feats)
 }
 
@@ -774,9 +834,27 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32) ->
 }
 
 fn eval_board_ml(board: &GameBoard, player: usize, game_count: u32) -> i32 {
-    // 使用增强版评估函数作为 ML AI 的评估
-    // XGBoost 模型在 count=3 棋子评估上有根本缺陷，增强版替代 ML 评估
-    eval_board_improved(board, player, game_count)
+    let engine = xgb_engine();
+    let feats = extract_features_improved(board, player, max_players_for(board));
+    let (raw_score, _prob) = engine.predict(&feats);
+    // XGBoost 输出 log-odds (约 -5~5)，缩放到与 handcraft eval 相近的量级 (~-200~200)
+    let ml_score = (raw_score * 40.0) as i32;
+    // 与手写评估混合，保证稳定性
+    let hand_score = eval_board_improved(board, player, game_count);
+    (ml_score + hand_score) / 2
+}
+
+/// 获取当前棋盘的玩家数
+fn max_players_for(board: &GameBoard) -> usize {
+    let mut players: std::collections::HashSet<usize> = std::collections::HashSet::new();
+    for row in board {
+        for c in row {
+            if let Some(owner) = c.owner {
+                players.insert(owner);
+            }
+        }
+    }
+    players.len().max(2)
 }
 
 // ─── Neighbors ───
@@ -2077,8 +2155,21 @@ pub fn generate_selfplay_data(
     let mut writer = std::io::BufWriter::new(file);
     let mut total_steps: u64 = 0;
     let mut rng = rand::thread_rng();
+    let start = std::time::Instant::now();
 
     for game_id in 0..num_games {
+        // 进度条（每 5 局或最后一局更新）
+        if game_id % 5 == 0 || game_id == num_games - 1 {
+            let pct = (game_id + 1) as f64 / num_games as f64 * 100.0;
+            let bar_w = 30;
+            let filled = (pct / 100.0 * bar_w as f64) as usize;
+            let bar: String = std::iter::repeat('█').take(filled)
+                .chain(std::iter::repeat('░').take(bar_w - filled)).collect();
+            let elapsed = start.elapsed().as_secs_f64();
+            let remaining = if game_id > 0 { elapsed / (game_id + 1) as f64 * (num_games - game_id - 1) as f64 } else { 0.0 };
+            eprint!("\r  游戏 {}/{} |{}| {:>3.0}%  ETA {:>4}s  步数:{}", game_id + 1, num_games, bar, pct, remaining as u32, total_steps);
+        }
+
         let mut board = vec![
             vec![Cell { owner: None, count: 0 }; board_size];
             board_size

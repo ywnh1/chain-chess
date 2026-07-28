@@ -263,11 +263,8 @@ Router.register('history', {
   leave() { if(_multiSelectActive)exitMultiSelect(); }
 });
 
-);
 
-);
 
-);
 
 Router.register('game', {
   back: null,
@@ -1335,7 +1332,7 @@ function renderPlayerBar(){
     if(!alive&&board.some(r=>r.some(c=>c.owner!==null)))t.classList.add('elim');
     t.style.background=COLORS_LIGHT[p];
     t.style.color=COLORS[p];
-    let label=aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`;
+    let label=(_colorNames&&_colorNames[p])||(aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`);
     t.innerHTML=`${label} <span class="cnt">${cnt[p]}</span>`;
     el.appendChild(t);
   }
@@ -1347,6 +1344,8 @@ function cloneBoard(b){
 async function triggerAI(){
   if(gameOver||aiThinking||isPaused)return;
   if(!aiPlayers.has(curPlayer))return;
+  // AI 首子由玩家放置：AI 无棋子时，由玩家点击落子
+  if(!hasPieces(curPlayer,board))return;
   saveUndoState();
   aiThinking=true;
   await sleep(50);
@@ -1386,7 +1385,7 @@ async function triggerAI(){
   // 缓存 AI 走法到 undo 栈顶，悔棋时直接重放无需重算
   if(undoStack.length>0)undoStack[undoStack.length-1].aiMove=move;
   if(!move){
-    showMsg(`AI ${curPlayer+1} 无合法落子，跳过`,'error');
+    showMsg(`${_colorNames?.[curPlayer]||'AI '+(curPlayer+1)} 无合法落子，跳过`,'error');
     aiThinking=false;
     let alive=[];
     for(let p=0;p<maxPlayers;p++){if(!eliminatedPlayers.has(p))alive.push(p);}
@@ -1798,6 +1797,7 @@ function handleClick(x,y){
 /* ==================== SETTLEMENT ==================== */
 function getPlayerLabel(p){
   if(p===undefined||p===null)return '未知';
+  if(_colorNames&&_colorNames[p])return _colorNames[p];
   return aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`;
 }
 
@@ -2390,7 +2390,8 @@ let editingPlayerIdx=-1;
 function openPlayerModal(idx){
   editingPlayerIdx=idx;
   const cfg=playerConfigs[idx];
-  document.getElementById('playerModalTitle').textContent='玩家 '+(idx+1)+' 设置';
+  const pName=playerConfigs[idx]?.name||COLOR_NAMES[idx]||('玩家'+(idx+1));
+  document.getElementById('playerModalTitle').textContent=pName+' 设置';
   document.getElementById('playerNameInput').value=cfg.name||'';
   document.getElementById('depthValue').textContent=String(cfg.depth);
   document.getElementById('randomScaleSlider').value=String(cfg.randomScale);

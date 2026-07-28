@@ -55,8 +55,9 @@ release.keystore
 # --- 字体（避免大文件进仓库） ---
 tauri/public/fonts/font.ttf
 
-# --- ML 训练数据（1.2GB，避免进仓库） ---
+# --- ML 训练数据（大量大文件，避免进仓库） ---
 data/
+*.jsonl
 
 # --- XGBoost 训练生成的模型文件（可由 data/train_xgb.py 重新生成） ---
 xgb_model.json
