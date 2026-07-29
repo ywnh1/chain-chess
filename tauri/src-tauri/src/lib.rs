@@ -859,16 +859,14 @@ fn max_players_for(board: &GameBoard) -> usize {
 
 // ─── Neighbors ───
 
-/// 邻居迭代器（返回 4 元素数组 + 实际长度，零分配）
+/// 邻居迭代器，只返回有效邻居（防止角落/边缘格子返回误填充的 (0,0)）
 #[inline]
-fn nbrs(i: usize, j: usize, sz: usize) -> [(usize, usize); 4] {
-    let mut n = 0usize;
-    let mut r = [(0, 0); 4];
-    if i > 0 { r[n] = (i - 1, j); n += 1; }
-    if i + 1 < sz { r[n] = (i + 1, j); n += 1; }
-    if j > 0 { r[n] = (i, j - 1); n += 1; }
-    if j + 1 < sz { r[n] = (i, j + 1); }
-    // n tracks fill count; use r[..n] at call sites if needed
+fn nbrs(i: usize, j: usize, sz: usize) -> Vec<(usize, usize)> {
+    let mut r = Vec::with_capacity(4);
+    if i > 0 { r.push((i - 1, j)); }
+    if i + 1 < sz { r.push((i + 1, j)); }
+    if j > 0 { r.push((i, j - 1)); }
+    if j + 1 < sz { r.push((i, j + 1)); }
     r
 }
 

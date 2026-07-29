@@ -635,6 +635,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
   text-align:center;margin-left:4px;
   font-size:var(--text-base);font-weight:var(--weight-bold);
 }
+.player-tag:hover{opacity:.85;border-color:var(--glass-w-12)}
 .player-tag.active{opacity:1;border-color:var(--glass-w-15);transform:scale(1.06);box-shadow:0 0 12px var(--glass-w-06)}
 .player-tag.elim{opacity:.15;text-decoration:line-through}
 

@@ -716,31 +716,46 @@ function expandHistory(compact, playerCount){
 }
 // Save game history for Tauri（紧凑存储）
 // historyArg 可选：若传入则用其代替 gameHistory（用于 gameHistory 已被清空的场景）
-function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
+// 将 _colorNames（可能为对象）转为数组，确保 Rust Vec<String> 正确反序列化
+function toColorNamesArray(src){
+  if(Array.isArray(src))return src;
+  if(src&&typeof src==='object'){
+    var arr=[];
+    for(var i=0;i<maxPlayers;i++){
+      arr.push(src[i]||COLOR_NAMES[i]||'玩家 '+(i+1));
+    }
+    return arr;
+  }
+  return COLOR_NAMES;
+}
+async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
   const src = historyArg || gameHistory;
   const compact = compactHistory(src, maxPlayers);
-  tauriInvoke('save_game_history', {
-    record: {
-      id: Date.now(),
-      time: formatTime(new Date()),
-      mode: mode || gameMode || 'local',
-      aiAlgorithm: aiAlg || aiAlgorithm || '',
-      aiDepth: aiDp || aiDepth || 0,
-      gameCount: gameCount,
-      playerCount: maxPlayers,
-      aiCount: aiPlayers.size,
-      boardSize: size,
-      winner: winner !== null && winner !== undefined ? winner : null,
-      colorNames: _colorNames || COLOR_NAMES,
-      chainStats: chainStats,
-      maxChain: maxChainOverall,
-      finished: true,
-      history: compact,
-    }
-  }).then(() => {
+  try {
+    await tauriInvoke('save_game_history', {
+      record: {
+        id: Date.now(),
+        time: formatTime(new Date()),
+        mode: mode || gameMode || 'local',
+        aiAlgorithm: aiAlg || aiAlgorithm || '',
+        aiDepth: aiDp || aiDepth || 0,
+        gameCount: gameCount,
+        playerCount: maxPlayers,
+        aiCount: aiPlayers.size,
+        boardSize: size,
+        winner: winner !== null && winner !== undefined ? winner : null,
+        colorNames: toColorNamesArray(_colorNames),
+        chainStats: chainStats,
+        maxChain: maxChainOverall,
+        finished: true,
+        history: compact,
+      }
+    });
     // 保存成功后清理磁盘上的回合数据（不再需要）
     tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history after save failed:', e));
-  }).catch(e=>logWarn('Save history failed:', e));
+  } catch(e) {
+    logWarn('Save history failed:', e);
+  }
 }// ─── 保存未完成游戏历史记录（用于异常退出后继续游戏） ───
 async function saveUnfinishedGameHistory(){
   if(!gameMode||gameOver)return;
@@ -794,33 +809,37 @@ async function saveUnfinishedGameHistory(){
     gameCount: _gameCount,
     aiAlgorithm: _aiAlgorithm,
     aiDepth: _aiDepth,
-    colorNames: _colorNames,
+    colorNames: toColorNamesArray(_colorNames),
     aiCount: _aiPlayers.length,
     undoStack: [],
     savedHistory: fullHistory.length > 0 ? compactHistory(fullHistory, _maxPlayers) : null,
   };
   const stateJson = JSON.stringify(state);
   const compact = fullHistory.length > 0 ? compactHistory(fullHistory, _maxPlayers) : {};
-  tauriInvoke("save_game_history", {
-    record: {
-      id: Date.now(),
-      time: formatTime(new Date()),
-      mode: _gameMode,
-      aiAlgorithm: _aiAlgorithm,
-      aiDepth: _aiDepth,
-      gameCount: _gameCount,
-      playerCount: _maxPlayers,
-      aiCount: _aiPlayers.length,
-      boardSize: _size,
-      winner: null,
-      colorNames: _colorNames,
-      chainStats: _chainStats,
-      maxChain: _maxChainOverall,
-      finished: false,
-      history: compact,
-      gameState: stateJson,
-    }
-  }).catch(e => logWarn("Save unfinished history failed:", e));
+  try {
+    await tauriInvoke("save_game_history", {
+      record: {
+        id: Date.now(),
+        time: formatTime(new Date()),
+        mode: _gameMode,
+        aiAlgorithm: _aiAlgorithm,
+        aiDepth: _aiDepth,
+        gameCount: _gameCount,
+        playerCount: _maxPlayers,
+        aiCount: _aiPlayers.length,
+        boardSize: _size,
+        winner: null,
+        colorNames: toColorNamesArray(_colorNames),
+        chainStats: _chainStats,
+        maxChain: _maxChainOverall,
+        finished: false,
+        history: compact,
+        gameState: stateJson,
+      }
+    });
+  } catch(e) {
+    logWarn("Save unfinished history failed:", e);
+  }
 }
 
 // ─── 从未完成历史记录继续游戏 ───
@@ -883,6 +902,7 @@ function loadGameFromState(saved){
     saved.eliminatedPlayers.forEach(p => eliminatedPlayers.add(p));
   }
 
+  _colorNames = saved.colorNames || COLOR_NAMES;
   chainStats = saved.chainStats || {};
   maxChainOverall = saved.maxChainOverall || {player:null,length:0};
 
@@ -1339,6 +1359,8 @@ function renderPlayerBar(){
     t.style.color=COLORS[p];
     let label=(_colorNames&&_colorNames[p])||(aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`);
     t.innerHTML=`${label} <span class="cnt">${cnt[p]}</span>`;
+    t.style.cursor='pointer';
+    t.onclick=function(e){e.stopPropagation();openInGamePlayerConfig(p)};
     el.appendChild(t);
   }
 }
@@ -1648,7 +1670,7 @@ async function endGameNow(){
   }
   if(survivorCount >= 2){
     // 2+ 存活 → 保存未完成记录，退回主菜单
-    saveUnfinishedGameHistory();
+    await saveUnfinishedGameHistory();
     gameOver = true;
     exitGame();
     return;
@@ -2108,7 +2130,7 @@ async function showSettlement(winner,colorNames,history){
   homeBtn.onclick = () => { Router.navigate('welcome'); };
   inner.appendChild(homeBtn);
   Router.navigate('checkout', prevPage);
-  saveGameHistory(winner, undefined, undefined, undefined, fullHistory);
+  await saveGameHistory(winner, undefined, undefined, undefined, fullHistory);
 }
 
 function showHistoryDetail(r){
@@ -2430,8 +2452,72 @@ function updateModalRows(){
   document.getElementById('playerRandomRow').style.display=needDepth?'block':'none';
   document.getElementById('playerEvalRow').style.display=needEval?'block':'none';
 }
-function closePlayerModal(){closeModal('playerConfigModal')}
+function closePlayerModal(){
+  _inGameSettingsMode=false;
+  closeModal('playerConfigModal');
+}
+var _inGameSettingsMode=false;
+var _inGameSettingsIdx=-1;
+function openInGamePlayerConfig(idx){
+  _inGameSettingsMode=true;
+  _inGameSettingsIdx=idx;
+  var pName=(_colorNames&&_colorNames[idx])||(aiPlayers.has(idx)?'AI '+(idx+1):'玩家 '+(idx+1));
+  document.getElementById('playerModalTitle').textContent=pName+' 设置';
+  var isAI=aiPlayers.has(idx);
+  var cfg=aiConfigs[idx]||{};
+  var curType=isAI?(cfg.algorithm||'strategy'):'human';
+  var curDepth=cfg.depth||2;
+  var curRandom=cfg.randomScale??10;
+  var curUseMlEval=cfg.useMlEval!==false;
+  var nameInput=document.getElementById('playerNameInput');
+  if(nameInput)nameInput.value=pName;
+  document.getElementById('depthValue').textContent=String(curDepth);
+  document.getElementById('randomScaleSlider').value=String(curRandom);
+  document.getElementById('randomValueLabel').textContent=curRandom+'%';
+  var btns=document.getElementById('playerTypeBtns');
+  btns.querySelectorAll('.am-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===curType)});
+  btns.querySelectorAll('.am-btn').forEach(function(b){b.onclick=function(){btns.querySelectorAll('.am-btn').forEach(function(x){x.classList.remove('selected')});this.classList.add('selected');updateModalRows();}});
+  updateModalRows();
+  document.getElementById('depthDecBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v>1){v--;e.textContent=v}};
+  document.getElementById('depthIncBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v<10){v++;e.textContent=v}};
+  document.getElementById('randomScaleSlider').oninput=function(){document.getElementById('randomValueLabel').textContent=this.value+'%'};
+  var evalBtns=document.getElementById('playerEvalToggle');
+  if(evalBtns){
+    evalBtns.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===String(curUseMlEval))});
+  }
+  openModal('playerConfigModal');
+}
+function saveInGamePlayerConfig(){
+  var idx=_inGameSettingsIdx;
+  var selBtn=document.querySelector('#playerTypeBtns .am-btn.selected');
+  var newType=selBtn?selBtn.dataset.value:'human';
+  var newDepth=parseInt(document.getElementById('depthValue').textContent)||2;
+  var newRandom=parseInt(document.getElementById('randomScaleSlider').value)??10;
+  var evalSel=document.querySelector('#playerEvalToggle .tg-btn.selected');
+  var newUseMlEval=evalSel?evalSel.dataset.value==='true':true;
+  if(newType==='human'){
+    if(aiPlayers.has(idx)){
+      aiPlayers.delete(idx);
+      delete aiConfigs[idx];
+    }
+  }else{
+    aiPlayers.add(idx);
+    aiConfigs[idx]={algorithm:newType,depth:newDepth,randomScale:newRandom,useMlEval:newUseMlEval};
+    if(!aiConfigs[0]){aiAlgorithm=newType;aiDepth=newDepth}
+  }
+  _inGameSettingsMode=false;
+  closeModal('playerConfigModal');
+  renderPlayerBar();
+  if(!gameOver&&idx===curPlayer&&aiPlayers.has(idx)&&hasPieces(idx,board)){
+    setTimeout(function(){triggerAI()},300);
+  }
+}
+
 function savePlayerConfig(){
+  if(_inGameSettingsMode){
+    saveInGamePlayerConfig();
+    return;
+  }
   const cfg=playerConfigs[editingPlayerIdx];
   cfg.name=document.getElementById('playerNameInput').value.trim();
   var selBtn=document.querySelector('#playerTypeBtns .am-btn.selected');
