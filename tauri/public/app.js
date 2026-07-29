@@ -728,6 +728,18 @@ function toColorNamesArray(src){
   }
   return COLOR_NAMES;
 }
+function getPlayerTypesArray(){
+  var arr=[];
+  for(var i=0;i<maxPlayers;i++){
+    if(aiPlayers.has(i)){
+      var cfg=aiConfigs[i]||{};
+      arr.push(cfg.algorithm||'strategy');
+    }else{
+      arr.push('human');
+    }
+  }
+  return arr;
+}
 async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
   const src = historyArg || gameHistory;
   const compact = compactHistory(src, maxPlayers);
@@ -749,6 +761,7 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
         maxChain: maxChainOverall,
         finished: true,
         history: compact,
+        playerTypes: getPlayerTypesArray(),
       }
     });
     // 保存成功后清理磁盘上的回合数据（不再需要）
@@ -816,6 +829,16 @@ async function saveUnfinishedGameHistory(){
   };
   const stateJson = JSON.stringify(state);
   const compact = fullHistory.length > 0 ? compactHistory(fullHistory, _maxPlayers) : {};
+  // 生成未完成游戏的 playerTypes
+  var _playerTypes=[];
+  for(var _pi=0;_pi<_maxPlayers;_pi++){
+    if(_aiPlayers.indexOf(_pi)>=0){
+      var _pcfg=_aiConfigs[_pi]||{};
+      _playerTypes.push(_pcfg.algorithm||'strategy');
+    }else{
+      _playerTypes.push('human');
+    }
+  }
   try {
     await tauriInvoke("save_game_history", {
       record: {
@@ -835,6 +858,7 @@ async function saveUnfinishedGameHistory(){
         finished: false,
         history: compact,
         gameState: stateJson,
+        playerTypes: _playerTypes,
       }
     });
   } catch(e) {
@@ -1518,14 +1542,21 @@ async function showPauseOverlay(){
   // 刷盘获取完整历史
   const fullHistory=await flushAndGetFullHistory();
 
-  // 统一渲染
+  // 排名列表
   let statsGrid=document.getElementById('pauseStats');
   statsGrid.innerHTML='';
+  // 添加排名标题
+  let rankTitle=document.createElement('h4');
+  rankTitle.style.cssText='margin:0 0 6px 0;font-size:.85rem;color:var(--text);text-align:center';
+  rankTitle.textContent='当前排名';
+  statsGrid.appendChild(rankTitle);
+  renderRankingList(statsGrid, board, maxPlayers, eliminatedPlayers, _colorNames||COLOR_NAMES, aiConfigs, null, chainStats, fullHistory, null, null, curPlayer);
+  // 图表区域
   let chartArea=document.getElementById('pauseCharts');
   chartArea.innerHTML='';
-  renderGameCharts(statsGrid,fullHistory,{
+  renderGameCharts(chartArea,fullHistory,{
     colorNames:_colorNames||COLOR_NAMES,colors:COLORS,eliminated:eliminatedPlayers,
-    _noBack:true
+    _noBack:true,_noGrid:true
   });
   // 图表额外放进 chartArea（因为 pauseOverlay 布局分 stats 和 charts 两个容器）
   // 移动图表到 chartArea
@@ -1828,6 +1859,277 @@ function getPlayerLabel(p){
   return aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`;
 }
 
+// 获取玩家类型标签
+function getPlayerTypeLabel(p){
+  if(!aiPlayers.has(p))return '人类';
+  var cfg=aiConfigs[p]||{};
+  var alg=cfg.algorithm||'strategy';
+  var labels={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS'};
+  return labels[alg]||'AI '+alg;
+}
+
+// 绘制排名列表
+function renderRankingList(container, boardState, playerCnt, eliminatedSet, colorNames, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerDataOverride, playerTypesOverride, currentPlayerIdx){
+  var data=[];
+  var maxPieces=0;
+  for(var p=0;p<playerCnt;p++){
+    var pieces=0,points=0;
+    if(playerDataOverride&&playerDataOverride[p]){
+      pieces=playerDataOverride[p].pieces||0;
+      points=playerDataOverride[p].points||0;
+    }else{
+      for(var r=0;r<boardState.length;r++)for(var c=0;c<boardState[r].length;c++){
+        var cell=boardState[r][c];
+        if(cell.owner===p){pieces++;points+=cell.count}
+      }
+    }
+    if(pieces>maxPieces)maxPieces=pieces;
+    var typeRaw,typeLabel,typeCss,detailStr='';
+    if(playerTypesOverride&&playerTypesOverride[p]){
+      typeRaw=playerTypesOverride[p];
+      var typeMap={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS',human:'人类'};
+      var cssMap={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',mcts:'ai-mcts',human:'human'};
+      typeLabel=typeMap[typeRaw]||typeRaw;
+      typeCss='rank-type '+cssMap[typeRaw];
+    }else if(aiCfgMap&&aiCfgMap[p]){
+      var cfg=aiCfgMap[p];
+      typeRaw=cfg.algorithm||'strategy';
+      var typeMap2={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS'};
+      var cssMap2={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',mcts:'ai-mcts'};
+      typeLabel=typeMap2[typeRaw]||('AI '+typeRaw);
+      typeCss='rank-type '+(cssMap2[typeRaw]||'');
+      detailStr='深度: '+cfg.depth+'  随机: '+cfg.randomScale+'%';
+      if(cfg.useMlEval===false)detailStr+=' 手写评估';
+      else if(cfg.useMlEval===true||cfg.useMlEval===undefined)detailStr+=' ML评估';
+    }else{
+      typeRaw='human';
+      typeLabel='人类';
+      typeCss='rank-type human';
+    }
+    data.push({index:p,name:(colorNames&&colorNames[p])||getPlayerLabel(p),pieces:pieces,points:points,type:typeLabel,typeCss:typeCss,typeRaw:typeRaw,detail:detailStr,eliminated:(eliminatedSet&&eliminatedSet.has(p)),isWinner:p===winnerP,chain:chainStatsMap&&chainStatsMap[p]});
+  }
+  // 按棋子数降序排名，同棋子数按点数降序
+  data.sort(function(a,b){
+    if(a.eliminated!==b.eliminated)return a.eliminated?1:-1;
+    if(b.pieces!==a.pieces)return b.pieces-a.pieces;
+    return b.points-a.points;
+  });
+  var leaderPieces=data.length>0?data[0].pieces:0;
+  var table=document.createElement('div');table.className='rank-list';
+  var hasActive=false,hasElim=false;
+  for(var i=0;i<data.length;i++){
+    if(!data[i].eliminated)hasActive=true;
+    else hasElim=true;
+  }
+  for(var i=0;i<data.length;i++){
+    var d=data[i];
+    var item=document.createElement('div');item.className='rank-item';
+    if(d.isWinner)item.classList.add('winner');
+    if(d.eliminated)item.classList.add('eliminated');
+    if(currentPlayerIdx!==undefined&currentPlayerIdx!==null&&d.index===currentPlayerIdx&&!d.isWinner)item.classList.add('current-turn');
+    // 左侧颜色边
+    item.style.setProperty('--rank-left-c',COLORS[d.index]||'#888');
+    // 进度条 (relative to max pieces)
+    var barPct=maxPieces>0?Math.round(d.pieces/maxPieces*100):0;
+    item.style.setProperty('--rank-bar-w',barPct+'%');
+    item.style.setProperty('--rank-bar-c',COLORS[d.index]||'#888');
+    // 名次
+    var rankEl=document.createElement('span');rankEl.className='rank-pos';
+    if(d.isWinner){rankEl.textContent='🏆';rankEl.classList.add('trophy')}
+    else if(d.eliminated){rankEl.textContent='✖';}
+    else if(i===0){rankEl.textContent='🥇';rankEl.classList.add('medal')}
+    else if(i===1){rankEl.textContent='🥈';rankEl.classList.add('medal')}
+    else if(i===2){rankEl.textContent='🥉';rankEl.classList.add('medal')}
+    else rankEl.textContent='#'+(i+1);
+    item.appendChild(rankEl);
+    // 名称行
+    var nameLine=document.createElement('div');nameLine.className='rank-name-line';
+    var dot=document.createElement('span');dot.className='rank-dot';dot.style.background=COLORS[d.index]||'#888';
+    var nameEl=document.createElement('span');nameEl.className='rank-name';nameEl.textContent=d.name;
+    nameLine.appendChild(dot);nameLine.appendChild(nameEl);
+    item.appendChild(nameLine);
+    // 统计行
+    var statsLine=document.createElement('div');statsLine.className='rank-stats-line';
+    var piecesStat=document.createElement('span');piecesStat.className='rank-stat';
+    piecesStat.innerHTML='<span class="rank-stat-val">'+d.pieces+'</span><span class="rank-stat-lbl">棋</span>';
+    statsLine.appendChild(piecesStat);
+    var pointsStat=document.createElement('span');pointsStat.className='rank-stat';
+    pointsStat.innerHTML='<span class="rank-stat-val">'+d.points+'</span><span class="rank-stat-lbl">点</span>';
+    statsLine.appendChild(pointsStat);
+    item.appendChild(statsLine);
+    // 类型行
+    var typeLine=document.createElement('div');typeLine.className='rank-type-line';
+    if(d.typeCss){
+      var typeEl=document.createElement('span');typeEl.className=d.typeCss;typeEl.textContent=d.type;
+      typeLine.appendChild(typeEl);
+    }
+    // 距离第一名的差距
+    if(!d.isWinner&&!d.eliminated&&leaderPieces>d.pieces){
+      var gapEl=document.createElement('span');gapEl.className='rank-gap';
+      gapEl.textContent='-❤~'+d.pieces+'棋';
+      typeLine.appendChild(gapEl);
+    }
+    // 连炸 badge
+    if(d.chain&&d.chain.triggered>0){
+      var chainEl=document.createElement('span');chainEl.className='rank-chain-badge';
+      chainEl.textContent='连炸'+d.chain.triggered+'次';
+      typeLine.appendChild(chainEl);
+    }
+    // hint removed
+    item.appendChild(typeLine);
+    // 详细信息行
+    if(d.detail){
+      item.classList.add('has-detail');
+      var detailLine=document.createElement('div');detailLine.className='rank-detail-line';
+      detailLine.textContent=d.detail;
+      item.appendChild(detailLine);
+    }
+    // 点击事件
+    item.onclick=function(idx,pid){return function(e){
+      e.stopPropagation();
+      showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerTypesOverride);
+    }}(i,d.index);
+    table.appendChild(item);
+  }
+  // 活跃/淘汰分隔线
+  if(hasActive&&hasElim){
+    var sep=document.createElement('div');sep.className='rank-divider';sep.textContent='淘汰';
+    table.appendChild(sep);
+    // 将淘汰的 item 移到分隔线后
+    var elimItems=[];
+    var children=Array.from(table.children);
+    for(var ci=0;ci<children.length;ci++){
+      var ch=children[ci];
+      if(ch.classList&&ch.classList.contains('rank-item')&&ch.classList.contains('eliminated')){
+        elimItems.push(ch);
+        table.removeChild(ch);
+      }
+    }
+    for(var ci=0;ci<elimItems.length;ci++){
+      table.appendChild(elimItems[ci]);
+    }
+  }
+  container.appendChild(table);
+}
+
+// 玩家详情弹窗
+function showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerTypesOverride){
+  var pName=(colorNames&&colorNames[pid])||getPlayerLabel(pid);
+  var isElim=eliminatedSet&&eliminatedSet.has(pid);
+  var isWinner=pid===winnerP;
+  var pColor=COLORS[pid]||'#888';
+  // 获取玩家类型
+  var typeRaw,typeLabel,typeCss,detailStr='';
+  if(playerTypesOverride&&playerTypesOverride[pid]){
+    typeRaw=playerTypesOverride[pid];
+    var tm={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS',human:'人类'};
+    var tmc={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',mcts:'ai-mcts',human:'human'};
+    typeLabel=tm[typeRaw]||typeRaw;
+    typeCss=tmc[typeRaw]||'';
+  }else if(aiCfgMap&&aiCfgMap[pid]){
+    var cfg=aiCfgMap[pid];
+    typeRaw=cfg.algorithm||'strategy';
+    var tm2={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS'};
+    var tmc2={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',mcts:'ai-mcts'};
+    typeLabel=tm2[typeRaw]||('AI '+typeRaw);
+    typeCss=tmc2[typeRaw]||'';
+    detailStr='深度: '+cfg.depth+' | 随机: '+cfg.randomScale+'%';
+    if(cfg.useMlEval===false)detailStr+=' | 手写评估';
+    else if(cfg.useMlEval===true||cfg.useMlEval===undefined)detailStr+=' | ML评估';
+  }else{
+    typeRaw='human';
+    typeLabel='人类';
+    typeCss='human';
+  }
+  // 从 fullHistory 提取该玩家的历史
+  var playerHistory=[];
+  if(fullHistory&&fullHistory.length>0){
+    for(var hi=0;hi<fullHistory.length;hi++){
+      var snap=fullHistory[hi].snapshot||{};
+      var pd=snap[String(pid)];
+      if(pd){
+        playerHistory.push({turn:fullHistory[hi].turn||hi,snapshot:{}});
+        playerHistory[playerHistory.length-1].snapshot[String(pid)]={pieces:pd.pieces||0,points:pd.points||0};
+      }
+    }
+  }
+  // 获取最后一幕的数据
+  var finalPieces=0,finalPoints=0;
+  if(playerHistory.length>0){
+    var lastP=playerHistory[playerHistory.length-1].snapshot[String(pid)];
+    if(lastP){finalPieces=lastP.pieces;finalPoints=lastP.points}
+  }
+  // 创建弹窗
+  var overlay=document.createElement('div');overlay.className='rank-modal';
+  history.pushState(null,'');
+  window._rankModalOpen=1;
+  var inner=document.createElement('div');inner.className='rank-modal-inner';
+  inner.style.setProperty('--rm-color',pColor);
+  // 头部
+  var header=document.createElement('div');header.className='rank-modal-header';
+  var hName=document.createElement('span');hName.className='rank-modal-name';
+  hName.textContent=pName;
+  var statusEl=document.createElement('span');statusEl.className='rank-modal-status';
+  if(isWinner){statusEl.textContent='🏆 获胜';statusEl.classList.add('winner')}
+  else if(isElim){statusEl.textContent='✖ 已淘汰';statusEl.classList.add('eliminated')}
+  else{statusEl.textContent='● 存活';statusEl.classList.add('alive')}
+  var closeBtn=document.createElement('button');closeBtn.className='rank-modal-close';
+  closeBtn.textContent='✕';
+  closeBtn.onclick=function(){document.body.removeChild(overlay);};
+  header.appendChild(hName);header.appendChild(statusEl);header.appendChild(closeBtn);
+  inner.appendChild(header);
+  // 内容体
+  var body=document.createElement('div');body.className='rank-modal-body';
+  // Hero: 大数字展示棋子数和点数
+  var hero=document.createElement('div');hero.className='rank-modal-hero';
+  var heroPieces=document.createElement('div');heroPieces.className='rank-modal-hero-item';
+  heroPieces.innerHTML='<div class="hero-label">棋子数</div><div class="hero-value pieces-color">'+finalPieces+'</div>';
+  var heroPoints=document.createElement('div');heroPoints.className='rank-modal-hero-item';
+  heroPoints.innerHTML='<div class="hero-label">点数</div><div class="hero-value">'+finalPoints+'</div>';
+  hero.appendChild(heroPieces);hero.appendChild(heroPoints);
+  body.appendChild(hero);
+  // 类型 + AI 详情
+  var typeRow=document.createElement('div');typeRow.className='rank-modal-type-row';
+  var typeBadge=document.createElement('span');typeBadge.className='rank-modal-type-badge'+(typeCss?' '+typeCss:'');
+  typeBadge.textContent=typeLabel;
+  typeRow.appendChild(typeBadge);
+  var typeDetail=document.createElement('span');typeDetail.className='rank-modal-type-detail';
+  typeDetail.textContent=detailStr||'—';
+  typeRow.appendChild(typeDetail);
+  body.appendChild(typeRow);
+  // 连炸统计
+  if(chainStatsMap&&chainStatsMap[pid]&&chainStatsMap[pid].triggered>0){
+    var cs=chainStatsMap[pid];
+    var chainRow=document.createElement('div');chainRow.className='rank-modal-chain-row';
+    chainRow.innerHTML='<span class="rank-modal-chain-item"><span class="chain-icon">💥</span><span>连炸 <strong class="chain-val">'+cs.triggered+'</strong> 次</span></span>'+
+      '<span class="rank-modal-chain-item"><span class="chain-icon">🔥</span><span>最高 <strong class="chain-val">'+cs.maxChain+'</strong> 连</span></span>';
+    body.appendChild(chainRow);
+  }
+  // 图表
+  if(playerHistory.length>=2){
+    var cNames={};cNames[String(pid)]=pName;
+    var colors={};colors[String(pid)]=pColor;
+    var cId1='rmP_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    var cId2='rmPt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    var cb1=document.createElement('div');cb1.className='rank-modal-chart-box';
+    cb1.innerHTML='<h4 onclick="showFullscreenChart(\''+cId1+'\')">棋子数变化 🔍</h4><canvas id="'+cId1+'" onclick="showFullscreenChart(\''+cId1+'\')" style="cursor:pointer"></canvas>';
+    body.appendChild(cb1);
+    var cb2=document.createElement('div');cb2.className='rank-modal-chart-box';
+    cb2.innerHTML='<h4 onclick="showFullscreenChart(\''+cId2+'\')">点数变化 🔍</h4><canvas id="'+cId2+'" onclick="showFullscreenChart(\''+cId2+'\')" style="cursor:pointer"></canvas>';
+    body.appendChild(cb2);
+    setTimeout(function(){
+      var el1=document.getElementById(cId1);if(el1){var r1=el1.getBoundingClientRect();if(r1.width>0&&r1.height>0)drawLineChart(el1,playerHistory,cNames,colors,'pieces');else{var p1=function(){var r=el1.getBoundingClientRect();if(r.width>0&&r.height>0){drawLineChart(el1,playerHistory,cNames,colors,'pieces')}else requestAnimationFrame(p1)};requestAnimationFrame(p1)}}
+      var el2=document.getElementById(cId2);if(el2){var r2=el2.getBoundingClientRect();if(r2.width>0&&r2.height>0)drawLineChart(el2,playerHistory,cNames,colors,'points');else{var p2=function(){var r=el2.getBoundingClientRect();if(r.width>0&&r.height>0){drawLineChart(el2,playerHistory,cNames,colors,'points')}else requestAnimationFrame(p2)};requestAnimationFrame(p2)}}
+    },50);
+  }else{
+    body.innerHTML+='<p style="text-align:center;color:var(--dim);font-size:.78rem;margin-top:8px">历史数据不足，无法绘制图表</p>';
+  }
+  inner.appendChild(body);
+  overlay.appendChild(inner);
+  overlay.onclick=function(e){if(e.target===overlay){document.body.removeChild(overlay);}};
+  document.body.appendChild(overlay);
+}
+
 function drawLineChart(canvas,history,colorNames,colors,valueKey){
   if(!canvas||history.length<1)return;
   let dpr=window.devicePixelRatio||1;
@@ -1926,26 +2228,28 @@ function renderGameCharts(container, history, opts){
   }else if(showTitle&&winner===undefined){
     let t=document.createElement('h2');t.textContent='对局统计';container.appendChild(t);
   }
-  let grid=document.createElement('div');grid.className='stats-grid';
-  let active=[];
-  for(let p=0;p<maxPlayers;p++){
-    if(eliminated&&eliminated.has(p))continue;
-    let snap=lastSnap[String(p)];
-    if(snap&&snap.pieces>0)active.push(p);
+  if(!opts._noGrid){
+    let grid=document.createElement('div');grid.className='stats-grid';
+    let active=[];
+    for(let p=0;p<maxPlayers;p++){
+      if(eliminated&&eliminated.has(p))continue;
+      let snap=lastSnap[String(p)];
+      if(snap&&snap.pieces>0)active.push(p);
+    }
+    if(active.length===0&&winner!==null&&winner!==undefined)active=[winner];
+    for(let pid of active){
+      let snap=lastSnap[String(pid)],pieces=snap?snap.pieces:0,points=snap?snap.points:0;
+      let card=document.createElement('div');card.className='stat-card';
+      if(pid===winner)card.style.border=`1px solid ${colors[pid]||'#888'}`;
+      let cs=chainStats&&chainStats[pid];
+      let csStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
+      card.innerHTML=`<div class="name"><span class="color-dot" style="background:${colors[pid]||'#888'}"></span>${cNames[pid]||getPlayerLabel(pid)} ${pid===winner?' ★':''}</div>
+        <div class="num" style="color:${colors[pid]||'#888'}">${pieces}</div><div class="lbl">棋子</div>
+        <div class="num" style="color:${colors[pid]||'#888'}">${points}</div><div class="lbl">点数</div>${csStr}`;
+      grid.appendChild(card);
+    }
+    container.appendChild(grid);
   }
-  if(active.length===0&&winner!==null&&winner!==undefined)active=[winner];
-  for(let pid of active){
-    let snap=lastSnap[String(pid)],pieces=snap?snap.pieces:0,points=snap?snap.points:0;
-    let card=document.createElement('div');card.className='stat-card';
-    if(pid===winner)card.style.border=`1px solid ${colors[pid]||'#888'}`;
-    let cs=chainStats&&chainStats[pid];
-    let csStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
-    card.innerHTML=`<div class="name"><span class="color-dot" style="background:${colors[pid]||'#888'}"></span>${cNames[pid]||getPlayerLabel(pid)} ${pid===winner?' ★':''}</div>
-      <div class="num" style="color:${colors[pid]||'#888'}">${pieces}</div><div class="lbl">棋子</div>
-      <div class="num" style="color:${colors[pid]||'#888'}">${points}</div><div class="lbl">点数</div>${csStr}`;
-    grid.appendChild(card);
-  }
-  container.appendChild(grid);
   if(maxChain&&maxChain.player!==null&&maxChain.length>0){
     let ci=document.createElement('p');
     ci.style.cssText='font-size:.75rem;color:var(--dim);margin:4px 0;text-align:center;';
@@ -2117,9 +2421,15 @@ async function showSettlement(winner,colorNames,history){
   const content = document.getElementById('checkoutContent');
   content.innerHTML = '<div class="settlement"><div class="settlement-inner" id="chkInner"></div></div>';
   const inner = document.getElementById('chkInner');
+  // 排名列表
+  let rankTitle=document.createElement('h4');
+  rankTitle.style.cssText='margin:0 0 6px 0;font-size:.85rem;color:var(--text);text-align:center';
+  rankTitle.textContent='最终排名';
+  inner.appendChild(rankTitle);
+  renderRankingList(inner, board, maxPlayers, eliminatedPlayers, colorNames||_colorNames||COLOR_NAMES, aiConfigs, winner, chainStats, fullHistory, null, null, null);
   renderGameCharts(inner, fullHistory, {
     winner, colorNames, colors: COLORS, eliminated: eliminatedPlayers,
-    chainStats, maxChain: maxChainOverall, showTitle: false, _noBack: true,
+    chainStats, maxChain: maxChainOverall, showTitle: false, _noBack: true, _noGrid: true,
     onReplay: () => { Router.navigate(_originPage || 'welcome'); }
   });
   // 返回主菜单按钮
@@ -2159,11 +2469,32 @@ function showHistoryDetail(r){
   }
   // 用记录中 playerCount 临时覆盖 maxPlayers 以复用统一渲染，不显示默认"返回主界面"
   const origMax = maxPlayers;
-  maxPlayers = r.playerCount || maxPlayers;
+  const histPlayerCnt = r.playerCount || maxPlayers;
+  maxPlayers = histPlayerCnt;
+  // 排名列表（从最后一幕提取棋子数/点数）
+  var rankingTitle=document.createElement('h4');
+  rankingTitle.style.cssText='margin:0 0 6px 0;font-size:.85rem;color:var(--text);text-align:center';
+  rankingTitle.textContent='最终排名';
+  inner.appendChild(rankingTitle);
+  var finalSnap={};
+  if(historyData&&historyData.length>0){
+    var lastTurn=historyData[historyData.length-1];
+    if(lastTurn&&lastTurn.snapshot){
+      for(var ps in lastTurn.snapshot){
+        finalSnap[ps]=lastTurn.snapshot[ps];
+      }
+    }
+  }
+  // 判断被淘汰的玩家（最后一幕棋子数为0）
+  var histEliminated=new Set();
+  for(var pe=0;pe<histPlayerCnt;pe++){
+    if(!finalSnap[String(pe)]||!finalSnap[String(pe)].pieces)histEliminated.add(pe);
+  }
+  renderRankingList(inner, [], histPlayerCnt, histEliminated, r.colorNames, null, r.winner, r.chainStats, historyData, finalSnap, r.playerTypes, null);
   renderGameCharts(inner, historyData, {
     winner: r.winner, colorNames: r.colorNames, colors: COLORS,
     chainStats: r.chainStats, maxChain: r.maxChain,
-    showTitle: false, _noBack: true,
+    showTitle: false, _noBack: true, _noGrid: true,
   });
   // 添加"关闭"按钮（还原 maxPlayers）
   const closeBtn = document.createElement('button');
@@ -2422,6 +2753,9 @@ function openPlayerModal(idx){
   const cfg=playerConfigs[idx];
   const pName=playerConfigs[idx]?.name||('玩家'+(idx+1));
   document.getElementById('playerModalTitle').textContent=pName+' 设置';
+  // 设置页面显示名称输入框
+  const nameRow=document.getElementById('playerNameInput').closest('.form-row');
+  if(nameRow)nameRow.style.display='block';
   document.getElementById('playerNameInput').value=cfg.name||'';
   document.getElementById('depthValue').textContent=String(cfg.depth);
   document.getElementById('randomScaleSlider').value=String(cfg.randomScale);
@@ -2464,6 +2798,9 @@ function openInGamePlayerConfig(idx){
   _inGameSettingsIdx=idx;
   var pName=(_colorNames&&_colorNames[idx])||(aiPlayers.has(idx)?'AI '+(idx+1):'玩家 '+(idx+1));
   document.getElementById('playerModalTitle').textContent=pName+' 设置';
+  // 局内不显示名称输入框
+  const nameRow=document.getElementById('playerNameInput').closest('.form-row');
+  if(nameRow)nameRow.style.display='none';
   var isAI=aiPlayers.has(idx);
   var cfg=aiConfigs[idx]||{};
   var curType=isAI?(cfg.algorithm||'strategy'):'human';
@@ -2706,6 +3043,15 @@ window.addEventListener('popstate',()=>{
     if(fsOverlay){
       window._chartFsState=0;
       fsOverlay.remove();
+      handled = true;
+    }
+  }
+
+  if(!handled){
+    // 1.5) 玩家详情弹窗 (RankModal) — 关闭弹窗，不切页面
+    var rankModal=document.querySelector('.rank-modal');
+    if(rankModal){
+      rankModal.remove();
       handled = true;
     }
   }
