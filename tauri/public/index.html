@@ -144,7 +144,7 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.1.1</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.1.2</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -222,13 +222,13 @@
       <h3 class="ai-alg-title" style="color:var(--accent2)">🧠 Alpha-Beta 剪枝 · 经典搜索</h3>
       <p class="ai-alg-desc">标准 Alpha-Beta 剪枝搜索，Rust + Rayon 根级并行。采用 <strong>克隆式搜索</strong>——每次走法复制棋盘而非撤销，天然适配多玩家连锁反应。</p>
       <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
-        <strong style="color:var(--accent2)">搜索深度</strong> 1~10 层 · <strong style="color:var(--accent2)">分支限制</strong> top 15 · <strong style="color:var(--accent2)">走法排序</strong> 三级优先<br>
+        <strong style="color:var(--accent2)">搜索深度</strong> 1~10 层 · <strong style="color:var(--accent2)">根级分支</strong> top 10 · <strong style="color:var(--accent2)">走法排序</strong> 三级优先<br>
         <strong style="color:var(--accent2)">随机化探索</strong> 早期对局加入随机扰动，增加走法多样性<br>
         <strong style="color:var(--accent2)">评估函数</strong> 支持增强版（位置+威胁评分）或手写规则评估
       </div>
 
       <h3 class="ai-alg-title" style="color:var(--accent2)">🔬 PVS NegaMax · 精炼剪枝</h3>
-      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设最优走法已被首先搜索，后续走法用<strong>零窗口（Null Window）</strong>快速试探——要么迅速证明不比首走法好，要么触发重搜索。同等时间下比标准 Alpha-Beta 探索更高效。</p>
+      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设最优走法已被首先搜索，后续走法用<strong>零窗口（Null Window）</strong>快速试探——要么迅速证明不比首走法好，要么触发重搜索。560 局基准测试中，PVS d=2 ML 以 70.0% 胜率持平 Alpha-Beta d=2 ML（70.7%），手写评估下 PVS（49.3%）反超 AB 手写（35.0%）。</p>
       <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
         <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录两条杀招走法 · <strong style="color:var(--accent2)">History 启发</strong> 全局走法成功率表<br>
         <strong style="color:var(--accent2)">QSearch 静止搜索</strong> 到底层只搜索爆炸性走法（限3层），消除水平线效应<br>

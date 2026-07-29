@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=fff" alt="Android">
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/badge/version-3.1.1-orange" alt="v3.1.1">
+    <img src="https://img.shields.io/badge/version-3.1.2-orange" alt="v3.1.2">
   </p>
 </div>
 
@@ -127,7 +127,7 @@ cd ..
 
 - **Rayon 多线程** — 根节点走法并行搜索，充分利用多核 CPU
 - **走法排序** — 三级棋子优先、周围对手多优先，提高剪枝效率
-- **分支限制** — 每层最多搜索 top 15 个走法
+- **根级分支** — 根级 top 10 走法，内部节点无分支限制（全量搜索）
 - **深度可调** — 支持 1~10 层搜索（默认 2）
 - **随机化探索** — 早期对局加入随机扰动，增加走法多样性
 
@@ -139,11 +139,11 @@ Principal Variation Search（主变例搜索）是 Alpha-Beta 的精炼版本。
 
 - **Killer 启发** — 每层记录两条杀招走法，后续优先尝试
 - **History 启发** — 40×40 全局历史表，记录各位置的成功率
-- **QSearch 静止搜索** — 搜索到底时只搜爆炸性走法，防止水平线效应
-- **动态分支控制** — 浅层多搜，深层少搜，大棋盘自动加宽
-- **自适应预热** — warmup 搜索深度设为总深度一半，killer/history 表更准确
+- **QSearch 静止搜索** — 搜索到底时只搜爆炸性走法（限 3 层），防止水平线效应
+- **动态分支控制** — 浅层多搜（depth=1→14 条），深层少搜（depth=3→8 条）
+- **根级 Rayon 并行** — 多核并行加速根层搜索
 
-同等深度下比标准 Alpha-Beta 探索更高效，适合需要更强棋力的竞技场景。
+560 局基准测试中，PVS d=2 ML 以 70.0% 胜率持平 Alpha-Beta d=2 ML（70.7%），手写评估下 PVS（49.3%）反超 AB 手写（35.0%）。
 
 ### 🎲 MCTS 蒙特卡洛树搜索
 

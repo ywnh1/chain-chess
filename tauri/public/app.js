@@ -2349,6 +2349,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.1.2 · 第 25 版',desc:'PVS 绝杀修复（终局符号反转）、Killer/History 动态优化、QSearch 深度收窄至3层、warmup 移除、分支收紧、AI 战力评测页面（560局8选手）'},
     {v:'v3.1.1 · 第 24 版',desc:'ML 模型迭代自对弈训练（16维改进特征，800树，AUC 0.898），ML vs 手写 83% 胜率，颜色称谓修复，去除 beta 标记'},
     {v:'v3.1.1-beta · 第 23 版',desc:'增强版 AI 评估函数（位置权重+威胁评分+爆发势能），nbrs() 零分配性能优化，死代码清理，AI 首子由玩家放置，README/About 页面重写'},
     {v:'v3.0.0-beta · 第 21 版',desc:'排版变量体系重构，自定义AI选择弹窗，rand库随机化AI引擎，跳过按钮纯按钮化，README+About重写'},
