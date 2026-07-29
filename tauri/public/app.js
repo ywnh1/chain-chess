@@ -2702,6 +2702,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.1.4 · 第 27 版',desc:'排名列表UI优化：可点击详情弹窗、暂停/结算/历史三处排名、局内改名取消、按钮布局优化'},
     {v:'v3.1.3 · 第 26 版',desc:'修复历史记录无法保存（colorNames 类型不匹配导致 Rust 反序列化失败）、恢复后图表丢失、局内算法修改弹窗'},
     {v:'v3.1.2 · 第 25 版',desc:'PVS 绝杀修复（终局符号反转）、Killer/History 动态优化、QSearch 深度收窄至3层、warmup 移除、分支收紧、AI 战力评测页面（560局8选手）'},
     {v:'v3.1.1 · 第 24 版',desc:'ML 模型迭代自对弈训练（16维改进特征，800树，AUC 0.898），ML vs 手写 83% 胜率，颜色称谓修复，去除 beta 标记'},

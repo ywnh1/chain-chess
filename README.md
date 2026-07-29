@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=fff" alt="Android">
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/badge/version-3.1.3-orange" alt="v3.1.3">
+    <img src="https://img.shields.io/badge/version-3.1.4-orange" alt="v3.1.4">
   </p>
 </div>
 
