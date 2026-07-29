@@ -291,12 +291,11 @@ Router.register('about-license', {
   back: 'about',
   enter() { document.body.style.background=''; },
   leave() {}
+});
 Router.register('about-benchmark', {
   back: 'about',
   enter() { document.body.style.background='' },
   leave() {}
-});
-
 });
 
 Router.register('checkout', {

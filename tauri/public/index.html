@@ -173,7 +173,7 @@
       <h3>功能亮点</h3>
       <p style="font-size:.82rem;line-height:1.7;margin:0">
         🦀 <strong>Rust AI 引擎</strong> — 四款搜索算法（策略 / A-B / PVS / MCTS），Rayon 多核并行<br>
-        🎯 <strong>增强版 AI 评估</strong> — 位置权重 + 邻居威胁评分 + 爆发势能，7/10 胜率击败经典手写评估<br>
+        🎯 <strong>增强版 AI 评估</strong> — 位置权重 + 邻居威胁评分 + 爆发势能，ML 评估以 70% vs 35% 优势碾压手写版<br>
         💾 <strong>中断恢复</strong> — 异常退出自动保存，历史页面一键继续上次对局<br>
         📊 <strong>结算图表</strong> — 棋子数和点数双折线图，支持全屏缩放与双指缩放<br>
         🔊 <strong>合成音效</strong> — 落子、爆炸、淘汰、获胜各有独立音频反馈（Web Audio API）<br>
@@ -231,8 +231,8 @@
       <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设最优走法已被首先搜索，后续走法用<strong>零窗口（Null Window）</strong>快速试探——要么迅速证明不比首走法好，要么触发重搜索。同等时间下比标准 Alpha-Beta 探索更高效。</p>
       <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
         <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录两条杀招走法 · <strong style="color:var(--accent2)">History 启发</strong> 全局走法成功率表<br>
-        <strong style="color:var(--accent2)">QSearch 静止搜索</strong> 到底层只评估爆炸性走法，消除水平线效应<br>
-        <strong style="color:var(--accent2)">动态分支</strong> 浅层多搜深层少搜 · <strong style="color:var(--accent2)">自适应预热</strong> 预热 killer/history 表
+        <strong style="color:var(--accent2)">QSearch 静止搜索</strong> 到底层只搜索爆炸性走法（限3层），消除水平线效应<br>
+        <strong style="color:var(--accent2)">动态分支</strong> 浅层多搜深层少搜 · <strong style="color:var(--accent2)">根级 Rayon 并行</strong> 多核加速
       </div>
 
       <h3 class="ai-alg-title" style="color:#c88cff">🎲 MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
@@ -252,26 +252,133 @@
   <div class="about-scroll">
     <h2>AI 性能评测</h2>
     <div class="about-card">
-      <h3 style="font-size:1.05rem;margin-bottom:8px">&#x1F3DF;  AI 战力排行</h3>
-      <p style="font-size:.82rem;color:var(--dim);margin-bottom:10px">循环赛 10 局制 · 7×7 棋盘 · 先手交替 · 共 150 局</p>
+      <h3 style="font-size:1.05rem;margin-bottom:8px">🏆 AI 战力排行</h3>
+      <p style="font-size:.82rem;color:var(--dim);margin-bottom:10px">
+        循环赛 · 7×7 棋盘 · 每对 20 局 · 先手交替 · <strong>共 560 局</strong>
+      </p>
+
+      <!-- 排行榜 -->
       <table style="width:100%;font-size:.82rem;border-collapse:collapse">
-        <tr style="border-bottom:1px solid rgba(255,255,255,.08)"><th style="text-align:left;padding:4px 6px">排名</th><th style="text-align:left;padding:4px 6px">选手</th><th style="text-align:right;padding:4px 6px">胜率</th><th style="text-align:right;padding:4px 6px">积分</th></tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">&#x1F947;</td><td style="padding:3px 6px"><strong>AB ML d2</strong></td><td style="padding:3px 6px;text-align:right">98%</td><td style="padding:3px 6px;text-align:right">147</td></tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">&#x1F948;</td><td style="padding:3px 6px"><strong>AB 手写 d2</strong></td><td style="padding:3px 6px;text-align:right">82%</td><td style="padding:3px 6px;text-align:right">123</td></tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">&#x1F949;</td><td style="padding:3px 6px"><strong>AB ML d1</strong></td><td style="padding:3px 6px;text-align:right">52%</td><td style="padding:3px 6px;text-align:right">78</td></tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">4</td><td style="padding:3px 6px">策略算法</td><td style="padding:3px 6px;text-align:right">28%</td><td style="padding:3px 6px;text-align:right">42</td></tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)"><td style="padding:3px 6px">5</td><td style="padding:3px 6px">AB 手写 d1</td><td style="padding:3px 6px;text-align:right">26%</td><td style="padding:3px 6px;text-align:right">39</td></tr>
-        <tr><td style="padding:3px 6px">6</td><td style="padding:3px 6px">MCTS d2</td><td style="padding:3px 6px;text-align:right">14%</td><td style="padding:3px 6px;text-align:right">21</td></tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="text-align:left;padding:5px 6px;width:28px">#</th>
+          <th style="text-align:left;padding:5px 6px">AI 选手</th>
+          <th style="text-align:right;padding:5px 6px">胜</th>
+          <th style="text-align:right;padding:5px 6px">负</th>
+          <th style="text-align:right;padding:5px 6px">胜率</th>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+          <td style="padding:4px 6px">🥇</td>
+          <td style="padding:4px 6px"><strong>Alpha-Beta d=3 ML</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">128</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">12</td>
+          <td style="padding:4px 6px;text-align:right;font-weight:bold">91.4%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">🥈</td>
+          <td style="padding:4px 6px"><strong>Alpha-Beta d=2 ML</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">99</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">41</td>
+          <td style="padding:4px 6px;text-align:right;font-weight:bold">70.7%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">🥉</td>
+          <td style="padding:4px 6px"><strong>PVS d=2 ML</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">98</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">42</td>
+          <td style="padding:4px 6px;text-align:right;font-weight:bold">70.0%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">4</td>
+          <td style="padding:4px 6px">PVS d=3 ML</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">93</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">47</td>
+          <td style="padding:4px 6px;text-align:right">66.4%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">5</td>
+          <td style="padding:4px 6px">PVS d=2 手写</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">69</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">71</td>
+          <td style="padding:4px 6px;text-align:right">49.3%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">6</td>
+          <td style="padding:4px 6px">Alpha-Beta d=2 手写</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">49</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">91</td>
+          <td style="padding:4px 6px;text-align:right">35.0%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">7</td>
+          <td style="padding:4px 6px">MCTS d=2</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">13</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">127</td>
+          <td style="padding:4px 6px;text-align:right">9.3%</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px">8</td>
+          <td style="padding:4px 6px">策略算法</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">11</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">129</td>
+          <td style="padding:4px 6px;text-align:right">7.9%</td>
+        </tr>
       </table>
-      <h4 style="margin-top:14px;margin-bottom:6px">关键分析</h4>
-      <ul style="font-size:.8rem;line-height:1.6;padding-left:16px">
-        <li><strong>AB ML d2</strong> 以 98% 胜率碾压所有对手</li>
-        <li>同深度下，ML 评估 vs 手写评估约 <strong>9:1</strong></li>
-        <li>深度翻倍带来约 2 倍的棋力提升</li>
+
+      <h4 style="margin-top:16px;margin-bottom:8px;font-size:.95rem">🔍 关键发现</h4>
+      <ul style="font-size:.8rem;line-height:1.7;padding-left:16px;margin:0">
+        <li><strong>AB d=3 ML 稳居榜首</strong> — 91.4% 胜率碾压全场，仅输 12 局</li>
+        <li><strong>PVS ≈ Alpha-Beta 同深度持平</strong> — PVS d=2 ML (70.0%) vs AB d=2 ML (70.7%)，差距不足 1%</li>
+        <li><strong>PVS d=3 没能超越 d=2</strong> — 66.4% 反低于 70.0%，PVS 的 null-window 剪枝在深层的分支限制过紧，丢失最佳走法</li>
+        <li><strong>ML > 手写评估（约 2:1）</strong> — AB d=2 ML (70.7%) vs AB d=2 手写 (35.0%)；PVS d=2 ML (70.0%) vs PVS d=2 手写 (49.3%)</li>
+        <li><strong>PVS 手写 > AB 手写</strong> — PVS d=2 手写 (49.3%) 明显优于 AB d=2 手写 (35.0%)，Killer/History 启发在弱评估下优势更突出</li>
+        <li><strong>MCTS 和策略算法</strong> 为非搜索型 AI，棋力偏弱但各有用途：策略最快，MCTS 可发现非直觉走法</li>
       </ul>
-      <h4 style="margin-top:14px;margin-bottom:6px">评估函数影响</h4>
-      <p style="font-size:.8rem;line-height:1.6">ML 评估在 Alpha-Beta 框架下的优势显著：同深度同算法，ML 版以 9:1 碾压手写版。浅深度下 ML 版仍保持 52%，手写版仅 26%。</p>
-      <p style="font-size:.75rem;color:var(--dim);margin-top:10px">测试时间: 2026-07-28</p>
+
+      <h4 style="margin-top:16px;margin-bottom:6px;font-size:.95rem">⚔️ 重点对局详解</h4>
+      <table style="width:100%;font-size:.8rem;border-collapse:collapse;margin-top:4px">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+          <th style="text-align:left;padding:4px 6px">对战</th>
+          <th style="text-align:center;padding:4px 6px">比分</th>
+          <th style="text-align:right;padding:4px 6px">均时</th>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">AB d=3 ML vs PVS d=3 ML</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#ff7070">20 : 0</td>
+          <td style="padding:3px 6px;text-align:right">1.24s</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">AB d=3 ML vs AB d=2 ML</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#70d070">12 : 8</td>
+          <td style="padding:3px 6px;text-align:right">1.10s</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">PVS d=2 ML vs AB d=2 ML</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#70d070">11 : 9</td>
+          <td style="padding:3px 6px;text-align:right">0.29s</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">PVS d=2 手写 vs AB d=2 手写</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#70d070">17 : 3</td>
+          <td style="padding:3px 6px;text-align:right">0.69s</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">PVS d=2 ML vs PVS d=3 ML</td>
+          <td style="padding:3px 6px;text-align:center;color:#f0d060">10 : 10</td>
+          <td style="padding:3px 6px;text-align:right">0.21s</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 6px">AB d=3 ML vs PVS d=2 ML</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#ff7070">19 : 1</td>
+          <td style="padding:3px 6px;text-align:right">0.08s</td>
+        </tr>
+      </table>
+
+      <h4 style="margin-top:16px;margin-bottom:6px;font-size:.95rem">📊 数据总览</h4>
+      <div style="font-size:.8rem;line-height:1.7;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px">
+        <strong>总对局</strong> 560 局 · <strong>总耗时</strong> 358.6s · <strong>平均</strong> 0.64s/局<br>
+        <strong>测试环境</strong> 7×7 棋盘 · depth=2/3 · ML / 手写双评估
+      </div>
+      <p style="font-size:.75rem;color:var(--dim);margin-top:12px">测试时间: 2026-07-29 ｜ 脚本: test_ai.py（8 AI × 循环赛 × 28 对）</p>
     </div>
   </div>
 </div>

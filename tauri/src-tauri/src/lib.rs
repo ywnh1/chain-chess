@@ -1316,9 +1316,11 @@ impl PvsSearcher {
             .filter(|p| !elim.contains(*p) && has_pieces(board, *p))
             .count();
         if alive_cnt <= 1 {
-            return if player == self.ai_player { i32::MAX - 1000 } else { i32::MIN + 1000 };
+            // AI获胜→返回MIN→调用者取反→MAX→AI看好棋
+            return i32::MIN + 1000;
         }
-        if depth >= 8 { return eval_board(board, player, 0, self.use_ml_eval); }
+        // QSearch 最多 3 层（防长链爆炸耗死）
+        if depth >= 3 { return eval_board(board, player, 0, self.use_ml_eval); }
         let stand_pat = eval_board(board, player, 0, self.use_ml_eval);
         if stand_pat >= beta { return beta; }
         let mut alpha = if stand_pat > alpha { stand_pat } else { alpha };
@@ -1367,19 +1369,19 @@ impl PvsSearcher {
             .filter(|p| !elim.contains(*p) && has_pieces(board, *p))
             .count();
         if alive_cnt <= 1 {
-            return if player == self.ai_player { i32::MAX - 1000 } else { i32::MIN + 1000 };
+            // AI获胜→返回MIN→调用者取反→MAX→AI看好棋
+            return i32::MIN + 1000;
         }
         if depth == 0 {
             if use_qsearch {
                 return self.quiescence(board, sz, player, max_players, elim, alpha, beta, 0);
-            } else {
-                return eval_board(board, player, 0, self.use_ml_eval);
             }
+            return eval_board(board, player, 0, self.use_ml_eval);
         }
 
         let moves = self.get_moves_ordered(board, sz, player, depth);
         // 深层少分支，浅层多分支
-        let max_branch = moves.len().min(10 + (4usize).saturating_sub(depth) * 2);
+        let max_branch = moves.len().min(8usize + (3usize).saturating_sub(depth) * 3);
         if max_branch == 0 { return eval_board(board, player, 0, self.use_ml_eval); }
 
         let mut best_score = i32::MIN + 1;
@@ -1430,29 +1432,16 @@ impl PvsSearcher {
             return first_move_center(board, sz);
         }
 
-        let max_branch = ordered.len().min((sz as f64 * 1.8) as usize).min(16);
         let elim_root = ElimSet::from_slice(eliminated);
+        // 根层走法限制
+        let root_limit = ordered.len().min(10usize.saturating_add(depth.saturating_sub(1) * 2));
+        if root_limit == 0 { return ordered.into_iter().next(); }
 
-        // ─── Warmup: 用搜索深度的一半做预热 ───
-        let warmup_n = max_branch.min(4);
-        let warm_depth = (depth / 2).max(1);
-        if warm_depth > 0 {
-            for &m in ordered[..warmup_n].iter() {
-                let mut child = board.clone();
-                let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players);
-                let mut child_elim = elim_root;
-                for &e in &new_elim { child_elim.add(e); }
-                let next = next_live_player_es(&child, sz, player, child_elim, max_players);
-                self.pvs(&child, sz, next, max_players, child_elim, warm_depth, i32::MIN + 1, i32::MAX - 1, false);
-            }
-        }
-
-        // 快照预热后的 killer/history（Copy 类型，闭包按值捕获）
-        let base_killers = self.killers;
-        let base_history = self.history;
-
-        // ─── 根级并行搜索（每个分支自带预热数据） ───
-        let results: Vec<_> = ordered[..max_branch]
+        // ─── 根级并行搜索（每个分支独立 killer/history） ───
+        let ai_player = self.ai_player;
+        let gc = self.game_count;
+        let ml = self.use_ml_eval;
+        let results: Vec<_> = ordered[..root_limit]
             .par_iter()
             .map(|&m| {
                 let mut child = board.clone();
@@ -1461,17 +1450,11 @@ impl PvsSearcher {
                 for &e in &new_elim { child_elim.add(e); }
                 let next = next_live_player_es(&child, sz, player, child_elim, max_players);
 
-                let mut searcher = PvsSearcher {
-                    game_count: self.game_count,
-                    killers: base_killers,
-                    history: base_history,
-                    ai_player: player,
-                    use_ml_eval: self.use_ml_eval,
-                };
+                let mut searcher = PvsSearcher::new(ai_player, gc, ml);
                 let score = if depth > 0 {
-                    -searcher.pvs(&child, sz, next, max_players, child_elim, depth - 1, i32::MIN + 1, i32::MAX - 1, true)
+                    -searcher.pvs(&child, sz, next, max_players, child_elim, depth - 1, i32::MIN + 1, i32::MAX - 1, false)
                 } else {
-                    eval_board(&child, player, 0, self.use_ml_eval)
+                    eval_board(&child, player, 0, ml)
                 };
                 (score, m)
             })

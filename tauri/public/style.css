@@ -517,15 +517,15 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .p9{background:#5D6D7E}
 
 /* about screen — 一级页 */
-#about.screen,#about-ai.screen,#about-changelog.screen,#about-license.screen{max-width:520px;gap:10px;padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(32px + env(safe-area-inset-bottom, 0px));height:100dvh;overflow:hidden;width:100%}
-#about.screen.active,#about-ai.screen.active,#about-changelog.screen.active,#about-license.screen.active{display:flex;flex-direction:column;align-items:center}
-#about .back,#about-ai .back,#about-changelog .back,#about-license .back{align-self:flex-start;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
-#about h2,#about-ai h2,#about-license h2{font-size:var(--text-2xl);font-weight:var(--weight-semibold);text-align:center;padding:4px 0 6px;flex-shrink:0;letter-spacing:1px}
-#about .about-scroll,#about-ai .about-scroll,#about-changelog .about-scroll,#about-license .about-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
-#about .about-scroll > * + *,#about-ai .about-scroll > * + *,#about-changelog .about-scroll > * + *,#about-license .about-scroll > * + *{margin-top:10px}
-#about .about-scroll::-webkit-scrollbar,#about-ai .about-scroll::-webkit-scrollbar,#about-changelog .about-scroll::-webkit-scrollbar,#about-license .about-scroll::-webkit-scrollbar{width:4px}
-#about .about-scroll::-webkit-scrollbar-track,#about-ai .about-scroll::-webkit-scrollbar-track,#about-changelog .about-scroll::-webkit-scrollbar-track,#about-license .about-scroll::-webkit-scrollbar-track{background:var(--glass-w-04);border-radius:2px}
-#about .about-scroll::-webkit-scrollbar-thumb,#about-ai .about-scroll::-webkit-scrollbar-thumb,#about-changelog .about-scroll::-webkit-scrollbar-thumb,#about-license .about-scroll::-webkit-scrollbar-thumb{background:var(--glass-w-10);border-radius:3px}
+#about.screen,#about-ai.screen,#about-benchmark.screen,#about-changelog.screen,#about-license.screen{max-width:520px;gap:10px;padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(32px + env(safe-area-inset-bottom, 0px));height:100dvh;overflow:hidden;width:100%}
+#about.screen.active,#about-ai.screen.active,#about-benchmark.screen.active,#about-changelog.screen.active,#about-license.screen.active{display:flex;flex-direction:column;align-items:center}
+#about .back,#about-ai .back,#about-benchmark .back,#about-changelog .back,#about-license .back{align-self:flex-start;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+#about h2,#about-ai h2,#about-benchmark h2,#about-license h2{font-size:var(--text-2xl);font-weight:var(--weight-semibold);text-align:center;padding:4px 0 6px;flex-shrink:0;letter-spacing:1px}
+#about .about-scroll,#about-ai .about-scroll,#about-benchmark .about-scroll,#about-changelog .about-scroll,#about-license .about-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
+#about .about-scroll > * + *,#about-ai .about-scroll > * + *,#about-benchmark .about-scroll > * + *,#about-changelog .about-scroll > * + *,#about-license .about-scroll > * + *{margin-top:10px}
+#about .about-scroll::-webkit-scrollbar,#about-ai .about-scroll::-webkit-scrollbar,#about-benchmark .about-scroll::-webkit-scrollbar,#about-changelog .about-scroll::-webkit-scrollbar,#about-license .about-scroll::-webkit-scrollbar{width:4px}
+#about .about-scroll::-webkit-scrollbar-track,#about-ai .about-scroll::-webkit-scrollbar-track,#about-benchmark .about-scroll::-webkit-scrollbar-track,#about-changelog .about-scroll::-webkit-scrollbar-track,#about-license .about-scroll::-webkit-scrollbar-track{background:var(--glass-w-04);border-radius:2px}
+#about .about-scroll::-webkit-scrollbar-thumb,#about-ai .about-scroll::-webkit-scrollbar-thumb,#about-benchmark .about-scroll::-webkit-scrollbar-thumb,#about-changelog .about-scroll::-webkit-scrollbar-thumb,#about-license .about-scroll::-webkit-scrollbar-thumb{background:var(--glass-w-10);border-radius:3px}
 
 /* 信息行（键值对齐） */
 #about .about-info{background-image:var(--liquid-iris),var(--glass-w-10);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);box-shadow:var(--glass-shadow);position:relative}
@@ -535,12 +535,12 @@ body{padding-top:env(safe-area-inset-top,20px)}
 #about .info-val{color:var(--text)}
 
 /* 短内容卡片 */
-#about .about-card,#about-ai .about-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1)}
-#about .about-card h3{font-size:var(--text-lg);font-weight:var(--weight-bold);margin:0 0 8px;color:var(--accent);letter-spacing:.5px}
-#about .about-card p{font-size:var(--text-base);line-height:var(--leading-loose);color:var(--text);margin:0}
-#about .about-card ol{margin:4px 0 0;padding-left:16px}
-#about .about-card li{font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text);margin-bottom:3px}
-#about .about-card li:last-child{margin-bottom:0}
+#about .about-card,#about-ai .about-card,#about-benchmark .about-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1)}
+#about .about-card h3,#about-benchmark .about-card h3{font-size:var(--text-lg);font-weight:var(--weight-bold);margin:0 0 8px;color:var(--accent);letter-spacing:.5px}
+#about .about-card p,#about-benchmark .about-card p{font-size:var(--text-base);line-height:var(--leading-loose);color:var(--text);margin:0}
+#about .about-card ol,#about-benchmark .about-card ol{margin:4px 0 0;padding-left:16px}
+#about .about-card li,#about-benchmark .about-card li{font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text);margin-bottom:3px}
+#about .about-card li:last-child,#about-benchmark .about-card li:last-child{margin-bottom:0}
 
 /* 导航条目（指向二级页面，统一为 mode-card 风格） */
 #about .about-nav{background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:20px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:.35s cubic-bezier(.22,1,.36,1);touch-action:manipulation;min-height:56px}
