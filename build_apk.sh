@@ -8,8 +8,8 @@ set -e
 
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
-PRODUCT="连锁棋"
-VERSION="3.1.6"
+PRODUCT="chainchess"
+VERSION="3.1.7"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 
@@ -232,11 +232,46 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "  文件: ${OUTPUT}"
 echo "  大小: ${FILESIZE}"
   echo "  耗时: ${ELAPSED}s"
+
+# ── 步骤 4: 生成 update.json ──────────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  📄 生成 update.json"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+UPDATE_NOTES="${UPDATE_NOTES:-• 新增自动更新功能\n• 优化游戏体验\n• 修复已知问题}"
+APK_SIZE=$(stat -c%s "$OUTPUT" 2>/dev/null || echo 0)
+
+cat > release/update.json << UPDATEEOF
+{
+  "version": "${VERSION}",
+  "notes": "${UPDATE_NOTES}",
+  "pub_date": "$(date -u +%Y-%m-%dT00:00:00Z)",
+  "platforms": {
+    "linux": {
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v${VERSION}/${PRODUCT}-${VERSION}.AppImage",
+      "size": 0
+    },
+    "android": {
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v${VERSION}/${PRODUCT}-${VERSION}.apk",
+      "size": ${APK_SIZE}
+    }
+  }
+}
+UPDATEEOF
+
+echo "  已生成: release/update.json"
+echo "  版本: ${VERSION}"
+echo "  大小: ${APK_SIZE} bytes"
+echo ""
+echo "  📌 上传到 Gitee Release 前请确认："
+echo "     1. release/update.json → 提交到 chain-chess-release 仓库 main 分支"
+echo "     2. ${OUTPUT##release/} → 上传到 Gitee Release 附件"
 echo ""
 
 # 尝试复制到 Android 设备（仅当路径存在时）
 if [ -d "/storage/emulated/0/用户" ]; then
-  cp -r release README.md LICENSE /storage/emulated/0/用户/
+  cp -r release /storage/emulated/0/用户/
   echo "  📱 已复制到 /storage/emulated/0/用户/"
 fi
 

@@ -11,6 +11,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use alpha_beta_pruning::{AlphaBeta, Grade};
+#[cfg(not(target_os = "android"))]
 use semver::Version;
 
 // ─── Board types ───
@@ -527,6 +528,7 @@ async fn export_game_history_dialog(
 
 // ─── Auto Update ───
 
+#[cfg(not(target_os = "android"))]
 const UPDATE_URL: &str = "https://gitee.com/ywnh1/chain-chess-release/raw/main/update.json";
 
 #[derive(Clone, Serialize)]
@@ -539,7 +541,8 @@ struct UpdateInfo {
     error: Option<String>,
 }
 
-/// 检查是否有新版本可用
+/// 检查是否有新版本可用（桌面端用 reqwest）
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, String> {
     let current_ver = app_handle.config().version.clone().unwrap_or_else(|| "0.0.0".into());
@@ -569,13 +572,8 @@ async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, String
         .to_string();
     let notes = update_data["notes"].as_str().unwrap_or("").to_string();
 
-    // 根据当前平台选择下载链接
-    let platform_key = if cfg!(target_os = "android") {
-        "android"
-    } else {
-        "linux"
-    };
-    let url = update_data["platforms"][platform_key]["url"]
+    // 桌面端用 linux 平台的 URL
+    let url = update_data["platforms"]["linux"]["url"]
         .as_str()
         .unwrap_or("")
         .to_string();
@@ -584,10 +582,9 @@ async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, String
         Version::parse(&current_ver),
         Version::parse(&remote_version),
     ) {
-        (Ok(current), Ok(remote)) => remote > current,
+        (Ok(current), Ok(remote)) => remote >= current,
         _ => {
-            // 无法解析版本号时做字符串比较
-            remote_version != current_ver && !remote_version.is_empty()
+            !remote_version.is_empty()
         }
     };
 
@@ -600,10 +597,17 @@ async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, String
     })
 }
 
-/// 下载更新文件到应用数据目录
+/// Android 端更新检查由前端 JS fetch() 处理
+#[cfg(target_os = "android")]
+#[tauri::command]
+async fn check_update(_app_handle: tauri::AppHandle) -> Result<UpdateInfo, String> {
+    Err("请使用前端 JS 检查更新".into())
+}
+
+/// 下载更新文件（桌面端用 reqwest 下载到应用数据目录）
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 async fn download_update(url: String, app_handle: tauri::AppHandle) -> Result<String, String> {
-    // 获取文件名
     let filename = url
         .rsplit('/')
         .next()
@@ -618,7 +622,6 @@ async fn download_update(url: String, app_handle: tauri::AppHandle) -> Result<St
     fs::create_dir_all(&download_dir).map_err(|e| format!("创建下载目录失败: {}", e))?;
     let filepath = download_dir.join(filename);
 
-    // 下载文件
     let response = reqwest::get(&url)
         .await
         .map_err(|e| format!("下载失败: {}", e))?;
@@ -632,7 +635,6 @@ async fn download_update(url: String, app_handle: tauri::AppHandle) -> Result<St
         .await
         .map_err(|e| format!("读取响应失败: {}", e))?;
 
-    // 原子写入：先写临时文件再重命名
     let tmp_path = filepath.with_extension("tmp");
     fs::write(&tmp_path, &bytes).map_err(|e| format!("写入文件失败: {}", e))?;
     fs::rename(&tmp_path, &filepath).map_err(|e| format!("重命名失败: {}", e))?;
@@ -640,12 +642,23 @@ async fn download_update(url: String, app_handle: tauri::AppHandle) -> Result<St
     Ok(filepath.to_string_lossy().to_string())
 }
 
-/// 安装/打开已下载的更新文件
+/// Android 端下载：直接打开系统浏览器让用户手动下载
+#[cfg(target_os = "android")]
+#[tauri::command]
+async fn download_update(url: String, app_handle: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_opener::OpenerExt;
+    app_handle
+        .opener()
+        .open_url(&url, None::<&str>)
+        .map_err(|e| format!("打开浏览器失败: {}", e))?;
+    Ok(url)
+}
+
+/// 安装/打开已下载的更新文件（通用——所有平台）
 #[tauri::command]
 async fn install_update(path: String, app_handle: tauri::AppHandle) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
 
-    // 用系统默认方式打开文件
     app_handle
         .opener()
         .open_path(&path, None::<&str>)
@@ -653,7 +666,6 @@ async fn install_update(path: String, app_handle: tauri::AppHandle) -> Result<()
 
     Ok(())
 }
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

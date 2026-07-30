@@ -1,6 +1,6 @@
 {
   "name": "tauri",
-  "version": "3.1.6",
+  "version": "3.1.7",
   "description": "连锁棋 - Tauri 桌面/移动端应用",
   "main": "index.js",
   "scripts": {

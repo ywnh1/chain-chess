@@ -33,11 +33,6 @@
   <div class="welcome-content">
     <div class="logo">♟<span>连锁棋</span></div>
     <div class="tagline">多人联手，一触即发</div>
-    <!-- 更新检查状态栏 -->
-    <div id="updateBar" class="update-bar" style="display:none">
-      <span id="updateStatus">检查更新中...</span>
-      <button id="updateBtn" class="update-btn" style="display:none" onclick="startUpdate()">下载更新</button>
-    </div>
     <button class="glass-btn primary start-btn" onclick="Router.navigate('gameSetup')">开始游戏</button>
     <div class="welcome-footer">
       <button onclick="Router.navigate('about')" class="glass-btn about-foot-btn">关于</button>
@@ -162,7 +157,7 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.1.6</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.1.7</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -523,6 +518,119 @@
   </div>
 </div>
 
+<script>
+<script>
+/* ─── Auto Update Check ─── */
+(function(){
+var CACHE_KEY = 'update_cache';
+var CACHE_TTL = 60 * 60 * 1000;
+var _updUrl = '';
+
+function closeUpdateModal() { try { document.getElementById('updateModal').classList.remove('show'); } catch(e) {} }
+
+function getCurVer() {
+  try { var el = document.querySelector('.info-val'); if (el) return el.textContent.replace('v', ''); } catch(e) {}
+  return '0.0.0';
+}
+
+function cmpVer(a, b) {
+  var pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+  for (var i = 0; i < Math.max(pa.length, pb.length); i++) {
+    var na = pa[i] || 0, nb = pb[i] || 0;
+    if (na !== nb) return na - nb;
+  }
+  return 0;
+}
+
+function backgroundCheck() {
+  try {
+    var c = JSON.parse(localStorage.getItem(CACHE_KEY));
+    if (c && c.checkedAt && (Date.now() - c.checkedAt < CACHE_TTL)) {
+      if (c.available) { showUpdateModal(c.version, c.notes, c.url); }
+      return;
+    }
+  } catch(e) {}
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'https://gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json?ref=main', true);
+  xhr.timeout = 15000;
+  xhr.onload = function() {
+    try {
+      if (xhr.status !== 200) return;
+      var r = xhr.responseText;
+      if (!r || r.charAt(0) === '<') return;
+      var a = JSON.parse(r);
+      if (!a.content || a.encoding !== 'base64') return;
+      var b64 = a.content; while (b64.length % 4) b64 += '=';
+      var d = JSON.parse(atob(b64));
+      if (!d || !d.version) return;
+      var cur = getCurVer();
+      var available = cmpVer(d.version, cur) > 0;
+      var url = (d.platforms && d.platforms.android && d.platforms.android.url) || '';
+      url = encodeURI(url);
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        checkedAt: Date.now(), available: available && !!url,
+        version: d.version, notes: d.notes || '', url: url
+      }));
+      if (available && url) showUpdateModal(d.version, d.notes || '', url);
+    } catch(e) {}
+  };
+  xhr.onerror = function() {};
+  xhr.ontimeout = function() {};
+  xhr.send();
+}
+
+function showUpdateModal(ver, notes, url) {
+  _updUrl = url;
+  var m = document.getElementById('updateModal');
+  if (!m) return;
+  m.classList.add('show');
+  document.getElementById('updateModalTitle').textContent = 'New version v' + ver + ' available';
+  document.getElementById('updateModalMsg').innerHTML = notes.replace(/\n/g, '<br>');
+  document.getElementById('updateModalConfirm').style.display = 'inline-block';
+  document.getElementById('updateModalConfirm').onclick = startDownload;
+  document.getElementById('updateModalCancel').style.display = 'inline-block';
+  document.getElementById('updateModalCancel').textContent = 'Later';
+}
+
+function startDownload() {
+  if (!_updUrl) return;
+  var p = document.getElementById('updateProgressWrap');
+  var b = document.getElementById('updateModalConfirm');
+  var c = document.getElementById('updateModalCancel');
+  b.style.display = 'none';
+  c.textContent = 'Downloading...';
+  p.style.display = 'block';
+  document.getElementById('updateProgressBar').style.width = '0%';
+  document.getElementById('updateProgressText').textContent = 'Starting...';
+  document.getElementById('updateModalTitle').textContent = 'Downloading...';
+  document.getElementById('updateModalMsg').textContent = 'Opening download link...';
+
+  var invoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
+  if (invoke) {
+    invoke('download_update', { url: _updUrl }).then(function() {
+      document.getElementById('updateProgressBar').style.width = '100%';
+      document.getElementById('updateProgressText').textContent = 'Done';
+      document.getElementById('updateModalTitle').textContent = 'Download link opened';
+      document.getElementById('updateModalMsg').textContent = 'Please complete installation in your browser';
+      c.style.display = 'none';
+      setTimeout(closeUpdateModal, 4000);
+    }).catch(function() {
+      document.getElementById('updateModalTitle').textContent = 'Download failed';
+      document.getElementById('updateModalMsg').textContent = 'Failed to open link, please try again later';
+      p.style.display = 'none';
+    });
+  } else {
+    p.style.display = 'none';
+    document.getElementById('updateModalTitle').textContent = 'Test mode';
+    document.getElementById('updateModalMsg').textContent = 'Non-Tauri environment, build APK to test';
+    c.textContent = 'Close';
+  }
+}
+
+backgroundCheck();
+})();
+</script>
 <script src="app.js"></script>
 </body>
 </html>
