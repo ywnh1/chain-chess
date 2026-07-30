@@ -19,6 +19,10 @@ use std::time::Instant;
 use serde::Deserialize;
 use chain_chess_lib::*;
 
+use chain_chess_lib::BorderMode;
+
+const BORDER_MODE: BorderMode = BorderMode::Default;
+
 /// AI 选手配置（来自 JSON）
 #[derive(Deserialize, Clone)]
 struct AiPlayerConfig {
@@ -68,10 +72,11 @@ fn play_game(
         let chosen = find_best_move_by_alg(
             &board, board_size, cur_player, cfg,
             &eliminated, max_players, game_id, None,
+            BORDER_MODE,
         );
 
         let (mx, my) = chosen.unwrap_or_else(|| legal_moves[0]);
-        let (new_elim, _) = process_click(&mut board, board_size, mx, my, cur_player, max_players);
+        let (new_elim, _) = process_click(&mut board, board_size, mx, my, cur_player, max_players, BORDER_MODE);
         for &e in &new_elim {
             if !eliminated.contains(&e) { eliminated.push(e); }
         }

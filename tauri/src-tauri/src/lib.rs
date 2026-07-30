@@ -14,6 +14,18 @@ use alpha_beta_pruning::{AlphaBeta, Grade};
 
 // ─── Board types ───
 
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+pub enum BorderMode {
+    #[serde(rename = "default")]
+    Default,
+    #[serde(rename = "wrap")]
+    Wrap,
+    #[serde(rename = "bounce")]
+    Bounce,
+    #[serde(rename = "degrade")]
+    Degrade,
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct Cell {
     pub owner: Option<usize>,
@@ -120,10 +132,11 @@ async fn process_move(
     y: usize,
     player: usize,
     max_players: usize,
+    border_mode: BorderMode,
 ) -> Result<ProcessMoveResult, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut b = board.clone();
-        let (eliminated, chain_count) = process_click(&mut b, size, x, y, player, max_players);
+        let (eliminated, chain_count) = process_click(&mut b, size, x, y, player, max_players, border_mode);
         let game_over = eliminated.len() >= max_players.saturating_sub(1);
         let winner = if game_over {
             // find the remaining player
@@ -156,12 +169,13 @@ async fn ai_move(
     depth: usize,
     eliminated: Vec<usize>,
     max_players: usize,
+    border_mode: BorderMode,
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
     use_ml_eval: bool,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval)
+        find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval, border_mode)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -181,6 +195,7 @@ async fn ai_move_v2(
     depth: usize,
     eliminated: Vec<usize>,
     max_players: usize,
+    border_mode: BorderMode,
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
     algorithm: String,
@@ -189,11 +204,11 @@ async fn ai_move_v2(
     let result = tauri::async_runtime::spawn_blocking(move || {
         if algorithm == "pvs" {
             // PVS (NegaMax) + Killer/History + QSearch
-            let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval);
+            let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval, border_mode);
             searcher.find_best(&board, size, player, max_players, &eliminated, depth)
         } else {
             // 默认使用 Alpha-Beta（原 find_best_move）
-            find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval)
+            find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval, border_mode)
         }
     })
     .await
@@ -212,11 +227,12 @@ async fn ai_move_strategy(
     player: usize,
     eliminated: Vec<usize>,
     max_players: usize,
+    border_mode: BorderMode,
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        find_best_move_strategy(&board, size, player, &eliminated, max_players, game_count, first_move_pos)
+        find_best_move_strategy(&board, size, player, &eliminated, max_players, game_count, first_move_pos, border_mode)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -236,9 +252,10 @@ async fn ai_move_mcts(
     depth: usize,
     eliminated: Vec<usize>,
     max_players: usize,
+    border_mode: BorderMode,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        find_best_move_mcts(&board, size, player, depth, &eliminated, max_players)
+        find_best_move_mcts(&board, size, player, depth, &eliminated, max_players, border_mode)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -728,11 +745,11 @@ pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usi
 }
 
 /// 调度器：根据 per-AI 配置调用 ML 或手写评估
-pub fn eval_board(board: &GameBoard, player: usize, game_count: u32, use_ml_eval: bool) -> i32 {
+pub fn eval_board(board: &GameBoard, player: usize, game_count: u32, use_ml_eval: bool, border_mode: BorderMode) -> i32 {
     if use_ml_eval {
-        eval_board_ml(board, player, game_count)
+        eval_board_ml(board, player, game_count, border_mode)
     } else {
-        eval_board_handcraft(board, player, game_count)
+        eval_board_handcraft(board, player, game_count, border_mode)
     }
 }
 
@@ -746,7 +763,7 @@ pub fn xgb_predict(engine: &XGBoostEngine, feats: &[f32; FEAT_DIM]) -> (f32, f32
 
 /// 增强版评估函数：在原手写评估基础上加入位置权重、邻居威胁、爆发势能
 /// 深度优化——单次遍历，零额外 Vec 分配
-pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32) -> i32 {
+pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, border_mode: BorderMode) -> i32 {
     let sz = board.len();
     let cx = (sz as f64 - 1.0) * 0.5;
     let mut my_score = 0i32;
@@ -775,7 +792,7 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32) ->
                     if cell.count >= 3 { my_chain_threat += (cell.count as i32) * 5; }
                     else if cell.count >= 2 { my_chain_threat += 2; }
                     // 邻居对手计数：己方高级棋子靠近对手 = 爆发势能
-                    let nbrs = nbrs(i, j, sz);
+                    let nbrs = nbrs_with_mode(i, j, sz, border_mode);
                     for &(ni, nj) in &nbrs {
                         let nc = &board[ni][nj];
                         if nc.owner.is_some() && nc.owner != Some(player) {
@@ -789,7 +806,7 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32) ->
                     opp_pos_bonus += pos_val;
                     if cell.count >= 3 { opp_chain_threat += (cell.count as i32) * 5; }
                     else if cell.count >= 2 { opp_chain_threat += 2; }
-                    let nbrs = nbrs(i, j, sz);
+                    let nbrs = nbrs_with_mode(i, j, sz, border_mode);
                     for &(ni, nj) in &nbrs {
                         let nc = &board[ni][nj];
                         if nc.owner == Some(player) {
@@ -833,14 +850,14 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32) ->
     }
 }
 
-fn eval_board_ml(board: &GameBoard, player: usize, game_count: u32) -> i32 {
+fn eval_board_ml(board: &GameBoard, player: usize, game_count: u32, border_mode: BorderMode) -> i32 {
     let engine = xgb_engine();
     let feats = extract_features_improved(board, player, max_players_for(board));
     let (raw_score, _prob) = engine.predict(&feats);
     // XGBoost log-odds (~[-30,30]) 缩放到搜索敏感量级
     let ml_score = (raw_score * 12.0) as i32;
     // 与手写评估混合（2/3 ML + 1/3 手写），兼顾 ML 的深度学习与手写的稳定边界
-    let hand_score = eval_board_improved(board, player, game_count);
+    let hand_score = eval_board_improved(board, player, game_count, border_mode);
     (ml_score * 2 + hand_score) / 3
 }
 
@@ -868,6 +885,23 @@ fn nbrs(i: usize, j: usize, sz: usize) -> Vec<(usize, usize)> {
     if j > 0 { r.push((i, j - 1)); }
     if j + 1 < sz { r.push((i, j + 1)); }
     r
+}
+
+/// 回环边界邻居：四个方向全部回环
+fn nbrs_wrap(i: usize, j: usize, sz: usize) -> Vec<(usize, usize)> {
+    let up = if i == 0 { sz - 1 } else { i - 1 };
+    let down = if i + 1 >= sz { 0 } else { i + 1 };
+    let left = if j == 0 { sz - 1 } else { j - 1 };
+    let right = if j + 1 >= sz { 0 } else { j + 1 };
+    vec![(up, j), (down, j), (i, left), (i, right)]
+}
+
+/// 根据边界模式选择邻居函数
+fn nbrs_with_mode(i: usize, j: usize, sz: usize, border_mode: BorderMode) -> Vec<(usize, usize)> {
+    match border_mode {
+        BorderMode::Wrap => nbrs_wrap(i, j, sz),
+        _ => nbrs(i, j, sz),
+    }
 }
 
 
@@ -899,7 +933,7 @@ fn is_in_any_restricted_zone(board: &GameBoard, sz: usize, x: usize, y: usize) -
     false
 }
 
-pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize, _max_players: usize) -> (Vec<usize>, u32) {
+pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize, _max_players: usize, border_mode: BorderMode) -> (Vec<usize>, u32) {
     // collect owners before
     let before: HashSet<usize> = board
         .iter()
@@ -927,15 +961,76 @@ pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, playe
     let mut chain: VecDeque<(usize, usize)> = VecDeque::new();
     chain.push_back((x, y));
     let mut chain_count: u32 = 0;
+
     while let Some((cx, cy)) = chain.pop_front() {
-        if board[cx][cy].count >= 4 {
+        // 降级边界模式：角上阈值=2，边上阈值=3，中央阈值=4
+        let threshold = match border_mode {
+            BorderMode::Degrade => {
+                let on_corner = (cx == 0 || cx == sz-1) && (cy == 0 || cy == sz-1);
+                let on_edge = cx == 0 || cx == sz-1 || cy == 0 || cy == sz-1;
+                if on_corner { 2 } else if on_edge { 3 } else { 4 }
+            }
+            _ => 4,
+        };
+
+        if board[cx][cy].count >= threshold {
+            let owner = board[cx][cy].owner.unwrap();
             board[cx][cy].count = 0;
             board[cx][cy].owner = None;
             chain_count += 1;
-            for (nx, ny) in nbrs(cx, cy, sz) {
-                board[nx][ny].owner = Some(player);
-                board[nx][ny].count = board[nx][ny].count.saturating_add(1);
-                chain.push_back((nx, ny));
+
+            match border_mode {
+                BorderMode::Wrap => {
+                    // 回环边界：向四个方向爆炸，边界处回环到对面
+                    let up = if cx == 0 { sz - 1 } else { cx - 1 };
+                    let down = if cx + 1 >= sz { 0 } else { cx + 1 };
+                    let left = if cy == 0 { sz - 1 } else { cy - 1 };
+                    let right = if cy + 1 >= sz { 0 } else { cy + 1 };
+                    for &(nx, ny) in &[(up, cy), (down, cy), (cx, left), (cx, right)] {
+                        board[nx][ny].owner = Some(owner);
+                        board[nx][ny].count = board[nx][ny].count.saturating_add(1);
+                        chain.push_back((nx, ny));
+                    }
+                }
+                BorderMode::Bounce => {
+                    // 反弹边界：出界的爆炸能量反弹到正对的邻居上
+                    // 方向排列：[上, 下, 左, 右]，方向对：0↔1 (上下)，2↔3 (左右)
+                    let dirs = [
+                        (cx.wrapping_sub(1), cy),
+                        (cx + 1, cy),
+                        (cx, cy.wrapping_sub(1)),
+                        (cx, cy + 1),
+                    ];
+                    let opposite = [1usize, 0, 3, 2];
+                    let mut has_valid = false;
+                    // 第一遍：所有有效方向 + 基础能量 1
+                    for &(nx, ny) in &dirs {
+                        if nx < sz && ny < sz {
+                            has_valid = true;
+                            board[nx][ny].owner = Some(owner);
+                            board[nx][ny].count = board[nx][ny].count.saturating_add(1);
+                            chain.push_back((nx, ny));
+                        }
+                    }
+                    if !has_valid { continue; }
+                    // 第二遍：出界方向的能量反弹到正对方向（额外 +1）
+                    for (i, &(nx, ny)) in dirs.iter().enumerate() {
+                        if nx >= sz || ny >= sz {
+                            let (ox, oy) = dirs[opposite[i]];
+                            if ox < sz && oy < sz {
+                                board[ox][oy].count = board[ox][oy].count.saturating_add(1);
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    // 默认边界 / 降级边界：标准邻居扩散
+                    for (nx, ny) in nbrs(cx, cy, sz) {
+                        board[nx][ny].owner = Some(owner);
+                        board[nx][ny].count = board[nx][ny].count.saturating_add(1);
+                        chain.push_back((nx, ny));
+                    }
+                }
             }
         }
     }
@@ -950,7 +1045,7 @@ pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, playe
     (before.difference(&after).copied().collect(), chain_count)
 }
 
-pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32) -> i32 {
+pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, _border_mode: BorderMode) -> i32 {
     let mut my_score = 0i32;
     let mut opp_score = 0i32;
     let mut my_territory = 0i32;
@@ -1072,6 +1167,7 @@ struct GameState {
     max_players: usize,
     game_count: u32,
     use_ml_eval: bool,
+    border_mode: BorderMode,
 }
 
 impl AlphaBeta<(usize, usize)> for GameState {
@@ -1087,7 +1183,7 @@ impl AlphaBeta<(usize, usize)> for GameState {
             return Grade::Max;
         }
         // 非终局：按点数和棋子数打分
-        Grade::Score(eval_board(&self.board, self.ai_player, self.game_count, self.use_ml_eval) as i64)
+        Grade::Score(eval_board(&self.board, self.ai_player, self.game_count, self.use_ml_eval, self.border_mode) as i64)
     }
     fn get_moves(&self) -> Vec<(usize, usize)> {
         get_moves(&self.board, self.sz, self.player, None)
@@ -1095,7 +1191,7 @@ impl AlphaBeta<(usize, usize)> for GameState {
 
     fn set(&mut self, m: &(usize, usize)) {
         let (x, y) = *m;
-        let (elim, _chain) = process_click(&mut self.board, self.sz, x, y, self.player, self.max_players);
+        let (elim, _chain) = process_click(&mut self.board, self.sz, x, y, self.player, self.max_players, self.border_mode);
         for &e in &elim {
             if !self.eliminated.contains(&e) {
                 self.eliminated.push(e);
@@ -1234,16 +1330,18 @@ struct PvsSearcher {
     history: [[i32; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
     ai_player: usize,
     use_ml_eval: bool,
+    border_mode: BorderMode,
 }
 
 impl PvsSearcher {
-    fn new(ai_player: usize, game_count: u32, use_ml_eval: bool) -> Self {
+    fn new(ai_player: usize, game_count: u32, use_ml_eval: bool, border_mode: BorderMode) -> Self {
         Self {
             game_count,
             killers: [[None; PVS_MAX_DEPTH]; 2],
             history: [[0; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
             ai_player,
             use_ml_eval,
+            border_mode,
         }
     }
 
@@ -1318,8 +1416,8 @@ impl PvsSearcher {
             return i32::MIN + 1000;
         }
         // QSearch 最多 3 层（防长链爆炸耗死）
-        if depth >= 3 { return eval_board(board, player, 0, self.use_ml_eval); }
-        let stand_pat = eval_board(board, player, 0, self.use_ml_eval);
+        if depth >= 3 { return eval_board(board, player, 0, self.use_ml_eval, self.border_mode); }
+        let stand_pat = eval_board(board, player, 0, self.use_ml_eval, self.border_mode);
         if stand_pat >= beta { return beta; }
         let mut alpha = if stand_pat > alpha { stand_pat } else { alpha };
 
@@ -1329,14 +1427,22 @@ impl PvsSearcher {
         let mut n = 0usize;
         for i in 0..sz { for j in 0..sz {
             let c = &board[i][j];
-            if c.owner == Some(player) && c.count >= 3 && c.count < 4 {
+            let on_corner_deg = (i == 0 || i == sz-1) && (j == 0 || j == sz-1);
+            let on_edge_deg = i == 0 || i == sz-1 || j == 0 || j == sz-1;
+            let min_explosive = match self.border_mode {
+                BorderMode::Degrade => {
+                    if on_corner_deg { 1 } else if on_edge_deg { 2 } else { 3 }
+                }
+                _ => 3,
+            };
+            if c.owner == Some(player) && c.count >= min_explosive && c.count < 4 {
                 if n < moves_buf.len() { moves_buf[n] = (i, j); n += 1; }
             }
         }}
 
         for &m in &moves_buf[..n] {
             let mut child = board.clone();
-            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players);
+            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode);
             let mut child_elim = elim;
             for &e in &new_elim { child_elim.add(e); }
             let next = next_live_player_es(&child, sz, player, child_elim, max_players);
@@ -1374,19 +1480,19 @@ impl PvsSearcher {
             if use_qsearch {
                 return self.quiescence(board, sz, player, max_players, elim, alpha, beta, 0);
             }
-            return eval_board(board, player, 0, self.use_ml_eval);
+            return eval_board(board, player, 0, self.use_ml_eval, self.border_mode);
         }
 
         let moves = self.get_moves_ordered(board, sz, player, depth);
         // 深层少分支，浅层多分支
         let max_branch = moves.len().min(8usize + (3usize).saturating_sub(depth) * 3);
-        if max_branch == 0 { return eval_board(board, player, 0, self.use_ml_eval); }
+        if max_branch == 0 { return eval_board(board, player, 0, self.use_ml_eval, self.border_mode); }
 
         let mut best_score = i32::MIN + 1;
 
         for (idx, &m) in moves[..max_branch].iter().enumerate() {
             let mut child = board.clone();
-            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players);
+            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode);
             let mut child_elim = elim;
             for &e in &new_elim { child_elim.add(e); }
             let next = next_live_player_es(&child, sz, player, child_elim, max_players);
@@ -1439,20 +1545,21 @@ impl PvsSearcher {
         let ai_player = self.ai_player;
         let gc = self.game_count;
         let ml = self.use_ml_eval;
+        let bm = self.border_mode;
         let results: Vec<_> = ordered[..root_limit]
             .par_iter()
             .map(|&m| {
                 let mut child = board.clone();
-                let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players);
+                let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode);
                 let mut child_elim = elim_root;
                 for &e in &new_elim { child_elim.add(e); }
                 let next = next_live_player_es(&child, sz, player, child_elim, max_players);
 
-                let mut searcher = PvsSearcher::new(ai_player, gc, ml);
+                let mut searcher = PvsSearcher::new(ai_player, gc, ml, bm);
                 let score = if depth > 0 {
                     -searcher.pvs(&child, sz, next, max_players, child_elim, depth - 1, i32::MIN + 1, i32::MAX - 1, false)
                 } else {
-                    eval_board(&child, player, 0, ml)
+                    eval_board(&child, player, 0, ml, bm)
                 };
                 (score, m)
             })
@@ -1526,10 +1633,11 @@ struct MctsTree {
     max_players: usize,
     ai_player: usize,
     max_nodes: usize,
+    border_mode: BorderMode,
 }
 
 impl MctsTree {
-    fn new(board: GameBoard, eliminated: Vec<usize>, player: usize, sz: usize, max_players: usize, ai_player: usize, max_nodes: usize) -> Self {
+    fn new(board: GameBoard, eliminated: Vec<usize>, player: usize, sz: usize, max_players: usize, ai_player: usize, max_nodes: usize, border_mode: BorderMode) -> Self {
         Self {
             visits: vec![0],
             wins: vec![0.0],
@@ -1541,6 +1649,7 @@ impl MctsTree {
             max_players,
             ai_player,
             max_nodes,
+            border_mode,
         }
     }
 
@@ -1604,7 +1713,7 @@ impl MctsTree {
         // 应用走法得到新状态
         let mut new_board = self.boards[node].clone();
         let mut new_elim = self.eliminateds[node].clone();
-        let (new_elim_players, _) = process_click(&mut new_board, self.sz, mx, my, self.players[node], self.max_players);
+        let (new_elim_players, _) = process_click(&mut new_board, self.sz, mx, my, self.players[node], self.max_players, self.border_mode);
         for &e in &new_elim_players {
             if !new_elim.contains(&e) { new_elim.push(e); }
         }
@@ -1649,6 +1758,7 @@ impl MctsTree {
         let score = mcts_playout(
             &self.boards[leaf], self.sz, self.players[leaf],
             &self.eliminateds[leaf], self.max_players, self.ai_player, rng,
+            self.border_mode,
         );
 
         // 3) BACKPROPAGATE
@@ -1669,6 +1779,7 @@ fn mcts_playout(
     max_players: usize,
     ai_player: usize,
     rng: &mut XorShift,
+    border_mode: BorderMode,
 ) -> f64 {
     let mut b = board.clone();
     let mut elim = eliminated.to_vec();
@@ -1690,7 +1801,7 @@ fn mcts_playout(
 
         let idx = rng.next_usize(moves.len());
         let (x, y) = moves[idx];
-        let (new_elim, _) = process_click(&mut b, sz, x, y, cur, max_players);
+        let (new_elim, _) = process_click(&mut b, sz, x, y, cur, max_players, border_mode);
         for &e in &new_elim {
             if !elim.contains(&e) { elim.push(e); }
         }
@@ -1725,6 +1836,7 @@ fn mcts_search(
     iterations: usize,
     eliminated: &[usize],
     max_players: usize,
+    border_mode: BorderMode,
     first_move_pos: Option<(usize, usize)>,
 ) -> Option<(usize, usize)> {
     let all_moves = get_moves(board, sz, ai_player, first_move_pos);
@@ -1748,14 +1860,14 @@ fn mcts_search(
         // 应用根走法得到子树根状态
         let mut b = board.clone();
         let mut elim = eliminated.to_vec();
-        let (new_elim, _) = process_click(&mut b, sz, mx, my, ai_player, max_players);
+        let (new_elim, _) = process_click(&mut b, sz, mx, my, ai_player, max_players, border_mode);
         for &e in &new_elim {
             if !elim.contains(&e) { elim.push(e); }
         }
         let next_p = next_live_player(&b, sz, ai_player, &elim, max_players);
 
         // 构建子树
-        let mut tree = MctsTree::new(b, elim, next_p, sz, max_players, ai_player, max_nodes);
+        let mut tree = MctsTree::new(b, elim, next_p, sz, max_players, ai_player, max_nodes, border_mode);
         let mut rng = XorShift::seed(rand::thread_rng().gen::<u64>());
 
         for _ in 0..iters_per {
@@ -1784,9 +1896,10 @@ pub fn find_best_move_mcts(
     depth: usize,  // 1~10，控制迭代次数
     eliminated: &[usize],
     max_players: usize,
+    border_mode: BorderMode,
 ) -> Option<(usize, usize)> {
     let iterations = depth.max(1) * MCTS_ITER_PER_DEPTH;
-    mcts_search(board, sz, player, iterations, eliminated, max_players, None)
+    mcts_search(board, sz, player, iterations, eliminated, max_players, border_mode, None)
 }
 
 /// 获取下一个活跃玩家（在 process_click 后调用）
@@ -1841,6 +1954,7 @@ pub fn find_best_move(
     game_count: u32,
     _first_move_pos: Option<[usize; 2]>,
     use_ml_eval: bool,
+    border_mode: BorderMode,
 ) -> Option<(usize, usize)> {
     let state = GameState {
         board: board.clone(),
@@ -1851,6 +1965,7 @@ pub fn find_best_move(
         max_players,
         game_count,
         use_ml_eval,
+        border_mode,
     };
     state.run(depth)
 }
@@ -1889,6 +2004,7 @@ pub fn find_best_move_strategy(
     _max_players: usize,
     _game_count: u32,
     _first_move_pos: Option<[usize; 2]>,
+    _border_mode: BorderMode,
 ) -> Option<(usize, usize)> {
     // 收集己方棋子
     let mut mine: Vec<(usize, usize)> = Vec::new();
@@ -2069,6 +2185,7 @@ struct StepRecord {
     turn: u32,
     size: usize,
     max_players: usize,
+    border_mode: BorderMode,
     board: GameBoard,
     cur_player: usize,
     move_x: usize,
@@ -2088,8 +2205,9 @@ pub fn find_best_move_pvs(
     max_players: usize,
     game_count: u32,
     use_ml_eval: bool,
+    border_mode: BorderMode,
 ) -> Option<(usize, usize)> {
-    let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval);
+    let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval, border_mode);
     searcher.find_best(board, sz, player, max_players, eliminated, depth)
 }
 
@@ -2102,19 +2220,20 @@ pub fn find_best_move_by_alg(
     max_players: usize,
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
+    border_mode: BorderMode,
 ) -> Option<(usize, usize)> {
     match config.algorithm.as_str() {
         "alphabeta" => {
-            find_best_move(board, sz, player, config.depth, eliminated, max_players, game_count, first_move_pos, config.use_ml_eval)
+            find_best_move(board, sz, player, config.depth, eliminated, max_players, game_count, first_move_pos, config.use_ml_eval, border_mode)
         }
         "pvs" => {
-            find_best_move_pvs(board, sz, player, config.depth, eliminated, max_players, game_count, config.use_ml_eval)
+            find_best_move_pvs(board, sz, player, config.depth, eliminated, max_players, game_count, config.use_ml_eval, border_mode)
         }
         "mcts" => {
-            find_best_move_mcts(board, sz, player, config.depth, eliminated, max_players)
+            find_best_move_mcts(board, sz, player, config.depth, eliminated, max_players, border_mode)
         }
         _ => {
-            find_best_move_strategy(board, sz, player, eliminated, max_players, game_count, first_move_pos)
+            find_best_move_strategy(board, sz, player, eliminated, max_players, game_count, first_move_pos, border_mode)
         }
     }
 }
@@ -2125,6 +2244,7 @@ pub fn generate_selfplay_data(
     num_games: u32,
     player_configs: &[PlayerAiConfig],
     output_path: &str,
+    border_mode: BorderMode,
 ) -> Result<u64, String> {
     use std::io::Write;
     use rand::Rng;
@@ -2179,6 +2299,7 @@ pub fn generate_selfplay_data(
             let chosen = find_best_move_by_alg(
                 &board, board_size, cur_player, config,
                 &eliminated, max_players, game_count, first_move_arr,
+                border_mode,
             );
 
             let (mx, my) = chosen.unwrap_or_else(|| {
@@ -2191,7 +2312,7 @@ pub fn generate_selfplay_data(
                 .filter(|p| !eliminated.contains(p) && has_pieces(&board, *p))
                 .collect();
 
-            let (new_elim, _chain_count) = process_click(&mut board, board_size, mx, my, cur_player, max_players);
+            let (new_elim, _chain_count) = process_click(&mut board, board_size, mx, my, cur_player, max_players, border_mode);
             for &e in &new_elim {
                 if !eliminated.contains(&e) { eliminated.push(e); }
             }
@@ -2213,6 +2334,7 @@ pub fn generate_selfplay_data(
                 cur_player, move_x: mx, move_y: my,
                 live_players: live_before,
                 eliminated: eliminated.clone(),
+                border_mode,
                 winner, game_over,
             };
 

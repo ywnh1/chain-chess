@@ -5,7 +5,7 @@ fn test_find_best_move_finds_valid_move() {
     // Empty board with one piece for player 0
     let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0 }; 7]; 7];
     b[3][3] = Cell { owner: Some(0), count: 1 };
-    let result = find_best_move(&b, 7, 0, 1, &[], 2, 10, None, false);
+    let result = find_best_move(&b, 7, 0, 1, &[], 2, 10, None, false, BorderMode::Default);
     assert!(result.is_some(), "AI should find a valid move at depth=1");
     let (x, y) = result.unwrap();
     assert!(x < 7 && y < 7);
@@ -17,7 +17,7 @@ fn test_find_best_move_finds_valid_move() {
 fn test_find_best_move_strategy_returns_something() {
     let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0 }; 5]; 5];
     b[2][2] = Cell { owner: Some(0), count: 3 };
-    let result = find_best_move_strategy(&b, 5, 0, &[], 2, 10, None);
+    let result = find_best_move_strategy(&b, 5, 0, &[], 2, 10, None, BorderMode::Default);
     assert!(result.is_some(), "Strategy AI should find a move");
     let (x, y) = result.unwrap();
     assert!(x < 5 && y < 5);

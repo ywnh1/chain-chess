@@ -26,6 +26,13 @@
 const COLORS=['#E74C3C','#F1C40F','#3498DB','#2ECC71','#9B59B6','#E91E63','#1ABC9C','#F39C12','#8B5E3C','#5D6D7E'];
 const COLORS_LIGHT=['rgba(231,76,60,.08)','rgba(241,196,15,.08)','rgba(52,152,219,.08)','rgba(46,204,113,.08)','rgba(155,89,182,.08)','rgba(233,30,99,.08)','rgba(26,188,156,.08)','rgba(243,156,18,.08)','rgba(139,94,60,.08)','rgba(93,109,126,.08)'];
 const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色','橙色','棕色','深灰色'];
+// 棋盘边界模式描述
+const BORDER_MODE_DESC = {
+  'default': '标准模式：达到 4 子即爆，边界处正常扩散',
+  'wrap': '回环模式：棋子达到 4 子即爆，爆炸会穿过边界到达对面，棋盘变成甜甜圈',
+  'bounce': '反弹模式：达到 4 子即爆，边界处能量反弹集中：边上出一颗二级棋子和两颗一级棋子，角上出两颗二级棋子',
+  'degrade': '降级模式：中央区域 4 子即爆，边界处降为 3 子即爆，角落处仅需 2 子即爆',
+};
 // 根据棋盘大小返回最大允许玩家人数
 function getMaxPlayersBySize(boardSize){
   if(boardSize===5)return 5;
@@ -98,6 +105,9 @@ let chainSkipAll=false;
 // 自动跳过连爆动画（持久开关，true=跳过所有连爆动画，false=行为不变）
 let autoSkipChain=false;
  
+// 棋盘边界模式
+let borderMode='default';
+
 // 首子落位（用于限制其他玩家落子）
 let firstMovePos=null;
 
@@ -144,6 +154,9 @@ document.addEventListener('click',function(e){
   // 触发副作用
   if(container.id==='setupSizeGrid'||container.id==='setupPlayersGroup'){
     setTimeout(setupLobbySync,10);
+  }else if(container.id==='borderModeGroup'){
+    const descEl=document.getElementById('borderModeDesc');
+    if(descEl&&BORDER_MODE_DESC[t.dataset.value]){descEl.textContent=BORDER_MODE_DESC[t.dataset.value];}
   }else if(t.classList.contains('size-btn')||t.classList.contains('gb'))setTimeout(setupLobbySync,10);
 });
 
@@ -909,6 +922,7 @@ function loadGameFromState(saved){
   gameCount = (saved.gameCount || 0) + 1;
   aiAlgorithm = saved.aiAlgorithm || "";
   aiDepth = saved.aiDepth || 0;
+  borderMode = saved.borderMode || "default";
 
   document.getElementById("pauseBtn").textContent = "暂停";
   _originPage = gameMode === "ai" ? "aiLobby" : (gameMode === "eve" ? "eveLobby" : "localLobby");
@@ -970,6 +984,7 @@ function saveCurrentGameState(historyOverride){
     chainStats: JSON.parse(JSON.stringify(chainStats || {})),
     maxChainOverall: maxChainOverall ? {...maxChainOverall} : {player:null,length:0},
     gameCount: gameCount || 0,
+    borderMode: borderMode || 'default',
     aiAlgorithm: aiAlgorithm || '',
     aiDepth: aiDepth || 0,
     colorNames: _colorNames || COLOR_NAMES,
@@ -1154,7 +1169,36 @@ function resetRoundHistory(){
   tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history failed:', e));
 }
 
-async function processClick(b,s,x,y,pl,anim,playerColor){
+
+// 边界模式感知的爆炸阈值
+function capForMode(i,j,sz,bm){
+  if(bm==='degrade'){
+    let onCorner=(i===0||i===sz-1)&&(j===0||j===sz-1);
+    let onEdge=i===0||i===sz-1||j===0||j===sz-1;
+    if(onCorner)return 2;
+    if(onEdge)return 3;
+  }
+  return 4;
+}
+
+// 边界模式感知的邻居函数
+function nbrsForMode(i,j,sz,bm){
+  if(bm==='wrap'){
+    let up=i===0?sz-1:i-1;
+    let down=i+1>=sz?0:i+1;
+    let left=j===0?sz-1:j-1;
+    let right=j+1>=sz?0:j+1;
+    return[[up,j],[down,j],[i,left],[i,right]];
+  }
+  let r=[];
+  if(i>0)r.push([i-1,j]);
+  if(i+1<sz)r.push([i+1,j]);
+  if(j>0)r.push([i,j-1]);
+  if(j+1<sz)r.push([i,j+1]);
+  return r;
+}
+
+async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
   let c=b[x][y];
   if(c.owner===null){
     let anyPieces=false;
@@ -1166,88 +1210,64 @@ async function processClick(b,s,x,y,pl,anim,playerColor){
   }
   else if(c.owner===pl)c.count++
   else return[];
+
+  // 如果有 Rust 结果，先保存最终棋盘用于最后矫正
+  let finalBoard = (rustResult && rustResult.board) ? rustResult.board : null;
+
   let had=new Set();
   for(let row of b)for(let cl of row)if(cl.owner!==null)had.add(cl.owner);
   let chain=[[x,y]];
   let chainCount=0;
+  let bm=borderMode||'default';
+  let animDelay=(anim==='explode')?220:0;
 
-  if(anim==='explode'){
-    // ★ 逐格爆炸动画：每次只炸一个格子，用户可跳过
-    chainSkipAll=false;
-    if(autoSkipChain)chainSkipAll=true;
-    if(!autoSkipChain)showSkipBtn(true);
-    while(chain.length){
-      if(chainSkipAll){
-        // 跳过剩余动画 → 一口气处理完
-        while(chain.length){
-          let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
-          if(cell.count>=capv){
-            cell.count=0;cell.owner=null;
-            chainCount++;
-            playExplosion();
-            const cl=cells?.[cx]?.[cy];
-            if(cl){addShockwave(cl,playerColor);addParticles(cl,playerColor,8)}
-            for(let[nx,ny]of nbrs(cx,cy,s)){
-              let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
-            }
-          }
-        }
-        break;
+  while(chain.length){
+    let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=capForMode(cx,cy,s,bm);
+    if(cell.count>=capv){
+      cell.count=0;cell.owner=null;
+      chainCount++;
+      if(anim){playExplosion();}
+      // 爆炸扩散到邻居（按边界模式）
+      for(let[nx,ny]of nbrsForMode(cx,cy,s,bm)){
+        let nc=b[nx][ny];nc.owner=pl;nc.count++;
+        chain.push([nx,ny]);
       }
-      let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
-      if(cell.count>=capv){
-        cell.count=0;cell.owner=null;
-        chainCount++;
-        playExplosion();
-        const el2=cells?.[cx]?.[cy];
-        if(el2){addShockwave(el2,playerColor);addParticles(el2,playerColor,8)}
-        for(let[nx,ny]of nbrs(cx,cy,s)){
-          let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
-        }
-        // 渲染当前棋盘 + 爆炸动画
-        renderBoard(true);
+      if(anim==='explode'){
         let el=cells?.[cx]?.[cy];
+        if(el){addShockwave(el,playerColor);addParticles(el,playerColor,8)}
+        renderBoard(true);
         if(el)el.classList.add('explode');
-        await sleep(220);
+        await sleep(animDelay);
         if(el)el.classList.remove('explode');
-      }
-    }
-    showSkipBtn(false);
-  }else{
-    // 原快速处理（非动画模式）
-    while(chain.length){
-      let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=cap(cx,cy,s);
-      if(cell.count>=capv){
-        cell.count=0;cell.owner=null;
-        chainCount++;
-        playExplosion();
-        for(let[nx,ny]of nbrs(cx,cy,s)){
-          let nc=b[nx][ny];nc.owner=pl;nc.count++;chain.push([nx,ny]);
-        }
-        if(anim&&!autoSkipChain){
-          let el=cells?.[cx]?.[cy];if(el)el.classList.add('explode');
-          renderBoard(false,anim==='pop'?cx:undefined);
-          await sleep(180);
-          if(el)el.classList.remove('explode');
-        }
-        else if(autoSkipChain&&anim){
-          // 自动跳过也要渲染棋盘
-          renderBoard(false);
-        }
+      }else if(anim){
+        let el=cells?.[cx]?.[cy];if(el)el.classList.add('explode');
+        renderBoard(false);
+        await sleep(150);
+        if(el)el.classList.remove('explode');
+      }else{
+        renderBoard(false);
       }
     }
   }
-  // 记录连爆统计
-  if(chainCount > 0){
-    if(!chainStats[pl]) chainStats[pl] = {triggered: 0, maxChain: 0};
-    chainStats[pl].triggered++;
-    if(chainCount > chainStats[pl].maxChain) chainStats[pl].maxChain = chainCount;
-    if(chainCount > maxChainOverall.length){
-      maxChainOverall = {player: pl, length: chainCount};
+
+  // 用 Rust 结果矫正本地棋盘（弥补前端简化模拟 vs 真实边界逻辑的偏差）
+  if(finalBoard){
+    for(let i=0;i<size;i++) for(let j=0;j<size;j++){
+      b[i][j]=finalBoard[i][j];
     }
+    if(!anim||chainCount===0)renderBoard(true);
+  }
+
+  // 记录连爆统计
+  if(chainCount>0){
+    if(!chainStats[pl]) chainStats[pl]={triggered:0,maxChain:0};
+    chainStats[pl].triggered++;
+    if(chainCount>chainStats[pl].maxChain) chainStats[pl].maxChain=chainCount;
+    if(chainCount>maxChainOverall.length) maxChainOverall={player:pl,length:chainCount};
   }
   let now=new Set();
   for(let row of b)for(let cl of row)if(cl.owner!==null)now.add(cl.owner);
+  if(finalBoard&&rustResult&&rustResult.eliminated)return rustResult.eliminated;
   return[...had].filter(p=>!now.has(p));
 }
 
@@ -1426,6 +1446,7 @@ async function triggerAI(){
     depth: dep,
     eliminated: [...eliminatedPlayers],
     maxPlayers: maxPlayers,
+    borderMode: borderMode,
     gameCount: gameCount,
     firstMovePos: firstMovePos,
     randomScale: randomScale,
@@ -1474,9 +1495,10 @@ async function triggerAI(){
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
-      player:curPlayer,maxPlayers:maxPlayers
+      player:curPlayer,maxPlayers:maxPlayers,
+      borderMode:borderMode
     });
-    elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
+    elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
     board=result.board;
     elim=result.eliminated||[];
   }catch(e){
@@ -1638,9 +1660,10 @@ async function replayAiMove(move){
   try{
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
-      player:curPlayer,maxPlayers:maxPlayers
+      player:curPlayer,maxPlayers:maxPlayers,
+      borderMode:borderMode
     });
-    elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer]);
+    elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer],result);
     board=result.board;
     elim=result.eliminated||[];
   }catch(e){
@@ -1741,18 +1764,13 @@ async function animateBoardDiff(oldBoard, newBoard, sz){
     }
   }
   if(changed.length===0){renderBoard(true);return}
-  chainSkipAll=false;
-  if(autoSkipChain){renderBoard(true);return}
-  showSkipBtn(true);
   for(let[cx,cy]of changed){
-    if(chainSkipAll)break;
     renderBoard(true);
     let el=cells?.[cx]?.[cy];
     if(el)el.classList.add('explode');
     await sleep(180);
     if(el)el.classList.remove('explode');
   }
-  showSkipBtn(false);
   renderBoard(true);
 }
 
@@ -1778,9 +1796,10 @@ async function localClick(x,y){
     try {
       let result=await tauriInvoke('process_move',{
         board:board,size:size,x:x,y:y,
-        player:curPlayer,maxPlayers:maxPlayers
+        player:curPlayer,maxPlayers:maxPlayers,
+        borderMode:borderMode
       });
-      elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
+      elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
       board=result.board;
       elim=result.eliminated||[];
     }catch(e){
@@ -1828,9 +1847,10 @@ async function localClick(x,y){
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
-      player:curPlayer,maxPlayers:maxPlayers
+      player:curPlayer,maxPlayers:maxPlayers,
+      borderMode:borderMode
     });
-    elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
+    elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
     board=result.board;
     elim=result.eliminated||[];
   }catch(e){
@@ -2715,6 +2735,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.1.5 · 第 28 版',desc:'新增3个棋盘模式，丰富游戏体验'},
     {v:'v3.1.4 · 第 27 版',desc:'排名列表UI优化：可点击详情弹窗、暂停/结算/历史三处排名、局内改名取消、按钮布局优化'},
     {v:'v3.1.3 · 第 26 版',desc:'修复历史记录无法保存（colorNames 类型不匹配导致 Rust 反序列化失败）、恢复后图表丢失、局内算法修改弹窗'},
     {v:'v3.1.2 · 第 25 版',desc:'PVS 绝杀修复（终局符号反转）、Killer/History 动态优化、QSearch 深度收窄至3层、warmup 移除、分支收紧、AI 战力评测页面（560局8选手）'},
@@ -2959,6 +2980,7 @@ function startLocalFromSetup(sz,cnt){
   resetRoundHistory();
   undoStack=[];
   size=sz;maxPlayers=cnt;
+  borderMode=getSelStr('borderModeGroup')||'default';
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='local';_originPage='gameSetup';
@@ -2976,7 +2998,7 @@ function startLocalFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
-  _lastGameConfig={mode:'local',size,maxPlayers,colorNames};
+  _lastGameConfig={mode:'local',size,maxPlayers,colorNames,borderMode};
 }
 function startAIFromSetup(sz,cnt){
   clearSavedGameState();
@@ -2984,6 +3006,7 @@ function startAIFromSetup(sz,cnt){
   resetRoundHistory();
   undoStack=[];
   size=sz;maxPlayers=cnt;
+  borderMode=getSelStr('borderModeGroup')||'default';
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='ai';_originPage='gameSetup';
@@ -3010,7 +3033,7 @@ function startAIFromSetup(sz,cnt){
   document.body.style.background='';
   renderPlayerBar();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames};
+  _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode};
 }
 function startEveFromSetup(sz,cnt){
   clearSavedGameState();
@@ -3018,6 +3041,7 @@ function startEveFromSetup(sz,cnt){
   resetRoundHistory();
   undoStack=[];
   size=sz;maxPlayers=cnt;
+  borderMode=getSelStr('borderModeGroup')||'default';
   board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='eve';_originPage='gameSetup';
@@ -3038,7 +3062,7 @@ function startEveFromSetup(sz,cnt){
   document.body.style.background='';
   renderPlayerBar();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames};
+  _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode};
 }
 window.addEventListener('popstate',()=>{
   const cur = Router._current;

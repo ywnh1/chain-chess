@@ -9,7 +9,7 @@ set -e
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="连锁棋"
-VERSION="3.1.4"
+VERSION="3.1.5"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 
@@ -70,18 +70,78 @@ CONFIG_EOF
   echo "  已创建: $CARGO_CONFIG"
   echo ""
 
-  # 注册清理函数：退出时删除配置（即使中途失败）
-  cleanup_native() {
-    if [ -f "$CARGO_CONFIG" ]; then
-      rm -f "$CARGO_CONFIG"
-      echo ""
-      echo "  🧹 已清理: $CARGO_CONFIG"
-    fi
-  }
-  trap cleanup_native EXIT
+  # 清理将在统一的 cleanup_all 中处理
 
   echo "  Tauri 将使用 NDK 链接器自动编译 Rust 库（带 native 优化）"
   echo ""
+fi
+
+# ── 自动清理 ──────────────────────────────────────────────
+# 统一退出清理：恢复被修改的配置文件
+APP_BUILD_GRADLE="tauri/src-tauri/gen/android/app/build.gradle.kts"
+cleanup_all() {
+  # 恢复 Gradle 编译配置（JDK 21 降级）
+  if [ -f "${APP_BUILD_GRADLE}.bak" ]; then
+    cp "${APP_BUILD_GRADLE}.bak" "$APP_BUILD_GRADLE"
+    rm -f "${APP_BUILD_GRADLE}.bak"
+    echo ""
+    echo "  🧹 已恢复: app/build.gradle.kts"
+  fi
+  # 清理 native 优化配置（--native 模式生成）
+  if [ -f "$CARGO_CONFIG" ]; then
+    rm -f "$CARGO_CONFIG"
+    echo ""
+    echo "  🧹 已清理: .cargo/config.toml"
+  fi
+}
+trap cleanup_all EXIT
+
+# ── Android SDK 版本检测与自动降级 ──────────────────────
+# build-tools 34 无法加载 android-35+ 的平台资源
+# 检测 compileSdk 是否超出 build-tools 兼容范围，是则自动降级到 34
+COMPILE_SDK=$(grep 'compileSdk =' "$APP_BUILD_GRADLE" | sed 's/.*compileSdk = \([0-9]*\).*/\1/')
+TARGET_SDK=$(grep 'targetSdk =' "$APP_BUILD_GRADLE" | sed 's/.*targetSdk = \([0-9]*\).*/\1/')
+SDK_DOWNGRADED=false
+
+if [ -n "$COMPILE_SDK" ]; then
+  # 用 aapt2 验证平台 jar 是否可加载
+  PLATFORM_JAR="${ANDROID_HOME}/platforms/android-${COMPILE_SDK}/android.jar"
+  AAPT2=$(ls ${ANDROID_HOME}/build-tools/*/aapt2 2>/dev/null | head -1)
+  PLATFORM_BAD=false
+
+  if [ ! -f "$PLATFORM_JAR" ] || [ ! -s "$PLATFORM_JAR" ]; then
+    PLATFORM_BAD=true
+  elif [ -n "$AAPT2" ]; then
+    # aapt2 dump resources 验证 jar 可被正确解析
+    if ! "$AAPT2" dump resources "$PLATFORM_JAR" > /dev/null 2>&1; then
+      PLATFORM_BAD=true
+    fi
+  fi
+
+  if [ "$PLATFORM_BAD" = true ]; then
+    echo ""
+    echo "  ⚠️  Android SDK 平台 android-${COMPILE_SDK} 与当前 build-tools 不兼容"
+    echo "  🛠️  自动降级 compileSdk/targetSdk: ${COMPILE_SDK} → 34"
+    echo ""
+
+    # 备份原始文件
+    cp "$APP_BUILD_GRADLE" "${APP_BUILD_GRADLE}.bak"
+
+    # 降级 compileSdk/targetSdk + 依赖版本（高版本依赖要求 compileSdk >= 35）
+    awk '{
+  gsub(/compileSdk = [0-9]+/, "compileSdk = 34")
+  gsub(/targetSdk = [0-9]+/, "targetSdk = 34")
+  gsub(/androidx\.activity:activity-ktx:[0-9]+\.[0-9]+\.[0-9]+/, "androidx.activity:activity-ktx:1.9.3")
+  gsub(/androidx\.webkit:webkit:[0-9]+\.[0-9]+\.[0-9]+/, "androidx.webkit:webkit:1.12.1")
+  gsub(/androidx\.lifecycle:lifecycle-process:[0-9]+\.[0-9]+\.[0-9]+/, "androidx.lifecycle:lifecycle-process:2.8.7")
+  print
+}' "${APP_BUILD_GRADLE}.bak" > "$APP_BUILD_GRADLE"
+
+    SDK_DOWNGRADED=true
+
+    echo "  ✅ 已降级到 34，构建完成后自动恢复"
+    echo ""
+  fi
 fi
 
 # ── 检查 Android 项目结构 ──────────────────────────────
@@ -109,7 +169,16 @@ if [ -f "$TAURI_PROPERTIES" ]; then
   sed -i "s/^tauri.android.versionCode=.*/tauri.android.versionCode=${VC}/" "$TAURI_PROPERTIES"
 fi
 
-# ── 步骤 1: 编译 APK ─────────────────────────────────────
+# ── 步骤 1: 复制前端资源到 assets ──────────────────────
+# Tauri CLI 在 SKIP_RUST_BUILD 下可能跳过前端资源复制
+ASSETS_DIR="tauri/src-tauri/gen/android/app/src/main/assets"
+FRONTEND_DIR="tauri/public"
+mkdir -p "$ASSETS_DIR"
+cp "$FRONTEND_DIR"/* "$ASSETS_DIR"/ 2>/dev/null
+cp "tauri/src-tauri/tauri.conf.json" "$ASSETS_DIR"/ 2>/dev/null
+echo "  📦 前端资源已复制到 assets ($(ls -1 "$ASSETS_DIR" | wc -l) 个文件)"
+
+# ── 步骤 2: 编译 APK ─────────────────────────────────────
 # TAURI_ANDROID_SKIP_RUST_BUILD 让 Gradle 跳过 Rust 重编译
 # Tauri CLI 已负责 Rust 编译，Gradle 无需重复
 export TAURI_ANDROID_SKIP_RUST_BUILD=1

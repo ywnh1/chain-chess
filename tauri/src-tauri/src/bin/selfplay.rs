@@ -88,7 +88,8 @@ fn main() {
     eprintln!("开始生成数据...");
 
     let start = std::time::Instant::now();
-    match generate_selfplay_data(board_size, num_players, num_games, &configs, output_path) {
+        const BORDER_MODE: chain_chess_lib::BorderMode = chain_chess_lib::BorderMode::Default;
+    match generate_selfplay_data(board_size, num_players, num_games, &configs, output_path, BORDER_MODE) {
         Ok(steps) => {
             let elapsed = start.elapsed();
             let steps_per_sec = steps as f64 / elapsed.as_secs_f64();

@@ -67,6 +67,19 @@
     </div>
   </div>
 
+  <!-- 棋盘边界模式 -->
+  <div class="form-row"><label>棋盘边界</label>
+    <div id="borderModeGroup" class="btn-group border-mode-group">
+      <button class="gb selected" data-value="default">默认边界</button>
+      <button class="gb" data-value="wrap">回环边界</button>
+      <button class="gb" data-value="bounce">反弹边界</button>
+      <button class="gb" data-value="degrade">降级边界</button>
+    </div>
+    <p id="borderModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
+      标准模式：达到 4 子即爆，边界处正常扩散
+    </p>
+  </div>
+
   <!-- 玩家人数 -->
   <div class="form-row"><label>玩家人数</label>
     <div id="setupPlayersGroup" class="btn-group">
@@ -144,7 +157,7 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.1.4</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.1.5</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>

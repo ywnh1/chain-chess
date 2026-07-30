@@ -355,7 +355,7 @@ body::after{content:'';position:fixed;inset:0;
   70%{transform:translate(-50%,-50%) scale(1.12)}
   100%{transform:translate(-50%,-50%) scale(1)}
 }
-.cell.explode{animation:explode .4s ease forwards;z-index:10}
+.cell.explode{animation:explode .25s ease forwards;z-index:10}
 @keyframes explode{
   0%{background:rgba(255,255,255,.3);transform:scale(1)}
   20%{background:rgba(255,255,255,.7);transform:scale(1.1)}
@@ -750,6 +750,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .btn-group .gb:hover{border-color:var(--glass-w-16);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
 .btn-group .gb:active{transform:scale(.93);transition:all .06s ease}
 .btn-group .gb.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
+.border-mode-group .gb{flex:1;font-size:.73rem;padding:7px 4px;min-width:0;white-space:nowrap}
 
 /* 评估函数切换按钮 */
 .toggle-group{display:flex;gap:4px;flex-wrap:wrap}
