@@ -453,7 +453,6 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 #pauseOverlay #pauseCharts{display:flex;flex-direction:column;gap:14px;width:100%}
 #pauseOverlay .stats-grid{gap:10px}
-#pauseOverlay .glass-btn.primary{margin-top:6px}
 #pauseOverlay .chart-box canvas{height:200px}
 
 /* checkout screen — 结算/历史详情页（复用 settlement 样式，但作为 .screen） */
