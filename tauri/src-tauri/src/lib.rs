@@ -11,6 +11,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use alpha_beta_pruning::{AlphaBeta, Grade};
+use semver::Version;
 
 // ─── Board types ───
 
@@ -524,11 +525,141 @@ async fn export_game_history_dialog(
 }
 
 
+// ─── Auto Update ───
+
+const UPDATE_URL: &str = "https://gitee.com/ywnh1/chain-chess-release/raw/main/update.json";
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateInfo {
+    available: bool,
+    version: String,
+    notes: String,
+    url: String,
+    error: Option<String>,
+}
+
+/// 检查是否有新版本可用
+#[tauri::command]
+async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, String> {
+    let current_ver = app_handle.config().version.clone().unwrap_or_else(|| "0.0.0".into());
+
+    let resp = reqwest::get(UPDATE_URL)
+        .await
+        .map_err(|e| format!("网络请求失败: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Ok(UpdateInfo {
+            available: false,
+            version: String::new(),
+            notes: String::new(),
+            url: String::new(),
+            error: Some(format!("服务器返回 {}", resp.status())),
+        });
+    }
+
+    let update_data: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("解析更新数据失败: {}", e))?;
+
+    let remote_version = update_data["version"]
+        .as_str()
+        .unwrap_or("0.0.0")
+        .to_string();
+    let notes = update_data["notes"].as_str().unwrap_or("").to_string();
+
+    // 根据当前平台选择下载链接
+    let platform_key = if cfg!(target_os = "android") {
+        "android"
+    } else {
+        "linux"
+    };
+    let url = update_data["platforms"][platform_key]["url"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+
+    let available = match (
+        Version::parse(&current_ver),
+        Version::parse(&remote_version),
+    ) {
+        (Ok(current), Ok(remote)) => remote > current,
+        _ => {
+            // 无法解析版本号时做字符串比较
+            remote_version != current_ver && !remote_version.is_empty()
+        }
+    };
+
+    Ok(UpdateInfo {
+        available,
+        version: remote_version,
+        notes,
+        url,
+        error: None,
+    })
+}
+
+/// 下载更新文件到应用数据目录
+#[tauri::command]
+async fn download_update(url: String, app_handle: tauri::AppHandle) -> Result<String, String> {
+    // 获取文件名
+    let filename = url
+        .rsplit('/')
+        .next()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("update");
+
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+    let download_dir = app_data_dir.join("downloads");
+    fs::create_dir_all(&download_dir).map_err(|e| format!("创建下载目录失败: {}", e))?;
+    let filepath = download_dir.join(filename);
+
+    // 下载文件
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("下载失败: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("服务器返回 {}", response.status()));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("读取响应失败: {}", e))?;
+
+    // 原子写入：先写临时文件再重命名
+    let tmp_path = filepath.with_extension("tmp");
+    fs::write(&tmp_path, &bytes).map_err(|e| format!("写入文件失败: {}", e))?;
+    fs::rename(&tmp_path, &filepath).map_err(|e| format!("重命名失败: {}", e))?;
+
+    Ok(filepath.to_string_lossy().to_string())
+}
+
+/// 安装/打开已下载的更新文件
+#[tauri::command]
+async fn install_update(path: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    // 用系统默认方式打开文件
+    app_handle
+        .opener()
+        .open_path(&path, None::<&str>)
+        .map_err(|e| format!("打开文件失败: {}", e))?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // 使用 Tauri 应用数据目录（Android/iOS/桌面通用）
             let app_data_dir = app.path().app_data_dir()
@@ -547,6 +678,9 @@ pub fn run() {
             ai_move_v2,
             ai_move_mcts,
             ai_move_strategy,
+            check_update,
+            download_update,
+            install_update,
             process_move,
             save_game_history,
             load_game_history,
@@ -1042,7 +1176,9 @@ pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, playe
         .filter_map(|c| c.owner)
         .collect();
 
-    (before.difference(&after).copied().collect(), chain_count)
+    let mut eliminated: Vec<usize> = before.difference(&after).copied().collect();
+    eliminated.sort(); // 确定顺序，避免前端排行错乱
+    (eliminated, chain_count)
 }
 
 pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, _border_mode: BorderMode) -> i32 {

@@ -261,7 +261,11 @@ const Router = {
 // ─── 页面注册 ───
 Router.register('welcome', {
   back: null,
-  enter() { document.body.style.background='' },
+  enter() {
+    document.body.style.background='';
+    // 自动检查更新（非 Tauri 环境静默跳过）
+    checkForUpdates();
+  },
   leave() {}
 });
 
@@ -1957,7 +1961,7 @@ function renderRankingList(container, boardState, playerCnt, eliminatedSet, colo
     if(a.eliminated&&b.eliminated){
       var ra=getEliminationRound(a.index);
       var rb=getEliminationRound(b.index);
-      if(ra!==rb)return ra-rb;
+      if(ra!==rb)return rb-ra; // 后淘汰者（更大轮次）排前面，先淘汰者排后面
       return 0; // 同一轮淘汰 = 并列
     }
     if(b.pieces!==a.pieces)return b.pieces-a.pieces;
@@ -2735,6 +2739,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.1.6 · 第 29 版',desc:'新增自动更新功能：每次启动自动检测新版本、下载后自动打开安装包；优化游戏体验；修复已知问题'},
     {v:'v3.1.5 · 第 28 版',desc:'新增3个棋盘模式，丰富游戏体验'},
     {v:'v3.1.4 · 第 27 版',desc:'排名列表UI优化：可点击详情弹窗、暂停/结算/历史三处排名、局内改名取消、按钮布局优化'},
     {v:'v3.1.3 · 第 26 版',desc:'修复历史记录无法保存（colorNames 类型不匹配导致 Rust 反序列化失败）、恢复后图表丢失、局内算法修改弹窗'},
@@ -3144,3 +3149,139 @@ window.addEventListener('popstate',()=>{
   history.pushState(null, '');
   history.pushState(null, '');
 })();
+/* ==================== AUTO UPDATE ==================== */
+
+var _updateInfo = null;
+var _updateChecking = false;
+var _updateDownloading = false;
+
+/** 检查更新（在欢迎页进入时调用） */
+function checkForUpdates() {
+  if (_updateChecking || _updateDownloading) return;
+  if (!window.__TAURI_INTERNALS__) return;
+
+  var bar = document.getElementById('updateBar');
+  var status = document.getElementById('updateStatus');
+  var btn = document.getElementById('updateBtn');
+  if (!bar || !status) return;
+
+  _updateChecking = true;
+  bar.style.display = 'flex';
+  status.textContent = '检查更新中...';
+  btn.style.display = 'none';
+
+  tauriInvoke('check_update').then(function(info) {
+    _updateChecking = false;
+    if (info.error) {
+      status.textContent = '检查更新失败';
+      bar.style.display = 'none';
+      logWarn('更新检查失败:', info.error);
+      return;
+    }
+    if (info.available && info.url) {
+      status.textContent = '发现新版本 v' + info.version;
+      btn.style.display = 'inline-block';
+      btn.textContent = '下载更新';
+      _updateInfo = info;
+    } else if (info.version) {
+      status.textContent = '已是最新版本 v' + info.version;
+      setTimeout(function() { bar.style.display = 'none'; }, 3000);
+    } else {
+      bar.style.display = 'none';
+    }
+  }).catch(function(err) {
+    _updateChecking = false;
+    bar.style.display = 'none';
+    logWarn('更新检查出错:', err);
+  });
+}
+
+/** 打开更新弹窗 */
+function startUpdate() {
+  if (!_updateInfo) return;
+  var modal = document.getElementById('updateModal');
+  var title = document.getElementById('updateModalTitle');
+  var msg = document.getElementById('updateModalMsg');
+  var confirmBtn = document.getElementById('updateModalConfirm');
+  var cancelBtn = document.getElementById('updateModalCancel');
+  var extra = document.getElementById('updateModalExtra');
+  var progressWrap = document.getElementById('updateProgressWrap');
+  if (!modal || !_updateInfo) return;
+
+  title.textContent = '发现新版本 v' + _updateInfo.version;
+  msg.innerHTML = _updateInfo.notes.replace(/\n/g, '<br>');
+  confirmBtn.style.display = 'inline-block';
+  confirmBtn.textContent = '下载更新';
+  cancelBtn.style.display = 'inline-block';
+  extra.style.display = 'none';
+  progressWrap.style.display = 'none';
+  modal.classList.add('show');
+}
+
+/** 关闭更新弹窗 */
+function closeUpdateModal() {
+  var modal = document.getElementById('updateModal');
+  if (modal) modal.classList.remove('show');
+}
+
+/** 确认下载更新 */
+function confirmUpdate() {
+  if (!_updateInfo || _updateDownloading) return;
+
+  var confirmBtn = document.getElementById('updateModalConfirm');
+  var cancelBtn = document.getElementById('updateModalCancel');
+  var msg = document.getElementById('updateModalMsg');
+  var progressWrap = document.getElementById('updateProgressWrap');
+  var progressBar = document.getElementById('updateProgressBar');
+  var progressText = document.getElementById('updateProgressText');
+
+  _updateDownloading = true;
+  confirmBtn.style.display = 'none';
+  cancelBtn.textContent = '后台下载';
+  msg.textContent = '正在下载更新...';
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressText.textContent = '0%';
+
+  var fakeProgress = 0;
+  var fakeTimer = setInterval(function() {
+    fakeProgress += Math.random() * 8;
+    if (fakeProgress > 90) fakeProgress = 90;
+    progressBar.style.width = fakeProgress + '%';
+    progressText.textContent = Math.floor(fakeProgress) + '%';
+  }, 500);
+
+  tauriInvoke('download_update', { url: _updateInfo.url }).then(function(localPath) {
+    clearInterval(fakeTimer);
+    progressBar.style.width = '100%';
+    progressText.textContent = '100%';
+    _updateDownloading = false;
+    msg.textContent = '下载完成！正在打开安装包...';
+    cancelBtn.style.display = 'none';
+
+    setTimeout(function() {
+      tauriInvoke('install_update', { path: localPath }).then(function() {
+        closeUpdateModal();
+        var bar = document.getElementById('updateBar');
+        var status = document.getElementById('updateStatus');
+        if (bar && status) {
+          status.textContent = '安装包已打开，请按提示完成安装';
+          bar.style.display = 'none';
+        }
+      }).catch(function(err) {
+        logWarn('安装失败:', err);
+        var extra = document.getElementById('updateModalExtra');
+        msg.textContent = '打开安装包失败: ' + err;
+        if (extra) extra.style.display = 'block';
+      });
+    }, 800);
+  }).catch(function(err) {
+    clearInterval(fakeTimer);
+    _updateDownloading = false;
+    progressWrap.style.display = 'none';
+    msg.textContent = '下载失败: ' + err;
+    var extra = document.getElementById('updateModalExtra');
+    if (extra) extra.style.display = 'block';
+    logWarn('下载失败:', err);
+  });
+}

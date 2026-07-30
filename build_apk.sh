@@ -9,7 +9,7 @@ set -e
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="连锁棋"
-VERSION="3.1.5"
+VERSION="3.1.6"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 
@@ -236,7 +236,7 @@ echo ""
 
 # 尝试复制到 Android 设备（仅当路径存在时）
 if [ -d "/storage/emulated/0/用户" ]; then
-  cp "$OUTPUT" /storage/emulated/0/用户/
+  cp -r release README.md LICENSE /storage/emulated/0/用户/
   echo "  📱 已复制到 /storage/emulated/0/用户/"
 fi
 

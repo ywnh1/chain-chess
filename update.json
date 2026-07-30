@@ -1,0 +1,15 @@
+{
+  "version": "3.1.6",
+  "notes": "• 新增自动更新功能：每次启动自动检测新版本、下载后自动打开安装包\n• 优化游戏体验\n• 修复已知问题",
+  "pub_date": "2026-07-30T00:00:00Z",
+  "platforms": {
+    "linux": {
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.1.6/连锁棋-3.1.6.AppImage",
+      "size": 0
+    },
+    "android": {
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.1.6/连锁棋-3.1.6.apk",
+      "size": 11227607
+    }
+  }
+}
