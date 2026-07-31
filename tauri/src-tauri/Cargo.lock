@@ -481,7 +481,7 @@ dependencies = [
 
 [[package]]
 name = "chain-chess"
-version = "3.2.0"
+version = "3.2.1"
 dependencies = [
  "alpha_beta_pruning",
  "rand 0.8.7",

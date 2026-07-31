@@ -9,7 +9,7 @@ set -e
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="chainchess"
-VERSION="3.2.0"
+VERSION="3.2.1"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 
@@ -156,6 +156,7 @@ if [ ! -f "$ANDROID_MAIN_ACTIVITY" ]; then
   echo ""
 fi
 
+
 # 确保 tauri.properties 存在
 TAURI_PROPERTIES="tauri/src-tauri/gen/android/app/tauri.properties"
 if [ -f "$TAURI_PROPERTIES" ]; then
@@ -176,6 +177,8 @@ FRONTEND_DIR="tauri/public"
 mkdir -p "$ASSETS_DIR"
 cp "$FRONTEND_DIR"/* "$ASSETS_DIR"/ 2>/dev/null
 cp "tauri/src-tauri/tauri.conf.json" "$ASSETS_DIR"/ 2>/dev/null
+# 给 assets 里的资源引用打上版本戳，避免 WebView 缓存旧版 CSS/JS（升级后仍加载旧样式）
+sed -i "s/\(href=\"style\\.css\)[^\"]*/\1?v=${VERSION}/; s/\(src=\"app\\.js\)[^\"]*/\1?v=${VERSION}/" "$ASSETS_DIR/index.html" 2>/dev/null || true
 echo "  📦 前端资源已复制到 assets ($(ls -1 "$ASSETS_DIR" | wc -l) 个文件)"
 
 # ── 步骤 2: 编译 APK ─────────────────────────────────────

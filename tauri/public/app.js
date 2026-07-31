@@ -238,10 +238,25 @@ function playGameOver(){
   playThemeSound('gameover');
   vibrate([80,40,80,40,100]);
 }
-// ─── 震动反馈（调用系统 API，Android WebView 原生支持） ───
-// 不可用环境（桌面、iOS）静默降级
-function vibrate(pattern){
+// ─── 震动反馈 ───
+// Android WebView 的 navigator.vibrate 不可用（WebView 禁用 Vibration API），
+// 因此优先走 Tauri haptics 插件（原生 Vibrator，需 VIBRATE 权限），
+// 命令不可用（桌面等）时回退 navigator.vibrate，均失败则静默降级。
+async function vibrate(pattern){
   if(appSettings.vibrate===false)return;
+  const list=Array.isArray(pattern)?pattern:[pattern];
+  const invoke=window.__TAURI_INTERNALS__&&window.__TAURI_INTERNALS__.invoke;
+  if(invoke){
+    try{
+      // pattern 数组语义：[振动, 间隔, 振动, 间隔...]
+      for(let i=0;i<list.length;i++){
+        const d=list[i];
+        if(i%2===0&&d>0)await invoke('plugin:haptics|vibrate',{duration:d});
+        if(i<list.length-1&&list[i+1]>0)await new Promise(r=>setTimeout(r,list[i+1]));
+      }
+      return;
+    }catch(e){/* 插件命令不可用（桌面端未注册等）→ 回退 */ }
+  }
   try{if(navigator.vibrate)navigator.vibrate(pattern)}catch(e){}
 }
 
@@ -1398,6 +1413,9 @@ function nbrsForMode(i,j,sz,bm){
 async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
   animating=true;
   try{
+  // 是否需要跳过连炸动画：autoSkipChain 为持久开关，chainSkipAll 为当前动画内点击「跳过动画」临时置位
+  const wantSkip=()=>chainSkipAll||autoSkipChain;
+  if(anim&&!wantSkip())showSkipBtn(true);
   let c=b[x][y];
   if(c.owner===null){
     let anyPieces=false;
@@ -1427,13 +1445,16 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
     if(cell.count>=capv){
       cell.count=0;cell.owner=null;
       chainCount++;
-      if(anim){playExplosion();}
+      const skipNow=wantSkip();
       // 爆炸扩散到邻居（按边界模式）
       for(let[nx,ny]of nbrsForMode(cx,cy,s,bm)){
         let nc=b[nx][ny];nc.owner=pl;nc.count++;
         chain.push([nx,ny]);
       }
-      if(anim==='explode'){
+      if(anim&&skipNow){
+        // 跳过模式：不播特效、不逐帧渲染、不等待，连锁瞬间完成（末尾统一渲染一次）
+      }else if(anim==='explode'){
+        playExplosion();
         let el=cells?.[cx]?.[cy];
         renderBoard(false);
         if(el){addShockwave(el,playerColor);addParticles(el,playerColor,8)}
@@ -1441,6 +1462,7 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
         await sleep(animDelay);
         if(el)el.classList.remove('explode');
       }else if(anim){
+        playExplosion();
         let el=cells?.[cx]?.[cy];if(el)el.classList.add('explode');
         renderBoard(false);
         await sleep(150);
@@ -1456,7 +1478,10 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
     for(let i=0;i<size;i++) for(let j=0;j<size;j++){
       b[i][j]=finalBoard[i][j];
     }
-    if(!anim||chainCount===0)renderBoard(true);
+    if(!anim||chainCount===0||wantSkip())renderBoard(true);
+  }else if(anim&&chainCount>0&&wantSkip()){
+    // 跳过模式未逐帧渲染，补一次最终棋盘渲染
+    renderBoard(true);
   }
 
   // 记录连爆统计
@@ -1472,6 +1497,8 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
   return[...had].filter(p=>!now.has(p));
   }finally{
     animating=false;
+    if(anim)showSkipBtn(false);
+    chainSkipAll=false; // 手动跳过只作用于当前动画，播完即复位，避免影响后续动画
   }
 }
 
@@ -1484,7 +1511,6 @@ function toggleAutoSkip(){
   autoSkipChain=!autoSkipChain;
   const btn=document.getElementById('autoSkipBtn');
   if(btn)btn.classList.toggle('on',autoSkipChain);
-  if(autoSkipChain)chainSkipAll=true;
 }
 
 /* ==================== RENDER ==================== */
@@ -1638,6 +1664,7 @@ function cloneBoard(b){
 /* ═══════ AI 帮忙（人类玩家回合 AI 推荐落子） ═══════ */
 let aiHelpMap={};           // pid -> 等级（人类玩家开启帮忙时）
 let aiHintTimer=null;
+let fastFinishing=false;    // 一键终局计算中（暂停后台游戏）
 function clearAiHint(){
   try{document.querySelectorAll('.ai-hint').forEach(function(el){el.classList.remove('ai-hint')})}catch(e){}
 }
@@ -1701,7 +1728,11 @@ function confirmFastFinish(){
   openModal('fastFinishConfirm');
 }
 async function fastFinish(){
-  if(gameOver)return;
+  if(gameOver||fastFinishing)return;
+  fastFinishing=true;
+  aiThinking=true;         // 拦截排队的 setTimeout(triggerAI) 与人类点击
+  isPaused=true;           // 暂停游戏状态，后台棋盘不再继续
+  clearAiHint();
   showFastFinishOverlay(true);
   updateFastFinishBtn();
   const alive=[];
@@ -1732,12 +1763,18 @@ async function fastFinish(){
       if(!eliminationInfo[kb[0]])eliminationInfo[kb[0]]=kb[1];
     }
     gameOver=true;
+    isPaused=false;
+    aiThinking=false;
+    fastFinishing=false;
     renderBoard(true);
     renderPlayerBar();
     showFastFinishOverlay(false);
     showSettlement(r.winner,_colorNames||COLOR_NAMES,gameHistory);
   }catch(e){
     logWarn('simulate_to_end failed:',e);
+    isPaused=false;
+    aiThinking=false;
+    fastFinishing=false;
     showFastFinishOverlay(false);
     showMsg('终局计算失败：'+e,'error');
     updateFastFinishBtn();
@@ -1880,6 +1917,12 @@ function togglePause(){
 }
 async function showPauseOverlay(){
   let overlay=document.getElementById('pauseOverlay');
+  // 先放加载占位，避免面板以空内容（深色背景）闪一下黑，
+  // 数据（排名+图表）就绪后再替换
+  let ps0=document.getElementById('pauseStats');
+  let pc0=document.getElementById('pauseCharts');
+  if(ps0)ps0.innerHTML='<div style="text-align:center;color:var(--dim);font-size:.82rem;padding:24px 0">正在加载统计…</div>';
+  if(pc0)pc0.innerHTML='';
   overlay.style.display='flex';
 
   // 追加快照：从板面实时状态
@@ -3115,7 +3158,7 @@ function exitGame(){
   clearSavedGameState();
   // 刷盘残留历史再退出，清理磁盘回合数据
   if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history on exit failed:', e))}
-  gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
+  gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;fastFinishing=false;
   aiPlayers=new Set();aiHelpMap={};eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;undoStack=[];
   if(aiHintTimer){clearTimeout(aiHintTimer);aiHintTimer=null}
@@ -3141,6 +3184,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.2.1 · 第 32 版',desc:'修复了3.2.0仓促发布的各种bug'},
     {v:'v3.2.0 · 第 31 版',desc:'新增设置页面（主题切换/震动开关/预设音效/手动检查更新）、新增AI帮忙与一键终局、重写背景光球动画、修复对局结算显示问题'},
     {v:'v3.1.7 · 第 30 版',desc:'新增自动更新功能：启动时静默检查更新、有更新时弹窗提示、浏览器下载安装；修复中文文件名 URL 编码问题；优化提示文字为英文'},
     {v:'v3.1.6 · 第 29 版',desc:'新增自动更新功能：每次启动自动检测新版本、下载后自动打开安装包；优化游戏体验；修复已知问题'},
@@ -3600,4 +3644,4 @@ window.addEventListener('popstate',()=>{
   // 消耗一条补充两条，确保栈始终有足够条目，安卓不会因无历史记录而退出应用。
   history.pushState(null, '');
   history.pushState(null, '');
-})();
+});

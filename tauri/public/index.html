@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#0f0f13" id="metaThemeColor">
 <meta name="color-scheme" content="light dark">
 <title>连锁棋</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3.2.1">
 </head>
 <body>
 <!-- 背景彩色光球容器 -->
@@ -172,10 +172,6 @@
           <button class="tg-btn" data-value="system">跟随系统</button>
         </div>
       </div>
-      <div class="form-row">
-        <label style="flex:1">震动反馈</label>
-        <label class="switch"><input type="checkbox" id="vibrateToggle"><span class="slider"></span></label>
-      </div>
     </div>
 
     <div class="about-card">
@@ -220,7 +216,7 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.2.0</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.2.1</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -760,13 +756,17 @@ function startDownload() {
 }
 
 silentCheck();
-})();
-// 暴露 closeUpdateModal 到全局（HTML onclick 需要）
+// 暴露到全局（HTML onclick 需要）——必须放在 IIFE 内部，
+// 否则引用不到内部函数（此前 window.showToast = showToast 写在 IIFE 外，
+// 抛 ReferenceError 导致 closeUpdateModal 从未注册到全局）
 window.showToast = showToast;
 window.closeUpdateModal = function() {
   try { document.getElementById('updateModal').classList.remove('show'); } catch(e) {}
 };
+// confirmUpdate 仅为 HTML 初始 onclick 提供兜底（弹窗打开时会被 startDownload 覆盖）
+window.confirmUpdate = function() { startDownload(); };
+})();
 </script>
-<script src="app.js"></script>
+<script src="app.js?v=3.2.1"></script>
 </body>
 </html>

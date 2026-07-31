@@ -838,7 +838,8 @@ body{padding-top:env(safe-area-inset-top,20px)}
 
 /* ═══════ 浅色模式 ═══════ */
 @media (prefers-color-scheme: light){
-  :root{
+  /* 手动选择深色（html[data-theme='dark']）时整块浅色覆盖失效，回到 :root 默认深色 */
+  html:not([data-theme='dark']){
     --bg:linear-gradient(160deg,#f3f2ec 0%,#ede9e0 30%,#f2eaea 70%,#eeeae0 100%);
     --bg-solid:#f3f2ec;
     --surface:rgba(255,255,255,.88);
@@ -872,14 +873,14 @@ body{padding-top:env(safe-area-inset-top,20px)}
     --glass-w-18:rgba(0,0,0,.18);
     --glass-w-20:rgba(0,0,0,.20);
   }
-  body::before{background:
+  html:not([data-theme='dark']) body::before{background:
     radial-gradient(ellipse 70% 50% at 50% -10%,rgba(217,119,6,.06) 0%,transparent 70%),
     radial-gradient(ellipse 60% 40% at 100% 90%,rgba(42,157,143,.04) 0%,transparent 70%),
     radial-gradient(ellipse 50% 30% at 20% 40%,rgba(217,119,6,.02) 0%,transparent 60%),
     radial-gradient(ellipse 40% 25% at 80% 60%,rgba(42,157,143,.02) 0%,transparent 60%);
     filter:blur(6px) saturate(1.05);}
-  body::after{background:rgba(0,0,0,.04)}
-  .form-row select option{background:#fff;color:var(--text)}
+  html:not([data-theme='dark']) body::after{background:rgba(0,0,0,.04)}
+  html:not([data-theme='dark']) .form-row select option{background:#fff;color:var(--text)}
 }
 
 /* 手动切换浅色模式（body.light-mode） */
@@ -1273,13 +1274,6 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
   background:var(--glass-w-04);color:var(--dim);font-size:.74rem;font-weight:500;cursor:pointer;transition:.12s;font-family:var(--font)}
 .theme-group .tg-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
 
-/* 开关 */
-.switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
-.switch input{opacity:0;width:0;height:0}
-.switch .slider{position:absolute;inset:0;border-radius:13px;background:var(--glass-w-12);transition:.18s;cursor:pointer}
-.switch .slider::before{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-.switch input:checked + .slider{background:var(--accent)}
-.switch input:checked + .slider::before{transform:translateX(20px)}
 
 /* ═══════ AI 帮忙推荐高亮（棋盘格子） ═══════ */
 .ai-hint{outline:3px solid var(--accent);outline-offset:-3px;border-radius:6px;
@@ -1315,3 +1309,9 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 @keyframes ffSpin{to{transform:rotate(360deg)}}
 .ff-overlay .ff-title{font-size:1rem;font-weight:600;color:var(--text);letter-spacing:.5px}
 .ff-overlay .ff-sub{font-size:.75rem;color:var(--dim);max-width:280px;text-align:center;line-height:1.5}
+
+/* ═══════ 原生控件渲染跟随手动主题（默认 light dark 跟随系统） ═══════ */
+html[data-theme='dark']{color-scheme:dark}
+html[data-theme='light']{color-scheme:light}
+body.light-mode{color-scheme:light}
+html:not([data-theme]){color-scheme:light dark}

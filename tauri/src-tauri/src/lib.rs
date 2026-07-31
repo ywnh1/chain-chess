@@ -695,21 +695,17 @@ async fn export_game_history_dialog(
 pub struct AppSettings {
     #[serde(default = "settings_default_theme")]
     pub theme: String,
-    #[serde(default = "settings_default_true")]
-    pub vibrate: bool,
     #[serde(default = "settings_default_sound")]
     pub sound_theme: String,
 }
 
 fn settings_default_theme() -> String { "system".to_string() }
-fn settings_default_true() -> bool { true }
 fn settings_default_sound() -> String { "classic".to_string() }
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
             theme: settings_default_theme(),
-            vibrate: settings_default_true(),
             sound_theme: settings_default_sound(),
         }
     }
