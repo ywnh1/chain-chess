@@ -1,14 +1,14 @@
 {
-  "version": "3.1.7",
-  "notes": "• Added auto-update feature (silent background check, modal prompt, browser download), fixed URL encoding for Chinese filenames, English modal text",
-  "pub_date": "2026-07-30T00:00:00Z",
+  "version": "3.2.0",
+  "notes": "• 新增设置页面（主题切换/震动开关/预设音效/手动检查更新）、新增AI帮忙与一键终局、重写背景光球动画、修复对局结算显示问题",
+  "pub_date": "2026-07-31T00:00:00Z",
   "platforms": {
     "linux": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.1.7/chainchess-3.1.7.AppImage",
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.2.0/chainchess-3.2.0.AppImage",
       "size": 0
     },
     "android": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.1.7/chainchess-3.1.7.apk",
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.2.0/chainchess-3.2.0.apk",
       "size": 11338454
     }
   }

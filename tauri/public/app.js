@@ -3141,6 +3141,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.2.0 · 第 31 版',desc:'新增设置页面（主题切换/震动开关/预设音效/手动检查更新）、新增AI帮忙与一键终局、重写背景光球动画、修复对局结算显示问题'},
     {v:'v3.1.7 · 第 30 版',desc:'新增自动更新功能：启动时静默检查更新、有更新时弹窗提示、浏览器下载安装；修复中文文件名 URL 编码问题；优化提示文字为英文'},
     {v:'v3.1.6 · 第 29 版',desc:'新增自动更新功能：每次启动自动检测新版本、下载后自动打开安装包；优化游戏体验；修复已知问题'},
     {v:'v3.1.5 · 第 28 版',desc:'新增3个棋盘模式，丰富游戏体验'},

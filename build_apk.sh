@@ -9,7 +9,7 @@ set -e
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="chainchess"
-VERSION="3.1.7"
+VERSION="3.2.0"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 
