@@ -73,7 +73,7 @@ function getMaxPlayersBySize(boardSize){
 // 双向联动：棋盘大小 ↔ 人数/AI数量，互相扣掉不合法的按钮
 
 /* ═══════ 设置系统（主题 / 震动 / 音效主题） ═══════ */
-let appSettings={theme:'system',vibrate:true,soundTheme:'classic'};
+let appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long'};
 let settingsLoaded=false;
 
 // 主题切换：system 跟随系统；light/dark 手动覆盖
@@ -99,14 +99,21 @@ function applyTheme(theme){
 async function loadSettings(){
   try{
     const s=await tauriInvoke('load_settings');
-    if(s)appSettings={theme:'system',vibrate:true,soundTheme:'classic',...s};
+    if(s)appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',...s};
   }catch(e){}
   settingsLoaded=true;
   applyTheme(appSettings.theme);
+  updateDogBarkRow();
 }
 
 async function saveSettings(){
   try{await tauriInvoke('save_settings',{settings:appSettings})}catch(e){}
+}
+
+// 大狗叫声模式行：仅在大狗叫主题时显示
+function updateDogBarkRow(){
+  const row=document.getElementById('dogBarkRow');
+  if(row)row.style.display=(appSettings.soundTheme==='dog')?'flex':'none';
 }
 
 // 渲染设置页（每次进入时同步 UI 状态并绑定事件）
@@ -149,9 +156,27 @@ function renderSettingsPage(){
         this.classList.add('selected');
         appSettings.soundTheme=this.dataset.value;
         saveSettings();
+        updateDogBarkRow();
       };
     });
   }
+  // 大狗叫声模式（仅大狗叫主题显示）
+  const dbRow=document.getElementById('dogBarkRow');
+  const dbg=document.getElementById('dogBarkGroup');
+  if(dbRow&&dbg){
+    dbg.querySelectorAll('.tg-btn').forEach(function(b){
+      b.classList.toggle('selected',b.dataset.value===appSettings.dogBarkMode);
+    });
+    dbg.querySelectorAll('.tg-btn').forEach(function(b){
+      b.onclick=function(){
+        dbg.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+        appSettings.dogBarkMode=this.dataset.value;
+        saveSettings();
+      };
+    });
+  }
+  updateDogBarkRow();
   // 试听按钮
   const pl=document.getElementById('soundPreviewBtn');
   if(pl){
@@ -216,15 +241,53 @@ const SOUND_THEMES={
     elim:[{f:500,dur:0.10,type:'sawtooth',vol:0.10},{f:350,dur:0.10,type:'sawtooth',vol:0.10},{f:200,dur:0.15,type:'sawtooth',vol:0.12}],
     gameover:[{f:440,dur:0.12,type:'square',vol:0.10},{f:554,dur:0.12,type:'square',vol:0.10},{f:659,dur:0.2,type:'square',vol:0.12}],
   },
+  dog:{
+    label:'大狗叫',
+    // 使用 public/audio/ 下的真实音频，其余音效静音
+    click:'audio/大狗.mp3',
+    explosion:'dog-bark', // 特殊标记：按 dogBarkMode 在 3 种叫声间选择
+    elim:null,
+    gameover:null,
+  },
+  mute:{
+    label:'静音',
+    // 取消全部音效
+    click:null,
+    explosion:null,
+    elim:null,
+    gameover:null,
+  },
 };
+
+// 大狗叫声模式 → 音频文件（中淡出 / 无淡出 / 长淡出）
+const DOG_BARK_FILES={
+  medium:'audio/叫(中淡出).mp3',
+  none:'audio/叫(无淡出).mp3',
+  long:'audio/叫(长淡出).mp3',
+};
+
+// 播放外部音频文件（相对 public 根目录）
+function playSoundFile(src){
+  try{
+    const a=new Audio(encodeURI(src));
+    a.volume=0.9;
+    a.play().catch(()=>{});
+  }catch(e){}
+}
 
 // 按当前主题播放指定音效
 function playThemeSound(key){
   const theme=SOUND_THEMES[appSettings.soundTheme]||SOUND_THEMES.classic;
   const s=theme[key];
+  if(!s)return;
+  if(s==='dog-bark'){
+    playSoundFile(DOG_BARK_FILES[appSettings.dogBarkMode]||DOG_BARK_FILES.long);
+    return;
+  }
+  if(typeof s==='string'){playSoundFile(s);return;}
   if(Array.isArray(s)){
     s.forEach((x,i)=>setTimeout(()=>playTone(x.f,x.dur,x.type,x.vol),i*120));
-  }else if(s){
+  }else{
     playTone(s.f,s.dur,s.type,s.vol);
   }
 }
@@ -3184,6 +3247,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.2.2 · 第 33 版',desc:'新增大狗叫音频主题（爆炸音效可选3种叫声模式）、新增静音主题、音效主题按钮两行排版优化'},
     {v:'v3.2.1 · 第 32 版',desc:'修复了3.2.0仓促发布的各种bug'},
     {v:'v3.2.0 · 第 31 版',desc:'新增设置页面（主题切换/震动开关/预设音效/手动检查更新）、新增AI帮忙与一键终局、重写背景光球动画、修复对局结算显示问题'},
     {v:'v3.1.7 · 第 30 版',desc:'新增自动更新功能：启动时静默检查更新、有更新时弹窗提示、浏览器下载安装；修复中文文件名 URL 编码问题；优化提示文字为英文'},

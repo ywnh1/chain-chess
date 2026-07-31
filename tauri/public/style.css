@@ -1269,8 +1269,8 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 @keyframes toastFadeIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
 /* ═══════ 设置页组件 ═══════ */
-.theme-group{display:flex;gap:6px}
-.theme-group .tg-btn{flex:1;padding:6px 10px;border-radius:8px;border:1px solid var(--glass-w-08);
+.theme-group{display:flex;gap:6px;flex-wrap:wrap}
+.theme-group .tg-btn{flex:0 0 calc(33.333% - 6px);box-sizing:border-box;padding:6px 10px;border-radius:8px;border:1px solid var(--glass-w-08);
   background:var(--glass-w-04);color:var(--dim);font-size:.74rem;font-weight:500;cursor:pointer;transition:.12s;font-family:var(--font)}
 .theme-group .tg-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
 

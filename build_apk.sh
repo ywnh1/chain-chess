@@ -9,7 +9,7 @@ set -e
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="chainchess"
-VERSION="3.2.1"
+VERSION="3.2.2"
 OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
 
@@ -175,7 +175,7 @@ fi
 ASSETS_DIR="tauri/src-tauri/gen/android/app/src/main/assets"
 FRONTEND_DIR="tauri/public"
 mkdir -p "$ASSETS_DIR"
-cp "$FRONTEND_DIR"/* "$ASSETS_DIR"/ 2>/dev/null
+cp -r "$FRONTEND_DIR"/. "$ASSETS_DIR"/ 2>/dev/null
 cp "tauri/src-tauri/tauri.conf.json" "$ASSETS_DIR"/ 2>/dev/null
 # 给 assets 里的资源引用打上版本戳，避免 WebView 缓存旧版 CSS/JS（升级后仍加载旧样式）
 sed -i "s/\(href=\"style\\.css\)[^\"]*/\1?v=${VERSION}/; s/\(src=\"app\\.js\)[^\"]*/\1?v=${VERSION}/" "$ASSETS_DIR/index.html" 2>/dev/null || true
@@ -242,7 +242,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "  📄 生成 update.json"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-UPDATE_NOTES="${UPDATE_NOTES:-• 新增自动更新功能\n• 优化游戏体验\n• 修复已知问题}"
+# UPDATE_NOTES 必须是ASCII字符，禁止中文
+UPDATE_NOTES="${UPDATE_NOTES:-some update notes}"
 APK_SIZE=$(stat -c%s "$OUTPUT" 2>/dev/null || echo 0)
 
 cat > release/update.json << UPDATEEOF
@@ -274,8 +275,11 @@ echo ""
 
 # 尝试复制到 Android 设备（仅当路径存在时）
 if [ -d "/storage/emulated/0/用户" ]; then
-  cp -r release /storage/emulated/0/用户/
+  cp "$OUTPUT" /storage/emulated/0/用户/
   echo "  📱 已复制到 /storage/emulated/0/用户/"
 fi
-
+if [ -d "../chain-chess-release" ]; then
+  cp release/update.json ../chain-chess-release
+  echo "  已复制到 ../chain-chess-release"
+fi
 echo ""
