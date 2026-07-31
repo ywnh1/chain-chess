@@ -530,6 +530,65 @@ async fn export_game_history_dialog(
 }
 
 
+// ─── App Settings（持久化到 app_data_dir/settings.json） ───
+
+/// 应用设置。theme: "system" | "light" | "dark"；soundTheme 为预设音效主题。
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    #[serde(default = "settings_default_theme")]
+    pub theme: String,
+    #[serde(default = "settings_default_true")]
+    pub vibrate: bool,
+    #[serde(default = "settings_default_sound")]
+    pub sound_theme: String,
+}
+
+fn settings_default_theme() -> String { "system".to_string() }
+fn settings_default_true() -> bool { true }
+fn settings_default_sound() -> String { "classic".to_string() }
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            theme: settings_default_theme(),
+            vibrate: settings_default_true(),
+            sound_theme: settings_default_sound(),
+        }
+    }
+}
+
+fn get_settings_path(app_data_dir: &std::path::Path) -> PathBuf {
+    app_data_dir.join("settings.json")
+}
+
+/// 读取应用设置（不存在时返回默认值）
+#[tauri::command]
+async fn load_settings(app_handle: tauri::AppHandle) -> Result<AppSettings, String> {
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+    let path = get_settings_path(&data_dir);
+    if !path.exists() {
+        return Ok(AppSettings::default());
+    }
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("读取设置失败: {}", e))?;
+    serde_json::from_str(&content).map_err(|e| format!("解析设置失败: {}", e))
+}
+
+/// 保存应用设置
+#[tauri::command]
+async fn save_settings(app_handle: tauri::AppHandle, settings: AppSettings) -> Result<(), String> {
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+    let path = get_settings_path(&data_dir);
+    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    atomic_write(&path, &json)
+}
+
 // ─── Auto Update ───
 
 #[cfg(not(target_os = "android"))]
@@ -694,6 +753,8 @@ pub fn run() {
             ai_move_v2,
             ai_move_mcts,
             ai_move_strategy,
+            load_settings,
+            save_settings,
             check_update,
             download_update,
             install_update,

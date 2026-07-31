@@ -519,6 +519,15 @@ body{padding-top:env(safe-area-inset-top,20px)}
 #about.screen,#about-ai.screen,#about-benchmark.screen,#about-changelog.screen,#about-license.screen{max-width:520px;gap:10px;padding:calc(8px + env(safe-area-inset-top, 0px)) 8px calc(32px + env(safe-area-inset-bottom, 0px));height:100dvh;overflow:hidden;width:100%}
 #about.screen.active,#about-ai.screen.active,#about-benchmark.screen.active,#about-changelog.screen.active,#about-license.screen.active{display:flex;flex-direction:column;align-items:center}
 #about .back,#about-ai .back,#about-benchmark .back,#about-changelog .back,#about-license .back{align-self:flex-start;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+#settings .back{align-self:flex-start;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+#settings h2{font-size:var(--text-2xl);font-weight:var(--weight-semibold);text-align:center;padding:4px 0 6px;flex-shrink:0;letter-spacing:1px}
+#settings .about-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
+#settings .about-scroll > * + *{margin-top:10px}
+#settings .about-scroll::-webkit-scrollbar{width:4px}
+#settings .about-scroll::-webkit-scrollbar-track{background:var(--glass-w-04);border-radius:2px}
+#settings .about-scroll::-webkit-scrollbar-thumb{background:var(--glass-w-10);border-radius:3px}
+#settings .about-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1)}
+#settings .about-card h3{font-size:var(--text-lg);font-weight:var(--weight-bold);margin:0 0 8px;color:var(--accent);letter-spacing:.5px}
 #about h2,#about-ai h2,#about-benchmark h2,#about-license h2{font-size:var(--text-2xl);font-weight:var(--weight-semibold);text-align:center;padding:4px 0 6px;flex-shrink:0;letter-spacing:1px}
 #about .about-scroll,#about-ai .about-scroll,#about-benchmark .about-scroll,#about-changelog .about-scroll,#about-license .about-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
 #about .about-scroll > * + *,#about-ai .about-scroll > * + *,#about-benchmark .about-scroll > * + *,#about-changelog .about-scroll > * + *,#about-license .about-scroll > * + *{margin-top:10px}
@@ -919,43 +928,16 @@ body.light-mode{
 /* ═══════ 背景彩色光球动画 ═══════ */
 .orb-container{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden}
 .orb{
-  position:absolute;border-radius:50%;filter:blur(50px);opacity:.7;
+  position:absolute;border-radius:50%;filter:blur(46px);opacity:.85;
   mix-blend-mode:screen;will-change:transform;
+  animation:orbFloat 10s cubic-bezier(.45,.05,.35,1) infinite;
 }
-.orb-1{width:320px;height:320px;background:radial-gradient(circle,rgba(255,210,90,.60) 0%,rgba(200,140,240,.35) 70%,transparent);top:8%;left:-8%;animation:orbFloat1 10s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-2{width:260px;height:260px;background:radial-gradient(circle,rgba(95,210,210,.55) 0%,rgba(170,130,255,.35) 60%,transparent);bottom:2%;right:-5%;animation:orbFloat2 14s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-3{width:240px;height:240px;background:radial-gradient(circle,rgba(210,150,255,.50) 0%,rgba(255,190,80,.25) 60%,transparent);top:45%;left:55%;animation:orbFloat3 12s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-4{width:200px;height:200px;background:radial-gradient(circle,rgba(255,110,100,.45) 0%,rgba(95,210,210,.25) 70%,transparent);top:25%;right:15%;animation:orbFloat4 9s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-5{width:220px;height:220px;background:radial-gradient(circle,rgba(170,130,255,.50) 0%,rgba(255,110,100,.20) 65%,transparent);bottom:15%;left:10%;animation:orbFloat5 15s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-6{width:180px;height:180px;background:radial-gradient(circle,rgba(110,210,255,.45) 0%,rgba(255,190,80,.20) 60%,transparent);top:70%;left:30%;animation:orbFloat6 11s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-7{width:150px;height:150px;background:radial-gradient(circle,rgba(255,110,160,.40) 0%,rgba(95,210,210,.20) 65%,transparent);top:15%;right:35%;animation:orbFloat7 10s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-8{width:190px;height:190px;background:radial-gradient(circle,rgba(180,230,100,.40) 0%,rgba(200,140,255,.15) 60%,transparent);top:5%;left:40%;animation:orbFloat8 12s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-9{width:170px;height:170px;background:radial-gradient(circle,rgba(255,200,100,.45) 0%,rgba(95,210,210,.18) 65%,transparent);bottom:30%;right:10%;animation:orbFloat9 11s cubic-bezier(.45,.05,.35,1) infinite}
-.orb-10{width:140px;height:140px;background:radial-gradient(circle,rgba(200,150,255,.40) 0%,rgba(255,110,100,.15) 60%,transparent);top:60%;left:5%;animation:orbFloat10 9s cubic-bezier(.45,.05,.35,1) infinite}
-@keyframes orbFloat1{
+/* 统一光球动画：方向/位移由 JS 生成的 CSS 变量 --dx/--dy 控制 */
+@keyframes orbFloat{
   0%,100%{transform:translate(0,0) scale(1)}
-  33%{transform:translate(120px,80px) scale(1.12)}
-  66%{transform:translate(60px,150px) scale(.92)}
-}
-@keyframes orbFloat2{
-  0%,100%{transform:translate(0,0) scale(1)}
-  33%{transform:translate(-100px,-60px) scale(1.08)}
-  66%{transform:translate(-50px,-140px) scale(.95)}
-}
-@keyframes orbFloat3{
-  0%,100%{transform:translate(0,0) scale(1)}
-  25%{transform:translate(-80px,40px) scale(1.1)}
-  50%{transform:translate(-40px,-60px) scale(.93)}
-  75%{transform:translate(60px,-20px) scale(1.05)}
-}
-@keyframes orbFloat4{
-  0%,100%{transform:translate(0,0) scale(1)}
-  50%{transform:translate(-70px,-50px) scale(1.15)}
-}
-@keyframes orbFloat5{
-  0%,100%{transform:translate(0,0) scale(1)}
-  33%{transform:translate(80px,-70px) scale(1.1)}
-  66%{transform:translate(40px,50px) scale(.9)}
+  25%{transform:translate(var(--dx,120px),var(--dy,80px)) scale(1.08)}
+  50%{transform:translate(calc(var(--dx,120px)*-0.6),calc(var(--dy,80px)*-0.8)) scale(.94)}
+  75%{transform:translate(calc(var(--dx,120px)*0.4),calc(var(--dy,80px)*-0.5)) scale(1.04)}
 }
 /* 光球与玻璃元素互动 — 增强折射/反射效果 */
 .glass-btn,.mode-card,.play-config-item,.about-card,.about-info,.about-nav,.history-item,
@@ -1079,17 +1061,7 @@ body.light-mode{
 .random-labels{display:flex;justify-content:space-between;font-size:.65rem;color:var(--dim);padding:0 2px}
 .player-modal .modal-actions{margin-top:12px;gap:8px}
 /* ═══ 浅色模式适配 ═══ */
-body.light-mode .orb{opacity:.65}
-body.light-mode .orb-1{background:radial-gradient(circle,rgba(217,119,6,.45) 0%,rgba(200,140,240,.15) 70%,transparent)}
-body.light-mode .orb-2{background:radial-gradient(circle,rgba(42,157,143,.4) 0%,rgba(160,120,255,.15) 60%,transparent)}
-body.light-mode .orb-3{background:radial-gradient(circle,rgba(160,120,255,.35) 0%,rgba(217,119,6,.12) 60%,transparent)}
-body.light-mode .orb-4{background:radial-gradient(circle,rgba(180,80,70,.3) 0%,rgba(42,157,143,.12) 70%,transparent)}
-body.light-mode .orb-5{background:radial-gradient(circle,rgba(160,120,255,.35) 0%,rgba(180,80,70,.1) 65%,transparent)}
-body.light-mode .orb-6{background:radial-gradient(circle,rgba(100,200,255,.3) 0%,rgba(240,179,75,.12) 60%,transparent)}
-body.light-mode .orb-7{background:radial-gradient(circle,rgba(255,100,150,.25) 0%,rgba(95,195,195,.12) 65%,transparent)}
-body.light-mode .orb-8{background:radial-gradient(circle,rgba(180,230,100,.35) 0%,rgba(200,140,255,.15) 60%,transparent)}
-body.light-mode .orb-9{background:radial-gradient(circle,rgba(255,200,100,.4) 0%,rgba(95,210,210,.15) 65%,transparent)}
-body.light-mode .orb-10{background:radial-gradient(circle,rgba(200,150,255,.35) 0%,rgba(255,110,100,.12) 60%,transparent)}
+body.light-mode .orb{opacity:.5}
 body.light-mode .player-modal .form-row select option{background:#fff;color:var(--text)}
 body.light-mode .start-btn{background-image:linear-gradient(135deg,rgba(217,119,6,.12) 0%,rgba(160,120,255,.06) 50%,rgba(42,157,143,.1) 100%),var(--glass-w-10)}
 body.light-mode .random-slider{background:rgba(0,0,0,.1)}
@@ -1294,3 +1266,17 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 .rank-modal-chart-box canvas{width:100%;height:100px;display:block}
 .rank-modal-chart-box h4{font-size:.75rem;font-weight:var(--weight-medium);margin-bottom:4px;cursor:pointer;color:var(--dim)}
 @keyframes toastFadeIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ═══════ 设置页组件 ═══════ */
+.theme-group{display:flex;gap:6px}
+.theme-group .tg-btn{flex:1;padding:6px 10px;border-radius:8px;border:1px solid var(--glass-w-08);
+  background:var(--glass-w-04);color:var(--dim);font-size:.74rem;font-weight:500;cursor:pointer;transition:.12s;font-family:var(--font)}
+.theme-group .tg-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
+
+/* 开关 */
+.switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.switch .slider{position:absolute;inset:0;border-radius:13px;background:var(--glass-w-12);transition:.18s;cursor:pointer}
+.switch .slider::before{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.switch input:checked + .slider{background:var(--accent)}
+.switch input:checked + .slider::before{transform:translateX(20px)}

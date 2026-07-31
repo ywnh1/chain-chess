@@ -16,16 +16,10 @@
 <body>
 <!-- 背景彩色光球容器 -->
 <div class="orb-container" aria-hidden="true">
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-  <div class="orb orb-4"></div>
-  <div class="orb orb-5"></div>
-  <div class="orb orb-6"></div>
-  <div class="orb orb-7"></div>
-  <div class="orb orb-8"></div>
-  <div class="orb orb-9"></div>
-  <div class="orb orb-10"></div>
+  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+  <div class="orb"></div>
 </div>
 
 <!-- Welcome -->
@@ -35,7 +29,7 @@
     <div class="tagline">多人联手，一触即发</div>
     <button class="glass-btn primary start-btn" onclick="Router.navigate('gameSetup')">开始游戏</button>
     <div class="welcome-footer">
-      <button onclick="Router.navigate('about')" class="glass-btn about-foot-btn">关于</button>
+      <button onclick="Router.navigate('settings')" class="glass-btn about-foot-btn">设置</button>
       <button onclick="Router.navigate('history')" class="glass-btn history-foot-btn">历史记录</button>
     </div>
   </div>
@@ -145,6 +139,62 @@
     <div class="modal-actions">
       <button class="glass-btn" onclick="closePlayerModal()">取消</button>
       <button class="glass-btn primary" onclick="savePlayerConfig()">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Screen -->
+<div id="settings" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>设置</h2>
+
+    <div class="about-card">
+      <h3>外观</h3>
+      <div class="form-row">
+        <label style="flex:1">主题模式</label>
+        <div class="theme-group" id="themeGroup" style="display:flex;gap:6px">
+          <button class="tg-btn" data-value="light">浅色</button>
+          <button class="tg-btn" data-value="dark">深色</button>
+          <button class="tg-btn" data-value="system">跟随系统</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label style="flex:1">震动反馈</label>
+        <label class="switch"><input type="checkbox" id="vibrateToggle"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="about-card">
+      <h3>游戏音效</h3>
+      <div class="form-row">
+        <label style="flex:1">音效主题</label>
+        <div class="theme-group" id="soundThemeGroup" style="display:flex;gap:6px">
+          <button class="tg-btn" data-value="classic">经典</button>
+          <button class="tg-btn" data-value="soft">柔和</button>
+          <button class="tg-btn" data-value="crisp">清脆</button>
+          <button class="tg-btn" data-value="electronic">电子</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label style="flex:1">试听当前主题音效</label>
+        <button class="glass-btn primary" id="soundPreviewBtn" style="padding:6px 14px;font-size:.78rem">▶ 试听</button>
+      </div>
+    </div>
+
+    <div class="about-card">
+      <h3>更新</h3>
+      <div class="form-row">
+        <label style="flex:1">检查更新</label>
+        <button class="glass-btn primary" onclick="manualCheckUpdate()" style="padding:6px 14px;font-size:.78rem">检查更新</button>
+      </div>
+    </div>
+
+    <div class="about-card" style="cursor:pointer" onclick="Router.navigate('about')">
+      <div class="form-row">
+        <label style="flex:1">关于连锁棋</label>
+        <span style="color:var(--dim)">→</span>
+      </div>
     </div>
   </div>
 </div>
@@ -540,6 +590,46 @@ function cmpVer(a, b) {
 }
 
 /** 启动后静默检查 */
+// 手动检查更新：与自动检查不同，已是最新也提示结果
+function manualCheckUpdate(){
+  showUpdateModal('检查中…','正在检查新版本，请稍候','');
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'https://gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json?ref=main', true);
+  xhr.timeout = 15000;
+  xhr.onload = function() {
+    try {
+      if (xhr.status !== 200) { showUpdateResult('error','检查更新失败 (HTTP '+xhr.status+')'); return; }
+      var r = xhr.responseText;
+      if (!r || r.charAt(0) === '<') { showUpdateResult('error','检查更新失败：服务器返回了 HTML'); return; }
+      var a = JSON.parse(r);
+      if (!a.content || a.encoding !== 'base64') { showUpdateResult('error','检查更新失败：数据格式异常'); return; }
+      var b64 = a.content; while (b64.length % 4) b64 += '=';
+      var d = JSON.parse(atob(b64));
+      if (!d || !d.version) { showUpdateResult('error','检查更新失败：缺少版本号'); return; }
+      var cur = getCurVer();
+      var available = cmpVer(d.version, cur) > 0;
+      var dl = (d.platforms && d.platforms.android && d.platforms.android.url) || '';
+      var up = (d.platforms && d.platforms.linux && d.platforms.linux.url) || '';
+      var dlUrl = encodeURI(dl || up || '');
+      if (available && dlUrl) { showUpdateModal(d.version, d.notes || '', dlUrl); }
+      else { showUpdateResult('ok','当前已是最新版本 v'+cur); }
+    } catch(e) { showUpdateResult('error','检查更新失败：'+e.message); }
+  };
+  xhr.onerror = function() { showUpdateResult('error','检查更新失败：网络请求失败'); };
+  xhr.ontimeout = function() { showUpdateResult('error','检查更新失败：请求超时 (15s)'); };
+  xhr.send();
+}
+// 手动检查结果展示（无更新/失败也提示）
+function showUpdateResult(kind,msg){
+  document.getElementById('updateModalTitle').textContent = kind==='ok' ? '已是最新' : '检查更新';
+  document.getElementById('updateModalMsg').textContent = msg;
+  document.getElementById('updateModalConfirm').style.display = 'none';
+  document.getElementById('updateModalCancel').style.display = 'inline-block';
+  document.getElementById('updateModalCancel').textContent = '关闭';
+  document.getElementById('updateModalCancel').onclick = closeUpdateModal;
+}
+window.manualCheckUpdate = manualCheckUpdate;
+
 function silentCheck() {
   document.title = 'upd:fetch';
   var xhr = new XMLHttpRequest();

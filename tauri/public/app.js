@@ -22,6 +22,37 @@
   mq.addEventListener('change',sync);
 })();
 
+/* ═══════ 背景光球随机初始化（大小/方向/速度/位置/颜色随机，更快更明显） ═══════ */
+function randOrbGradient(){
+  const h=Math.floor(Math.random()*360);
+  const h2=(h+40+Math.floor(Math.random()*80))%360;
+  const s=85+Math.floor(Math.random()*15);
+  const l=55+Math.floor(Math.random()*15);
+  return 'radial-gradient(circle, hsla('+h+','+s+'%,'+l+'%,.85) 0%, hsla('+h2+','+s+'%,'+l+'%,.38) 60%, transparent)';
+}
+function initOrbs(){
+  const orbs=document.querySelectorAll('.orb');
+  const light=window.matchMedia('(prefers-color-scheme: light)').matches;
+  orbs.forEach(function(el){
+    const sz=120+Math.random()*300;            // 大小 120~420px
+    const dx=(Math.random()*2-1)*160;          // 方向 -160~160
+    const dy=(Math.random()*2-1)*160;
+    const dur=(4+Math.random()*8).toFixed(2);  // 速度 4~12s（更快）
+    const delay=(-Math.random()*dur).toFixed(2); // 负延迟错开相位
+    el.style.width=sz+'px';
+    el.style.height=sz+'px';
+    el.style.top=(Math.random()*120-10)+'%';
+    el.style.left=(Math.random()*120-10)+'%';
+    el.style.setProperty('--dx',dx+'px');
+    el.style.setProperty('--dy',dy+'px');
+    el.style.animationDuration=dur+'s';
+    el.style.animationDelay=delay+'s';
+    el.style.background=randOrbGradient();
+    el.style.opacity=light?(0.45+Math.random()*0.15).toFixed(2):(0.75+Math.random()*0.2).toFixed(2);
+  });
+}
+initOrbs();
+
 /* ==================== CONSTANTS ==================== */
 const COLORS=['#E74C3C','#F1C40F','#3498DB','#2ECC71','#9B59B6','#E91E63','#1ABC9C','#F39C12','#8B5E3C','#5D6D7E'];
 const COLORS_LIGHT=['rgba(231,76,60,.08)','rgba(241,196,15,.08)','rgba(52,152,219,.08)','rgba(46,204,113,.08)','rgba(155,89,182,.08)','rgba(233,30,99,.08)','rgba(26,188,156,.08)','rgba(243,156,18,.08)','rgba(139,94,60,.08)','rgba(93,109,126,.08)'];
@@ -41,7 +72,98 @@ function getMaxPlayersBySize(boardSize){
 }
 // 双向联动：棋盘大小 ↔ 人数/AI数量，互相扣掉不合法的按钮
 
- 
+/* ═══════ 设置系统（主题 / 震动 / 音效主题） ═══════ */
+let appSettings={theme:'system',vibrate:true,soundTheme:'classic'};
+let settingsLoaded=false;
+
+// 主题切换：system 跟随系统；light/dark 手动覆盖
+function applyTheme(theme){
+  if(theme==='light'){document.body.classList.add('light-mode');document.documentElement.setAttribute('data-theme','light')}
+  else if(theme==='dark'){document.body.classList.remove('light-mode');document.documentElement.setAttribute('data-theme','dark')}
+  else{document.body.classList.remove('light-mode');document.documentElement.removeAttribute('data-theme')}
+  // 状态栏主题色
+  const meta=document.getElementById('metaThemeColor');
+  if(meta){
+    const lightNow=(theme==='light')||(theme==='system'&&window.matchMedia('(prefers-color-scheme: light)').matches);
+    meta.content=lightNow?'#eae8e0':'#0f0f13';
+  }
+  // 同步光球透明度（浅色下更淡）
+  try{
+    const lightNow=(theme==='light')||(theme==='system'&&window.matchMedia('(prefers-color-scheme: light)').matches);
+    document.querySelectorAll('.orb').forEach(function(el){
+      el.style.opacity=lightNow?(0.45+Math.random()*0.15).toFixed(2):(0.75+Math.random()*0.2).toFixed(2);
+    });
+  }catch(e){}
+}
+
+async function loadSettings(){
+  try{
+    const s=await tauriInvoke('load_settings');
+    if(s)appSettings={theme:'system',vibrate:true,soundTheme:'classic',...s};
+  }catch(e){}
+  settingsLoaded=true;
+  applyTheme(appSettings.theme);
+}
+
+async function saveSettings(){
+  try{await tauriInvoke('save_settings',{settings:appSettings})}catch(e){}
+}
+
+// 渲染设置页（每次进入时同步 UI 状态并绑定事件）
+function renderSettingsPage(){
+  // 主题按钮
+  const tg=document.getElementById('themeGroup');
+  if(tg){
+    tg.querySelectorAll('.tg-btn').forEach(function(b){
+      b.classList.toggle('selected',b.dataset.value===appSettings.theme);
+    });
+    tg.querySelectorAll('.tg-btn').forEach(function(b){
+      b.onclick=function(){
+        tg.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+        appSettings.theme=this.dataset.value;
+        applyTheme(appSettings.theme);
+        saveSettings();
+      };
+    });
+  }
+  // 震动开关
+  const vt=document.getElementById('vibrateToggle');
+  if(vt){
+    vt.checked=!!appSettings.vibrate;
+    vt.onchange=function(){
+      appSettings.vibrate=this.checked;
+      saveSettings();
+      if(appSettings.vibrate)vibrate(15);
+    };
+  }
+  // 音效主题
+  const st=document.getElementById('soundThemeGroup');
+  if(st){
+    st.querySelectorAll('.tg-btn').forEach(function(b){
+      b.classList.toggle('selected',b.dataset.value===appSettings.soundTheme);
+    });
+    st.querySelectorAll('.tg-btn').forEach(function(b){
+      b.onclick=function(){
+        st.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+        appSettings.soundTheme=this.dataset.value;
+        saveSettings();
+      };
+    });
+  }
+  // 试听按钮
+  const pl=document.getElementById('soundPreviewBtn');
+  if(pl){
+    pl.onclick=function(){
+      playClick();setTimeout(()=>playExplosion(),300);
+      setTimeout(()=>playElim(),700);setTimeout(()=>playGameOver(),1100);
+    };
+  }
+}
+
+loadSettings();
+
 // ========== 音效 ==========
 let audioCtx = null;
 function getAudioCtx(){
@@ -62,23 +184,64 @@ function playTone(f,dur,type,vol){
     osc.start();osc.stop(ctx.currentTime+dur);
   }catch(e){}
 }
-function playClick(){playTone(800,0.08,'sine',0.12);vibrate(12)}
-function playExplosion(){playTone(150,0.25,'sawtooth',0.15);vibrate(25)}
+// ─── 预设音效主题（Web Audio 合成，无需外部文件） ───
+// 每套主题定义 4 个音效：click/explosion/elim/gameover
+// 值为单个音或音序列（数组，每项 {f,dur,type,vol}，按 120ms 间隔播放）
+const SOUND_THEMES={
+  classic:{
+    label:'经典',
+    click:{f:800,dur:0.08,type:'sine',vol:0.12},
+    explosion:{f:150,dur:0.25,type:'sawtooth',vol:0.15},
+    elim:[{f:400,dur:0.15,type:'square',vol:0.08},{f:300,dur:0.15,type:'square',vol:0.08},{f:200,dur:0.2,type:'square',vol:0.08}],
+    gameover:[{f:523,dur:0.15,type:'sine',vol:0.12},{f:659,dur:0.15,type:'sine',vol:0.12},{f:784,dur:0.3,type:'sine',vol:0.15}],
+  },
+  soft:{
+    label:'柔和',
+    click:{f:600,dur:0.12,type:'triangle',vol:0.10},
+    explosion:{f:110,dur:0.35,type:'sine',vol:0.14},
+    elim:[{f:330,dur:0.2,type:'sine',vol:0.08},{f:262,dur:0.2,type:'sine',vol:0.08},{f:196,dur:0.25,type:'sine',vol:0.08}],
+    gameover:[{f:392,dur:0.25,type:'sine',vol:0.10},{f:494,dur:0.25,type:'sine',vol:0.10},{f:587,dur:0.4,type:'sine',vol:0.12}],
+  },
+  crisp:{
+    label:'清脆',
+    click:{f:1200,dur:0.05,type:'triangle',vol:0.12},
+    explosion:{f:220,dur:0.15,type:'square',vol:0.12},
+    elim:[{f:600,dur:0.08,type:'triangle',vol:0.10},{f:450,dur:0.08,type:'triangle',vol:0.10},{f:300,dur:0.12,type:'triangle',vol:0.10}],
+    gameover:[{f:784,dur:0.10,type:'triangle',vol:0.12},{f:988,dur:0.10,type:'triangle',vol:0.12},{f:1319,dur:0.25,type:'triangle',vol:0.15}],
+  },
+  electronic:{
+    label:'电子',
+    click:{f:700,dur:0.06,type:'square',vol:0.10},
+    explosion:{f:100,dur:0.3,type:'sawtooth',vol:0.18},
+    elim:[{f:500,dur:0.10,type:'sawtooth',vol:0.10},{f:350,dur:0.10,type:'sawtooth',vol:0.10},{f:200,dur:0.15,type:'sawtooth',vol:0.12}],
+    gameover:[{f:440,dur:0.12,type:'square',vol:0.10},{f:554,dur:0.12,type:'square',vol:0.10},{f:659,dur:0.2,type:'square',vol:0.12}],
+  },
+};
+
+// 按当前主题播放指定音效
+function playThemeSound(key){
+  const theme=SOUND_THEMES[appSettings.soundTheme]||SOUND_THEMES.classic;
+  const s=theme[key];
+  if(Array.isArray(s)){
+    s.forEach((x,i)=>setTimeout(()=>playTone(x.f,x.dur,x.type,x.vol),i*120));
+  }else if(s){
+    playTone(s.f,s.dur,s.type,s.vol);
+  }
+}
+function playClick(){playThemeSound('click');vibrate(12)}
+function playExplosion(){playThemeSound('explosion');vibrate(25)}
 function playElim(){
-  playTone(400,0.15,'square',0.08);
-  setTimeout(()=>playTone(300,0.15,'square',0.08),120);
-  setTimeout(()=>playTone(200,0.2,'square',0.08),240);
+  playThemeSound('elim');
   vibrate([40,30,50]);
 }
 function playGameOver(){
-  playTone(523,0.15,'sine',0.12);
-  setTimeout(()=>playTone(659,0.15,'sine',0.12),150);
-  setTimeout(()=>playTone(784,0.3,'sine',0.15),300);
+  playThemeSound('gameover');
   vibrate([80,40,80,40,100]);
 }
 // ─── 震动反馈（调用系统 API，Android WebView 原生支持） ───
 // 不可用环境（桌面、iOS）静默降级
 function vibrate(pattern){
+  if(appSettings.vibrate===false)return;
   try{if(navigator.vibrate)navigator.vibrate(pattern)}catch(e){}
 }
 
@@ -284,6 +447,12 @@ Router.register('history', {
 
 
 
+Router.register('settings', {
+  back: 'welcome',
+  enter() { document.body.style.background=''; renderSettingsPage(); },
+  leave() {}
+});
+
 Router.register('game', {
   back: null,
   enter() {},
@@ -291,7 +460,7 @@ Router.register('game', {
 });
 
 Router.register('about', {
-  back: 'welcome',
+  back: 'settings',
   enter() { document.body.style.background=''; },
   leave() {}
 });
@@ -3235,7 +3404,8 @@ window.addEventListener('popstate',()=>{
       'welcome':       () => showExitConfirm(),                     // 1 => 14
       'gameSetup':     () => Router.switchPage('welcome'),          // new => welcome
       'history':       () => Router.switchPage('welcome'),          // 5 => 1
-      'about':         () => Router.switchPage('welcome'),          // 6 => 1
+      'settings':      () => Router.switchPage('welcome'),          // settings => 1
+      'about':         () => Router.switchPage('settings'),         // 6 => settings
       'about-ai':      () => Router.switchPage('about'),            // 10 => 6
       'about-changelog': () => Router.switchPage('about'),          // 11 => 6
       'about-benchmark': () => Router.switchPage('about'),            // 12 => 6
