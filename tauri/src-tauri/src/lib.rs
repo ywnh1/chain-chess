@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use std::io::Write;
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -100,6 +100,9 @@ pub struct HistoryRecord {
 pub struct ProcessMoveResult {
     pub board: GameBoard,
     pub eliminated: Vec<usize>,
+    /// 被淘汰玩家对应的击败者：(victim, killer)，无法确定时缺省
+    #[serde(default)]
+    pub killed_by: Vec<(usize, usize)>,
     pub chain_count: u32,
     pub game_over: bool,
     pub winner: Option<usize>,
@@ -138,7 +141,7 @@ async fn process_move(
 ) -> Result<ProcessMoveResult, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut b = board.clone();
-        let (eliminated, chain_count) = process_click(&mut b, size, x, y, player, max_players, border_mode);
+        let (eliminated, chain_count, killed_by) = process_click_with_killer(&mut b, size, x, y, player, max_players, border_mode);
         let game_over = eliminated.len() >= max_players.saturating_sub(1);
         let winner = if game_over {
             // find the remaining player
@@ -153,6 +156,7 @@ async fn process_move(
             board: b,
             chain_count,
             eliminated,
+            killed_by,
             game_over,
             winner,
         }
@@ -1079,7 +1083,7 @@ fn is_in_any_restricted_zone(board: &GameBoard, sz: usize, x: usize, y: usize) -
     false
 }
 
-pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize, _max_players: usize, border_mode: BorderMode) -> (Vec<usize>, u32) {
+pub fn process_click_with_killer(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize, _max_players: usize, border_mode: BorderMode) -> (Vec<usize>, u32, Vec<(usize, usize)>) {
     // collect owners before
     let before: HashSet<usize> = board
         .iter()
@@ -1099,16 +1103,24 @@ pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, playe
         } else if cell.owner == Some(player) {
             cell.count += 1;
         } else {
-            return (vec![], 0);
+            return (vec![], 0, vec![]);
         }
     }
 
     // chain reaction (FIFO = VecDeque)
     let mut chain: VecDeque<(usize, usize)> = VecDeque::new();
+    // victim -> killer：记录每个玩家最后一次被谁覆盖棋子（最后覆盖者即击败者）
+    let mut last_killer: HashMap<usize, usize> = HashMap::new();
     chain.push_back((x, y));
     let mut chain_count: u32 = 0;
+    // 连锁防御上限：正常对局连锁远低于此值；
+    // 防特定棋盘结构（相邻格子互相供能）下无限互炸导致死锁/卡死
+    const MAX_CHAIN_STEPS: u32 = 100_000;
+    let mut chain_steps: u32 = 0;
 
     while let Some((cx, cy)) = chain.pop_front() {
+        chain_steps += 1;
+        if chain_steps > MAX_CHAIN_STEPS { break; }
         // 降级边界模式：角上阈值=2，边上阈值=3，中央阈值=4
         let threshold = match border_mode {
             BorderMode::Degrade => {
@@ -1133,6 +1145,9 @@ pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, playe
                     let left = if cy == 0 { sz - 1 } else { cy - 1 };
                     let right = if cy + 1 >= sz { 0 } else { cy + 1 };
                     for &(nx, ny) in &[(up, cy), (down, cy), (cx, left), (cx, right)] {
+                        if let Some(pv) = board[nx][ny].owner {
+                            if pv != owner { last_killer.insert(pv, owner); }
+                        }
                         board[nx][ny].owner = Some(owner);
                         board[nx][ny].count = board[nx][ny].count.saturating_add(1);
                         chain.push_back((nx, ny));
@@ -1153,6 +1168,9 @@ pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, playe
                     for &(nx, ny) in &dirs {
                         if nx < sz && ny < sz {
                             has_valid = true;
+                            if let Some(pv) = board[nx][ny].owner {
+                                if pv != owner { last_killer.insert(pv, owner); }
+                            }
                             board[nx][ny].owner = Some(owner);
                             board[nx][ny].count = board[nx][ny].count.saturating_add(1);
                             chain.push_back((nx, ny));
@@ -1172,6 +1190,9 @@ pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, playe
                 _ => {
                     // 默认边界 / 降级边界：标准邻居扩散
                     for (nx, ny) in nbrs(cx, cy, sz) {
+                        if let Some(pv) = board[nx][ny].owner {
+                            if pv != owner { last_killer.insert(pv, owner); }
+                        }
                         board[nx][ny].owner = Some(owner);
                         board[nx][ny].count = board[nx][ny].count.saturating_add(1);
                         chain.push_back((nx, ny));
@@ -1190,6 +1211,19 @@ pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, playe
 
     let mut eliminated: Vec<usize> = before.difference(&after).copied().collect();
     eliminated.sort(); // 确定顺序，避免前端排行错乱
+    // 为每个被淘汰玩家确定击败者（最后一次覆盖其棋子的玩家）
+    let mut killed_by: Vec<(usize, usize)> = Vec::new();
+    for &victim in &eliminated {
+        if let Some(&killer) = last_killer.get(&victim) {
+            killed_by.push((victim, killer));
+        }
+    }
+    (eliminated, chain_count, killed_by)
+}
+
+/// 无击败者信息的简单版本（供 AI 搜索/基准测试等内部调用）
+pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize, max_players: usize, border_mode: BorderMode) -> (Vec<usize>, u32) {
+    let (eliminated, chain_count, _) = process_click_with_killer(board, sz, x, y, player, max_players, border_mode);
     (eliminated, chain_count)
 }
 

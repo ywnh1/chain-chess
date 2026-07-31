@@ -90,12 +90,14 @@ let _originPage=null; // 游戏从哪个 lobby 页面发起（用于「再来一
 let gameOver=false;
 let aiPlayers=new Set();
 let aiThinking=false;
+let animating=false; // 连锁动画播放中，期间锁定落子/悔棋
 let aiAlgorithm='strategy';
 let aiDepth=2;
 let aiConfigs={}; // per-AI configs for eve mode
 let gameCount=0;
 let eliminatedPlayers=new Set();
 var eliminationRounds=[];
+var eliminationInfo={}; // pid -> 击败者 pid（被谁淘汰）
 let gameHistory=[];
 let chainStats={};
 let maxChainOverall={player:null,length:0};
@@ -778,6 +780,7 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
         finished: true,
         history: compact,
         playerTypes: getPlayerTypesArray(),
+        killedBy: {...eliminationInfo},
       }
     });
     // 保存成功后清理磁盘上的回合数据（不再需要）
@@ -798,6 +801,7 @@ async function saveUnfinishedGameHistory(){
   const _aiPlayers = Array.from(aiPlayers);
   const _aiConfigs = aiConfigs || {};
   const _eliminatedPlayers = Array.from(eliminatedPlayers);
+  const _eliminationInfo = {...eliminationInfo};
   const _chainStats = JSON.parse(JSON.stringify(chainStats || {}));
   const _maxChainOverall = maxChainOverall ? {...maxChainOverall} : {player:null,length:0};
   const _gameCount = gameCount || 0;
@@ -833,6 +837,7 @@ async function saveUnfinishedGameHistory(){
     aiPlayers: _aiPlayers,
     aiConfigs: _aiConfigs,
     eliminatedPlayers: _eliminatedPlayers,
+    eliminationInfo: _eliminationInfo,
     chainStats: _chainStats,
     maxChainOverall: _maxChainOverall,
     gameCount: _gameCount,
@@ -940,11 +945,13 @@ function loadGameFromState(saved){
 
   eliminatedPlayers = new Set();
   eliminationRounds = [];
+  eliminationInfo = {};
   if(saved.eliminatedPlayers && saved.eliminatedPlayers.length > 0){
     saved.eliminatedPlayers.forEach(p => eliminatedPlayers.add(p));
     // 重建淘汰轮次
     saved.eliminatedPlayers.forEach(p => eliminationRounds.push([p]));
   }
+  if(saved.eliminationInfo)eliminationInfo = saved.eliminationInfo;
 
   _colorNames = saved.colorNames || COLOR_NAMES;
   chainStats = saved.chainStats || {};
@@ -983,6 +990,7 @@ function saveCurrentGameState(historyOverride){
     aiPlayers: Array.from(aiPlayers),
     aiConfigs: aiConfigs || {},
     eliminatedPlayers: Array.from(eliminatedPlayers),
+    eliminationInfo: {...eliminationInfo},
     chainStats: JSON.parse(JSON.stringify(chainStats || {})),
     maxChainOverall: maxChainOverall ? {...maxChainOverall} : {player:null,length:0},
     gameCount: gameCount || 0,
@@ -1192,6 +1200,24 @@ function nbrsForMode(i,j,sz,bm){
     let right=j+1>=sz?0:j+1;
     return[[up,j],[down,j],[i,left],[i,right]];
   }
+  if(bm==='bounce'){
+    // 反弹边界：出界方向的能量反弹到正对方向（该方向额外 +1，重复出现表示能量叠加）
+    let dirs=[[i-1,j],[i+1,j],[i,j-1],[i,j+1]];
+    let opp=[1,0,3,2];
+    let out=[];
+    for(let k=0;k<4;k++){
+      let[nx,ny]=dirs[k];
+      if(nx>=0&&nx<sz&&ny>=0&&ny<sz)out.push([nx,ny]);
+    }
+    for(let k=0;k<4;k++){
+      let[nx,ny]=dirs[k];
+      if(nx<0||nx>=sz||ny<0||ny>=sz){
+        let[ox,oy]=dirs[opp[k]];
+        if(ox>=0&&ox<sz&&oy>=0&&oy<sz)out.push([ox,oy]);
+      }
+    }
+    return out;
+  }
   let r=[];
   if(i>0)r.push([i-1,j]);
   if(i+1<sz)r.push([i+1,j]);
@@ -1201,6 +1227,8 @@ function nbrsForMode(i,j,sz,bm){
 }
 
 async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
+  animating=true;
+  try{
   let c=b[x][y];
   if(c.owner===null){
     let anyPieces=false;
@@ -1223,7 +1251,9 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
   let bm=borderMode||'default';
   let animDelay=(anim==='explode')?220:0;
 
+  let chainGuard=0; // 连锁防御上限：防止特定棋盘结构下无限互炸导致动画/点击卡死
   while(chain.length){
+    if(++chainGuard>100000)break;
     let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=capForMode(cx,cy,s,bm);
     if(cell.count>=capv){
       cell.count=0;cell.owner=null;
@@ -1236,8 +1266,8 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
       }
       if(anim==='explode'){
         let el=cells?.[cx]?.[cy];
+        renderBoard(false);
         if(el){addShockwave(el,playerColor);addParticles(el,playerColor,8)}
-        renderBoard(true);
         if(el)el.classList.add('explode');
         await sleep(animDelay);
         if(el)el.classList.remove('explode');
@@ -1271,6 +1301,9 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
   for(let row of b)for(let cl of row)if(cl.owner!==null)now.add(cl.owner);
   if(finalBoard&&rustResult&&rustResult.eliminated)return rustResult.eliminated;
   return[...had].filter(p=>!now.has(p));
+  }finally{
+    animating=false;
+  }
 }
 
 function showSkipBtn(v){
@@ -1303,29 +1336,44 @@ function clearBoardDOM(){
 }
 
 /* ═══ 视觉特效辅助函数 ═══ */
+// 特效挂到独立 fixed 层，避免棋盘格子重绘（innerHTML='' / DOM 重建）清掉动画
+function getFxLayer(){
+  let l=document.getElementById('fxLayer');
+  if(!l){
+    l=document.createElement('div');l.id='fxLayer';
+    l.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden';
+    document.body.appendChild(l);
+  }
+  return l;
+}
 function addRipple(el){
   if(!el)return;
+  const rect=el.getBoundingClientRect();
   const rip=document.createElement('div');rip.className='ripple';
-  el.appendChild(rip);
+  rip.style.cssText=`position:absolute;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px`;
+  getFxLayer().appendChild(rip);
   setTimeout(()=>rip.remove(),600);
 }
 function addShockwave(el,color){
   if(!el)return;
+  const rect=el.getBoundingClientRect();
   const sw=document.createElement('div');sw.className='shockwave';
   sw.style.borderColor=color||'rgba(255,255,255,.5)';
-  el.appendChild(sw);
+  sw.style.cssText=`position:absolute;left:${rect.left-8}px;top:${rect.top-8}px;width:${rect.width+16}px;height:${rect.height+16}px;border:2px solid ${color||'rgba(255,255,255,.5)'}`;
+  getFxLayer().appendChild(sw);
   setTimeout(()=>sw.remove(),600);
 }
 function addParticles(el,color,count){
   if(!el)return;
   const rect=el.getBoundingClientRect();
-  const cx=rect.width/2,cy=rect.height/2;
+  const fx=getFxLayer();
+  const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
   for(let i=0;i<(count||6);i++){
     const p=document.createElement('div');p.className='particle';
     const angle=Math.random()*Math.PI*2;
     const dist=30+Math.random()*50;
-    p.style.cssText=`left:${cx}px;top:${cy}px;background:${color||'rgba(255,255,255,.7)'};--dx:${Math.cos(angle)*dist}px;--dy:${Math.sin(angle)*dist}px`;
-    el.appendChild(p);
+    p.style.cssText=`position:absolute;left:${cx}px;top:${cy}px;background:${color||'rgba(255,255,255,.7)'};--dx:${Math.cos(angle)*dist}px;--dy:${Math.sin(angle)*dist}px`;
+    fx.appendChild(p);
     setTimeout(()=>p.remove(),700);
   }
 }
@@ -1419,7 +1467,7 @@ function cloneBoard(b){
 }
 
 async function triggerAI(){
-  if(gameOver||aiThinking||isPaused)return;
+  if(gameOver||aiThinking||isPaused||animating)return;
   if(!aiPlayers.has(curPlayer))return;
   // AI 首子由玩家放置：AI 无棋子时，由玩家点击落子
   if(!hasPieces(curPlayer,board)){
@@ -1493,7 +1541,7 @@ async function triggerAI(){
   const aiClickEl=cells?.[x]?.[y];
   if(aiClickEl)addRipple(aiClickEl);
   playClick();
-  let elim;
+  let elim, killedBy;
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
@@ -1502,12 +1550,12 @@ async function triggerAI(){
     });
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
     board=result.board;
+    killedBy=result.killedBy;
     elim=result.eliminated||[];
   }catch(e){
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
   }
-  for(let e of elim){eliminatedPlayers.add(e);playElim()}
-  if(elim&&elim.length>0)eliminationRounds.push([...elim]);
+  handleEliminations(elim, killedBy, curPlayer);
   recordHistory();
   renderBoard(true);
   let alive=[];
@@ -1616,6 +1664,8 @@ function saveUndoState(){
     curPlayer: curPlayer,
     firstMovePos: firstMovePos,
     eliminatedPlayers: new Set(eliminatedPlayers),
+    eliminationInfo: {...eliminationInfo},
+    eliminationRounds: eliminationRounds.slice(),
     chainStats: JSON.parse(JSON.stringify(chainStats)),
     maxChainOverall: {...maxChainOverall},
     aiMove: null,  // AI 缓存走法，悔棋时无需重算
@@ -1625,12 +1675,14 @@ function saveUndoState(){
   updateUndoBtn();
 }
 function undoLastMove(){
-  if(undoStack.length===0||gameOver||aiThinking)return;
+  if(undoStack.length===0||gameOver||aiThinking||animating)return;
   let state=undoStack.pop();
   board=state.board;
   curPlayer=state.curPlayer;
   firstMovePos=state.firstMovePos;
   eliminatedPlayers=state.eliminatedPlayers;
+  eliminationInfo=state.eliminationInfo||{};
+  eliminationRounds=state.eliminationRounds||[];
   chainStats=state.chainStats;
   maxChainOverall=state.maxChainOverall;
   // 移除 gameHistory 最后一条
@@ -1658,8 +1710,8 @@ async function replayAiMove(move){
   let el=cells?.[x]?.[y];
   if(el)addRipple(el);
   playClick();
-  let elim;
-  try{
+  let elim, killedBy;
+  try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
       player:curPlayer,maxPlayers:maxPlayers,
@@ -1667,12 +1719,12 @@ async function replayAiMove(move){
     });
     elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer],result);
     board=result.board;
+    killedBy=result.killedBy;
     elim=result.eliminated||[];
   }catch(e){
     elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer]);
   }
-  for(let e of elim){eliminatedPlayers.add(e);playElim()}
-  if(elim&&elim.length>0)eliminationRounds.push([...elim]);
+  handleEliminations(elim, killedBy, curPlayer);
   recordHistory();
   renderBoard(true);
   let alive=[];
@@ -1777,7 +1829,7 @@ async function animateBoardDiff(oldBoard, newBoard, sz){
 }
 
 async function localClick(x,y){
-  if(gameOver||aiThinking||isPaused)return;
+  if(gameOver||aiThinking||isPaused||animating)return;
   // AI 首子由玩家放置：轮到 AI 且 AI 无棋子时，人类可点击为空 AI 放置首子
   if(aiPlayers.has(curPlayer) && hasPieces(curPlayer,board)){
     showMsg('轮到 AI 思考，请等待', '');
@@ -1794,7 +1846,7 @@ async function localClick(x,y){
     playClick();
     const clickEl=cells?.[x]?.[y];
     if(clickEl)addRipple(clickEl);
-    let elim;
+    let elim, killedBy;
     try {
       let result=await tauriInvoke('process_move',{
         board:board,size:size,x:x,y:y,
@@ -1803,12 +1855,12 @@ async function localClick(x,y){
       });
       elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
       board=result.board;
+      killedBy=result.killedBy;
       elim=result.eliminated||[];
     }catch(e){
       elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
     }
-    for(let e of elim){eliminatedPlayers.add(e);playElim()}
-    if(elim&&elim.length>0)eliminationRounds.push([...elim]);
+    handleEliminations(elim, killedBy, curPlayer);
     recordHistory();
     renderBoard(true);
     let alive=[];
@@ -1845,7 +1897,7 @@ async function localClick(x,y){
   // 落子波纹视觉反馈
   const clickEl=cells?.[x]?.[y];
   if(clickEl)addRipple(clickEl);
-  let elim;
+  let elim, killedBy;
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
@@ -1854,12 +1906,12 @@ async function localClick(x,y){
     });
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
     board=result.board;
+    killedBy=result.killedBy;
     elim=result.eliminated||[];
   }catch(e){
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
   }
-  for(let e of elim){eliminatedPlayers.add(e);playElim()}
-  if(elim&&elim.length>0)eliminationRounds.push([...elim]);
+  handleEliminations(elim, killedBy, curPlayer);
   recordHistory();
   renderBoard(true);
   let alive=[];
@@ -1882,7 +1934,7 @@ async function localClick(x,y){
 }
 
 function handleClick(x,y){
-  if(!aiThinking&&!isPaused)localClick(x,y);
+  if(!aiThinking&&!isPaused&&!animating)localClick(x,y);
 }
 
 /* ==================== SETTLEMENT ==================== */
@@ -1890,6 +1942,40 @@ function getPlayerLabel(p){
   if(p===undefined||p===null)return '未知';
   if(_colorNames&&_colorNames[p])return _colorNames[p];
   return aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`;
+}
+
+// 处理一轮淘汰：记录击败者、播放音效、toast 播报
+function handleEliminations(elim, killedBy, curPlayer){
+  if(!elim||elim.length===0)return;
+  var parts=[];
+  for(let e of elim){
+    eliminatedPlayers.add(e);
+    playElim();
+    var killer=null;
+    if(killedBy&&killedBy.length){
+      for(var i=0;i<killedBy.length;i++){
+        if(killedBy[i][0]===e){killer=killedBy[i][1];break}
+      }
+    }
+    if(killer===null||killer===undefined)killer=curPlayer; // 兜底：视为当前落子玩家
+    eliminationInfo[e]=killer;
+    parts.push(getPlayerLabel(e)+' 被 '+getPlayerLabel(killer)+' 淘汰');
+  }
+  eliminationRounds.push([...elim]);
+  if(parts.length)showToast('❌ '+parts.join('；'));
+}
+
+// 获取某玩家被谁击败（返回击败者 pid，无则 null）
+function getEliminatorPid(pid){
+  if(pid===undefined||pid===null)return null;
+  var k=eliminationInfo[pid];
+  return (k===undefined||k===null)?null:k;
+}
+// 获取某玩家被谁击败的名字（无则 null）
+function getEliminatorName(pid, colorNames){
+  var k=getEliminatorPid(pid);
+  if(k===null)return null;
+  return (colorNames&&colorNames[k])||getPlayerLabel(k);
 }
 
 // 获取玩家类型标签
@@ -1902,7 +1988,7 @@ function getPlayerTypeLabel(p){
 }
 
 // 绘制排名列表
-function renderRankingList(container, boardState, playerCnt, eliminatedSet, colorNames, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerDataOverride, playerTypesOverride, currentPlayerIdx){
+function renderRankingList(container, boardState, playerCnt, eliminatedSet, colorNames, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerDataOverride, playerTypesOverride, currentPlayerIdx, killerMap){
   var data=[];
   var maxPieces=0;
   for(var p=0;p<playerCnt;p++){
@@ -2026,6 +2112,24 @@ function renderRankingList(container, boardState, playerCnt, eliminatedSet, colo
       typeLine.appendChild(chainEl);
     }
     item.appendChild(typeLine);
+    if(d.eliminated){
+      var elimLine=document.createElement('div');elimLine.className='rank-elim-line';
+      var kName=null;
+      if(typeof killerMap!=='undefined'&&killerMap&&killerMap[d.index]!==undefined&&killerMap[d.index]!==null){
+        kName=(colorNames&&colorNames[killerMap[d.index]])||getPlayerLabel(killerMap[d.index]);
+      }else{
+        kName=getEliminatorName(d.index,colorNames);
+      }
+      if(kName){
+        elimLine.appendChild(document.createTextNode('⚔ 被 '));
+        var kSpan=document.createElement('span');kSpan.className='rank-elim-killer';kSpan.textContent=kName;
+        elimLine.appendChild(kSpan);
+        elimLine.appendChild(document.createTextNode(' 淘汰'));
+      }else{
+        elimLine.textContent='✖ 已淘汰';
+      }
+      item.appendChild(elimLine);
+    }
     if(d.detail){
       item.classList.add('has-detail');
       var detailLine=document.createElement('div');detailLine.className='rank-detail-line';
@@ -2034,7 +2138,7 @@ function renderRankingList(container, boardState, playerCnt, eliminatedSet, colo
     }
     item.onclick=function(idx,pid){return function(e){
       e.stopPropagation();
-      showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerTypesOverride);
+      showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerTypesOverride, killerMap);
     }}(i,d.index);
     table.appendChild(item);
   }
@@ -2042,7 +2146,7 @@ function renderRankingList(container, boardState, playerCnt, eliminatedSet, colo
 }
 
 // 玩家详情弹窗
-function showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerTypesOverride){
+function showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerTypesOverride, killerMap){
   var pName=(colorNames&&colorNames[pid])||getPlayerLabel(pid);
   var isElim=eliminatedSet&&eliminatedSet.has(pid);
   var isWinner=pid===winnerP;
@@ -2106,7 +2210,16 @@ function showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap
   hName.textContent=pName;
   var statusEl=document.createElement('span');statusEl.className='rank-modal-status';
   if(isWinner){statusEl.textContent='🏆 获胜';statusEl.classList.add('winner')}
-  else if(isElim){statusEl.textContent='✖ 已淘汰';statusEl.classList.add('eliminated')}
+  else if(isElim){
+    var kName2=null;
+    if(typeof killerMap!=='undefined'&&killerMap&&killerMap[pid]!==undefined&&killerMap[pid]!==null){
+      kName2=(colorNames&&colorNames[killerMap[pid]])||getPlayerLabel(killerMap[pid]);
+    }else{
+      kName2=getEliminatorName(pid,colorNames);
+    }
+    statusEl.textContent=kName2?('✖ 被 '+kName2+' 淘汰'):'✖ 已淘汰';
+    statusEl.classList.add('eliminated')
+  }
   else{statusEl.textContent='● 存活';statusEl.classList.add('alive')}
   var closeBtn=document.createElement('button');closeBtn.className='rank-modal-close';
   closeBtn.textContent='✕';
@@ -2525,7 +2638,7 @@ function showHistoryDetail(r){
   for(var pe=0;pe<histPlayerCnt;pe++){
     if(!finalSnap[String(pe)]||!finalSnap[String(pe)].pieces)histEliminated.add(pe);
   }
-  renderRankingList(inner, [], histPlayerCnt, histEliminated, r.colorNames, null, r.winner, r.chainStats, historyData, finalSnap, r.playerTypes, null);
+  renderRankingList(inner, [], histPlayerCnt, histEliminated, r.colorNames, null, r.winner, r.chainStats, historyData, finalSnap, r.playerTypes, null, r.killedBy);
   renderGameCharts(inner, historyData, {
     winner: r.winner, colorNames: r.colorNames, colors: COLORS,
     chainStats: r.chainStats, maxChain: r.maxChain,
@@ -2717,7 +2830,7 @@ function exitGame(){
   // 刷盘残留历史再退出，清理磁盘回合数据
   if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history on exit failed:', e))}
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
-  aiPlayers=new Set();eliminatedPlayers=new Set();eliminationRounds=[];gameHistory=[];chainStats={};
+  aiPlayers=new Set();eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;undoStack=[];
   cells=[];board=[];
   try{document.getElementById('board').innerHTML='';}catch(e){}
@@ -2737,7 +2850,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-    {v:'v3.1.7 · 第 30 版',desc:'Added auto-update feature (silent background check, modal prompt, browser download), fixed URL encoding for Chinese filenames, English modal text'},
+    {v:'v3.1.7 · 第 30 版',desc:'新增自动更新功能：启动时静默检查更新、有更新时弹窗提示、浏览器下载安装；修复中文文件名 URL 编码问题；优化提示文字为英文'},
     {v:'v3.1.6 · 第 29 版',desc:'新增自动更新功能：每次启动自动检测新版本、下载后自动打开安装包；优化游戏体验；修复已知问题'},
     {v:'v3.1.5 · 第 28 版',desc:'新增3个棋盘模式，丰富游戏体验'},
     {v:'v3.1.4 · 第 27 版',desc:'排名列表UI优化：可点击详情弹窗、暂停/结算/历史三处排名、局内改名取消、按钮布局优化'},
@@ -2989,7 +3102,7 @@ function startLocalFromSetup(sz,cnt){
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='local';_originPage='gameSetup';
   aiPlayers=new Set();aiThinking=false;
-  eliminatedPlayers=new Set();eliminationRounds=[];gameHistory=[];chainStats={};
+  eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
   let colorNames={};
   for(let i=0;i<cnt;i++){
@@ -3015,7 +3128,7 @@ function startAIFromSetup(sz,cnt){
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='ai';_originPage='gameSetup';
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
-  eliminatedPlayers=new Set();eliminationRounds=[];gameHistory=[];chainStats={};
+  eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
   let colorNames={},humanIdx=-1;
   for(let i=0;i<cnt;i++){
@@ -3050,7 +3163,7 @@ function startEveFromSetup(sz,cnt){
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='eve';_originPage='gameSetup';
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
-  eliminatedPlayers=new Set();eliminationRounds=[];gameHistory=[];chainStats={};
+  eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
   let colorNames={};
   for(let i=0;i<cnt;i++){

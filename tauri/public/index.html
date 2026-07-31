@@ -518,15 +518,12 @@
   </div>
 </div>
 
-<script>
-<script>
-/* ─── Auto Update Check ─── */
-(function(){
-var CACHE_KEY = 'update_cache';
-var CACHE_TTL = 60 * 60 * 1000;
-var _updUrl = '';
 
-function closeUpdateModal() { try { document.getElementById('updateModal').classList.remove('show'); } catch(e) {} }
+<script>
+/* ─── Auto Update ─── */
+(function(){
+var CACHE_KEY = 'upd';
+var _updUrl = '';
 
 function getCurVer() {
   try { var el = document.querySelector('.info-val'); if (el) return el.textContent.replace('v', ''); } catch(e) {}
@@ -542,55 +539,68 @@ function cmpVer(a, b) {
   return 0;
 }
 
-function backgroundCheck() {
-  try {
-    var c = JSON.parse(localStorage.getItem(CACHE_KEY));
-    if (c && c.checkedAt && (Date.now() - c.checkedAt < CACHE_TTL)) {
-      if (c.available) { showUpdateModal(c.version, c.notes, c.url); }
-      return;
-    }
-  } catch(e) {}
-
+/** 启动后静默检查 */
+function silentCheck() {
+  document.title = 'upd:fetch';
   var xhr = new XMLHttpRequest();
   xhr.open('GET', 'https://gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json?ref=main', true);
   xhr.timeout = 15000;
   xhr.onload = function() {
+    document.title = 'upd:loaded';
     try {
-      if (xhr.status !== 200) return;
+      if (xhr.status !== 200) { document.title = 'upd:http' + xhr.status; showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25 (HTTP ' + xhr.status + ')'); return; }
       var r = xhr.responseText;
-      if (!r || r.charAt(0) === '<') return;
+      if (!r || r.charAt(0) === '<') { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u670d\u52a1\u5668\u8fd4\u56de\u4e86 HTML'); return; }
       var a = JSON.parse(r);
-      if (!a.content || a.encoding !== 'base64') return;
+      if (!a.content || a.encoding !== 'base64') { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u6570\u636e\u683c\u5f0f\u5f02\u5e38'); return; }
       var b64 = a.content; while (b64.length % 4) b64 += '=';
       var d = JSON.parse(atob(b64));
-      if (!d || !d.version) return;
+      if (!d || !d.version) { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u7f3a\u5c11\u7248\u672c\u53f7'); return; }
       var cur = getCurVer();
       var available = cmpVer(d.version, cur) > 0;
       var url = (d.platforms && d.platforms.android && d.platforms.android.url) || '';
       url = encodeURI(url);
-      localStorage.setItem(CACHE_KEY, JSON.stringify({
-        checkedAt: Date.now(), available: available && !!url,
-        version: d.version, notes: d.notes || '', url: url
-      }));
-      if (available && url) showUpdateModal(d.version, d.notes || '', url);
-    } catch(e) {}
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ver: d.version, available: available && !!url, notes: d.notes || '', url: url })); } catch(e) {}
+      if (available && url) { showUpdateModal(d.version, d.notes || '', url); }
+      else { document.title = 'upd:cur ' + d.version + ' (cur:' + cur + ')'; }
+      
+    } catch(e) { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25: ' + e.message); }
   };
-  xhr.onerror = function() {};
-  xhr.ontimeout = function() {};
+  xhr.onerror = function() { document.title = 'upd:error'; showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u7f51\u7edc\u8bf7\u6c42失\u8d25'); };
+  xhr.ontimeout = function() { document.title = 'upd:timeout'; showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u8bf7\u6c42\u8d85\u65f6 (15s)'); };
   xhr.send();
 }
 
+function showToast(msg) {
+  try {
+    var old = document.getElementById('autoToast');
+    if (old) old.remove();
+    var d = document.createElement('div');
+    d.id = 'autoToast';
+    d.textContent = msg;
+    d.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);max-width:85%;padding:10px 18px;background:rgba(231,76,60,.92);color:#fff;border-radius:10px;font-size:.82rem;text-align:center;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);animation:toastFadeIn .3s ease';
+    document.body.appendChild(d);
+    setTimeout(function() {
+      d.style.transition = 'opacity .6s ease';
+      d.style.opacity = '0';
+      setTimeout(function() { try { d.remove(); } catch(e) {} }, 700);
+    }, 3500);
+  } catch(e) {}
+}
+
 function showUpdateModal(ver, notes, url) {
+  document.title = 'upd:found v' + ver;
   _updUrl = url;
   var m = document.getElementById('updateModal');
   if (!m) return;
   m.classList.add('show');
-  document.getElementById('updateModalTitle').textContent = 'New version v' + ver + ' available';
-  document.getElementById('updateModalMsg').innerHTML = notes.replace(/\n/g, '<br>');
+  document.getElementById('updateModalTitle').textContent = '\u53d1\u73b0\u65b0\u7248\u672c v' + ver;
+  document.getElementById('updateModalMsg').innerHTML = notes.replace(/\\n/g, '<br>');
   document.getElementById('updateModalConfirm').style.display = 'inline-block';
   document.getElementById('updateModalConfirm').onclick = startDownload;
   document.getElementById('updateModalCancel').style.display = 'inline-block';
-  document.getElementById('updateModalCancel').textContent = 'Later';
+  document.getElementById('updateModalCancel').textContent = '\u7a0d\u540e';
+  document.getElementById('updateProgressWrap').style.display = 'none';
 }
 
 function startDownload() {
@@ -598,38 +608,40 @@ function startDownload() {
   var p = document.getElementById('updateProgressWrap');
   var b = document.getElementById('updateModalConfirm');
   var c = document.getElementById('updateModalCancel');
-  b.style.display = 'none';
-  c.textContent = 'Downloading...';
+  b.style.display = 'none'; c.textContent = '\u4e0b\u8f7d\u4e2d...';
   p.style.display = 'block';
   document.getElementById('updateProgressBar').style.width = '0%';
-  document.getElementById('updateProgressText').textContent = 'Starting...';
-  document.getElementById('updateModalTitle').textContent = 'Downloading...';
-  document.getElementById('updateModalMsg').textContent = 'Opening download link...';
-
+  document.getElementById('updateProgressText').textContent = '\u51c6\u5907\u4e2d';
+  document.getElementById('updateModalTitle').textContent = '\u6b63\u5728\u4e0b\u8f7d';
+  document.getElementById('updateModalMsg').textContent = '\u6b63\u5728\u6253\u5f00\u4e0b\u8f7d\u94fe\u63a5...';
   var invoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
   if (invoke) {
     invoke('download_update', { url: _updUrl }).then(function() {
       document.getElementById('updateProgressBar').style.width = '100%';
-      document.getElementById('updateProgressText').textContent = 'Done';
-      document.getElementById('updateModalTitle').textContent = 'Download link opened';
-      document.getElementById('updateModalMsg').textContent = 'Please complete installation in your browser';
+      document.getElementById('updateProgressText').textContent = '\u5b8c\u6210';
+      document.getElementById('updateModalTitle').textContent = '\u4e0b\u8f7d\u94fe\u63a5\u5df2\u6253\u5f00';
+      document.getElementById('updateModalMsg').textContent = '\u8bf7\u5728\u6d4f\u89c8\u5668\u4e2d\u5b8c\u6210\u4e0b\u8f7d\u548c\u5b89\u88c5';
       c.style.display = 'none';
       setTimeout(closeUpdateModal, 4000);
     }).catch(function() {
-      document.getElementById('updateModalTitle').textContent = 'Download failed';
-      document.getElementById('updateModalMsg').textContent = 'Failed to open link, please try again later';
+      document.getElementById('updateModalTitle').textContent = '\u4e0b\u8f7d\u5931\u8d25';
+      document.getElementById('updateModalMsg').textContent = '\u65e0\u6cd5\u6253\u5f00\u94fe\u63a5';
       p.style.display = 'none';
     });
   } else {
     p.style.display = 'none';
-    document.getElementById('updateModalTitle').textContent = 'Test mode';
-    document.getElementById('updateModalMsg').textContent = 'Non-Tauri environment, build APK to test';
-    c.textContent = 'Close';
+    document.getElementById('updateModalTitle').textContent = '\u6d4b\u8bd5\u6a21\u5f0f';
+    document.getElementById('updateModalMsg').textContent = '\u975e Tauri \u73af\u5883\uff0c\u8bf7\u6784\u5efa APK \u6d4b\u8bd5';
+    c.textContent = '\u5173\u95ed';
   }
 }
 
-backgroundCheck();
+silentCheck();
 })();
+// 暴露 closeUpdateModal 到全局（HTML onclick 需要）
+window.closeUpdateModal = function() {
+  try { document.getElementById('updateModal').classList.remove('show'); } catch(e) {}
+};
 </script>
 <script src="app.js"></script>
 </body>

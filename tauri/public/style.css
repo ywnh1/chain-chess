@@ -308,9 +308,10 @@ body::after{content:'';position:fixed;inset:0;
 }
 .cell.highlight{background:var(--glass-w-12);border-color:var(--glass-w-10);transform:scale(1.02)}
 .cell:active{transform:scale(.93)}
-/* ═══ 落子波纹特效 ═══ */
-.cell .ripple{
-  position:absolute;inset:0;border-radius:min(2.2vw,10px);
+/* ═══ 落子波纹特效（独立特效层，不受棋盘重绘影响）═══ */
+#fxLayer{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
+#fxLayer .ripple{
+  border-radius:min(2.2vw,10px);
   pointer-events:none;animation:rippleAnim .5s ease-out forwards;
 }
 @keyframes rippleAnim{
@@ -318,17 +319,16 @@ body::after{content:'';position:fixed;inset:0;
   100%{box-shadow:0 0 0 12px rgba(255,255,255,0),inset 0 0 0 6px rgba(255,255,255,0)}
 }
 /* ═══ 爆炸冲击波+碎片 ═══ */
-.cell .shockwave{
-  position:absolute;inset:-8px;border-radius:50%;
+#fxLayer .shockwave{
+  border-radius:50%;
   pointer-events:none;animation:shockwaveAnim .5s ease-out forwards;
-  border:2px solid rgba(255,255,255,.5);
 }
 @keyframes shockwaveAnim{
   0%{transform:scale(.8);opacity:1;border-width:3px}
   100%{transform:scale(2.5);opacity:0;border-width:1px}
 }
-.cell .particle{
-  position:absolute;width:6px;height:6px;border-radius:50%;
+#fxLayer .particle{
+  width:6px;height:6px;border-radius:50%;
   pointer-events:none;animation:particleFly .6s ease-out forwards;
 }
 @keyframes particleFly{
@@ -1173,6 +1173,10 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 .rank-type.ai-mcts{background:rgba(231,76,60,.08);color:#F1948A}
 .rank-gap{font-size:.6rem;color:var(--dim);opacity:.5}
 .rank-chain-badge{font-size:.6rem;color:var(--accent);background:rgba(240,179,75,.08);padding:0 5px;border-radius:4px;white-space:nowrap}
+/* 淘汰信息行：被谁击败 */
+.rank-elim-line{grid-row:4;grid-column:1 / -1;font-size:.62rem;color:#F1948A;padding:1px 0 0 0;border-top:1px solid var(--glass-w-04);margin-top:1px}
+.rank-elim-killer{font-weight:var(--weight-bold);color:#F1948A}
+.rank-item.eliminated .rank-elim-line{opacity:1}
 /* Row 3: detail (hidden by default) */
 .rank-detail-line{grid-row:3;grid-column:1 / -1;display:none}
 .rank-item.has-detail .rank-detail-line{display:block;font-size:.62rem;color:var(--dim);opacity:.65;padding:1px 0 0 0;border-top:1px solid var(--glass-w-04);margin-top:1px}
@@ -1289,3 +1293,4 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 .rank-modal-chart-box{background:var(--glass-w-025);border-radius:var(--radius-sm);padding:8px 10px;border:1px solid var(--glass-w-06);margin-bottom:8px}
 .rank-modal-chart-box canvas{width:100%;height:100px;display:block}
 .rank-modal-chart-box h4{font-size:.75rem;font-weight:var(--weight-medium);margin-bottom:4px;cursor:pointer;color:var(--dim)}
+@keyframes toastFadeIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
