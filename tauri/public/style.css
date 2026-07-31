@@ -1280,3 +1280,38 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 .switch .slider::before{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .switch input:checked + .slider{background:var(--accent)}
 .switch input:checked + .slider::before{transform:translateX(20px)}
+
+/* ═══════ AI 帮忙推荐高亮（棋盘格子） ═══════ */
+.ai-hint{outline:3px solid var(--accent);outline-offset:-3px;border-radius:6px;
+  animation:aiHintPulse 1s ease-in-out infinite}
+@keyframes aiHintPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(240,179,75,.5)}
+  50%{box-shadow:0 0 0 8px rgba(240,179,75,0)}
+}
+
+/* ═══════ 一键终局按钮与覆盖层 ═══════ */
+#fastFinishBtn{
+  padding:7px 14px;font-size:.72rem;font-weight:600;letter-spacing:.5px;
+  background:rgba(240,179,75,.14);color:var(--accent);
+  border:1px solid rgba(240,179,75,.35);border-radius:10px;
+  cursor:pointer;transition:all .2s ease;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 0 12px rgba(240,179,75,.06),inset 0 1px 0 rgba(240,179,75,.08);
+  font-family:var(--font);touch-action:manipulation}
+#fastFinishBtn:hover{background:rgba(240,179,75,.24);border-color:rgba(240,179,75,.55)}
+#fastFinishBtn:active{transform:scale(.96);transition:all .06s ease}
+
+.ff-overlay{
+  position:fixed;inset:0;z-index:1500;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;
+  background:var(--overlay-bg);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  animation:modalIn .25s cubic-bezier(.16,1,.3,1)}
+.ff-overlay .ff-spinner{
+  width:46px;height:46px;border-radius:50%;
+  border:4px solid var(--glass-w-12);
+  border-top-color:var(--accent);
+  animation:ffSpin .8s linear infinite}
+@keyframes ffSpin{to{transform:rotate(360deg)}}
+.ff-overlay .ff-title{font-size:1rem;font-weight:600;color:var(--text);letter-spacing:.5px}
+.ff-overlay .ff-sub{font-size:.75rem;color:var(--dim);max-width:280px;text-align:center;line-height:1.5}

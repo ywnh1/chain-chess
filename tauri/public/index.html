@@ -136,6 +136,19 @@
         <button class="tg-btn" data-value="false" onclick="var p=this.parentNode;p.querySelectorAll('.tg-btn').forEach(function(b){b.classList.remove('selected')});this.classList.add('selected')">手写规则</button>
       </div>
     </div>
+    <div class="form-row" id="playerAiHelpRow" style="display:none">
+      <label style="flex:1">AI 帮忙</label>
+      <div class="toggle-group" style="align-items:center">
+        <span id="aiHelpLevelLabel" style="font-size:.72rem;color:var(--dim);margin-right:8px">等级 2</span>
+        <div class="depth-adjust" style="flex-shrink:0">
+          <button class="dm-btn" id="aiHelpLevelDec">−</button>
+          <span class="dm-val" id="aiHelpLevelValue">2</span>
+          <button class="dm-btn" id="aiHelpLevelInc">+</button>
+        </div>
+        <button class="tg-btn" id="aiHelpToggleBtn" data-value="off" onclick="var t=this;var on=t.dataset.value==='on';t.dataset.value=on?'off':'on';t.classList.toggle('selected',!on);t.textContent=on?'开启':'关闭';">开启</button>
+      </div>
+      <p style="font-size:.7rem;color:var(--dim);margin-top:2px">轮到该玩家时，AI 推荐落子位置（等级越高推荐越强）</p>
+    </div>
     <div class="modal-actions">
       <button class="glass-btn" onclick="closePlayerModal()">取消</button>
       <button class="glass-btn primary" onclick="savePlayerConfig()">确认</button>
@@ -505,6 +518,7 @@
       <button onclick="undoLastMove()" id="undoBtn" disabled>悔棋</button>
       <button onclick="togglePause()" id="pauseBtn">暂停</button>
       <button id="autoSkipBtn" onclick="toggleAutoSkip()" title="自动跳过连爆动画">跳过</button>
+      <button id="fastFinishBtn" onclick="confirmFastFinish()" style="display:none" title="场上只剩 AI 时直接算出终局结果">⚡ 一键终局</button>
 </div>
   </div>
   <div id="playerBar" class="player-bar"></div>
@@ -554,6 +568,25 @@
       <button class="glass-btn" onclick="closeUpdateModal()">关闭</button>
     </div>
   </div>
+</div>
+
+<!-- Modal: Fast Finish Confirmation（一键终局确认） -->
+<div id="fastFinishConfirm" class="modal">
+  <div class="modal-inner">
+    <h3>一键获取最终结果</h3>
+    <p style="text-align:center;font-size:.85rem;color:var(--dim);margin-bottom:4px">将直接计算到终局，期间可能占用较高 CPU 导致卡顿，且无动画与音效反馈。图表与排行数据不受影响。确定继续吗？</p>
+    <div class="modal-actions">
+      <button class="glass-btn" onclick="closeModal('fastFinishConfirm')">取消</button>
+      <button class="glass-btn primary" onclick="closeModal('fastFinishConfirm');fastFinish()">确定计算</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fast Finish 计算中覆盖层 -->
+<div id="fastFinishOverlay" class="ff-overlay" style="display:none">
+  <div class="ff-spinner"></div>
+  <p class="ff-title">正在计算终局结果…</p>
+  <p class="ff-sub">后端模拟 AI 对局至分出胜负，可能需要一些时间，请稍候</p>
 </div>
 
 <!-- Modal: Exit Confirmation (page 14) -->
@@ -729,6 +762,7 @@ function startDownload() {
 silentCheck();
 })();
 // 暴露 closeUpdateModal 到全局（HTML onclick 需要）
+window.showToast = showToast;
 window.closeUpdateModal = function() {
   try { document.getElementById('updateModal').classList.remove('show'); } catch(e) {}
 };

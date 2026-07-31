@@ -249,6 +249,163 @@ async fn ai_move_strategy(
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SimulateResult {
+    pub board: GameBoard,
+    pub winner: Option<usize>,
+    pub eliminated_order: Vec<usize>,
+    pub killed_by: Vec<(usize, usize)>,
+    pub chain_stats: std::collections::HashMap<String, ChainStatsPlayer>,
+    pub max_chain: MaxChain,
+    pub history: Vec<TurnHistory>,
+}
+
+/// 一键终局：场上只剩 AI 时，后端无动画直接模拟到分出胜负。
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+async fn simulate_to_end(
+    board: GameBoard,
+    size: usize,
+    max_players: usize,
+    cur_player: usize,
+    eliminated: Vec<usize>,
+    border_mode: BorderMode,
+    first_move_pos: Option<[usize; 2]>,
+    game_count: u32,
+    ai_configs: std::collections::HashMap<String, serde_json::Value>,
+) -> Result<SimulateResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let mut b = board.clone();
+        let mut elim = eliminated.clone();
+        let mut killed_by: Vec<(usize, usize)> = Vec::new();
+        let mut chain_stats: std::collections::HashMap<String, ChainStatsPlayer> = std::collections::HashMap::new();
+        let mut max_chain = MaxChain { player: None, length: 0 };
+        let mut history: Vec<TurnHistory> = Vec::new();
+        let mut cur = cur_player;
+        let mut gc = game_count;
+        let mut no_move_round = 0usize;
+        let max_steps = (size * size * 4 * max_players).max(1000) as usize;
+        let mut steps = 0usize;
+
+        loop {
+            steps += 1;
+            if steps > max_steps {
+                let alive_final: Vec<usize> = (0..max_players)
+                    .filter(|p| !elim.contains(p) && has_pieces(&b, *p))
+                    .collect();
+                return SimulateResult {
+                    board: b.clone(),
+                    winner: alive_final.first().copied(),
+                    eliminated_order: elim,
+                    killed_by,
+                    chain_stats,
+                    max_chain,
+                    history,
+                };
+            }
+            let alive: Vec<usize> = (0..max_players)
+                .filter(|p| !elim.contains(p) && has_pieces(&b, *p))
+                .collect();
+            if alive.len() <= 1 {
+                return SimulateResult {
+                    board: b.clone(),
+                    winner: alive.first().copied(),
+                    eliminated_order: elim,
+                    killed_by,
+                    chain_stats,
+                    max_chain,
+                    history,
+                };
+            }
+            if !alive.contains(&cur) {
+                let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
+                cur = alive[(idx + 1) % alive.len()];
+                continue;
+            }
+            let cfg = ai_configs
+                .get(&cur.to_string())
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({"algorithm": "strategy"}));
+            let alg = cfg.get("algorithm").and_then(|v| v.as_str()).unwrap_or("strategy").to_string();
+            let depth = cfg.get("depth").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
+            let use_ml_eval = cfg.get("useMlEval").and_then(|v| v.as_bool()).unwrap_or(true);
+
+            let mv = match alg.as_str() {
+                "mcts" => find_best_move_mcts(&b, size, cur, depth, &elim, max_players, border_mode),
+                "pvs" => {
+                    let mut searcher = PvsSearcher::new(cur, gc, use_ml_eval, border_mode);
+                    searcher.find_best(&b, size, cur, max_players, &elim, depth)
+                }
+                "alphabeta" => find_best_move(&b, size, cur, depth, &elim, max_players, gc, first_move_pos, use_ml_eval, border_mode),
+                _ => find_best_move_strategy(&b, size, cur, &elim, max_players, gc, first_move_pos, border_mode),
+            };
+            let Some((x, y)) = mv else {
+                no_move_round += 1;
+                if no_move_round >= alive.len() {
+                    return SimulateResult {
+                        board: b.clone(),
+                        winner: alive.first().copied(),
+                        eliminated_order: elim,
+                        killed_by,
+                        chain_stats,
+                        max_chain,
+                        history,
+                    };
+                }
+                let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
+                cur = alive[(idx + 1) % alive.len()];
+                continue;
+            };
+            no_move_round = 0;
+
+            let (elims, chain_count, kbs) =
+                process_click_with_killer(&mut b, size, x, y, cur, max_players, border_mode);
+            killed_by.extend(kbs);
+            for e in elims {
+                if !elim.contains(&e) {
+                    elim.push(e);
+                }
+            }
+            if chain_count > 0 {
+                let stats = chain_stats
+                    .entry(cur.to_string())
+                    .or_insert(ChainStatsPlayer { triggered: 0, max_chain: 0 });
+                stats.triggered += 1;
+                if chain_count > stats.max_chain {
+                    stats.max_chain = chain_count;
+                }
+                if chain_count > max_chain.length {
+                    max_chain = MaxChain { player: Some(cur), length: chain_count };
+                }
+            }
+            let mut sn: std::collections::HashMap<String, PlayerSnapshot> = std::collections::HashMap::new();
+            for p in 0..max_players {
+                let mut pieces = 0u32;
+                let mut points = 0u32;
+                for row in &b {
+                    for c in row {
+                        if c.owner == Some(p) {
+                            pieces += 1;
+                            points += c.count as u32;
+                        }
+                    }
+                }
+                sn.insert(p.to_string(), PlayerSnapshot { pieces, points });
+            }
+            history.push(TurnHistory { turn: history.len() as u32, snapshot: sn });
+
+            gc += 1;
+            let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
+            cur = alive[(idx + 1) % alive.len()];
+        }
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?;
+
+    Ok(result)
+}
+
 #[tauri::command]
 async fn ai_move_mcts(
     _random_scale: u32,
@@ -753,6 +910,7 @@ pub fn run() {
             ai_move_v2,
             ai_move_mcts,
             ai_move_strategy,
+            simulate_to_end,
             load_settings,
             save_settings,
             check_update,

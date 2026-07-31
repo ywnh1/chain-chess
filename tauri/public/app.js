@@ -1635,6 +1635,115 @@ function cloneBoard(b){
   return b.map(row=>row.map(c=>({owner:c.owner,count:c.count})));
 }
 
+/* ═══════ AI 帮忙（人类玩家回合 AI 推荐落子） ═══════ */
+let aiHelpMap={};           // pid -> 等级（人类玩家开启帮忙时）
+let aiHintTimer=null;
+function clearAiHint(){
+  try{document.querySelectorAll('.ai-hint').forEach(function(el){el.classList.remove('ai-hint')})}catch(e){}
+}
+async function maybeSuggest(){
+  clearAiHint();
+  if(gameOver||isPaused||aiThinking)return;
+  const lvl=aiHelpMap[curPlayer];
+  if(!lvl||aiPlayers.has(curPlayer))return;
+  if(!hasPieces(curPlayer,board))return;
+  if(aiHintTimer)clearTimeout(aiHintTimer);
+  const askPid=curPlayer;
+  aiHintTimer=setTimeout(async function(){
+    if(gameOver||isPaused||aiThinking)return;
+    if(curPlayer!==askPid)return;
+    const alg=aiConfigs[curPlayer]?aiConfigs[curPlayer].algorithm:aiAlgorithm;
+    let cmd;
+    if(alg==='mcts'){cmd='ai_move_mcts';}
+    else if(alg==='pvs'){cmd='ai_move_v2';}
+    else if(alg==='alphabeta'){cmd='ai_move';}
+    else{cmd='ai_move_strategy';}
+    const args={
+      board:board,size:size,player:curPlayer,depth:lvl,
+      eliminated:[...eliminatedPlayers],maxPlayers:maxPlayers,
+      borderMode:borderMode,gameCount:gameCount,firstMovePos:firstMovePos,
+      randomScale:10,useMlEval:true
+    };
+    if(alg==='pvs')args.algorithm=alg;
+    try{
+      const result=await tauriInvoke(cmd,args);
+      if(!result||result.length!==2)return;
+      if(gameOver||isPaused||aiThinking)return;
+      if(!aiHelpMap[curPlayer]||aiPlayers.has(curPlayer))return;
+      const x=result[0],y=result[1];
+      clearAiHint();
+      if(cells&&cells[x]&&cells[x][y])cells[x][y].classList.add('ai-hint');
+    }catch(e){}
+  },120);
+}
+
+/* ═══════ 一键终局（场上只剩 AI 时快速结算） ═══════ */
+function allAliveAreAI(){
+  let aliveCnt=0;
+  for(let p=0;p<maxPlayers;p++){
+    if(eliminatedPlayers.has(p))continue;
+    aliveCnt++;
+    if(!aiPlayers.has(p))return false;
+  }
+  return aliveCnt>=2;
+}
+function updateFastFinishBtn(){
+  const btn=document.getElementById('fastFinishBtn');
+  if(!btn)return;
+  const show=!gameOver&&allAliveAreAI()&&typeof board!=='undefined'&&board.length>0;
+  btn.style.display=show?'inline-block':'none';
+}
+function showFastFinishOverlay(show){
+  const ov=document.getElementById('fastFinishOverlay');
+  if(ov)ov.style.display=show?'flex':'none';
+}
+function confirmFastFinish(){
+  openModal('fastFinishConfirm');
+}
+async function fastFinish(){
+  if(gameOver)return;
+  showFastFinishOverlay(true);
+  updateFastFinishBtn();
+  const alive=[];
+  for(let p=0;p<maxPlayers;p++){if(!eliminatedPlayers.has(p)&&hasPieces(p,board))alive.push(p);}
+  const cfgArg={};
+  for(const p of alive){
+    const ac=aiConfigs[p]||{};
+    cfgArg[p]={algorithm:ac.algorithm||aiAlgorithm,depth:ac.depth||aiDepth,useMlEval:ac.useMlEval!==false};
+  }
+  try{
+    const r=await tauriInvoke('simulate_to_end',{
+      board:board,size:size,maxPlayers:maxPlayers,
+      curPlayer:curPlayer,
+      eliminated:[...eliminatedPlayers],
+      borderMode:borderMode,
+      firstMovePos:firstMovePos,
+      gameCount:gameCount,
+      aiConfigs:cfgArg
+    });
+    board=r.board;
+    eliminatedPlayers=new Set(r.eliminatedOrder||[]);
+    gameHistory=(r.history||[]).map(function(h){return {turn:h.turn,snapshot:h.snapshot}});
+    chainStats=r.chainStats||{};
+    maxChainOverall=r.maxChain||{player:null,length:0};
+    eliminationRounds=[r.eliminatedOrder||[]];
+    eliminationInfo={};
+    for(const kb of (r.killedBy||[])){
+      if(!eliminationInfo[kb[0]])eliminationInfo[kb[0]]=kb[1];
+    }
+    gameOver=true;
+    renderBoard(true);
+    renderPlayerBar();
+    showFastFinishOverlay(false);
+    showSettlement(r.winner,_colorNames||COLOR_NAMES,gameHistory);
+  }catch(e){
+    logWarn('simulate_to_end failed:',e);
+    showFastFinishOverlay(false);
+    showMsg('终局计算失败：'+e,'error');
+    updateFastFinishBtn();
+  }
+}
+
 async function triggerAI(){
   if(gameOver||aiThinking||isPaused||animating)return;
   if(!aiPlayers.has(curPlayer))return;
@@ -1695,6 +1804,7 @@ async function triggerAI(){
     if(idx<0)idx=0;
     curPlayer=alive[(idx+1)%alive.length];
     renderPlayerBar();setBg(curPlayer);
+    updateFastFinishBtn();maybeSuggest();
     if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
     return;
   }
@@ -1743,6 +1853,7 @@ async function triggerAI(){
   curPlayer=alive[(idx+1)%alive.length];
   renderPlayerBar();
   setBg(curPlayer);
+  updateFastFinishBtn();maybeSuggest();
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
 }
 
@@ -1859,6 +1970,7 @@ function undoLastMove(){
   renderBoard(true);
   renderPlayerBar();
   setBg(curPlayer);
+  updateFastFinishBtn();maybeSuggest();
   updateUndoBtn();
   showMsg('已撤销上一步','');
   // 如果当前轮到 AI 且有缓存走法，直接重放无需重算
@@ -1912,6 +2024,7 @@ async function replayAiMove(move){
   curPlayer=alive[(idx+1)%alive.length];
   renderPlayerBar();
   setBg(curPlayer);
+  updateFastFinishBtn();maybeSuggest();
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
 }
 function updateUndoBtn(){
@@ -2048,6 +2161,7 @@ async function localClick(x,y){
     curPlayer=alive[(idx+1)%alive.length];
     renderPlayerBar();
     setBg(curPlayer);
+    updateFastFinishBtn();maybeSuggest();
     if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
     return;
   }
@@ -2099,6 +2213,7 @@ async function localClick(x,y){
   curPlayer=alive[(idx+1)%alive.length];
   renderPlayerBar();
   setBg(curPlayer);
+  updateFastFinishBtn();maybeSuggest();
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
 }
 
@@ -2131,7 +2246,7 @@ function handleEliminations(elim, killedBy, curPlayer){
     parts.push(getPlayerLabel(e)+' 被 '+getPlayerLabel(killer)+' 淘汰');
   }
   eliminationRounds.push([...elim]);
-  if(parts.length)showToast('❌ '+parts.join('；'));
+  if(parts.length){try{showToast('❌ '+parts.join('；'))}catch(e){logWarn('showToast failed:',e)}}
 }
 
 // 获取某玩家被谁击败（返回击败者 pid，无则 null）
@@ -2722,6 +2837,8 @@ async function continueGame(){
 }
 
 async function showSettlement(winner,colorNames,history){
+  clearAiHint();
+  if(aiHintTimer){clearTimeout(aiHintTimer);aiHintTimer=null}
   // 清理动态 settlement overlay（如果有残留）
   document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
   clearSavedGameState();
@@ -2999,8 +3116,10 @@ function exitGame(){
   // 刷盘残留历史再退出，清理磁盘回合数据
   if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history on exit failed:', e))}
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;
-  aiPlayers=new Set();eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
+  aiPlayers=new Set();aiHelpMap={};eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;undoStack=[];
+  if(aiHintTimer){clearTimeout(aiHintTimer);aiHintTimer=null}
+  clearAiHint();
   cells=[];board=[];
   try{document.getElementById('board').innerHTML='';}catch(e){}
   document.body.style.background='';
@@ -3010,6 +3129,9 @@ function exitGame(){
   document.querySelectorAll('.modal').forEach(e=>e.classList.remove('show'));
   // ★ 重新显示 game screen 中的暂停按钮和消息，确保 DOM 干净
   try{document.getElementById('pauseBtn').textContent='暂停';}catch(e){}
+  try{document.getElementById('fastFinishBtn').style.display='none';}catch(e){}
+  try{document.getElementById('fastFinishOverlay').style.display='none';}catch(e){}
+  clearAiHint();
   showMsg('','');
   Router.navigate('welcome');
 }
@@ -3094,6 +3216,21 @@ function openPlayerModal(idx){
   if(evalBtns){
     evalBtns.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===String(cfg.useMlEval!==false))});
   }
+  // 初始化 AI 帮忙（仅人类玩家显示该行）
+  const aiHelpRow=document.getElementById('playerAiHelpRow');
+  if(aiHelpRow)aiHelpRow.style.display=(cfg.type==='human')?'block':'none';
+  const aiBtn=document.getElementById('aiHelpToggleBtn');
+  if(aiBtn){
+    const aiOn=!!cfg.aiHelp;
+    aiBtn.dataset.value=aiOn?'on':'off';
+    aiBtn.classList.toggle('selected',aiOn);
+    aiBtn.textContent=aiOn?'关闭':'开启';
+  }
+  const aiLv=cfg.aiHelpLevel||2;
+  document.getElementById('aiHelpLevelValue').textContent=String(aiLv);
+  document.getElementById('aiHelpLevelLabel').textContent='等级 '+aiLv;
+  document.getElementById('aiHelpLevelDec').onclick=function(){var e=document.getElementById('aiHelpLevelValue');var v=parseInt(e.textContent)||2;if(v>1){v--;e.textContent=v;document.getElementById('aiHelpLevelLabel').textContent='等级 '+v}};
+  document.getElementById('aiHelpLevelInc').onclick=function(){var e=document.getElementById('aiHelpLevelValue');var v=parseInt(e.textContent)||2;if(v<5){v++;e.textContent=v;document.getElementById('aiHelpLevelLabel').textContent='等级 '+v}};
   openModal('playerConfigModal');
 }
 function updateModalRows(){
@@ -3107,6 +3244,8 @@ function updateModalRows(){
   document.getElementById('playerDepthRow').style.display=needDepth?'block':'none';
   document.getElementById('playerRandomRow').style.display=needDepth?'block':'none';
   document.getElementById('playerEvalRow').style.display=needEval?'block':'none';
+  const aiHelpRow=document.getElementById('playerAiHelpRow');
+  if(aiHelpRow)aiHelpRow.style.display=(val==='human')?'block':'none';
 }
 function closePlayerModal(){
   _inGameSettingsMode=false;
@@ -3144,6 +3283,21 @@ function openInGamePlayerConfig(idx){
   if(evalBtns){
     evalBtns.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===String(curUseMlEval))});
   }
+  // 初始化 AI 帮忙（局内：人类时显示，读取 aiHelpMap）
+  const aiHelpRow=document.getElementById('playerAiHelpRow');
+  if(aiHelpRow)aiHelpRow.style.display=(!isAI)?'block':'none';
+  const aiBtn=document.getElementById('aiHelpToggleBtn');
+  if(aiBtn){
+    const aiOn=!!aiHelpMap[idx];
+    aiBtn.dataset.value=aiOn?'on':'off';
+    aiBtn.classList.toggle('selected',aiOn);
+    aiBtn.textContent=aiOn?'关闭':'开启';
+  }
+  const aiLv=aiHelpMap[idx]||2;
+  document.getElementById('aiHelpLevelValue').textContent=String(aiLv);
+  document.getElementById('aiHelpLevelLabel').textContent='等级 '+aiLv;
+  document.getElementById('aiHelpLevelDec').onclick=function(){var e=document.getElementById('aiHelpLevelValue');var v=parseInt(e.textContent)||2;if(v>1){v--;e.textContent=v;document.getElementById('aiHelpLevelLabel').textContent='等级 '+v}};
+  document.getElementById('aiHelpLevelInc').onclick=function(){var e=document.getElementById('aiHelpLevelValue');var v=parseInt(e.textContent)||2;if(v<5){v++;e.textContent=v;document.getElementById('aiHelpLevelLabel').textContent='等级 '+v}};
   openModal('playerConfigModal');
 }
 function saveInGamePlayerConfig(){
@@ -3154,15 +3308,20 @@ function saveInGamePlayerConfig(){
   var newRandom=parseInt(document.getElementById('randomScaleSlider').value)??10;
   var evalSel=document.querySelector('#playerEvalToggle .tg-btn.selected');
   var newUseMlEval=evalSel?evalSel.dataset.value==='true':true;
+  const aiBtn=document.getElementById('aiHelpToggleBtn');
+  const newAiHelp=aiBtn?aiBtn.dataset.value==='on':false;
+  const newAiHelpLevel=parseInt(document.getElementById('aiHelpLevelValue').textContent)||2;
   if(newType==='human'){
     if(aiPlayers.has(idx)){
       aiPlayers.delete(idx);
       delete aiConfigs[idx];
     }
+    if(newAiHelp)aiHelpMap[idx]=newAiHelpLevel;else delete aiHelpMap[idx];
   }else{
     aiPlayers.add(idx);
     aiConfigs[idx]={algorithm:newType,depth:newDepth,randomScale:newRandom,useMlEval:newUseMlEval};
     if(!aiConfigs[0]){aiAlgorithm=newType;aiDepth=newDepth}
+    delete aiHelpMap[idx];
   }
   _inGameSettingsMode=false;
   closeModal('playerConfigModal');
@@ -3185,6 +3344,9 @@ function savePlayerConfig(){
   cfg.randomScale=parseInt(document.getElementById('randomScaleSlider').value)??10;
   var evalSel=document.querySelector('#playerEvalToggle .tg-btn.selected');
   cfg.useMlEval=evalSel?evalSel.dataset.value==='true':true;
+  const aiBtn=document.getElementById('aiHelpToggleBtn');
+  cfg.aiHelp=aiBtn?aiBtn.dataset.value==='on':false;
+  cfg.aiHelpLevel=parseInt(document.getElementById('aiHelpLevelValue').textContent)||2;
   closePlayerModal();
   generatePlayerConfigs();
 }
@@ -3195,7 +3357,7 @@ function generatePlayerConfigs(){
   const realCnt=Math.min(cnt,maxP);
   while(playerConfigs.length<realCnt){
     const i=playerConfigs.length;
-    playerConfigs.push({name:'',type:i===0?'human':'strategy',depth:2,randomScale:10,useMlEval:true});
+    playerConfigs.push({name:'',type:i===0?'human':'strategy',depth:2,randomScale:10,useMlEval:true,aiHelp:false,aiHelpLevel:2});
   }
   if(playerConfigs.length>realCnt)playerConfigs.length=realCnt;
   const container=document.getElementById('playerConfigList');
@@ -3274,9 +3436,11 @@ function startLocalFromSetup(sz,cnt){
   eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
   let colorNames={};
+  aiHelpMap={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
     colorNames[i]=cfg.name||('玩家'+(i+1));
+    if(cfg.aiHelp)aiHelpMap[i]=cfg.aiHelpLevel||2;
   }
   _colorNames=colorNames;
   recordHistory();
@@ -3300,11 +3464,13 @@ function startAIFromSetup(sz,cnt){
   eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
   let colorNames={},humanIdx=-1;
+  aiHelpMap={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
     colorNames[i]=cfg.name||('玩家'+(i+1));
     if(cfg.type==='human'){
       if(humanIdx<0)humanIdx=i;
+      if(cfg.aiHelp)aiHelpMap[i]=cfg.aiHelpLevel||2;
     }else{
       aiPlayers.add(i);
       aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10,useMlEval:cfg.useMlEval!==false};
@@ -3318,6 +3484,7 @@ function startAIFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
+  updateFastFinishBtn();maybeSuggest();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
   _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode};
 }
@@ -3335,6 +3502,7 @@ function startEveFromSetup(sz,cnt){
   eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
   let colorNames={};
+  aiHelpMap={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
     colorNames[i]=cfg.name||('AI '+(i+1));
@@ -3347,6 +3515,7 @@ function startEveFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
+  updateFastFinishBtn();maybeSuggest();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
   _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode};
 }
