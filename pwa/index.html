@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<!--
+  Copyright (c) 2026 ywnh1
+  SPDX-License-Identifier: MIT
+-->
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f0f13" id="metaThemeColor">
+<meta name="color-scheme" content="light dark">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>连锁棋</title>
+<link rel="stylesheet" href="style.css?v=3.2.1">
+</head>
+<body>
+<!-- 背景彩色光球容器 -->
+<div class="orb-container" aria-hidden="true">
+  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+  <div class="orb"></div>
+</div>
+
+<!-- Welcome -->
+<div id="welcome" class="screen active">
+  <div class="welcome-content">
+    <div class="logo">♟<span>连锁棋</span></div>
+    <div class="tagline">多人联手，一触即发</div>
+    <button class="glass-btn primary start-btn" onclick="Router.navigate('gameSetup')">开始游戏</button>
+    <div class="welcome-footer">
+      <button onclick="Router.navigate('settings')" class="glass-btn about-foot-btn">设置</button>
+      <button onclick="Router.navigate('history')" class="glass-btn history-foot-btn">历史记录</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Setup Screen -->
+<div id="gameSetup" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <h2>开始游戏</h2>
+
+  <!-- 棋盘大小 -->
+  <div class="form-row"><label>棋盘大小</label>
+    <div id="setupSizeGrid" class="size-grid">
+      <button class="size-btn" data-value="5">5×5</button>
+      <button class="size-btn" data-value="6">6×6</button>
+      <button class="size-btn selected" data-value="7">7×7</button>
+      <button class="size-btn" data-value="8">8×8</button>
+      <button class="size-btn" data-value="9">9×9</button>
+      <button class="size-btn" data-value="10">10×10</button>
+      <button class="size-btn" data-value="11">11×11</button>
+      <button class="size-btn" data-value="12">12×12</button>
+      <button class="size-btn" data-value="13">13×13</button>
+      <button class="size-btn" data-value="14">14×14</button>
+      <button class="size-btn" data-value="15">15×15</button>
+      <button class="size-btn" data-value="16">16×16</button>
+      <button class="size-btn" data-value="17">17×17</button>
+      <button class="size-btn" data-value="18">18×18</button>
+      <button class="size-btn" data-value="19">19×19</button>
+    </div>
+  </div>
+
+  <!-- 棋盘边界模式 -->
+  <div class="form-row"><label>棋盘边界</label>
+    <div id="borderModeGroup" class="btn-group border-mode-group">
+      <button class="gb selected" data-value="default">默认边界</button>
+      <button class="gb" data-value="wrap">回环边界</button>
+      <button class="gb" data-value="bounce">反弹边界</button>
+      <button class="gb" data-value="degrade">降级边界</button>
+    </div>
+    <p id="borderModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
+      标准模式：达到 4 子即爆，边界处正常扩散
+    </p>
+  </div>
+
+  <!-- 玩家人数 -->
+  <div class="form-row"><label>玩家人数</label>
+    <div id="setupPlayersGroup" class="btn-group">
+      <button class="gb selected" data-value="2">2</button>
+      <button class="gb" data-value="3">3</button>
+      <button class="gb" data-value="4">4</button>
+      <button class="gb" data-value="5">5</button>
+      <button class="gb" data-value="6">6</button>
+      <button class="gb" data-value="7">7</button>
+      <button class="gb" data-value="8">8</button>
+      <button class="gb" data-value="9">9</button>
+      <button class="gb" data-value="10">10</button>
+    </div>
+  </div>
+
+  <!-- 玩家配置列表 -->
+  <div id="playerConfigList" class="player-config-list">
+    <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">点击玩家设置名称、类型和 AI 参数</p>
+  </div>
+
+  <button class="glass-btn primary" onclick="startUnifiedGame()" style="margin-top:12px;padding:14px 28px;font-size:1.1rem">开始游戏</button>
+</div>
+
+<!-- 玩家配置弹窗 Modal -->
+<div id="playerConfigModal" class="modal">
+  <div class="modal-inner player-modal">
+    <h3 id="playerModalTitle">玩家设置</h3>
+    <div class="form-row"><label>名称</label>
+      <input type="text" id="playerNameInput" maxlength="16" placeholder="输入玩家名称（可选）" autocomplete="off">
+    </div>
+    <div class="form-row"><label>类型</label>
+      <div id="playerTypeBtns" class="alg-mini" style="flex-wrap:wrap;gap:4px">
+        <button class="am-btn" data-value="human">人类</button>
+        <button class="am-btn" data-value="strategy">AI 策略</button>
+        <button class="am-btn" data-value="alphabeta">A-B</button>
+        <button class="am-btn" data-value="pvs">PVS</button>
+        <button class="am-btn" data-value="mcts">MCTS</button>
+      </div>
+    </div>
+    <div class="form-row" id="playerDepthRow">
+      <label>搜索深度</label>
+      <div class="depth-adjust">
+        <button class="dm-btn" id="depthDecBtn">−</button>
+        <span class="dm-val" id="depthValue">2</span>
+        <button class="dm-btn" id="depthIncBtn">+</button>
+      </div>
+    </div>
+    <div class="form-row" id="playerRandomRow">
+      <label>随机刻度 <span id="randomValueLabel">10%</span></label>
+      <input type="range" id="randomScaleSlider" min="0" max="30" value="10" class="random-slider">
+      <div class="random-labels">
+        <span>0%</span><span>15%</span><span>30%</span>
+      </div>
+      <p style="font-size:.7rem;color:var(--dim);margin-top:2px">游戏开始时随机值固定 40%，逐渐降至设定值（策略 AI 不受影响）</p>
+    </div>
+    <div class="form-row" id="playerEvalRow" style="display:none">
+      <label style="flex:1">评估函数</label>
+      <div id="playerEvalToggle" class="toggle-group">
+        <button class="tg-btn selected" data-value="true" onclick="var p=this.parentNode;p.querySelectorAll('.tg-btn').forEach(function(b){b.classList.remove('selected')});this.classList.add('selected')">ML 模型</button>
+        <button class="tg-btn" data-value="false" onclick="var p=this.parentNode;p.querySelectorAll('.tg-btn').forEach(function(b){b.classList.remove('selected')});this.classList.add('selected')">手写规则</button>
+      </div>
+    </div>
+    <div class="form-row" id="playerAiHelpRow" style="display:none">
+      <label style="flex:1">AI 帮忙</label>
+      <div class="toggle-group" style="align-items:center">
+        <span id="aiHelpLevelLabel" style="font-size:.72rem;color:var(--dim);margin-right:8px">等级 2</span>
+        <div class="depth-adjust" style="flex-shrink:0">
+          <button class="dm-btn" id="aiHelpLevelDec">−</button>
+          <span class="dm-val" id="aiHelpLevelValue">2</span>
+          <button class="dm-btn" id="aiHelpLevelInc">+</button>
+        </div>
+        <button class="tg-btn" id="aiHelpToggleBtn" data-value="off" onclick="var t=this;var on=t.dataset.value==='on';t.dataset.value=on?'off':'on';t.classList.toggle('selected',!on);t.textContent=on?'开启':'关闭';">开启</button>
+      </div>
+      <p style="font-size:.7rem;color:var(--dim);margin-top:2px">轮到该玩家时，AI 推荐落子位置（等级越高推荐越强）</p>
+    </div>
+    <div class="modal-actions">
+      <button class="glass-btn" onclick="closePlayerModal()">取消</button>
+      <button class="glass-btn primary" onclick="savePlayerConfig()">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Screen -->
+<div id="settings" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>设置</h2>
+
+    <div class="about-card">
+      <h3>外观</h3>
+      <div class="form-row">
+        <label style="flex:1">主题模式</label>
+        <div class="theme-group" id="themeGroup" style="display:flex;gap:6px">
+          <button class="tg-btn" data-value="light">浅色</button>
+          <button class="tg-btn" data-value="dark">深色</button>
+          <button class="tg-btn" data-value="system">跟随系统</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="about-card">
+      <h3>游戏音效</h3>
+      <div class="form-row">
+        <label style="flex:1">音效主题</label>
+        <div class="theme-group" id="soundThemeGroup" style="display:flex;gap:6px">
+          <button class="tg-btn" data-value="classic">经典</button>
+          <button class="tg-btn" data-value="soft">柔和</button>
+          <button class="tg-btn" data-value="crisp">清脆</button>
+          <button class="tg-btn" data-value="electronic">电子</button>
+          <button class="tg-btn" data-value="dog">大狗叫</button>
+          <button class="tg-btn" data-value="mute">静音</button>
+        </div>
+      </div>
+      <div class="form-row" id="dogBarkRow" style="display:none">
+        <label style="flex:1">大狗叫声模式</label>
+        <div class="theme-group" id="dogBarkGroup" style="display:flex;gap:6px">
+          <button class="tg-btn" data-value="medium">中淡出</button>
+          <button class="tg-btn" data-value="none">无淡出</button>
+          <button class="tg-btn" data-value="long">长淡出</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label style="flex:1">试听当前主题音效</label>
+        <button class="glass-btn primary" id="soundPreviewBtn" style="padding:6px 14px;font-size:.78rem">▶ 试听</button>
+      </div>
+    </div>
+
+    <div class="about-card">
+      <h3>更新</h3>
+      <div class="form-row">
+        <label style="flex:1">检查更新</label>
+        <button class="glass-btn primary" onclick="manualCheckUpdate()" style="padding:6px 14px;font-size:.78rem">检查更新</button>
+      </div>
+    </div>
+
+    <div class="about-card" style="cursor:pointer" onclick="Router.navigate('about')">
+      <div class="form-row">
+        <label style="flex:1">关于连锁棋</label>
+        <span style="color:var(--dim)">→</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- About Screen -->
+<div id="about" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>关于连锁棋</h2>
+
+    <!-- 信息行：键值对齐 -->
+    <div class="about-info">
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.2.2</span></div>
+      <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
+      <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
+      <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
+    </div>
+
+    <!-- 游戏介绍 -->
+    <div class="about-card">
+      <h3>为什么玩连锁棋</h3>
+      <p>你点下的每一颗棋子，都可能引爆整张棋盘。每一次落子，都是在引爆点、扩散范围和对手布局之间做取舍。本地热座、人机对战、AI 斗蛐蛐三种模式，2~10 人同台博弈。纯客户端应用，无需服务器。</p>
+    </div>
+
+    <!-- 游戏规则（短卡片） -->
+    <div class="about-card">
+      <h3>游戏规则</h3>
+      <ol>
+        <li><strong>落子</strong> — 点击空位落子，每位玩家首步需避开所有已有棋子周围 12 格；点击自己的棋子可加子</li>
+        <li><strong>爆裂</strong> — 格子中的棋子数达到容量（4 个）时，向上下左右各扩散一个棋子</li>
+        <li><strong>连锁</strong> — 爆裂扩散会触发相邻格子的连锁爆裂，形成连爆效应</li>
+        <li><strong>淘汰</strong> — 当某玩家的所有棋子被吞噬时该玩家被淘汰</li>
+        <li><strong>胜利</strong> — 最后存活的一位玩家获胜</li>
+      </ol>
+    </div>
+
+    <!-- 功能亮点 -->
+    <div class="about-card">
+      <h3>功能亮点</h3>
+      <p style="font-size:.82rem;line-height:1.7;margin:0">
+        🦀 <strong>Rust AI 引擎</strong> — 四款搜索算法（策略 / A-B / PVS / MCTS），Rayon 多核并行<br>
+        🎯 <strong>增强版 AI 评估</strong> — 位置权重 + 邻居威胁评分 + 爆发势能，ML 评估以 70% vs 35% 优势碾压手写版<br>
+        💾 <strong>中断恢复</strong> — 异常退出自动保存，历史页面一键继续上次对局<br>
+        📊 <strong>结算图表</strong> — 棋子数和点数双折线图，支持全屏缩放与双指缩放<br>
+        🔊 <strong>合成音效</strong> — 落子、爆炸、淘汰、获胜各有独立音频反馈（Web Audio API）<br>
+        🎨 <strong>液态玻璃主题</strong> — 深色虹彩渐变玻璃 UI，背景 10 个彩色光球浮动
+      </p>
+    </div>
+
+    <!-- AI 介绍 → 二级页 -->
+    <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-ai')">
+      <span class="nav-label">AI 介绍</span>
+      <span class="nav-arrow">→</span>
+    </div>
+
+    <!-- AI 性能评测 → 二级页 -->
+    <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-benchmark')">
+      <span class="nav-label">AI 性能评测</span>
+      <span class="nav-arrow">→</span>
+    </div>
+    <!-- 更新详情 → 二级页 -->
+    <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-changelog')">
+      <span class="nav-label">更新详情</span>
+      <span class="nav-arrow">→</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- About AI page (二级) -->
+<div id="about-ai" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>AI 介绍</h2>
+
+    <div class="about-card">
+      <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋内置 <strong>四款 AI 算法</strong>，覆盖启发式规则、树搜索剪枝和随机模拟三大搜索范式。PVE、AI 对战、斗蛐蛐模式均可自由切换。除策略算法（JavaScript）外，其余三款使用 <strong>Rust + Rayon</strong> 多核并行加速。</p>
+
+      <h3 class="ai-alg-title" style="color:var(--accent)">⚡ 策略算法 · 启发式规则</h3>
+      <p class="ai-alg-desc">纯 JavaScript，基于人工优先级规则快速决策。无需 Rust 引擎，响应最快，适合新手入门和低算力设备。</p>
+      <div class="ai-alg-detail" style="background:rgba(240,179,75,.06)">
+        <strong style="color:var(--accent)">三级优先</strong> → 优先走即将爆裂的棋子（count=3）<br>
+        <strong style="color:var(--accent)">安全升级</strong> → 避开对手三级附近的二级棋子<br>
+        <strong style="color:var(--accent)">渐进控制</strong> → 一进二、下三级，逐步扩大地盘<br>
+        <strong style="color:var(--accent)">首子中心</strong> → 第一手落子在棋盘中央附近
+      </div>
+
+      <h3 class="ai-alg-title" style="color:var(--accent2)">🧠 Alpha-Beta 剪枝 · 经典搜索</h3>
+      <p class="ai-alg-desc">标准 Alpha-Beta 剪枝搜索，Rust + Rayon 根级并行。采用 <strong>克隆式搜索</strong>——每次走法复制棋盘而非撤销，天然适配多玩家连锁反应。</p>
+      <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
+        <strong style="color:var(--accent2)">搜索深度</strong> 1~10 层 · <strong style="color:var(--accent2)">根级分支</strong> top 10 · <strong style="color:var(--accent2)">走法排序</strong> 三级优先<br>
+        <strong style="color:var(--accent2)">随机化探索</strong> 早期对局加入随机扰动，增加走法多样性<br>
+        <strong style="color:var(--accent2)">评估函数</strong> 支持增强版（位置+威胁评分）或手写规则评估
+      </div>
+
+      <h3 class="ai-alg-title" style="color:var(--accent2)">🔬 PVS NegaMax · 精炼剪枝</h3>
+      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设最优走法已被首先搜索，后续走法用<strong>零窗口（Null Window）</strong>快速试探——要么迅速证明不比首走法好，要么触发重搜索。560 局基准测试中，PVS d=2 ML 以 70.0% 胜率持平 Alpha-Beta d=2 ML（70.7%），手写评估下 PVS（49.3%）反超 AB 手写（35.0%）。</p>
+      <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
+        <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录两条杀招走法 · <strong style="color:var(--accent2)">History 启发</strong> 全局走法成功率表<br>
+        <strong style="color:var(--accent2)">QSearch 静止搜索</strong> 到底层只搜索爆炸性走法（限3层），消除水平线效应<br>
+        <strong style="color:var(--accent2)">动态分支</strong> 浅层多搜深层少搜 · <strong style="color:var(--accent2)">根级 Rayon 并行</strong> 多核加速
+      </div>
+
+      <h3 class="ai-alg-title" style="color:#c88cff">🎲 MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
+      <p class="ai-alg-desc"><strong>不依赖评估函数</strong>——不猜哪个走法好，直接大量随机模拟直到终局，用胜负统计数据做决策。</p>
+      <div class="ai-alg-detail" style="background:rgba(200,140,255,.06)">
+        <strong style="color:#c88cff">SELECT</strong> → <strong style="color:#c88cff">EXPAND</strong> → <strong style="color:#c88cff">PLAYOUT</strong> → <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
+        UCB1 平衡探索与利用 · 策略偏置 Playout（80% 选好走法）· 渐进展开（≥3 次访问才展新分支）
+      </div>
+      <p class="ai-alg-desc">Rust + Rayon 根级并行，depth=1~10 对应 1200~12000 次迭代，树节点上限 3000。无需人为设计评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
+    </div>
+  </div>
+</div>
+
+<!-- About Changelog page (二级) -->
+<div id="about-benchmark" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">&larr; 返回</button>
+  <div class="about-scroll">
+    <h2>AI 性能评测</h2>
+    <div class="about-card">
+      <h3 style="font-size:1.05rem;margin-bottom:8px">🏆 AI 战力排行</h3>
+      <p style="font-size:.82rem;color:var(--dim);margin-bottom:10px">
+        循环赛 · 7×7 棋盘 · 每对 20 局 · 先手交替 · <strong>共 560 局</strong>
+      </p>
+
+      <!-- 排行榜 -->
+      <table style="width:100%;font-size:.82rem;border-collapse:collapse">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="text-align:left;padding:5px 6px;width:28px">#</th>
+          <th style="text-align:left;padding:5px 6px">AI 选手</th>
+          <th style="text-align:right;padding:5px 6px">胜</th>
+          <th style="text-align:right;padding:5px 6px">负</th>
+          <th style="text-align:right;padding:5px 6px">胜率</th>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+          <td style="padding:4px 6px">🥇</td>
+          <td style="padding:4px 6px"><strong>Alpha-Beta d=3 ML</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">128</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">12</td>
+          <td style="padding:4px 6px;text-align:right;font-weight:bold">91.4%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">🥈</td>
+          <td style="padding:4px 6px"><strong>Alpha-Beta d=2 ML</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">99</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">41</td>
+          <td style="padding:4px 6px;text-align:right;font-weight:bold">70.7%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">🥉</td>
+          <td style="padding:4px 6px"><strong>PVS d=2 ML</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">98</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">42</td>
+          <td style="padding:4px 6px;text-align:right;font-weight:bold">70.0%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">4</td>
+          <td style="padding:4px 6px">PVS d=3 ML</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">93</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">47</td>
+          <td style="padding:4px 6px;text-align:right">66.4%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">5</td>
+          <td style="padding:4px 6px">PVS d=2 手写</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">69</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">71</td>
+          <td style="padding:4px 6px;text-align:right">49.3%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">6</td>
+          <td style="padding:4px 6px">Alpha-Beta d=2 手写</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">49</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">91</td>
+          <td style="padding:4px 6px;text-align:right">35.0%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:4px 6px">7</td>
+          <td style="padding:4px 6px">MCTS d=2</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">13</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">127</td>
+          <td style="padding:4px 6px;text-align:right">9.3%</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px">8</td>
+          <td style="padding:4px 6px">策略算法</td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">11</td>
+          <td style="padding:4px 6px;text-align:right;color:#ff7070">129</td>
+          <td style="padding:4px 6px;text-align:right">7.9%</td>
+        </tr>
+      </table>
+
+      <h4 style="margin-top:16px;margin-bottom:8px;font-size:.95rem">🔍 关键发现</h4>
+      <ul style="font-size:.8rem;line-height:1.7;padding-left:16px;margin:0">
+        <li><strong>AB d=3 ML 稳居榜首</strong> — 91.4% 胜率碾压全场，仅输 12 局</li>
+        <li><strong>PVS ≈ Alpha-Beta 同深度持平</strong> — PVS d=2 ML (70.0%) vs AB d=2 ML (70.7%)，差距不足 1%</li>
+        <li><strong>PVS d=3 没能超越 d=2</strong> — 66.4% 反低于 70.0%，PVS 的 null-window 剪枝在深层的分支限制过紧，丢失最佳走法</li>
+        <li><strong>ML > 手写评估（约 2:1）</strong> — AB d=2 ML (70.7%) vs AB d=2 手写 (35.0%)；PVS d=2 ML (70.0%) vs PVS d=2 手写 (49.3%)</li>
+        <li><strong>PVS 手写 > AB 手写</strong> — PVS d=2 手写 (49.3%) 明显优于 AB d=2 手写 (35.0%)，Killer/History 启发在弱评估下优势更突出</li>
+        <li><strong>MCTS 和策略算法</strong> 为非搜索型 AI，棋力偏弱但各有用途：策略最快，MCTS 可发现非直觉走法</li>
+      </ul>
+
+      <h4 style="margin-top:16px;margin-bottom:6px;font-size:.95rem">⚔️ 重点对局详解</h4>
+      <table style="width:100%;font-size:.8rem;border-collapse:collapse;margin-top:4px">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+          <th style="text-align:left;padding:4px 6px">对战</th>
+          <th style="text-align:center;padding:4px 6px">比分</th>
+          <th style="text-align:right;padding:4px 6px">均时</th>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">AB d=3 ML vs PVS d=3 ML</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#ff7070">20 : 0</td>
+          <td style="padding:3px 6px;text-align:right">1.24s</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">AB d=3 ML vs AB d=2 ML</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#70d070">12 : 8</td>
+          <td style="padding:3px 6px;text-align:right">1.10s</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">PVS d=2 ML vs AB d=2 ML</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#70d070">11 : 9</td>
+          <td style="padding:3px 6px;text-align:right">0.29s</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">PVS d=2 手写 vs AB d=2 手写</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#70d070">17 : 3</td>
+          <td style="padding:3px 6px;text-align:right">0.69s</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:3px 6px">PVS d=2 ML vs PVS d=3 ML</td>
+          <td style="padding:3px 6px;text-align:center;color:#f0d060">10 : 10</td>
+          <td style="padding:3px 6px;text-align:right">0.21s</td>
+        </tr>
+        <tr>
+          <td style="padding:3px 6px">AB d=3 ML vs PVS d=2 ML</td>
+          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#ff7070">19 : 1</td>
+          <td style="padding:3px 6px;text-align:right">0.08s</td>
+        </tr>
+      </table>
+
+      <h4 style="margin-top:16px;margin-bottom:6px;font-size:.95rem">📊 数据总览</h4>
+      <div style="font-size:.8rem;line-height:1.7;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px">
+        <strong>总对局</strong> 560 局 · <strong>总耗时</strong> 358.6s · <strong>平均</strong> 0.64s/局<br>
+        <strong>测试环境</strong> 7×7 棋盘 · depth=2/3 · ML / 手写双评估
+      </div>
+      <p style="font-size:.75rem;color:var(--dim);margin-top:12px">测试时间: 2026-07-29 ｜ 脚本: test_ai.py（8 AI × 循环赛 × 28 对）</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- About changelog (二级) -->
+<div id="about-changelog" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll" id="changelogContainer">
+    <h2>更新详情</h2>
+  </div>
+</div>
+
+<!-- About License page (二级) -->
+<div id="about-license" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>许可证</h2>
+    <div class="about-card">
+      <h3>MIT License</h3>
+      <p>Copyright (c) 2026 ywnh1</p>
+      <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+      <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+      <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+    </div>
+  </div>
+</div>
+
+<!-- History Screen -->
+<div id="history" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+    <h2 style="margin:0">历史记录</h2>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="glass-btn primary" onclick="exportHistory()">导出</button>
+        <button class="glass-btn primary" onclick="document.getElementById('historyImportInput').click()">导入</button>
+        <button class="glass-btn danger" onclick="clearHistory()">清空</button>
+      </div>
+  </div>
+  <div id="selBar">
+    <span class="sel-count" id="selCount">已选择 0 项</span>
+    <div class="sel-actions">
+      <button class="glass-btn primary" onclick="exportSelectedRecords()" id="selExportBtn" style="display:none">导出选中</button>
+      <button class="glass-btn danger" onclick="deleteSelectedRecords()" id="selDeleteBtn" style="display:none">删除选中</button>
+      <button class="glass-btn" onclick="exitMultiSelect()" id="selCancelBtn" style="display:none">取消</button>
+    </div>
+  </div>
+  <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">所有对局记录</p>
+  <div id="historyList" class="history-list">
+    <div class="empty">加载中...</div>
+  </div>
+  <input type="file" id="historyImportInput" accept=".json" style="display:none" onchange="importHistory(event)">
+</div>
+
+
+<!-- Game Screen -->
+<div id="game" class="screen">
+  <div class="game-msg"><span id="msg"></span></div>
+  <div class="top">
+    <div class="top-left">
+      <button onclick="undoLastMove()" id="undoBtn" disabled>悔棋</button>
+      <button onclick="togglePause()" id="pauseBtn">暂停</button>
+      <button id="autoSkipBtn" onclick="toggleAutoSkip()" title="自动跳过连爆动画">跳过</button>
+      <button id="fastFinishBtn" onclick="confirmFastFinish()" style="display:none" title="场上只剩 AI 时直接算出终局结果">⚡ 一键终局</button>
+</div>
+  </div>
+  <div id="playerBar" class="player-bar"></div>
+  <div class="board-wrap"><div id="board"></div></div>
+  <div id="skipChainBtn" onclick="chainSkipAll=true">跳过动画</div>
+</div>
+
+<!-- Pause Overlay -->
+<div id="pauseOverlay" class="settlement" style="display:none !important;z-index:998">
+  <h2>⏸ 游戏暂停</h2>
+  <div class="settlement-inner">
+    <div id="pauseStats" class="stats-grid"></div>
+    <div id="pauseCharts" style="width:100%"></div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;width:100%">
+      <button class="glass-btn primary" onclick="resumeGame()" style="width:100%;padding:12px;font-size:1rem">▶ 继续游戏</button>
+      <button class="glass-btn danger" onclick="endGameNow()" style="width:100%;padding:10px;font-size:.9rem">结束游戏</button>
+    </div>
+  </div>
+</div>
+
+<!-- Checkout Screen (结算/历史详情) -->
+<div id="checkout" class="screen">
+  <div id="chkOuterTitle"></div>
+  <div id="checkoutContent" class="chk-scroll"></div>
+</div>
+
+
+
+<!-- Modal: Update Progress -->
+<div id="updateModal" class="modal">
+  <div class="modal-inner update-modal">
+    <h3 id="updateModalTitle">检查更新</h3>
+    <div id="updateModalBody">
+      <p id="updateModalMsg" style="text-align:center;font-size:.88rem;color:var(--dim);margin-bottom:4px">正在检查新版本...</p>
+      <div id="updateProgressWrap" style="display:none;margin:12px 0">
+        <div class="progress-bar-track">
+          <div id="updateProgressBar" class="progress-bar-fill" style="width:0%"></div>
+        </div>
+        <p id="updateProgressText" style="text-align:center;font-size:.72rem;color:var(--dim);margin-top:4px">0%</p>
+      </div>
+    </div>
+    <div id="updateModalActions" class="modal-actions">
+      <button id="updateModalCancel" class="glass-btn" onclick="closeUpdateModal()">取消</button>
+      <button id="updateModalConfirm" class="glass-btn primary" style="display:none" onclick="confirmUpdate()">下载更新</button>
+    </div>
+    <div class="modal-actions" id="updateModalExtra" style="display:none;margin-top:8px">
+      <button class="glass-btn" onclick="closeUpdateModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Fast Finish Confirmation（一键终局确认） -->
+<div id="fastFinishConfirm" class="modal">
+  <div class="modal-inner">
+    <h3>一键获取最终结果</h3>
+    <p style="text-align:center;font-size:.85rem;color:var(--dim);margin-bottom:4px">将直接计算到终局，期间可能占用较高 CPU 导致卡顿，且无动画与音效反馈。图表与排行数据不受影响。确定继续吗？</p>
+    <div class="modal-actions">
+      <button class="glass-btn" onclick="closeModal('fastFinishConfirm')">取消</button>
+      <button class="glass-btn primary" onclick="closeModal('fastFinishConfirm');fastFinish()">确定计算</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fast Finish 计算中覆盖层 -->
+<div id="fastFinishOverlay" class="ff-overlay" style="display:none">
+  <div class="ff-spinner"></div>
+  <p class="ff-title">正在计算终局结果…</p>
+  <p class="ff-sub">后端模拟 AI 对局至分出胜负，可能需要一些时间，请稍候</p>
+</div>
+
+<!-- Modal: Exit Confirmation (page 14) -->
+<div id="exitConfirm" class="modal">
+  <div class="modal-inner">
+    <h3>退出应用</h3>
+    <p style="text-align:center;font-size:.88rem;color:var(--dim);margin-bottom:4px">确定要退出连锁棋吗？</p>
+    <div class="modal-actions">
+      <button class="glass-btn" onclick="closeModal('exitConfirm')">取消</button>
+      <button class="glass-btn primary" onclick="confirmExitApp()">确认退出</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* ─── Auto Update ─── */
+(function(){
+var CACHE_KEY = 'upd';
+var _updUrl = '';
+
+function getCurVer() {
+  try { var el = document.querySelector('.info-val'); if (el) return el.textContent.replace('v', ''); } catch(e) {}
+  return '0.0.0';
+}
+
+function cmpVer(a, b) {
+  var pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+  for (var i = 0; i < Math.max(pa.length, pb.length); i++) {
+    var na = pa[i] || 0, nb = pb[i] || 0;
+    if (na !== nb) return na - nb;
+  }
+  return 0;
+}
+
+/** 启动后静默检查 */
+// 手动检查更新：与自动检查不同，已是最新也提示结果
+function manualCheckUpdate(){
+  showUpdateModal('检查中…','正在检查新版本，请稍候','');
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'https://gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json?ref=main', true);
+  xhr.timeout = 15000;
+  xhr.onload = function() {
+    try {
+      if (xhr.status !== 200) { showUpdateResult('error','检查更新失败 (HTTP '+xhr.status+')'); return; }
+      var r = xhr.responseText;
+      if (!r || r.charAt(0) === '<') { showUpdateResult('error','检查更新失败：服务器返回了 HTML'); return; }
+      var a = JSON.parse(r);
+      if (!a.content || a.encoding !== 'base64') { showUpdateResult('error','检查更新失败：数据格式异常'); return; }
+      var b64 = a.content; while (b64.length % 4) b64 += '=';
+      var d = JSON.parse(atob(b64));
+      if (!d || !d.version) { showUpdateResult('error','检查更新失败：缺少版本号'); return; }
+      var cur = getCurVer();
+      var available = cmpVer(d.version, cur) > 0;
+      var dl = (d.platforms && d.platforms.android && d.platforms.android.url) || '';
+      var up = (d.platforms && d.platforms.linux && d.platforms.linux.url) || '';
+      var dlUrl = encodeURI(dl || up || '');
+      if (available && dlUrl) { showUpdateModal(d.version, d.notes || '', dlUrl); }
+      else { showUpdateResult('ok','当前已是最新版本 v'+cur); }
+    } catch(e) { showUpdateResult('error','检查更新失败：'+e.message); }
+  };
+  xhr.onerror = function() { showUpdateResult('error','检查更新失败：网络请求失败'); };
+  xhr.ontimeout = function() { showUpdateResult('error','检查更新失败：请求超时 (15s)'); };
+  xhr.send();
+}
+// 手动检查结果展示（无更新/失败也提示）
+function showUpdateResult(kind,msg){
+  document.getElementById('updateModalTitle').textContent = kind==='ok' ? '已是最新' : '检查更新';
+  document.getElementById('updateModalMsg').textContent = msg;
+  document.getElementById('updateModalConfirm').style.display = 'none';
+  document.getElementById('updateModalCancel').style.display = 'inline-block';
+  document.getElementById('updateModalCancel').textContent = '关闭';
+  document.getElementById('updateModalCancel').onclick = closeUpdateModal;
+}
+window.manualCheckUpdate = manualCheckUpdate;
+
+function silentCheck() {
+  document.title = 'upd:fetch';
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'https://gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json?ref=main', true);
+  xhr.timeout = 15000;
+  xhr.onload = function() {
+    document.title = 'upd:loaded';
+    try {
+      if (xhr.status !== 200) { document.title = 'upd:http' + xhr.status; showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25 (HTTP ' + xhr.status + ')'); return; }
+      var r = xhr.responseText;
+      if (!r || r.charAt(0) === '<') { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u670d\u52a1\u5668\u8fd4\u56de\u4e86 HTML'); return; }
+      var a = JSON.parse(r);
+      if (!a.content || a.encoding !== 'base64') { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u6570\u636e\u683c\u5f0f\u5f02\u5e38'); return; }
+      var b64 = a.content; while (b64.length % 4) b64 += '=';
+      var d = JSON.parse(atob(b64));
+      if (!d || !d.version) { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u7f3a\u5c11\u7248\u672c\u53f7'); return; }
+      var cur = getCurVer();
+      var available = cmpVer(d.version, cur) > 0;
+      var url = (d.platforms && d.platforms.android && d.platforms.android.url) || '';
+      url = encodeURI(url);
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ver: d.version, available: available && !!url, notes: d.notes || '', url: url })); } catch(e) {}
+      if (available && url) { showUpdateModal(d.version, d.notes || '', url); }
+      else { document.title = 'upd:cur ' + d.version + ' (cur:' + cur + ')'; }
+      
+    } catch(e) { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25: ' + e.message); }
+  };
+  xhr.onerror = function() { document.title = 'upd:error'; showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u7f51\u7edc\u8bf7\u6c42失\u8d25'); };
+  xhr.ontimeout = function() { document.title = 'upd:timeout'; showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u8bf7\u6c42\u8d85\u65f6 (15s)'); };
+  xhr.send();
+}
+
+function showToast(msg) {
+  try {
+    var old = document.getElementById('autoToast');
+    if (old) old.remove();
+    var d = document.createElement('div');
+    d.id = 'autoToast';
+    d.textContent = msg;
+    d.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);max-width:85%;padding:10px 18px;background:rgba(231,76,60,.92);color:#fff;border-radius:10px;font-size:.82rem;text-align:center;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);animation:toastFadeIn .3s ease';
+    document.body.appendChild(d);
+    setTimeout(function() {
+      d.style.transition = 'opacity .6s ease';
+      d.style.opacity = '0';
+      setTimeout(function() { try { d.remove(); } catch(e) {} }, 700);
+    }, 3500);
+  } catch(e) {}
+}
+
+function showUpdateModal(ver, notes, url) {
+  document.title = 'upd:found v' + ver;
+  _updUrl = url;
+  var m = document.getElementById('updateModal');
+  if (!m) return;
+  m.classList.add('show');
+  document.getElementById('updateModalTitle').textContent = '\u53d1\u73b0\u65b0\u7248\u672c v' + ver;
+  document.getElementById('updateModalMsg').innerHTML = notes.replace(/\\n/g, '<br>');
+  document.getElementById('updateModalConfirm').style.display = 'inline-block';
+  document.getElementById('updateModalConfirm').onclick = startDownload;
+  document.getElementById('updateModalCancel').style.display = 'inline-block';
+  document.getElementById('updateModalCancel').textContent = '\u7a0d\u540e';
+  document.getElementById('updateProgressWrap').style.display = 'none';
+}
+
+function startDownload() {
+  if (!_updUrl) return;
+  var p = document.getElementById('updateProgressWrap');
+  var b = document.getElementById('updateModalConfirm');
+  var c = document.getElementById('updateModalCancel');
+  b.style.display = 'none'; c.textContent = '\u4e0b\u8f7d\u4e2d...';
+  p.style.display = 'block';
+  document.getElementById('updateProgressBar').style.width = '0%';
+  document.getElementById('updateProgressText').textContent = '\u51c6\u5907\u4e2d';
+  document.getElementById('updateModalTitle').textContent = '\u6b63\u5728\u4e0b\u8f7d';
+  document.getElementById('updateModalMsg').textContent = '\u6b63\u5728\u6253\u5f00\u4e0b\u8f7d\u94fe\u63a5...';
+  var invoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
+  if (invoke) {
+    invoke('download_update', { url: _updUrl }).then(function() {
+      document.getElementById('updateProgressBar').style.width = '100%';
+      document.getElementById('updateProgressText').textContent = '\u5b8c\u6210';
+      document.getElementById('updateModalTitle').textContent = '\u4e0b\u8f7d\u94fe\u63a5\u5df2\u6253\u5f00';
+      document.getElementById('updateModalMsg').textContent = '\u8bf7\u5728\u6d4f\u89c8\u5668\u4e2d\u5b8c\u6210\u4e0b\u8f7d\u548c\u5b89\u88c5';
+      c.style.display = 'none';
+      setTimeout(closeUpdateModal, 4000);
+    }).catch(function() {
+      document.getElementById('updateModalTitle').textContent = '\u4e0b\u8f7d\u5931\u8d25';
+      document.getElementById('updateModalMsg').textContent = '\u65e0\u6cd5\u6253\u5f00\u94fe\u63a5';
+      p.style.display = 'none';
+    });
+  } else {
+    p.style.display = 'none';
+    document.getElementById('updateModalTitle').textContent = '\u6d4b\u8bd5\u6a21\u5f0f';
+    document.getElementById('updateModalMsg').textContent = '\u975e Tauri \u73af\u5883\uff0c\u8bf7\u6784\u5efa APK \u6d4b\u8bd5';
+    c.textContent = '\u5173\u95ed';
+  }
+}
+
+silentCheck();
+// 暴露到全局（HTML onclick 需要）——必须放在 IIFE 内部，
+// 否则引用不到内部函数（此前 window.showToast = showToast 写在 IIFE 外，
+// 抛 ReferenceError 导致 closeUpdateModal 从未注册到全局）
+window.showToast = showToast;
+window.closeUpdateModal = function() {
+  try { document.getElementById('updateModal').classList.remove('show'); } catch(e) {}
+};
+// confirmUpdate 仅为 HTML 初始 onclick 提供兜底（弹窗打开时会被 startDownload 覆盖）
+window.confirmUpdate = function() { startDownload(); };
+})();
+</script>
+<script src="engine.js?v=3.2.2"></script>
+<script src="app.js?v=3.2.1"></script>
+</body>
+</html>

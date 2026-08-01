@@ -53,6 +53,16 @@ android {
     }
 }
 
+// debug 构建使用独立 applicationId，可与 release 版共存安装
+// BuildType 不支持 applicationId 属性，改用 AGP variant API 按构建类型覆盖
+androidComponents {
+    onVariants { variant ->
+        if (variant.buildType == "debug") {
+            variant.applicationId.set("com.chainchess.dev")
+        }
+    }
+}
+
 rust {
     rootDirRel = "../../../"
 }

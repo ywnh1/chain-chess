@@ -71,3 +71,7 @@ prompt.md
 .codewhale/
 
 .html.bak*.out
+
+# ─── PWA（pwa/ 目录） ───
+pwa/wasm/target/
+pwa/pkg-node/

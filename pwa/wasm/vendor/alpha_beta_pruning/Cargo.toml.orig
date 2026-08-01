@@ -1,0 +1,24 @@
+[package]
+name = "alpha_beta_pruning"
+version = "0.1.0"
+edition = "2024"
+description = "A generic alpha-beta pruning search algorithm for adversarial game AI"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/ywnh1/alpha_beta_pruning"
+documentation = "https://docs.rs/alpha_beta_pruning"
+keywords = [
+    "alpha-beta",
+    "minimax",
+    "game-theory",
+    "search",
+    "ai",
+]
+categories = [
+    "algorithms",
+    "game-development",
+    "artificial-intelligence",
+]
+
+[dependencies]
+rayon = "1.12.0"
