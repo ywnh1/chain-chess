@@ -1,6 +1,6 @@
 [package]
 name = "chain_chess_engine"
-version = "3.2.2"
+version = "3.2.3"
 edition = "2021"
 description = "连锁棋 PWA 游戏引擎（WASM）— 由 tauri 核心逻辑提取"
 

@@ -210,9 +210,16 @@
     }
   }
 
+  // 预加载 wasm：附加消费链记录失败警告，避免未处理的 rejected promise（unhandledrejection）。
+  // ready 保留原始 promise（resolve 为模块）；实际调用走 ensureWasm()，失败会重置 wasmPromise 允许重试。
+  const wasmReady = ensureWasm();
+  wasmReady.catch((e) => {
+    console.warn('[engine.js] WASM 预加载失败（首次使用时将重试）:', e && e.message ? e.message : e);
+  });
+
   window.ChainEngine = {
     isTauri: !!(window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke),
-    ready: ensureWasm(),   // 预加载 wasm
+    ready: wasmReady,   // 预加载 wasm
     webInvoke: webInvoke
   };
 

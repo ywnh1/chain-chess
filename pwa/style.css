@@ -5,8 +5,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 /* 自定义字体：FiraCode Nerd Font（复制到项目内，Tauri 打包自动包含） */
 @font-face{
   font-family:'CustomFont';
-  src:local('FiraCode Nerd Font'),
-       url('fonts/font.ttf') format('truetype');
+  /* 项目内无 fonts/font.ttf（tauri 与 pwa 均缺），仅用系统已安装字体，避免 404 */
+  src:local('FiraCode Nerd Font');
   font-display:swap;
 }
 :root{
@@ -579,14 +579,22 @@ body{padding-top:env(safe-area-inset-top,20px)}
 }
 #msg.error{background:#c0392b;color:#fff}
 
-/* modal — 简洁现代 */
+/* modal — 简洁现代
+   显示切换用 visibility/opacity 过渡而非 display:none→flex 突变，
+   避免 backdrop-filter 合成层突然建立导致整屏闪烁 */
 .modal{
-  display:none;position:fixed;inset:0;
+  position:fixed;inset:0;
   background:var(--modal-overlay, rgba(0,0,0,.6));
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   justify-content:center;align-items:center;z-index:1000;padding:20px;
+  display:flex;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .22s ease, visibility 0s linear .22s;
 }
-.modal.show{display:flex}
+.modal.show{
+  opacity:1;visibility:visible;pointer-events:auto;
+  transition:opacity .22s ease, visibility 0s;
+}
 .modal-inner{
   background:var(--surface);
   padding:28px 24px 20px;
@@ -1294,6 +1302,18 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
   font-family:var(--font);touch-action:manipulation}
 #fastFinishBtn:hover{background:rgba(240,179,75,.24);border-color:rgba(240,179,75,.55)}
 #fastFinishBtn:active{transform:scale(.96);transition:all .06s ease}
+
+/* ═══════ AI 走法建议按钮（局内手动触发） ═══════ */
+#aiHelpBtn{
+  padding:7px 14px;font-size:.72rem;font-weight:600;letter-spacing:.5px;
+  background:rgba(95,195,195,.14);color:var(--accent2);
+  border:1px solid rgba(95,195,195,.35);border-radius:10px;
+  cursor:pointer;transition:all .2s ease;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 0 12px rgba(95,195,195,.06),inset 0 1px 0 rgba(95,195,195,.08);
+  font-family:var(--font);touch-action:manipulation}
+#aiHelpBtn:hover{background:rgba(95,195,195,.24);border-color:rgba(95,195,195,.55)}
+#aiHelpBtn:active{transform:scale(.96);transition:all .06s ease}
 
 .ff-overlay{
   position:fixed;inset:0;z-index:1500;display:flex;flex-direction:column;

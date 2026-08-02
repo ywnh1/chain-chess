@@ -1,14 +1,14 @@
 {
-  "version": "3.2.2",
-  "notes": "New sound theme \"Big Dog Bark\" with 3 explosion bark modes, new mute theme, sound theme buttons layout optimized to two rows",
-  "pub_date": "2026-07-31T00:00:00Z",
+  "version": "3.2.3",
+  "notes": "Add in-game AI move suggestion (pick algorithm/depth, one-step hint), fix modal flash on open, random scale setting now effective, PWA offline cache fix, AI intro update",
+  "pub_date": "2026-08-02T00:00:00Z",
   "platforms": {
     "linux": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.2.2/chainchess-3.2.2.AppImage",
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.2.3/chainchess-3.2.3.AppImage",
       "size": 0
     },
     "android": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.2.2/chainchess-3.2.2.apk",
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.2.3/chainchess-3.2.3.apk",
       "size": 11539524
     }
   }

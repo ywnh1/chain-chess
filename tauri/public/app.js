@@ -1291,41 +1291,6 @@ setupAutoSave();
 
 
 let selectedPlayerColor = 0;
-function toggleAISettings(){
-  let v=parseInt(document.getElementById('localAI').value)||0;
-  let maxP=parseInt(document.getElementById('localPlayers').value)||2;
-  document.getElementById('aiSettings').style.display=v>0?'block':'none';
-  let humanCount = maxP - v;
-  let colorRow = document.getElementById('colorPickerRow');
-  if(humanCount === 1 && v > 0){
-    colorRow.style.display = 'block';
-    generateColorOptions();
-  } else {
-    colorRow.style.display = 'none';
-  }
-}
-function generateColorOptions(){
-  let container = document.getElementById('colorOptions');
-  if(!container)return;
-  container.innerHTML = '';
-  let maxP=parseInt(document.getElementById('localPlayers').value)||2;
-  let aiCount=parseInt(document.getElementById('localAI').value)||0;
-  for(let i=0;i<maxP;i++){
-    let isAi = i >= maxP - aiCount;
-    if(isAi) continue;
-    let btn = document.createElement('button');
-    btn.style.cssText = `width:36px;height:36px;border-radius:50%;border:2px solid transparent;background:${COLORS[i]};cursor:pointer;transition:.15s;`;
-    btn.dataset.idx = i;
-    if(i === selectedPlayerColor) btn.style.border = '2px solid #fff';
-    btn.onclick = function(){
-      document.querySelectorAll('#colorOptions button').forEach(b => b.style.border = '2px solid transparent');
-      this.style.border = '2px solid #fff';
-      selectedPlayerColor = parseInt(this.dataset.idx);
-    };
-    container.appendChild(btn);
-  }
-}
-
 /* ==================== GAME LOGIC ==================== */
 function cap(i,j,s){return 4}
 function nbrs(i,j,s){
@@ -1724,47 +1689,94 @@ function cloneBoard(b){
   return b.map(row=>row.map(c=>({owner:c.owner,count:c.count})));
 }
 
-/* ═══════ AI 帮忙（人类玩家回合 AI 推荐落子） ═══════ */
-let aiHelpMap={};           // pid -> 等级（人类玩家开启帮忙时）
-let aiHintTimer=null;
+/* ═══════ AI 走法建议（局内手动触发，仅给当前一步） ═══════ */
 let fastFinishing=false;    // 一键终局计算中（暂停后台游戏）
 function clearAiHint(){
   try{document.querySelectorAll('.ai-hint').forEach(function(el){el.classList.remove('ai-hint')})}catch(e){}
 }
-async function maybeSuggest(){
+// 打开建议弹窗：预填当前玩家 AI 配置（无则用全局默认）
+function openAiHelpModal(){
+  clearAiHint();
+  if(gameOver||isPaused||aiThinking){showMsg('当前状态无法获取建议','error');return;}
+  if(!hasPieces(curPlayer,board)){showMsg('当前玩家没有棋子','error');return;}
+  const cfg=aiConfigs[curPlayer];
+  const alg=(cfg&&cfg.algorithm)||aiAlgorithm||'alphabeta';
+  const dep=(cfg&&cfg.depth)||aiDepth||3;
+  const ml=(cfg&&cfg.useMlEval)!==false;
+  // 算法按钮
+  const btns=document.getElementById('aiHelpAlgBtns');
+  if(btns){
+    btns.querySelectorAll('.am-btn').forEach(function(b){
+      const on=b.dataset.value===alg;
+      b.classList.toggle('selected',on);
+      b.onclick=function(){
+        btns.querySelectorAll('.am-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+        updateAiHelpRows();
+      };
+    });
+  }
+  document.getElementById('aiHelpDepthValue').textContent=String(Math.max(1,Math.min(10,dep)));
+  document.getElementById('aiHelpDepthDec').onclick=function(){var e=document.getElementById('aiHelpDepthValue');var v=parseInt(e.textContent)||3;if(v>1){v--;e.textContent=v}};
+  document.getElementById('aiHelpDepthInc').onclick=function(){var e=document.getElementById('aiHelpDepthValue');var v=parseInt(e.textContent)||3;if(v<10){v++;e.textContent=v}};
+  const evalBtns=document.getElementById('aiHelpEvalToggle');
+  if(evalBtns){
+    evalBtns.querySelectorAll('.tg-btn').forEach(function(b){
+      b.classList.toggle('selected',b.dataset.value===String(ml));
+      b.onclick=function(){
+        evalBtns.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+      };
+    });
+  }
+  updateAiHelpRows();
+  openModal('aiHelpModal');
+}
+// 根据所选算法显示/隐藏深度与评估函数行（strategy 无需深度与评估）
+function updateAiHelpRows(){
+  const sel=document.querySelector('#aiHelpAlgBtns .am-btn.selected');
+  const val=sel?sel.dataset.value:'alphabeta';
+  const needDepth=val==='alphabeta'||val==='pvs'||val==='mcts';
+  const needEval=val==='alphabeta'||val==='pvs';
+  const dr=document.getElementById('aiHelpDepthRow');if(dr)dr.style.display=needDepth?'block':'none';
+  const er=document.getElementById('aiHelpEvalRow');if(er)er.style.display=needEval?'block':'none';
+}
+function closeAiHelpModal(){closeModal('aiHelpModal')}
+// 获取当前一步走法建议：调用引擎，仅高亮推荐落点
+async function requestAiSuggestion(){
+  closeAiHelpModal();
   clearAiHint();
   if(gameOver||isPaused||aiThinking)return;
-  const lvl=aiHelpMap[curPlayer];
-  if(!lvl||aiPlayers.has(curPlayer))return;
-  if(!hasPieces(curPlayer,board))return;
-  if(aiHintTimer)clearTimeout(aiHintTimer);
-  const askPid=curPlayer;
-  aiHintTimer=setTimeout(async function(){
+  const pid=curPlayer;
+  const sel=document.querySelector('#aiHelpAlgBtns .am-btn.selected');
+  const alg=sel?sel.dataset.value:'alphabeta';
+  const depth=parseInt(document.getElementById('aiHelpDepthValue').textContent)||3;
+  const evalSel=document.querySelector('#aiHelpEvalToggle .tg-btn.selected');
+  const useMlEval=evalSel?evalSel.dataset.value==='true':true;
+  let cmd;
+  if(alg==='mcts'){cmd='ai_move_mcts';}
+  else if(alg==='pvs'){cmd='ai_move_v2';}
+  else if(alg==='alphabeta'){cmd='ai_move';}
+  else{cmd='ai_move_strategy';}
+  const args={
+    board:board,size:size,player:pid,depth:depth,
+    eliminated:[...eliminatedPlayers],maxPlayers:maxPlayers,
+    borderMode:borderMode,gameCount:gameCount,firstMovePos:firstMovePos,
+    randomScale:10,useMlEval:useMlEval
+  };
+  if(alg==='pvs')args.algorithm=alg;
+  try{
+    const result=await tauriInvoke(cmd,args);
+    if(!result||result.length!==2)return;
     if(gameOver||isPaused||aiThinking)return;
-    if(curPlayer!==askPid)return;
-    const alg=aiConfigs[curPlayer]?aiConfigs[curPlayer].algorithm:aiAlgorithm;
-    let cmd;
-    if(alg==='mcts'){cmd='ai_move_mcts';}
-    else if(alg==='pvs'){cmd='ai_move_v2';}
-    else if(alg==='alphabeta'){cmd='ai_move';}
-    else{cmd='ai_move_strategy';}
-    const args={
-      board:board,size:size,player:curPlayer,depth:lvl,
-      eliminated:[...eliminatedPlayers],maxPlayers:maxPlayers,
-      borderMode:borderMode,gameCount:gameCount,firstMovePos:firstMovePos,
-      randomScale:10,useMlEval:true
-    };
-    if(alg==='pvs')args.algorithm=alg;
-    try{
-      const result=await tauriInvoke(cmd,args);
-      if(!result||result.length!==2)return;
-      if(gameOver||isPaused||aiThinking)return;
-      if(!aiHelpMap[curPlayer]||aiPlayers.has(curPlayer))return;
-      const x=result[0],y=result[1];
-      clearAiHint();
-      if(cells&&cells[x]&&cells[x][y])cells[x][y].classList.add('ai-hint');
-    }catch(e){}
-  },120);
+    if(curPlayer!==pid)return;
+    const x=result[0],y=result[1];
+    clearAiHint();
+    if(cells&&cells[x]&&cells[x][y]){
+      cells[x][y].classList.add('ai-hint');
+      showMsg(`AI 建议落在 ${x+1},${y+1}`,'');
+    }
+  }catch(e){}
 }
 
 /* ═══════ 一键终局（场上只剩 AI 时快速结算） ═══════ */
@@ -1904,7 +1916,7 @@ async function triggerAI(){
     if(idx<0)idx=0;
     curPlayer=alive[(idx+1)%alive.length];
     renderPlayerBar();setBg(curPlayer);
-    updateFastFinishBtn();maybeSuggest();
+    updateFastFinishBtn();
     if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
     return;
   }
@@ -1953,7 +1965,7 @@ async function triggerAI(){
   curPlayer=alive[(idx+1)%alive.length];
   renderPlayerBar();
   setBg(curPlayer);
-  updateFastFinishBtn();maybeSuggest();
+  updateFastFinishBtn();
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
 }
 
@@ -2076,7 +2088,7 @@ function undoLastMove(){
   renderBoard(true);
   renderPlayerBar();
   setBg(curPlayer);
-  updateFastFinishBtn();maybeSuggest();
+  updateFastFinishBtn();
   updateUndoBtn();
   showMsg('已撤销上一步','');
   // 如果当前轮到 AI 且有缓存走法，直接重放无需重算
@@ -2130,7 +2142,7 @@ async function replayAiMove(move){
   curPlayer=alive[(idx+1)%alive.length];
   renderPlayerBar();
   setBg(curPlayer);
-  updateFastFinishBtn();maybeSuggest();
+  updateFastFinishBtn();
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
 }
 function updateUndoBtn(){
@@ -2267,7 +2279,7 @@ async function localClick(x,y){
     curPlayer=alive[(idx+1)%alive.length];
     renderPlayerBar();
     setBg(curPlayer);
-    updateFastFinishBtn();maybeSuggest();
+    updateFastFinishBtn();
     if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
     return;
   }
@@ -2319,7 +2331,7 @@ async function localClick(x,y){
   curPlayer=alive[(idx+1)%alive.length];
   renderPlayerBar();
   setBg(curPlayer);
-  updateFastFinishBtn();maybeSuggest();
+  updateFastFinishBtn();
   if(aiPlayers.has(curPlayer)&&!gameOver)setTimeout(()=>triggerAI(),400);
 }
 
@@ -2944,8 +2956,7 @@ async function continueGame(){
 
 async function showSettlement(winner,colorNames,history){
   clearAiHint();
-  if(aiHintTimer){clearTimeout(aiHintTimer);aiHintTimer=null}
-  // 清理动态 settlement overlay（如果有残留）
+    // 清理动态 settlement overlay（如果有残留）
   document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
   clearSavedGameState();
   const fullHistory = await flushAndGetFullHistory();
@@ -3222,10 +3233,9 @@ function exitGame(){
   // 刷盘残留历史再退出，清理磁盘回合数据
   if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history on exit failed:', e))}
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;fastFinishing=false;
-  aiPlayers=new Set();aiHelpMap={};eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
+  aiPlayers=new Set();eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;undoStack=[];
-  if(aiHintTimer){clearTimeout(aiHintTimer);aiHintTimer=null}
-  clearAiHint();
+    clearAiHint();
   cells=[];board=[];
   try{document.getElementById('board').innerHTML='';}catch(e){}
   document.body.style.background='';
@@ -3247,6 +3257,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.2.3 · 第 34 版',desc:'新增局内AI走法建议（按钮选择算法与深度、仅提示当前一步）、修复弹窗弹出闪烁、随机刻度设置真正生效、PWA离线缓存修复、AI介绍内容更新'},
     {v:'v3.2.2 · 第 33 版',desc:'新增大狗叫音频主题（爆炸音效可选3种叫声模式）、新增静音主题、音效主题按钮两行排版优化'},
     {v:'v3.2.1 · 第 32 版',desc:'修复了3.2.0仓促发布的各种bug'},
     {v:'v3.2.0 · 第 31 版',desc:'新增设置页面（主题切换/震动开关/预设音效/手动检查更新）、新增AI帮忙与一键终局、重写背景光球动画、修复对局结算显示问题'},
@@ -3325,21 +3336,6 @@ function openPlayerModal(idx){
   if(evalBtns){
     evalBtns.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===String(cfg.useMlEval!==false))});
   }
-  // 初始化 AI 帮忙（仅人类玩家显示该行）
-  const aiHelpRow=document.getElementById('playerAiHelpRow');
-  if(aiHelpRow)aiHelpRow.style.display=(cfg.type==='human')?'block':'none';
-  const aiBtn=document.getElementById('aiHelpToggleBtn');
-  if(aiBtn){
-    const aiOn=!!cfg.aiHelp;
-    aiBtn.dataset.value=aiOn?'on':'off';
-    aiBtn.classList.toggle('selected',aiOn);
-    aiBtn.textContent=aiOn?'关闭':'开启';
-  }
-  const aiLv=cfg.aiHelpLevel||2;
-  document.getElementById('aiHelpLevelValue').textContent=String(aiLv);
-  document.getElementById('aiHelpLevelLabel').textContent='等级 '+aiLv;
-  document.getElementById('aiHelpLevelDec').onclick=function(){var e=document.getElementById('aiHelpLevelValue');var v=parseInt(e.textContent)||2;if(v>1){v--;e.textContent=v;document.getElementById('aiHelpLevelLabel').textContent='等级 '+v}};
-  document.getElementById('aiHelpLevelInc').onclick=function(){var e=document.getElementById('aiHelpLevelValue');var v=parseInt(e.textContent)||2;if(v<5){v++;e.textContent=v;document.getElementById('aiHelpLevelLabel').textContent='等级 '+v}};
   openModal('playerConfigModal');
 }
 function updateModalRows(){
@@ -3353,8 +3349,6 @@ function updateModalRows(){
   document.getElementById('playerDepthRow').style.display=needDepth?'block':'none';
   document.getElementById('playerRandomRow').style.display=needDepth?'block':'none';
   document.getElementById('playerEvalRow').style.display=needEval?'block':'none';
-  const aiHelpRow=document.getElementById('playerAiHelpRow');
-  if(aiHelpRow)aiHelpRow.style.display=(val==='human')?'block':'none';
 }
 function closePlayerModal(){
   _inGameSettingsMode=false;
@@ -3392,21 +3386,6 @@ function openInGamePlayerConfig(idx){
   if(evalBtns){
     evalBtns.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===String(curUseMlEval))});
   }
-  // 初始化 AI 帮忙（局内：人类时显示，读取 aiHelpMap）
-  const aiHelpRow=document.getElementById('playerAiHelpRow');
-  if(aiHelpRow)aiHelpRow.style.display=(!isAI)?'block':'none';
-  const aiBtn=document.getElementById('aiHelpToggleBtn');
-  if(aiBtn){
-    const aiOn=!!aiHelpMap[idx];
-    aiBtn.dataset.value=aiOn?'on':'off';
-    aiBtn.classList.toggle('selected',aiOn);
-    aiBtn.textContent=aiOn?'关闭':'开启';
-  }
-  const aiLv=aiHelpMap[idx]||2;
-  document.getElementById('aiHelpLevelValue').textContent=String(aiLv);
-  document.getElementById('aiHelpLevelLabel').textContent='等级 '+aiLv;
-  document.getElementById('aiHelpLevelDec').onclick=function(){var e=document.getElementById('aiHelpLevelValue');var v=parseInt(e.textContent)||2;if(v>1){v--;e.textContent=v;document.getElementById('aiHelpLevelLabel').textContent='等级 '+v}};
-  document.getElementById('aiHelpLevelInc').onclick=function(){var e=document.getElementById('aiHelpLevelValue');var v=parseInt(e.textContent)||2;if(v<5){v++;e.textContent=v;document.getElementById('aiHelpLevelLabel').textContent='等级 '+v}};
   openModal('playerConfigModal');
 }
 function saveInGamePlayerConfig(){
@@ -3417,20 +3396,15 @@ function saveInGamePlayerConfig(){
   var newRandom=parseInt(document.getElementById('randomScaleSlider').value)??10;
   var evalSel=document.querySelector('#playerEvalToggle .tg-btn.selected');
   var newUseMlEval=evalSel?evalSel.dataset.value==='true':true;
-  const aiBtn=document.getElementById('aiHelpToggleBtn');
-  const newAiHelp=aiBtn?aiBtn.dataset.value==='on':false;
-  const newAiHelpLevel=parseInt(document.getElementById('aiHelpLevelValue').textContent)||2;
   if(newType==='human'){
     if(aiPlayers.has(idx)){
       aiPlayers.delete(idx);
       delete aiConfigs[idx];
     }
-    if(newAiHelp)aiHelpMap[idx]=newAiHelpLevel;else delete aiHelpMap[idx];
   }else{
     aiPlayers.add(idx);
     aiConfigs[idx]={algorithm:newType,depth:newDepth,randomScale:newRandom,useMlEval:newUseMlEval};
     if(!aiConfigs[0]){aiAlgorithm=newType;aiDepth=newDepth}
-    delete aiHelpMap[idx];
   }
   _inGameSettingsMode=false;
   closeModal('playerConfigModal');
@@ -3453,9 +3427,6 @@ function savePlayerConfig(){
   cfg.randomScale=parseInt(document.getElementById('randomScaleSlider').value)??10;
   var evalSel=document.querySelector('#playerEvalToggle .tg-btn.selected');
   cfg.useMlEval=evalSel?evalSel.dataset.value==='true':true;
-  const aiBtn=document.getElementById('aiHelpToggleBtn');
-  cfg.aiHelp=aiBtn?aiBtn.dataset.value==='on':false;
-  cfg.aiHelpLevel=parseInt(document.getElementById('aiHelpLevelValue').textContent)||2;
   closePlayerModal();
   generatePlayerConfigs();
 }
@@ -3466,7 +3437,7 @@ function generatePlayerConfigs(){
   const realCnt=Math.min(cnt,maxP);
   while(playerConfigs.length<realCnt){
     const i=playerConfigs.length;
-    playerConfigs.push({name:'',type:i===0?'human':'strategy',depth:2,randomScale:10,useMlEval:true,aiHelp:false,aiHelpLevel:2});
+    playerConfigs.push({name:'',type:i===0?'human':'strategy',depth:2,randomScale:10,useMlEval:true});
   }
   if(playerConfigs.length>realCnt)playerConfigs.length=realCnt;
   const container=document.getElementById('playerConfigList');
@@ -3545,11 +3516,9 @@ function startLocalFromSetup(sz,cnt){
   eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
   let colorNames={};
-  aiHelpMap={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
     colorNames[i]=cfg.name||('玩家'+(i+1));
-    if(cfg.aiHelp)aiHelpMap[i]=cfg.aiHelpLevel||2;
   }
   _colorNames=colorNames;
   recordHistory();
@@ -3573,13 +3542,11 @@ function startAIFromSetup(sz,cnt){
   eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
   let colorNames={},humanIdx=-1;
-  aiHelpMap={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
     colorNames[i]=cfg.name||('玩家'+(i+1));
     if(cfg.type==='human'){
       if(humanIdx<0)humanIdx=i;
-      if(cfg.aiHelp)aiHelpMap[i]=cfg.aiHelpLevel||2;
     }else{
       aiPlayers.add(i);
       aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10,useMlEval:cfg.useMlEval!==false};
@@ -3593,7 +3560,7 @@ function startAIFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
-  updateFastFinishBtn();maybeSuggest();
+  updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
   _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode};
 }
@@ -3611,7 +3578,6 @@ function startEveFromSetup(sz,cnt){
   eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
   let colorNames={};
-  aiHelpMap={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
     colorNames[i]=cfg.name||('AI '+(i+1));
@@ -3624,7 +3590,7 @@ function startEveFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
-  updateFastFinishBtn();maybeSuggest();
+  updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
   _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode};
 }

@@ -1,7 +1,7 @@
 #!/bin/sh
 # build_apk.sh - 编译并签名连锁棋 APK
 # 用法: ./build_apk.sh [--release] [--native] <keystore_password>
-# 例如: ./build_apk.sh chainchess              # debug 快速编译（默认）
+# 仅支持 release 构建（debug 模式已移除）
 #       ./build_apk.sh --release chainchess    # release 激进优化（性能/体积，无视编译耗时）
 #       ./build_apk.sh --native chainchess     # release + target-cpu=native 极致优化
 #       ./build_apk.sh --native --release chainchess
@@ -11,7 +11,7 @@ set -e
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="chainchess"
-VERSION="3.2.2"
+VERSION="3.2.3"
 
 CARGO_CONFIG="tauri/src-tauri/.cargo/config.toml"
 CARGO_TOML="tauri/src-tauri/Cargo.toml"
@@ -26,7 +26,7 @@ fi
 # ── 参数解析 ──────────────────────────────────────────────
 # --release: 启用 release 激进优化（fat LTO 等，编译慢但性能/体积最优）
 # --native : target-cpu=native 极致优化，自动视为 --release
-RELEASE=false
+RELEASE=true
 NATIVE=false
 PASSWORD=""
 
@@ -50,7 +50,6 @@ fi
 
 if [ -z "$PASSWORD" ]; then
   echo "用法: $0 [--release] [--native] <keystore_password>"
-  echo "例如: $0 chainchess"
   echo "       $0 --release chainchess"
   echo "       $0 --native chainchess"
   exit 1
@@ -61,52 +60,42 @@ if [ ! -f "$KEYSTORE" ]; then
   exit 1
 fi
 
-# ── 构建模式与产物路径 ────────────────────────────────────
-if [ "$RELEASE" = true ]; then
-  UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
-  if [ "$NATIVE" = true ]; then
-    OUTPUT="release/${PRODUCT}-native-${VERSION}.apk"
-  else
-    OUTPUT="release/${PRODUCT}-${VERSION}.apk"
-  fi
+# ── 构建模式与产物路径（仅 release；debug 已移除）───────
+UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk"
+if [ "$NATIVE" = true ]; then
+  OUTPUT="release/${PRODUCT}-native-${VERSION}.apk"
 else
-  # debug 快速编译产物（Tauri debug APK 已自动用 debug keystore 签名，稍后统一重签）
-  UNSIGNED_APK="tauri/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk"
-  OUTPUT="release/${PRODUCT}-${VERSION}-debug.apk"
+  OUTPUT="release/${PRODUCT}-${VERSION}.apk"
 fi
-
 START_EPOCH=$(date +%s)
 
 # ── 构建模式提示 ──────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ "$RELEASE" = true ]; then
-  echo "  📦 构建模式: release（优化性能/体积，编译耗时较长）"
+if [ "$NATIVE" = true ]; then
+  echo "  📦 构建模式: release + native（target-cpu=native 极致优化）"
 else
-  echo "  📦 构建模式: debug（快速编译，默认）"
-  echo "  包名: com.chainchess.dev（可与 release 版共存安装）"
+  echo "  📦 构建模式: release（优化性能/体积，编译耗时较长）"
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 # ── Release 激进优化（修改 Cargo.toml，构建后自动恢复）─────
+# 仅 release 构建（debug 已移除），固定启用 fat LTO：
 # 基础 [profile.release] 已含 opt-level=3 / strip / codegen-units=1 / panic=abort，
-# --release 时再升级为 fat LTO（全程序链接优化，跨 crate 内联，
-# 性能与体积更优，但链接耗时显著增加 —— 用户已声明无视编译耗时）
-if [ "$RELEASE" = true ]; then
-  if grep -q '^\[profile\.release\]' "$CARGO_TOML"; then
-    cp "$CARGO_TOML" "${CARGO_TOML}.bak"
-    if grep -q '^lto' "$CARGO_TOML"; then
-      sed -i 's/^lto = .*/lto = "fat"/' "$CARGO_TOML"
-    else
-      sed -i '/^\[profile\.release\]/a lto = "fat"' "$CARGO_TOML"
-    fi
-    echo "  ⚙️  Cargo.toml: lto → fat（全程序链接优化）"
+# fat LTO 全程序链接优化，跨 crate 内联，性能与体积更优，但链接耗时显著增加。
+if grep -q '^\[profile\.release\]' "$CARGO_TOML"; then
+  cp "$CARGO_TOML" "${CARGO_TOML}.bak"
+  if grep -q '^lto' "$CARGO_TOML"; then
+    sed -i 's/^lto = .*/lto = "fat"/' "$CARGO_TOML"
   else
-    echo "  ⚠️  Cargo.toml 缺少 [profile.release]，跳过激进优化"
+    sed -i '/^\[profile\.release\]/a lto = "fat"' "$CARGO_TOML"
   fi
-  echo ""
+  echo "  ⚙️  Cargo.toml: lto → fat（全程序链接优化）"
+else
+  echo "  ⚠️  Cargo.toml 缺少 [profile.release]，跳过激进优化"
 fi
+echo ""
 
 # ── 原生优化模式（--native，仅 release 生效）─────────────
 if [ "$NATIVE" = true ]; then
@@ -227,7 +216,6 @@ if [ ! -f "$ANDROID_MAIN_ACTIVITY" ]; then
   echo ""
 fi
 
-
 # 确保 tauri.properties 存在
 TAURI_PROPERTIES="tauri/src-tauri/gen/android/app/tauri.properties"
 if [ -f "$TAURI_PROPERTIES" ]; then
@@ -259,21 +247,13 @@ export TAURI_ANDROID_SKIP_RUST_BUILD=1
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ "$RELEASE" = true ]; then
-  echo "  🔨 编译 arm64 release APK"
-else
-  echo "  🔨 编译 arm64 debug APK（快速编译）"
-fi
+echo "  🔨 编译 arm64 release APK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  产物: ${OUTPUT}"
 echo ""
 (
   cd tauri
-  if [ "$RELEASE" = true ]; then
-    npx tauri android build --target aarch64 --apk
-  else
-    npx tauri android build --target aarch64 --apk --debug
-  fi
+  npx tauri android build --target aarch64 --apk
 )
 
 # ── 步骤 2: 签名 ──────────────────────────────────────────
@@ -317,37 +297,30 @@ echo "  大小: ${FILESIZE}"
   echo "  耗时: ${ELAPSED}s"
 
 # ── 步骤 4: 生成 update.json（仅 release）─────────────────
-if [ "$RELEASE" = true ]; then
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  📄 验证 update.json"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [ -f "update.json" ]; then
+  # 用 APK 真实字节数更新 .android.size（--argjson 要求合法 JSON 数值）
+  jq --argjson sz "$FILESIZE_BYTES" '.platforms.android.size = $sz' update.json > tmp.json && mv tmp.json update.json
+
+  VERSION=$(jq -r '.version' update.json)
+  
+  echo "  已验证: update.json"
+  echo "  版本: ${VERSION}"
+  echo "  尺寸: ${FILESIZE}"
   echo ""
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  📄 验证 update.json"
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-  if [ -f "update.json" ]; then
-    # 用 APK 真实字节数更新 .android.size（--argjson 要求合法 JSON 数值）
-    jq --argjson sz "$FILESIZE_BYTES" '.platforms.android.size = $sz' update.json > tmp.json && mv tmp.json update.json
-
-    VERSION=$(jq -r '.version' update.json)
-    
-    echo "  已验证: update.json"
-    echo "  版本: ${VERSION}"
-    echo "  尺寸: ${FILESIZE}"
-    echo ""
-    batcat update.json
-    echo ""
-    echo "  📌 上传到 Gitee Release 前请确认："
-    echo "     1. update.json → 提交到 chain-chess-release 仓库 main 分支"
-    echo "     2. ${OUTPUT##release/} → 上传到 Gitee Release 附件"
-    echo ""
-  else
-    echo "update.json不存在"
-  fi
+  batcat update.json
+  echo ""
+  echo "  📌 上传到 Gitee Release 前请确认："
+  echo "     1. update.json → 提交到 chain-chess-release 仓库 main 分支"
+  echo "     2. ${OUTPUT##release/} → 上传到 Gitee Release 附件"
+  echo ""
 else
-  echo ""
-  echo "  ℹ️  debug 构建，跳过 update.json 发布流程"
-  echo "  💡 需要发布 APK 时请使用: $0 --release $PASSWORD"
+  echo "update.json不存在"
 fi
-
 # 尝试复制到 Android 设备（仅当路径存在时）
 if [ -d "/storage/emulated/0/用户" ]; then
   cp "$OUTPUT" /storage/emulated/0/用户/

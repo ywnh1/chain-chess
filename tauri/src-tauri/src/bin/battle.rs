@@ -72,7 +72,7 @@ fn play_game(
         let chosen = find_best_move_by_alg(
             &board, board_size, cur_player, cfg,
             &eliminated, max_players, game_id, None,
-            BORDER_MODE,
+            BORDER_MODE, 0,  // battle 工具不配置随机刻度
         );
 
         let (mx, my) = chosen.unwrap_or_else(|| legal_moves[0]);

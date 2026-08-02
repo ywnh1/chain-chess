@@ -138,25 +138,49 @@
         <button class="tg-btn" data-value="false" onclick="var p=this.parentNode;p.querySelectorAll('.tg-btn').forEach(function(b){b.classList.remove('selected')});this.classList.add('selected')">手写规则</button>
       </div>
     </div>
-    <div class="form-row" id="playerAiHelpRow" style="display:none">
-      <label style="flex:1">AI 帮忙</label>
-      <div class="toggle-group" style="align-items:center">
-        <span id="aiHelpLevelLabel" style="font-size:.72rem;color:var(--dim);margin-right:8px">等级 2</span>
-        <div class="depth-adjust" style="flex-shrink:0">
-          <button class="dm-btn" id="aiHelpLevelDec">−</button>
-          <span class="dm-val" id="aiHelpLevelValue">2</span>
-          <button class="dm-btn" id="aiHelpLevelInc">+</button>
-        </div>
-        <button class="tg-btn" id="aiHelpToggleBtn" data-value="off" onclick="var t=this;var on=t.dataset.value==='on';t.dataset.value=on?'off':'on';t.classList.toggle('selected',!on);t.textContent=on?'开启':'关闭';">开启</button>
-      </div>
-      <p style="font-size:.7rem;color:var(--dim);margin-top:2px">轮到该玩家时，AI 推荐落子位置（等级越高推荐越强）</p>
-    </div>
     <div class="modal-actions">
       <button class="glass-btn" onclick="closePlayerModal()">取消</button>
       <button class="glass-btn primary" onclick="savePlayerConfig()">确认</button>
     </div>
   </div>
 </div>
+
+<!-- AI 走法建议弹窗：局内点击「💡 建议」弹出，选择算法/深度后仅给出当前一步建议 -->
+<div id="aiHelpModal" class="modal">
+  <div class="modal-inner player-modal">
+    <h3>AI 走法建议</h3>
+    <div class="form-row">
+      <label>建议算法</label>
+      <div id="aiHelpAlgBtns" class="alg-mini" style="flex-wrap:wrap;gap:4px">
+        <button class="am-btn selected" data-value="alphabeta">A-B</button>
+        <button class="am-btn" data-value="pvs">PVS</button>
+        <button class="am-btn" data-value="mcts">MCTS</button>
+        <button class="am-btn" data-value="strategy">策略</button>
+      </div>
+    </div>
+    <div class="form-row" id="aiHelpDepthRow">
+      <label>搜索深度</label>
+      <div class="depth-adjust">
+        <button class="dm-btn" id="aiHelpDepthDec">−</button>
+        <span class="dm-val" id="aiHelpDepthValue">3</span>
+        <button class="dm-btn" id="aiHelpDepthInc">+</button>
+      </div>
+    </div>
+    <div class="form-row" id="aiHelpEvalRow" style="display:none">
+      <label style="flex:1">评估函数</label>
+      <div id="aiHelpEvalToggle" class="toggle-group">
+        <button class="tg-btn selected" data-value="true">ML 模型</button>
+        <button class="tg-btn" data-value="false">手写规则</button>
+      </div>
+    </div>
+    <p style="font-size:.72rem;color:var(--dim);margin:0 0 4px">仅为当前这一步给出推荐落子位置，不会自动持续提示。</p>
+    <div class="modal-actions">
+      <button class="glass-btn" onclick="closeAiHelpModal()">取消</button>
+      <button class="glass-btn primary" onclick="requestAiSuggestion()">给出建议</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- Settings Screen -->
 <div id="settings" class="screen">
@@ -228,7 +252,7 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.2.2</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.2.3</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -256,7 +280,7 @@
     <div class="about-card">
       <h3>功能亮点</h3>
       <p style="font-size:.82rem;line-height:1.7;margin:0">
-        🦀 <strong>Rust AI 引擎</strong> — 四款搜索算法（策略 / A-B / PVS / MCTS），Rayon 多核并行<br>
+        🦀 <strong>Rust AI 引擎</strong> — 四款算法（策略 / A-B / PVS / MCTS），桌面端 A-B/PVS/MCTS Rayon 多核并行<br>
         🎯 <strong>增强版 AI 评估</strong> — 位置权重 + 邻居威胁评分 + 爆发势能，ML 评估以 70% vs 35% 优势碾压手写版<br>
         💾 <strong>中断恢复</strong> — 异常退出自动保存，历史页面一键继续上次对局<br>
         📊 <strong>结算图表</strong> — 棋子数和点数双折线图，支持全屏缩放与双指缩放<br>
@@ -292,10 +316,10 @@
     <h2>AI 介绍</h2>
 
     <div class="about-card">
-      <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋内置 <strong>四款 AI 算法</strong>，覆盖启发式规则、树搜索剪枝和随机模拟三大搜索范式。PVE、AI 对战、斗蛐蛐模式均可自由切换。除策略算法（JavaScript）外，其余三款使用 <strong>Rust + Rayon</strong> 多核并行加速。</p>
+      <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋内置 <strong>四款 AI 算法</strong>，覆盖启发式规则、树搜索剪枝和随机模拟三大搜索范式。本地对战、AI 对战、AI 斗蛐蛐模式均可自由切换。四款算法均由 <strong>Rust</strong> 引擎实现（桌面端 A-B/PVS/MCTS 使用 Rayon 多核并行加速，PWA 版单线程 WASM）。</p>
 
       <h3 class="ai-alg-title" style="color:var(--accent)">⚡ 策略算法 · 启发式规则</h3>
-      <p class="ai-alg-desc">纯 JavaScript，基于人工优先级规则快速决策。无需 Rust 引擎，响应最快，适合新手入门和低算力设备。</p>
+      <p class="ai-alg-desc">Rust 实现，基于人工优先级规则快速决策，无需树搜索，响应最快，适合新手入门和低算力设备。</p>
       <div class="ai-alg-detail" style="background:rgba(240,179,75,.06)">
         <strong style="color:var(--accent)">三级优先</strong> → 优先走即将爆裂的棋子（count=3）<br>
         <strong style="color:var(--accent)">安全升级</strong> → 避开对手三级附近的二级棋子<br>
@@ -320,12 +344,12 @@
       </div>
 
       <h3 class="ai-alg-title" style="color:#c88cff">🎲 MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
-      <p class="ai-alg-desc"><strong>不依赖评估函数</strong>——不猜哪个走法好，直接大量随机模拟直到终局，用胜负统计数据做决策。</p>
+      <p class="ai-alg-desc"><strong>不依赖评估函数</strong>——不猜哪个走法好，直接大量随机模拟对局（单次最多 40 步，提前终局即停），用胜负统计数据做决策。</p>
       <div class="ai-alg-detail" style="background:rgba(200,140,255,.06)">
         <strong style="color:#c88cff">SELECT</strong> → <strong style="color:#c88cff">EXPAND</strong> → <strong style="color:#c88cff">PLAYOUT</strong> → <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
-        UCB1 平衡探索与利用 · 策略偏置 Playout（80% 选好走法）· 渐进展开（≥3 次访问才展新分支）
+        UCB1 平衡探索与利用 · 随机 Playout（均匀随机模拟）· 渐进展开（≥3 次访问才展新分支）
       </div>
-      <p class="ai-alg-desc">Rust + Rayon 根级并行，depth=1~10 对应 1200~12000 次迭代，树节点上限 3000。无需人为设计评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
+      <p class="ai-alg-desc">Rust 实现，depth=1~10 对应 800~8000 次迭代，树节点上限 2000。无需人为设计评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
     </div>
   </div>
 </div>
@@ -527,6 +551,7 @@
       <button onclick="togglePause()" id="pauseBtn">暂停</button>
       <button id="autoSkipBtn" onclick="toggleAutoSkip()" title="自动跳过连爆动画">跳过</button>
       <button id="fastFinishBtn" onclick="confirmFastFinish()" style="display:none" title="场上只剩 AI 时直接算出终局结果">⚡ 一键终局</button>
+      <button id="aiHelpBtn" onclick="openAiHelpModal()" title="让 AI 给出当前一步的走法建议">💡 建议</button>
 </div>
   </div>
   <div id="playerBar" class="player-bar"></div>

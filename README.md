@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=fff" alt="Android">
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/badge/version-3.2.2-orange" alt="v3.1.4">
+    <img src="https://img.shields.io/badge/version-3.2.3-orange" alt="v3.1.4">
   </p>
 </div>
 
@@ -114,7 +114,7 @@ cd ..
 
 ### ⚡ 策略算法 — 启发式规则
 
-纯 JavaScript 引擎，基于人工优先级规则快速决策。无需 Rust 引擎，响应最快，适合新手入门和低算力设备。
+Rust 实现，基于人工优先级规则快速决策，无需树搜索，响应最快，适合新手入门和低算力设备。
 
 - **三级优先** — 优先走即将爆裂的棋子（count=3），触发连锁反应
 - **安全升级** — 避开对手三级棋子附近的二级棋子，防止被吞噬
@@ -147,16 +147,16 @@ Principal Variation Search（主变例搜索）是 Alpha-Beta 的精炼版本。
 
 ### 🎲 MCTS 蒙特卡洛树搜索
 
-与剪枝搜索截然不同的范式——不依赖任何评估函数，通过大量随机模拟评估走法优劣。
+与剪枝搜索截然不同的范式——不依赖完整评估函数，通过大量随机模拟对局（单次最多 40 步，提前终局即停）评估走法优劣。
 
 ```
 SELECT → EXPAND → PLAYOUT → BACKPROPAGATE
 ```
 
 - **UCB1** 平衡探索与利用
-- **策略偏置 Playout** — 80% 概率选评分前 3 的走法，20% 纯随机
+- **随机 Playout** — 均匀随机选择走法模拟
 - **渐进展开** — 子节点访问 ≥3 次后才展新分支
-- **迭代数** — depth=1~10 对应 1200~12000 次迭代，树节点上限 3000
+- **迭代数** — depth=1~10 对应 800~8000 次迭代，树节点上限 2000
 
 擅长发现 Alpha-Beta 不易察觉的非直觉走法。
 
