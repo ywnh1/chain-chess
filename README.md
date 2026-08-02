@@ -110,9 +110,7 @@ cd ..
 ./build.sh chainchess
 ```
 
-Windows exe 交叉编译依赖（已安装）：`rustup target add x86_64-pc-windows-msvc` + `cargo install cargo-xwin`（首次运行自动下载 MSVC CRT/SDK）。
-
-预编译 APK 可在 [Releases](https://github.com/ywnh1/chain-chess/releases) 下载。
+预编译应用可在 [Releases](https://gitee.com/ywnh1/chain-chess-release/releases) 下载。
 
 ---
 

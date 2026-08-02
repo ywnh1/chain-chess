@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 [profile.release]
 panic = "abort"
 codegen-units = 1
-lto = true
+lto = "fat"
 opt-level = 3
 strip = true
 
