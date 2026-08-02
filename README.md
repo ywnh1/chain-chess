@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=fff" alt="Android">
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/badge/version-3.2.3-orange" alt="v3.1.4">
+    <img src="https://img.shields.io/badge/version-3.3.0-orange" alt="v3.1.4">
   </p>
 </div>
 
@@ -84,25 +84,33 @@ npx tauri dev          # 开发模式
 npx tauri build        # 构建可执行文件
 ```
 
-### Android APK
+### Android APK / Windows exe
 
 ```bash
-./build_apk.sh <keystore_password>
-
-# 例如：
-./build_apk.sh chainchess
+./build.sh --apk chainchess        # 仅构建 APK（签名）
+./build.sh --exe                   # 仅构建 Windows exe（cargo-xwin 交叉编译）
+./build.sh --apk --exe chainchess  # 同时构建两者（默认）
+./build.sh --native chainchess     # APK 加 target-cpu=native 极致优化
+./build.sh --pwa                   # 仅打包 PWA zip（不编译）
+./build.sh --all                   # 打包全部：pwa zip + 登记 release/ 已编译 apk/exe
 ```
 
-脚本自动编译 arm64 APK，用 `release.keystore` 签名并输出到 `release/` 目录。
+- **APK**：脚本自动编译 arm64 APK，用 `release.keystore` 签名并输出到 `release/` 目录（需 keystore 密码）。
+- **exe**：`cargo-xwin` 交叉编译 `x86_64-pc-windows-msvc`，无需密码，输出 `release/chainchess-<version>.exe`。
+- **pwa**：`--pwa` 只打包 `release/chain-chess-pwa-v<version>.zip`（排除 wasm 源码与 pkg-node，仅含编译好的 pkg/*.wasm）。
+- **all**：`--all` 打包 pwa zip 并把 `release/` 下已编译的 apk/exe 大小登记进 `update.json`（不编译，产物需先由 `--apk`/`--exe` 生成）。
+- 构建都会自动更新 `update.json` 中对应平台的 URL 与 size。
 
-首次构建需先初始化 Android 项目：
+首次构建 APK 需先初始化 Android 项目：
 
 ```bash
 cd tauri
 npx tauri android init
 cd ..
-./build_apk.sh chainchess
+./build.sh chainchess
 ```
+
+Windows exe 交叉编译依赖（已安装）：`rustup target add x86_64-pc-windows-msvc` + `cargo install cargo-xwin`（首次运行自动下载 MSVC CRT/SDK）。
 
 预编译 APK 可在 [Releases](https://github.com/ywnh1/chain-chess/releases) 下载。
 

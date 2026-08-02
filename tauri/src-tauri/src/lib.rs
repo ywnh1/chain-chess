@@ -793,8 +793,9 @@ async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, String
         .to_string();
     let notes = update_data["notes"].as_str().unwrap_or("").to_string();
 
-    // 桌面端用 linux 平台的 URL
-    let url = update_data["platforms"]["linux"]["url"]
+    // 桌面端按平台选择 URL：Windows → windows，其余 → linux
+    let platform_key = if cfg!(target_os = "windows") { "windows" } else { "linux" };
+    let url = update_data["platforms"][platform_key]["url"]
         .as_str()
         .unwrap_or("")
         .to_string();

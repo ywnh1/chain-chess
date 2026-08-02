@@ -252,7 +252,7 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.2.3</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.0</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -655,9 +655,21 @@ function cmpVer(a, b) {
   return 0;
 }
 
+/** 按运行平台挑选 update.json 中对应的下载 URL */
+function pickUpdateUrl(platforms) {
+  if (!platforms) return '';
+  var ua = navigator.userAgent || '';
+  if (/android/i.test(ua)) return (platforms.android && platforms.android.url) || '';
+  if (/windows/i.test(ua)) return (platforms.windows && platforms.windows.url) || '';
+  return (platforms.linux && platforms.linux.url) || '';
+}
+
 /** 启动后静默检查 */
 // 手动检查更新：与自动检查不同，已是最新也提示结果
 function manualCheckUpdate(){
+  // PWA 版本无独立安装包，不弹更新提示（版本由浏览器缓存管理）
+  showUpdateResult('ok','PWA 版本无需检查更新');
+  return;
   showUpdateModal('检查中…','正在检查新版本，请稍候','');
   var xhr = new XMLHttpRequest();
   xhr.open('GET', 'https://gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json?ref=main', true);
@@ -674,9 +686,7 @@ function manualCheckUpdate(){
       if (!d || !d.version) { showUpdateResult('error','检查更新失败：缺少版本号'); return; }
       var cur = getCurVer();
       var available = cmpVer(d.version, cur) > 0;
-      var dl = (d.platforms && d.platforms.android && d.platforms.android.url) || '';
-      var up = (d.platforms && d.platforms.linux && d.platforms.linux.url) || '';
-      var dlUrl = encodeURI(dl || up || '');
+      var dlUrl = encodeURI(pickUpdateUrl(d.platforms) || '');
       if (available && dlUrl) { showUpdateModal(d.version, d.notes || '', dlUrl); }
       else { showUpdateResult('ok','当前已是最新版本 v'+cur); }
     } catch(e) { showUpdateResult('error','检查更新失败：'+e.message); }
@@ -714,8 +724,7 @@ function silentCheck() {
       if (!d || !d.version) { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u7f3a\u5c11\u7248\u672c\u53f7'); return; }
       var cur = getCurVer();
       var available = cmpVer(d.version, cur) > 0;
-      var url = (d.platforms && d.platforms.android && d.platforms.android.url) || '';
-      url = encodeURI(url);
+      var url = encodeURI(pickUpdateUrl(d.platforms) || '');
       try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ver: d.version, available: available && !!url, notes: d.notes || '', url: url })); } catch(e) {}
       if (available && url) { showUpdateModal(d.version, d.notes || '', url); }
       else { document.title = 'upd:cur ' + d.version + ' (cur:' + cur + ')'; }
@@ -792,7 +801,7 @@ function startDownload() {
   }
 }
 
-silentCheck();
+// silentCheck(); // PWA 禁用自动更新检查
 // 暴露到全局（HTML onclick 需要）——必须放在 IIFE 内部，
 // 否则引用不到内部函数（此前 window.showToast = showToast 写在 IIFE 外，
 // 抛 ReferenceError 导致 closeUpdateModal 从未注册到全局）

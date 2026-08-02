@@ -3260,6 +3260,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.3.0 · 第 35 版',desc:'新增Windows桌面版支持（自动更新适配、按平台提供对应安装包）、修复桌面图标显示、构建脚本支持APK/exe双平台'},
     {v:'v3.2.3 · 第 34 版',desc:'新增局内AI走法建议（按钮选择算法与深度、仅提示当前一步）、修复弹窗弹出闪烁、随机刻度设置真正生效、PWA离线缓存修复、AI介绍内容更新'},
     {v:'v3.2.2 · 第 33 版',desc:'新增大狗叫音频主题（爆炸音效可选3种叫声模式）、新增静音主题、音效主题按钮两行排版优化'},
     {v:'v3.2.1 · 第 32 版',desc:'修复了3.2.0仓促发布的各种bug'},
