@@ -252,7 +252,7 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.2</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.3</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -359,136 +359,844 @@
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll">
     <h2>AI 性能评测</h2>
-<div class="about-card">
-        <h3 style="font-size:1.05rem;margin-bottom:8px">🧪 棋盘模式 AI 实力测试（96 局）</h3>
-        <p style="font-size:.82rem;color:var(--dim);margin-bottom:10px">
-          4 种边界 × 4 种爆炸阈值 = 16 组合 · 每组合 6 局 · 4 算法混战（每算法一名）· 7×7 棋盘<br>
-          A-B / PVS 深度 2 · MCTS 深度 1 · 随机刻度 5% · 首子合法分散布局
-        </p>
 
-        <h4 style="margin:10px 0 6px;font-size:.95rem">📊 总体胜率</h4>
-        <table style="width:100%;font-size:.82rem;border-collapse:collapse">
-          <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
-            <th style="text-align:left;padding:5px 6px;width:30px">#</th>
-            <th style="text-align:left;padding:5px 6px">算法</th>
-            <th style="text-align:right;padding:5px 6px">胜场</th>
-            <th style="text-align:right;padding:5px 6px">胜率</th>
-            <th style="text-align:right;padding:5px 6px">平均淘汰名次</th>
-          </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-          <td style="padding:4px 6px">🥇</td>
-          <td style="padding:4px 6px"><strong>A-B</strong></td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">46</td>
-          <td style="padding:4px 6px;text-align:right">47.9%</td>
-          <td style="padding:4px 6px;text-align:right">2.85</td>
+    <div class="about-card">
+      <h3 style="font-size:1.05rem;margin-bottom:8px">🧪 两两对战 AI 实力测试（432 局）</h3>
+      <p style="font-size:.82rem;color:var(--dim);line-height:1.7;margin:0">
+        6 配对（全两两）× 4 边界 × 3 爆炸阈值 = 12 模式 · 每模式 6 局（<strong>先手轮换</strong>，消除先后手偏差）<br>
+        7×7 棋盘 · A-B / PVS 深度 2 · MCTS 深度 1 · ML 评估 · 首子合法分散布局 · 随机刻度 0<br>
+        测试脚本: <code>tauri/src-tauri/src/bin/strength_test.rs</code>（Rust 端引擎）
+      </p>
+    </div>
+
+    <div class="about-card">
+      <h3 style="font-size:1.05rem;margin-bottom:8px">📌 总结</h3>
+      <ul style="font-size:.82rem;line-height:1.8;margin:0;padding-left:1.1em">
+        <li><strong>树搜索统治赛场</strong> — A-B 73.6% 与 PVS 71.3% 胜率断档领先；策略与 MCTS 合计仅 119 胜（A-B 159 胜 / PVS 154 胜）</li>
+        <li><strong>策略算法中等偏上（46.8%）</strong> — 在速爆 3（低阈值）模式下最有竞争力：对 A-B 拿到 4:2、对 PVS 多场 3:3 / 5:1，启发式"临界引爆"直觉贴近搜索结论</li>
+        <li><strong>MCTS 全面垫底（8.3%）</strong> — 深度 1（根分支约 400 次迭代）在 7×7 上模拟宽度/深度不足；平均 103 步即结束，多为快速送死，尚需更高迭代量</li>
+        <li><strong>阈值模式决定强弱分界</strong> — cap4（标准）几乎成为搜索算法的"送分项"（大量 6:0 / 0:6）；cap3 下策略算法反能多次咬下搜索算法</li>
+        <li><strong>边界影响节奏</strong> — 回环（wrap）对局最快（部分模式均步 45~92），反弹/降级出现长链僵持（均步可达 361~448）</li>
+        <li><strong>无平局、先手无优势</strong> — 432 局全部分出胜负；各配对先手胜率稳定在约 50%，赛制设计有效</li>
+      </ul>
+    </div>
+
+    <div class="about-card">
+      <h3 style="font-size:1.05rem;margin-bottom:8px">📊 综合胜率</h3>
+      <div style="display:flex;align-items:center;gap:8px;margin:5px 0">
+  <span style="width:60px;font-size:.8rem;white-space:nowrap">alphabeta</span>
+  <div style="flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;overflow:hidden">
+    <div style="width:73.6%;height:100%;background:linear-gradient(90deg,#5fc3c3,#70d070);border-radius:7px"></div>
+  </div>
+  <span style="width:52px;text-align:right;font-size:.8rem;color:var(--accent);font-weight:600">73.6%</span>
+</div><div style="display:flex;align-items:center;gap:8px;margin:5px 0">
+  <span style="width:60px;font-size:.8rem;white-space:nowrap">pvs</span>
+  <div style="flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;overflow:hidden">
+    <div style="width:71.3%;height:100%;background:linear-gradient(90deg,#9b7edc,#5fc3c3);border-radius:7px"></div>
+  </div>
+  <span style="width:52px;text-align:right;font-size:.8rem;color:var(--accent);font-weight:600">71.3%</span>
+</div><div style="display:flex;align-items:center;gap:8px;margin:5px 0">
+  <span style="width:60px;font-size:.8rem;white-space:nowrap">strategy</span>
+  <div style="flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;overflow:hidden">
+    <div style="width:46.8%;height:100%;background:linear-gradient(90deg,#f0b34b,#ff9d5c);border-radius:7px"></div>
+  </div>
+  <span style="width:52px;text-align:right;font-size:.8rem;color:var(--accent);font-weight:600">46.8%</span>
+</div><div style="display:flex;align-items:center;gap:8px;margin:5px 0">
+  <span style="width:60px;font-size:.8rem;white-space:nowrap">mcts</span>
+  <div style="flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;overflow:hidden">
+    <div style="width:8.3%;height:100%;background:linear-gradient(90deg,#ff8a8a,#ff6b6b);border-radius:7px"></div>
+  </div>
+  <span style="width:52px;text-align:right;font-size:.8rem;color:var(--accent);font-weight:600">8.3%</span>
+</div>
+      <h4 style="margin:14px 0 6px;font-size:.95rem">🏆 综合排行（所有模式汇总）</h4>
+      <table style="width:100%;font-size:.82rem;border-collapse:collapse">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="text-align:left;padding:5px 6px;width:30px">#</th>
+          <th style="text-align:left;padding:5px 6px">算法</th>
+          <th style="text-align:right;padding:5px 6px">胜</th>
+          <th style="text-align:right;padding:5px 6px">负</th>
+          <th style="text-align:right;padding:5px 6px">平</th>
+          <th style="text-align:right;padding:5px 6px">胜率</th>
+          <th style="text-align:right;padding:5px 6px">均步</th>
         </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-          <td style="padding:4px 6px">🥈</td>
-          <td style="padding:4px 6px"><strong>策略</strong></td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">32</td>
-          <td style="padding:4px 6px;text-align:right">33.3%</td>
-          <td style="padding:4px 6px;text-align:right">2.88</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-          <td style="padding:4px 6px">🥉</td>
-          <td style="padding:4px 6px"><strong>MCTS</strong></td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">12</td>
-          <td style="padding:4px 6px;text-align:right">12.5%</td>
-          <td style="padding:4px 6px;text-align:right">2.55</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
-          <td style="padding:4px 6px">4</td>
-          <td style="padding:4px 6px"><strong>PVS</strong></td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">6</td>
-          <td style="padding:4px 6px;text-align:right">6.2%</td>
-          <td style="padding:4px 6px;text-align:right">2.02</td>
-        </tr>
-        </table>
+      <td style="padding:4px 6px">🥇</td>
+      <td style="padding:4px 6px"><strong>alphabeta</strong></td>
+      <td style="padding:4px 6px;text-align:right;color:#70d070">159</td>
+      <td style="padding:4px 6px;text-align:right;color:#ff8a8a">57</td>
+      <td style="padding:4px 6px;text-align:right">0</td>
+      <td style="padding:4px 6px;text-align:right;font-weight:600">73.6%</td>
+      <td style="padding:4px 6px;text-align:right">158.4</td>
+    </tr><tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+      <td style="padding:4px 6px">🥈</td>
+      <td style="padding:4px 6px"><strong>pvs</strong></td>
+      <td style="padding:4px 6px;text-align:right;color:#70d070">154</td>
+      <td style="padding:4px 6px;text-align:right;color:#ff8a8a">62</td>
+      <td style="padding:4px 6px;text-align:right">0</td>
+      <td style="padding:4px 6px;text-align:right;font-weight:600">71.3%</td>
+      <td style="padding:4px 6px;text-align:right">149.7</td>
+    </tr><tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+      <td style="padding:4px 6px">🥉</td>
+      <td style="padding:4px 6px"><strong>strategy</strong></td>
+      <td style="padding:4px 6px;text-align:right;color:#70d070">101</td>
+      <td style="padding:4px 6px;text-align:right;color:#ff8a8a">115</td>
+      <td style="padding:4px 6px;text-align:right">0</td>
+      <td style="padding:4px 6px;text-align:right;font-weight:600">46.8%</td>
+      <td style="padding:4px 6px;text-align:right">150.7</td>
+    </tr><tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+      <td style="padding:4px 6px">4</td>
+      <td style="padding:4px 6px"><strong>mcts</strong></td>
+      <td style="padding:4px 6px;text-align:right;color:#70d070">18</td>
+      <td style="padding:4px 6px;text-align:right;color:#ff8a8a">198</td>
+      <td style="padding:4px 6px;text-align:right">0</td>
+      <td style="padding:4px 6px;text-align:right;font-weight:600">8.3%</td>
+      <td style="padding:4px 6px;text-align:right">103.4</td>
+    </tr>
+      </table>
+    </div>
 
-        <h4 style="margin:14px 0 6px;font-size:.95rem">🗺️ 分棋盘组合胜率（胜者算法）</h4>
-        <table style="width:100%;font-size:.78rem;border-collapse:collapse">
-          <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
-            <th style="text-align:left;padding:5px 6px">边界 \ 阈值</th>
-            <th style="padding:5px 6px">速爆3</th>
-            <th style="padding:5px 6px">标准4</th>
-            <th style="padding:5px 6px">重炮5</th>
-            <th style="padding:5px 6px">混合</th>
-          </tr>
-  <tr><th style="text-align:left;padding:5px 6px">默认</th>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.64);font-weight:600">A-B 5/6</td>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.64);font-weight:600">A-B 5/6</td>
-        <td style="padding:4px 6px;background:rgba(240,179,75,0.73);font-weight:600">策略 6/6</td>
-        <td style="padding:4px 6px;background:rgba(255,138,138,0.46);font-weight:600">MCTS 3/6</td>
-  </tr>
-  <tr><th style="text-align:left;padding:5px 6px">回环</th>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.64);font-weight:600">A-B 5/6</td>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.46);font-weight:600">A-B 3/6</td>
-        <td style="padding:4px 6px;background:rgba(240,179,75,0.73);font-weight:600">策略 6/6</td>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.46);font-weight:600">A-B 3/6</td>
-  </tr>
-  <tr><th style="text-align:left;padding:5px 6px">反弹</th>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.64);font-weight:600">A-B 5/6</td>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.73);font-weight:600">A-B 6/6</td>
-        <td style="padding:4px 6px;background:rgba(240,179,75,0.73);font-weight:600">策略 6/6</td>
-        <td style="padding:4px 6px;background:rgba(255,138,138,0.55);font-weight:600">MCTS 4/6</td>
-  </tr>
-  <tr><th style="text-align:left;padding:5px 6px">降级</th>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.46);font-weight:600">A-B 3/6</td>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.55);font-weight:600">A-B 4/6</td>
-        <td style="padding:4px 6px;background:rgba(240,179,75,0.73);font-weight:600">策略 6/6</td>
-        <td style="padding:4px 6px;background:rgba(95,195,195,0.55);font-weight:600">A-B 4/6</td>
-  </tr>
-        </table>
+    <div class="about-card">
+      <h3 style="font-size:1.05rem;margin-bottom:8px">🆚 配对明细（A:B，先手轮换）</h3>
+      <details style="margin-bottom:8px" open>
+      <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
+        🆚 <strong>strategy</strong> vs <strong>alphabeta</strong>
+        <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
+      </summary>
+      <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="text-align:left;padding:4px 6px">边界</th>
+          <th style="padding:4px 6px">阈值</th>
+          <th style="padding:4px 6px">strategy:alphabeta</th>
+          <th style="padding:4px 6px">平</th>
+          <th style="padding:4px 6px">先手胜</th>
+          <th style="padding:4px 6px;text-align:right">均步</th>
+        </tr>
+        <tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">4:2</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">278</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">130</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">348</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">4:2</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">78</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">52</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">2:4</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">169</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">4:2</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">194</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">123</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">1:5</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">177</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">2:4</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">361</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">81</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">2:4</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">1/6</td>
+        <td style="padding:3px 6px;text-align:right">187</td>
+      </tr>
+      </table>
+    </details><details style="margin-bottom:8px" open>
+      <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
+        🆚 <strong>strategy</strong> vs <strong>pvs</strong>
+        <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
+      </summary>
+      <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="text-align:left;padding:4px 6px">边界</th>
+          <th style="padding:4px 6px">阈值</th>
+          <th style="padding:4px 6px">strategy:pvs</th>
+          <th style="padding:4px 6px">平</th>
+          <th style="padding:4px 6px">先手胜</th>
+          <th style="padding:4px 6px;text-align:right">均步</th>
+        </tr>
+        <tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">183</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">112</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">1:5</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">187</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">73</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">53</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">140</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">229</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">121</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">108</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">448</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">68</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">180</td>
+      </tr>
+      </table>
+    </details><details style="margin-bottom:8px" open>
+      <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
+        🆚 <strong>strategy</strong> vs <strong>mcts</strong>
+        <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
+      </summary>
+      <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="text-align:left;padding:4px 6px">边界</th>
+          <th style="padding:4px 6px">阈值</th>
+          <th style="padding:4px 6px">strategy:mcts</th>
+          <th style="padding:4px 6px">平</th>
+          <th style="padding:4px 6px">先手胜</th>
+          <th style="padding:4px 6px;text-align:right">均步</th>
+        </tr>
+        <tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">58</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">121</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">166</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">60</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">88</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">99</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">96</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">86</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">122</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">125</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">79</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">245</td>
+      </tr>
+      </table>
+    </details><details style="margin-bottom:8px" open>
+      <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
+        🆚 <strong>alphabeta</strong> vs <strong>pvs</strong>
+        <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
+      </summary>
+      <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="text-align:left;padding:4px 6px">边界</th>
+          <th style="padding:4px 6px">阈值</th>
+          <th style="padding:4px 6px">alphabeta:pvs</th>
+          <th style="padding:4px 6px">平</th>
+          <th style="padding:4px 6px">先手胜</th>
+          <th style="padding:4px 6px;text-align:right">均步</th>
+        </tr>
+        <tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">289</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">0:6</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">152</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">149</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">2/6</td>
+        <td style="padding:3px 6px;text-align:right">65</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">6/6</td>
+        <td style="padding:3px 6px;text-align:right">64</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">82</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">2:4</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">5/6</td>
+        <td style="padding:3px 6px;text-align:right">378</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">6/6</td>
+        <td style="padding:3px 6px;text-align:right">97</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:inherit">3:3</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">442</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">278</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">86</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">1:5</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">236</td>
+      </tr>
+      </table>
+    </details><details style="margin-bottom:8px" open>
+      <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
+        🆚 <strong>alphabeta</strong> vs <strong>mcts</strong>
+        <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
+      </summary>
+      <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="text-align:left;padding:4px 6px">边界</th>
+          <th style="padding:4px 6px">阈值</th>
+          <th style="padding:4px 6px">alphabeta:mcts</th>
+          <th style="padding:4px 6px">平</th>
+          <th style="padding:4px 6px">先手胜</th>
+          <th style="padding:4px 6px;text-align:right">均步</th>
+        </tr>
+        <tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">160</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">86</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">134</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#ff8a8a">2:4</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">70</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">50</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">62</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">90</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">87</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">119</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">112</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">76</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">160</td>
+      </tr>
+      </table>
+    </details><details style="margin-bottom:8px" open>
+      <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
+        🆚 <strong>pvs</strong> vs <strong>mcts</strong>
+        <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
+      </summary>
+      <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="text-align:left;padding:4px 6px">边界</th>
+          <th style="padding:4px 6px">阈值</th>
+          <th style="padding:4px 6px">pvs:mcts</th>
+          <th style="padding:4px 6px">平</th>
+          <th style="padding:4px 6px">先手胜</th>
+          <th style="padding:4px 6px;text-align:right">均步</th>
+        </tr>
+        <tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">142</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">75</td>
+      </tr><tr>
+        <td style="padding:3px 6px">default</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">144</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">4:2</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">62</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">45</td>
+      </tr><tr>
+        <td style="padding:3px 6px">wrap</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">92</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">5:1</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">4/6</td>
+        <td style="padding:3px 6px;text-align:right">87</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">76</td>
+      </tr><tr>
+        <td style="padding:3px 6px">bounce</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">126</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">3</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">124</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">4</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">73</td>
+      </tr><tr>
+        <td style="padding:3px 6px">degrade</td>
+        <td style="padding:3px 6px;text-align:center">5</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:600;color:#70d070">6:0</td>
+        <td style="padding:3px 6px;text-align:center">0</td>
+        <td style="padding:3px 6px;text-align:center">3/6</td>
+        <td style="padding:3px 6px;text-align:right">124</td>
+      </tr>
+      </table>
+    </details>
+    </div>
 
-        <h4 style="margin:14px 0 6px;font-size:.95rem">⏱️ 平均对局步数</h4>
-        <table style="width:100%;font-size:.78rem;border-collapse:collapse">
-          <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
-            <th style="text-align:left;padding:5px 6px">边界 \ 阈值</th>
-            <th style="padding:5px 6px">速爆3</th>
-            <th style="padding:5px 6px">标准4</th>
-            <th style="padding:5px 6px">重炮5</th>
-            <th style="padding:5px 6px">混合</th>
-          </tr>
-  <tr><th style="text-align:left;padding:5px 6px">默认</th>
-        <td style="padding:4px 6px;text-align:right">331</td>
-        <td style="padding:4px 6px;text-align:right">174</td>
-        <td style="padding:4px 6px;text-align:right">287</td>
-        <td style="padding:4px 6px;text-align:right">111</td>
-  </tr>
-  <tr><th style="text-align:left;padding:5px 6px">回环</th>
-        <td style="padding:4px 6px;text-align:right">427</td>
-        <td style="padding:4px 6px;text-align:right">87</td>
-        <td style="padding:4px 6px;text-align:right">211</td>
-        <td style="padding:4px 6px;text-align:right">72</td>
-  </tr>
-  <tr><th style="text-align:left;padding:5px 6px">反弹</th>
-        <td style="padding:4px 6px;text-align:right">365</td>
-        <td style="padding:4px 6px;text-align:right">124</td>
-        <td style="padding:4px 6px;text-align:right">276</td>
-        <td style="padding:4px 6px;text-align:right">59</td>
-  </tr>
-  <tr><th style="text-align:left;padding:5px 6px">降级</th>
-        <td style="padding:4px 6px;text-align:right">261</td>
-        <td style="padding:4px 6px;text-align:right">72</td>
-        <td style="padding:4px 6px;text-align:right">272</td>
-        <td style="padding:4px 6px;text-align:right">99</td>
-  </tr>
-        </table>
-        <p style="font-size:.75rem;color:var(--dim);margin-top:4px">平均 202 步/局</p>
+    <div class="about-card">
+      <h3 style="font-size:1.05rem;margin-bottom:8px">🔍 关键洞察</h3>
+      <ul style="font-size:.82rem;line-height:1.8;margin:0;padding-left:1.1em">
+        <li><strong>为什么 A-B / PVS 断档？</strong> 搜索算法能显式推演 2 层连锁爆炸与淘汰，启发式只做单步贪心；cap4/cap5 下多步连锁价值巨大，搜索收益最高</li>
+        <li><strong>cap3 下策略为何能抗衡？</strong> 低阈值下棋盘"临界棋子"密集、每步都是爆炸点，深搜与浅贪心往往给出相同结论——启发式规则恰好命中</li>
+        <li><strong>MCTS 的均步最短（103.4）</strong> 说明它经常在中期就崩溃而非打满长局；提升迭代量（depth 2~3）或改用 UCT 变体是后续方向</li>
+        <li><strong>回环边界更快</strong> 因为爆炸能量绕圈回流、快速清盘；反弹/降级则制造"打不死"的僵持局</li>
+        <li><strong>ML 评估已生效</strong> 本测试使用新训练的 18 维阈值感知模型（800 树），A-B/PVS 在高价值长局中准确识别爆发链</li>
+      </ul>
+      <p style="font-size:.75rem;color:var(--dim);margin-top:12px">测试时间: 2026-08-03 ｜ 432 局总耗时 963.9s（平均 2.23s/局）· 完整原始输出见本页末尾</p>
+    </div>
 
-        <h4 style="margin:14px 0 6px;font-size:.95rem">🔍 关键发现</h4>
-        <ul style="font-size:.8rem;line-height:1.7;padding-left:16px;margin:0">
-          <li><strong>Alpha-Beta 综合最强</strong> — 47.9% 胜率居首，且平均淘汰名次最高（2.85），赢得多又活得久</li>
-          <li><strong>⚠ 重炮5（5级才炸）模式策略算法 24/24 全胜</strong> — 4 种边界无一例外；疑似 AI 搜索硬编码"4 级阈值"假设（min_explosive=3、评估函数未随 capMode 校准），搜索算法在该模式下频繁送子</li>
-          <li><strong>MCTS 在混合棋盘表现最好</strong> — 8/24（33%）远超其整体 12.5%；随机模拟不依赖固定阈值先验，天然适应每格随机 3/4/5 的棋盘</li>
-          <li><strong>PVS 全面垫底</strong> — 6.2% 胜率、平均第 2.02 名出局，与 A-B 同为 α-β 系却差距悬殊，需专项排查</li>
-          <li><strong>节奏两极</strong> — 混合最快（86 步/局），速爆3 反而最慢（347 步，回环+速爆有 1 局打到 1000 步上限的"低效僵持"）</li>
-        </ul>
-        <p style="font-size:.75rem;color:var(--dim);margin-top:12px">测试时间: 2026-08-03 ｜ 脚本: ai_strength.py（tauri 端引擎 ai_bench）· 完整报告与数据见 tauri/tests/ 目录</p>
-      </div>
+    <div class="about-card">
+      <h3 style="font-size:1.05rem;margin-bottom:8px">📄 完整测试结果（原始输出）</h3>
+      <pre style="font-size:.7rem;line-height:1.45;background:rgba(0,0,0,.25);border-radius:8px;padding:10px;overflow-x:auto;white-space:pre;margin:0;color:var(--dim)">════════════════════════════════════════════════════════════
+  连锁棋 AI 战力评估报告
+  棋盘 7×7 · alphabeta/pvs 深度 2 · MCTS 深度 1 · ML评估
+  参战: strategy / alphabeta / pvs / mcts · 每配对 6 局/模式（先手轮换） · seed 42
+  赛程: 6 配对 × 4 边界 × 3 阈值 × 6 局 = 432 局
+════════════════════════════════════════════════════════════
+
+  ⏳ 进度   6%  (25/432 局)  ETA 146s
+  ⏳ 进度  12%  (50/432 局)  ETA 121s
+  ⏳ 进度  17%  (75/432 局)  ETA 198s
+  ⏳ 进度  23%  (100/432 局)  ETA 277s
+  ⏳ 进度  29%  (125/432 局)  ETA 363s
+^[[6~  ⏳ 进度  35%  (150/432 局)  ETA 553s
+  ⏳ 进度  41%  (175/432 局)  ETA 464s
+  ⏳ 进度  46%  (200/432 局)  ETA 382s
+  ⏳ 进度  52%  (225/432 局)  ETA 411s
+  ⏳ 进度  58%  (250/432 局)  ETA 354s
+  ⏳ 进度  64%  (275/432 局)  ETA 423s
+  ⏳ 进度  69%  (300/432 局)  ETA 350s
+  ⏳ 进度  75%  (325/432 局)  ETA 266s
+  ⏳ 进度  81%  (350/432 局)  ETA 193s
+  ⏳ 进度  87%  (375/432 局)  ETA 133s
+  ⏳ 进度  93%  (400/432 局)  ETA 72s
+  ⏳ 进度  98%  (425/432 局)  ETA 15s
+  ⏳ 进度 100%  (432/432 局)  ETA 0s
+── 综合排名（所有模式汇总） ───────────────────────────────
+  算法                胜      负      平       胜率         均步
+  #1  alphabeta     159     57      0    73.6%      158.4
+  #2  pvs           154     62      0    71.3%      149.7
+  #3  strategy      101    115      0    46.8%      150.7
+  #4  mcts           18    198      0     8.3%      103.4
+
+── 配对明细（A 先手/后手轮换，按模式） ─────────────────────
+  ◆ strategy vs alphabeta（先手轮换 1/2）
+     default  cap3       4:2  (平0)  先手胜  3/ 6  均步  278
+     default  cap4       0:6  (平0)  先手胜  3/ 6  均步  130
+     default  cap5       0:6  (平0)  先手胜  3/ 6  均步  348
+     wrap     cap3       4:2  (平0)  先手胜  3/ 6  均步   78
+     wrap     cap4       0:6  (平0)  先手胜  3/ 6  均步   52
+     wrap     cap5       2:4  (平0)  先手胜  3/ 6  均步  169
+     bounce   cap3       4:2  (平0)  先手胜  3/ 6  均步  194
+     bounce   cap4       0:6  (平0)  先手胜  3/ 6  均步  123
+     bounce   cap5       1:5  (平0)  先手胜  4/ 6  均步  177
+     degrade  cap3       2:4  (平0)  先手胜  3/ 6  均步  361
+     degrade  cap4       0:6  (平0)  先手胜  3/ 6  均步   81
+     degrade  cap5       2:4  (平0)  先手胜  1/ 6  均步  187
+
+  ◆ strategy vs pvs（先手轮换 1/2）
+     default  cap3       3:3  (平0)  先手胜  4/ 6  均步  183
+     default  cap4       0:6  (平0)  先手胜  3/ 6  均步  112
+     default  cap5       1:5  (平0)  先手胜  2/ 6  均步  187
+     wrap     cap3       3:3  (平0)  先手胜  4/ 6  均步   73
+     wrap     cap4       0:6  (平0)  先手胜  3/ 6  均步   53
+     wrap     cap5       3:3  (平0)  先手胜  2/ 6  均步  140
+     bounce   cap3       5:1  (平0)  先手胜  2/ 6  均步  229
+     bounce   cap4       0:6  (平0)  先手胜  3/ 6  均步  121
+     bounce   cap5       0:6  (平0)  先手胜  3/ 6  均步  108
+     degrade  cap3       5:1  (平0)  先手胜  2/ 6  均步  448
+     degrade  cap4       0:6  (平0)  先手胜  3/ 6  均步   68
+     degrade  cap5       0:6  (平0)  先手胜  3/ 6  均步  180
+
+  ◆ strategy vs mcts（先手轮换 1/2）
+     default  cap3       6:0  (平0)  先手胜  3/ 6  均步   58
+     default  cap4       6:0  (平0)  先手胜  3/ 6  均步  121
+     default  cap5       6:0  (平0)  先手胜  3/ 6  均步  166
+     wrap     cap3       5:1  (平0)  先手胜  4/ 6  均步   60
+     wrap     cap4       6:0  (平0)  先手胜  3/ 6  均步   88
+     wrap     cap5       5:1  (平0)  先手胜  2/ 6  均步   99
+     bounce   cap3       6:0  (平0)  先手胜  3/ 6  均步   96
+     bounce   cap4       5:1  (平0)  先手胜  2/ 6  均步   86
+     bounce   cap5       3:3  (平0)  先手胜  2/ 6  均步  122
+     degrade  cap3       6:0  (平0)  先手胜  3/ 6  均步  125
+     degrade  cap4       3:3  (平0)  先手胜  4/ 6  均步   79
+     degrade  cap5       5:1  (平0)  先手胜  2/ 6  均步  245
+
+  ◆ alphabeta vs pvs（先手轮换 1/2）
+     default  cap3       3:3  (平0)  先手胜  2/ 6  均步  289
+     default  cap4       0:6  (平0)  先手胜  3/ 6  均步  152
+     default  cap5       3:3  (平0)  先手胜  4/ 6  均步  149
+     wrap     cap3       5:1  (平0)  先手胜  2/ 6  均步   65
+     wrap     cap4       3:3  (平0)  先手胜  6/ 6  均步   64
+     wrap     cap5       5:1  (平0)  先手胜  4/ 6  均步   82
+     bounce   cap3       2:4  (平0)  先手胜  5/ 6  均步  378
+     bounce   cap4       3:3  (平0)  先手胜  6/ 6  均步   97
+     bounce   cap5       3:3  (平0)  先手胜  4/ 6  均步  442
+     degrade  cap3       5:1  (平0)  先手胜  4/ 6  均步  278
+     degrade  cap4       6:0  (平0)  先手胜  3/ 6  均步   86
+     degrade  cap5       1:5  (平0)  先手胜  4/ 6  均步  236
+
+  ◆ alphabeta vs mcts（先手轮换 1/2）
+     default  cap3       6:0  (平0)  先手胜  3/ 6  均步  160
+     default  cap4       6:0  (平0)  先手胜  3/ 6  均步   86
+     default  cap5       6:0  (平0)  先手胜  3/ 6  均步  134
+     wrap     cap3       2:4  (平0)  先手胜  3/ 6  均步   70
+     wrap     cap4       6:0  (平0)  先手胜  3/ 6  均步   50
+     wrap     cap5       5:1  (平0)  先手胜  4/ 6  均步   62
+     bounce   cap3       6:0  (平0)  先手胜  3/ 6  均步   90
+     bounce   cap4       6:0  (平0)  先手胜  3/ 6  均步   87
+     bounce   cap5       6:0  (平0)  先手胜  3/ 6  均步  119
+     degrade  cap3       6:0  (平0)  先手胜  3/ 6  均步  112
+     degrade  cap4       6:0  (平0)  先手胜  3/ 6  均步   76
+     degrade  cap5       6:0  (平0)  先手胜  3/ 6  均步  160
+
+  ◆ pvs vs mcts（先手轮换 1/2）
+     default  cap3       6:0  (平0)  先手胜  3/ 6  均步  142
+     default  cap4       6:0  (平0)  先手胜  3/ 6  均步   75
+     default  cap5       6:0  (平0)  先手胜  3/ 6  均步  144
+     wrap     cap3       4:2  (平0)  先手胜  3/ 6  均步   62
+     wrap     cap4       6:0  (平0)  先手胜  3/ 6  均步   45
+     wrap     cap5       6:0  (平0)  先手胜  3/ 6  均步   92
+     bounce   cap3       5:1  (平0)  先手胜  4/ 6  均步   87
+     bounce   cap4       6:0  (平0)  先手胜  3/ 6  均步   76
+     bounce   cap5       6:0  (平0)  先手胜  3/ 6  均步  126
+     degrade  cap3       6:0  (平0)  先手胜  3/ 6  均步  124
+     degrade  cap4       6:0  (平0)  先手胜  3/ 6  均步   73
+     degrade  cap5       6:0  (平0)  先手胜  3/ 6  均步  124
+
+── 性能 ──────────────────────────────────────────────────
+  总对局: 432  总耗时: 963.9s  平均 2.23s/局
+════════════════════════════════════════════════════════════</pre>
+    </div>
   </div>
 </div>
-
 <div id="about-changelog" class="screen">
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll" id="changelogContainer">

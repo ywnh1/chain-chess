@@ -301,7 +301,7 @@ loop {
 }
 }
 
-const FEAT_DIM: usize = 16;
+const FEAT_DIM: usize = 18;
 
 #[derive(Clone, Deserialize)]
 #[allow(dead_code)]
@@ -388,8 +388,9 @@ fn xgb_engine() -> &'static XGBoostEngine {
 }
 
 /// 改进版特征提取：用 eval_board_improved 中间值做特征
-/// 兼容所有棋盘大小（5-19）和玩家人数（2-10）
-pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usize) -> [f32; FEAT_DIM] {
+/// 兼容所有棋盘大小（5-19）、玩家人数（2-10）、边界模式与爆炸阈值模式
+/// 18 维：前 16 维保持与旧模型一致（c3/c2 语义不变），新增 [16]/[17] 为阈值感知的临界棋子占比
+pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usize, border_mode: BorderMode, cap_mode: CapMode) -> [f32; FEAT_DIM] {
     let sz = board.len();
     let total_cells = (sz * sz) as f32;
     let cx = (sz as f32 - 1.0) * 0.5;
@@ -403,6 +404,7 @@ pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usi
     let mut my_pieces = 0i32; let mut opp_pieces = 0i32;
     let mut my_c2 = 0i32; let mut my_c3 = 0i32;
     let mut opp_c3 = 0i32;
+    let mut my_crit = 0i32; let mut opp_crit = 0i32;
     let mut my_cdist = 0.0f32; let mut opp_cdist = 0.0f32;
     let mut alive_count = 0i32;
 
@@ -413,6 +415,7 @@ pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usi
                 total_pieces += 1;
                 let d = dist_center + ((j as f32 - cx).abs() * 0.5) as i32;
                 let pos_val = 4i32.saturating_sub(d).max(0);
+                let crit = crit_level(i, j, sz, border_mode, cap_mode) as i32;
                 if owner == cur {
                     my_score += c.count as i32;
                     my_territory += 1;
@@ -420,9 +423,11 @@ pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usi
                     my_cdist += (i as f32 - cx).abs() + (j as f32 - cx).abs();
                     my_pieces += 1;
                     if c.count == 2 { my_c2 += 1; }
-                    if c.count >= 3 { my_c3 += 1; my_chain_threat += (c.count as i32) * 5; }
-                    else if c.count >= 2 { my_chain_threat += 2; }
-                    for &(ni, nj) in &nbrs(i, j, sz) {
+                    if c.count >= 3 { my_c3 += 1; }
+                    // 阈值感知威胁：临界等级高威胁，临界-1 中威胁
+                    if (c.count as i32) >= crit { my_chain_threat += (c.count as i32) * 5; my_crit += 1; }
+                    else if (c.count as i32) >= crit - 1 { my_chain_threat += 2; }
+                    for &(ni, nj) in &nbrs_with_mode(i, j, sz, border_mode) {
                         let nc = &board[ni][nj];
                         if nc.owner.is_some() && nc.owner != Some(cur) {
                             my_threat_prox += c.count as i32;
@@ -434,9 +439,10 @@ pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usi
                     opp_pos_bonus += pos_val;
                     opp_cdist += (i as f32 - cx).abs() + (j as f32 - cx).abs();
                     opp_pieces += 1;
-                    if c.count >= 3 { opp_c3 += 1; opp_chain_threat += (c.count as i32) * 5; }
-                    else if c.count >= 2 { opp_chain_threat += 2; }
-                    for &(ni, nj) in &nbrs(i, j, sz) {
+                    if c.count >= 3 { opp_c3 += 1; }
+                    if (c.count as i32) >= crit { opp_chain_threat += (c.count as i32) * 5; opp_crit += 1; }
+                    else if (c.count as i32) >= crit - 1 { opp_chain_threat += 2; }
+                    for &(ni, nj) in &nbrs_with_mode(i, j, sz, border_mode) {
                         let nc = &board[ni][nj];
                         if nc.owner == Some(cur) {
                             opp_threat_prox += c.count as i32;
@@ -473,15 +479,17 @@ pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usi
     f[13] = (my_territory - opp_territory) as f32 / total_cells;         // territory_balance
     f[14] = my_c3 as f32 / my_pieces.max(1) as f32;                      // my_threat_ratio (same as c3_share)
     f[15] = opp_c3 as f32 / opp_pieces.max(1) as f32;                    // opp_threat_ratio
+    f[16] = my_crit as f32 / my_pieces.max(1) as f32;                    // my_crit_share（阈值感知）
+    f[17] = opp_crit as f32 / opp_pieces.max(1) as f32;                  // opp_crit_share（阈值感知）
     f
 }
 
-/// 调度器：根据 per-AI 配置调用 ML 或手写评估
-pub fn eval_board(board: &GameBoard, player: usize, game_count: u32, use_ml_eval: bool, border_mode: BorderMode, user_random_scale: u32) -> i32 {
+/// 调度器：根据 per-AI 配置调用 ML 或手写评估（cap_mode 感知）
+pub fn eval_board(board: &GameBoard, player: usize, game_count: u32, use_ml_eval: bool, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> i32 {
     if use_ml_eval {
-        eval_board_ml(board, player, game_count, border_mode, user_random_scale)
+        eval_board_ml(board, player, game_count, border_mode, cap_mode, user_random_scale)
     } else {
-        eval_board_handcraft(board, player, game_count, border_mode, user_random_scale)
+        eval_board_handcraft(board, player, game_count, border_mode, cap_mode, user_random_scale)
     }
 }
 
@@ -496,7 +504,7 @@ pub fn xgb_predict(engine: &XGBoostEngine, feats: &[f32; FEAT_DIM]) -> (f32, f32
 
 /// 增强版评估函数：在原手写评估基础上加入位置权重、邻居威胁、爆发势能
 /// 深度优化——单次遍历，零额外 Vec 分配
-pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, border_mode: BorderMode, user_random_scale: u32) -> i32 {
+pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> i32 {
     let sz = board.len();
     let cx = (sz as f64 - 1.0) * 0.5;
     let mut my_score = 0i32;
@@ -522,8 +530,9 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, bo
                     my_score += cell.count as i32;
                     my_territory += 1;
                     my_pos_bonus += pos_val;
-                    if cell.count >= 3 { my_chain_threat += (cell.count as i32) * 5; }
-                    else if cell.count >= 2 { my_chain_threat += 2; }
+                    let crit = crit_level(i, j, sz, border_mode, cap_mode) as i32;
+                    if (cell.count as i32) >= crit { my_chain_threat += (cell.count as i32) * 5; }
+                    else if (cell.count as i32) >= crit - 1 { my_chain_threat += 2; }
                     // 邻居对手计数：己方高级棋子靠近对手 = 爆发势能
                     let nbrs = nbrs_with_mode(i, j, sz, border_mode);
                     for &(ni, nj) in &nbrs {
@@ -537,8 +546,9 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, bo
                     opp_score += cell.count as i32;
                     opp_territory += 1;
                     opp_pos_bonus += pos_val;
-                    if cell.count >= 3 { opp_chain_threat += (cell.count as i32) * 5; }
-                    else if cell.count >= 2 { opp_chain_threat += 2; }
+                    let crit = crit_level(i, j, sz, border_mode, cap_mode) as i32;
+                    if (cell.count as i32) >= crit { opp_chain_threat += (cell.count as i32) * 5; }
+                    else if (cell.count as i32) >= crit - 1 { opp_chain_threat += 2; }
                     let nbrs = nbrs_with_mode(i, j, sz, border_mode);
                     for &(ni, nj) in &nbrs {
                         let nc = &board[ni][nj];
@@ -585,14 +595,14 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, bo
     }
 }
 
-fn eval_board_ml(board: &GameBoard, player: usize, game_count: u32, border_mode: BorderMode, user_random_scale: u32) -> i32 {
+fn eval_board_ml(board: &GameBoard, player: usize, game_count: u32, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> i32 {
     let engine = xgb_engine();
-    let feats = extract_features_improved(board, player, max_players_for(board));
+    let feats = extract_features_improved(board, player, max_players_for(board), border_mode, cap_mode);
     let (raw_score, _prob) = engine.predict(&feats);
     // XGBoost log-odds (~[-30,30]) 缩放到搜索敏感量级
     let ml_score = (raw_score * 12.0) as i32;
     // 与手写评估混合（2/3 ML + 1/3 手写），兼顾 ML 的深度学习与手写的稳定边界
-    let hand_score = eval_board_improved(board, player, game_count, border_mode, user_random_scale);
+    let hand_score = eval_board_improved(board, player, game_count, border_mode, cap_mode, user_random_scale);
     (ml_score * 2 + hand_score) / 3
 }
 
@@ -683,6 +693,32 @@ fn explosion_threshold(_cell: &Cell, x: usize, y: usize, sz: usize, border_mode:
             _ => 4,
         },
     }
+}
+
+/// 格子的爆炸阈值（无 RNG 版本，供 AI 走法生成/评估/排序使用）。
+/// cap3/cap5 固定；cap4 默认 4、degrade 边界位置修正；random 模式搜索按中间值 4 处理。
+#[inline]
+fn cell_threshold(x: usize, y: usize, sz: usize, border_mode: BorderMode, cap_mode: CapMode) -> u32 {
+    match cap_mode {
+        CapMode::Cap3 => 3,
+        CapMode::Cap5 => 5,
+        CapMode::Random => 4,
+        CapMode::Cap4 => match border_mode {
+            BorderMode::Degrade => {
+                let on_corner = (x == 0 || x == sz - 1) && (y == 0 || y == sz - 1);
+                let on_edge = x == 0 || x == sz - 1 || y == 0 || y == sz - 1;
+                if on_corner { 2 } else if on_edge { 3 } else { 4 }
+            }
+            _ => 4,
+        },
+    }
+}
+
+/// 己方棋子的“临界等级”：达到该等级后再落一子即爆炸（阈值 - 1）。
+/// cap3→2、cap4→3、cap5→4；degrade 边界格子按位置修正。
+#[inline]
+fn crit_level(x: usize, y: usize, sz: usize, border_mode: BorderMode, cap_mode: CapMode) -> u32 {
+    cell_threshold(x, y, sz, border_mode, cap_mode) - 1
 }
 
 fn process_click_with_killer_inner(
@@ -943,7 +979,7 @@ pub fn process_click(
     (eliminated, chain_count)
 }
 
-pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, _border_mode: BorderMode, user_random_scale: u32) -> i32 {
+pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, _border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> i32 {
     let mut my_score = 0i32;
     let mut opp_score = 0i32;
     let mut my_territory = 0i32;
@@ -951,20 +987,28 @@ pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, _
     let mut my_chain_threat = 0i32;
     let mut opp_chain_threat = 0i32;
 
+    // 阈值感知的主临界等级（cap3→2、cap4→3、cap5→4；random 取中值 3）
+    let crit = match cap_mode {
+        CapMode::Cap3 => 2,
+        CapMode::Cap5 => 4,
+        CapMode::Random => 3,
+        CapMode::Cap4 => 3,
+    } as i32;
+
     for row in board {
         for cell in row {
             match cell.owner {
                 Some(p) if p == player => {
                     my_score += cell.count as i32;
                     my_territory += 1;
-                    if cell.count >= 3 { my_chain_threat += (cell.count as i32) * 4; }
-                    else if cell.count >= 2 { my_chain_threat += 1; }
+                    if (cell.count as i32) >= crit { my_chain_threat += (cell.count as i32) * 4; }
+                    else if (cell.count as i32) >= crit - 1 { my_chain_threat += 1; }
                 }
                 Some(_) => {
                     opp_score += cell.count as i32;
                     opp_territory += 1;
-                    if cell.count >= 3 { opp_chain_threat += (cell.count as i32) * 4; }
-                    else if cell.count >= 2 { opp_chain_threat += 1; }
+                    if (cell.count as i32) >= crit { opp_chain_threat += (cell.count as i32) * 4; }
+                    else if (cell.count as i32) >= crit - 1 { opp_chain_threat += 1; }
                 }
                 None => {}
             }
@@ -1005,14 +1049,15 @@ pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, _
 
 // ─── Move generation & ordering ───
 
-pub fn get_moves(board: &GameBoard, sz: usize, player: usize, _first_move_pos: Option<(usize, usize)>) -> Vec<(usize, usize)> {
+pub fn get_moves(board: &GameBoard, sz: usize, player: usize, _first_move_pos: Option<(usize, usize)>, border_mode: BorderMode, cap_mode: CapMode) -> Vec<(usize, usize)> {
     let has_p = has_pieces(board, player);
     let mut moves = Vec::new();
     for i in 0..sz {
         for j in 0..sz {
             let c = &board[i][j];
             if has_p {
-                if c.owner == Some(player) && c.count < 4 {
+                // 阈值感知：只有 count < 本格阈值 的棋子可以落子（cap5 下 count==4 的引爆动作合法）
+                if c.owner == Some(player) && (c.count as u32) < cell_threshold(i, j, sz, border_mode, cap_mode) {
                     moves.push((i, j));
                 }
             } else {
@@ -1025,16 +1070,18 @@ pub fn get_moves(board: &GameBoard, sz: usize, player: usize, _first_move_pos: O
     moves
 }
 
-fn order_moves(moves: Vec<(usize, usize)>, board: &GameBoard, sz: usize, player: usize) -> Vec<(usize, usize)> {
+fn order_moves(moves: Vec<(usize, usize)>, board: &GameBoard, sz: usize, player: usize, border_mode: BorderMode, cap_mode: CapMode) -> Vec<(usize, usize)> {
     let mut scored: Vec<(i32, (usize, usize))> = moves
         .into_iter()
         .map(|(i, j)| {
             let c = &board[i][j];
             let mut score = c.count as i32 * 10;
-            if c.count >= 3 {
+            // 阈值感知：临界等级（再落一子即炸）的走法优先
+            if (c.count as u32) >= crit_level(i, j, sz, border_mode, cap_mode) {
                 score += 100;
             }
-            let near_opp: i32 = nbrs(i, j, sz)
+            // 回环模式：邻居按边界模式计算（棋盘最上格的上方是最后一行）
+            let near_opp: i32 = nbrs_with_mode(i, j, sz, border_mode)
                 .iter()
                 .filter_map(|&(ni, nj)| {
                     let nc = &board[ni][nj];
@@ -1083,11 +1130,11 @@ impl AlphaBeta<(usize, usize)> for GameState {
         if alive.len() == 1 && alive[0] == self.ai_player {
             return Grade::Max;
         }
-        // 非终局：按点数和棋子数打分
-        Grade::Score(eval_board(&self.board, self.ai_player, self.game_count, self.use_ml_eval, self.border_mode, self.user_random_scale) as i64)
+        // 非终局：按点数和棋子数打分（cap_mode 感知）
+        Grade::Score(eval_board(&self.board, self.ai_player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale) as i64)
     }
     fn get_moves(&self) -> Vec<(usize, usize)> {
-        get_moves(&self.board, self.sz, self.player, None)
+        get_moves(&self.board, self.sz, self.player, None, self.border_mode, self.cap_mode)
     }
 
     fn set(&mut self, m: &(usize, usize)) {
@@ -1151,8 +1198,8 @@ impl AlphaBeta<(usize, usize)> for GameState {
                 });
         }
 
-        // 走法排序 + 限制前10
-        let ordered = order_moves(all_moves, &self.board, self.sz, self.player);
+        // 走法排序 + 限制前10（阈值感知 + 回环邻居）
+        let ordered = order_moves(all_moves, &self.board, self.sz, self.player, self.border_mode, self.cap_mode);
         let max_eval = ordered.len().min(10);
         if max_eval == 0 { return None; }
 
@@ -1172,12 +1219,14 @@ impl AlphaBeta<(usize, usize)> for GameState {
             .map(|(_, m)| m)
     }
 
-    /// 重写 alpha_beta：使用克隆替代 set/unset，支持多玩家轮换
+    /// 重写 alpha_beta：使用克隆替代 set/unset，支持多玩家轮换 + 走法排序提升剪枝
     fn alpha_beta(&mut self, mut alpha: Grade, mut beta: Grade, depth: usize, _is_max: bool) -> Grade {
-        let moves = self.get_moves();
+        let mut moves = self.get_moves();
         if depth == 0 || moves.is_empty() {
             return self.evaluate();
         }
+        // 阈值感知排序：临界走法优先 → 更多剪枝
+        moves = order_moves(moves, &self.board, self.sz, self.player, self.border_mode, self.cap_mode);
         // 根据实际轮到谁确定 max/min
         let is_max = self.player == self.ai_player;
         if is_max {
@@ -1262,14 +1311,12 @@ impl PvsSearcher {
         if has_p {
             for i in 0..sz { for j in 0..sz {
                 let c = &board[i][j];
-                if c.owner == Some(player) && c.count < 4 {
+                // 阈值感知：cap5 下 count==4 的引爆走法合法且关键
+                if c.owner == Some(player) && (c.count as u32) < cell_threshold(i, j, sz, self.border_mode, self.cap_mode) {
                     let mut score = c.count as i64 * 10;
-                    if c.count >= 3 { score += 100; }
-                    // 邻居对手分数（手动展开，避免 Vec 分配）
-                    if i > 0 { let nc = &board[i-1][j]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
-                    if i + 1 < sz { let nc = &board[i+1][j]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
-                    if j > 0 { let nc = &board[i][j-1]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
-                    if j + 1 < sz { let nc = &board[i][j+1]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
+                    if (c.count as u32) >= crit_level(i, j, sz, self.border_mode, self.cap_mode) { score += 100; }
+                    // 邻居对手分数（回环模式用 nbrs_with_mode）
+                    self.add_neighbor_scores(&mut score, board, sz, i, j, player);
                     // Killer bonus
                     if Some((i, j)) == k0 { score += 1_000_000; }
                     else if Some((i, j)) == k1 { score += 500_000; }
@@ -1284,17 +1331,32 @@ impl PvsSearcher {
             for i in 0..sz { for j in 0..sz {
                 if board[i][j].owner.is_none() && !is_in_any_restricted_zone(board, sz, i, j) {
                     let mut score = 0i64;
-                    // 邻居对手分数（手动展开，避免 Vec 分配）
-                    if i > 0 { let nc = &board[i-1][j]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
-                    if i + 1 < sz { let nc = &board[i+1][j]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
-                    if j > 0 { let nc = &board[i][j-1]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
-                    if j + 1 < sz { let nc = &board[i][j+1]; if nc.owner.is_some() && nc.owner != Some(player) { score += nc.count as i64 * 5; } }
+                    // 邻居对手分数（回环模式用 nbrs_with_mode）
+                    self.add_neighbor_scores(&mut score, board, sz, i, j, player);
                     moves.push((score, (i, j)));
                 }
             }}
         }
         moves.sort_unstable_by(|a, b| b.0.cmp(&a.0));
         moves.into_iter().map(|(_, m)| m).collect()
+    }
+
+    /// 邻居对手分数：回环模式按边界模式取邻居，其余模式手动展开避免 Vec 分配
+    fn add_neighbor_scores(&self, score: &mut i64, board: &GameBoard, sz: usize, i: usize, j: usize, player: usize) {
+        match self.border_mode {
+            BorderMode::Wrap => {
+                for &(ni, nj) in &nbrs_wrap(i, j, sz) {
+                    let nc = &board[ni][nj];
+                    if nc.owner.is_some() && nc.owner != Some(player) { *score += nc.count as i64 * 5; }
+                }
+            }
+            _ => {
+                if i > 0 { let nc = &board[i-1][j]; if nc.owner.is_some() && nc.owner != Some(player) { *score += nc.count as i64 * 5; } }
+                if i + 1 < sz { let nc = &board[i+1][j]; if nc.owner.is_some() && nc.owner != Some(player) { *score += nc.count as i64 * 5; } }
+                if j > 0 { let nc = &board[i][j-1]; if nc.owner.is_some() && nc.owner != Some(player) { *score += nc.count as i64 * 5; } }
+                if j + 1 < sz { let nc = &board[i][j+1]; if nc.owner.is_some() && nc.owner != Some(player) { *score += nc.count as i64 * 5; } }
+            }
+        }
     }
 
     /// QSearch: 仅搜索爆炸性走法，使用 bitset 加速 eliminated 判断
@@ -1321,8 +1383,8 @@ impl PvsSearcher {
             return i32::MIN + 1000;
         }
         // QSearch 最多 3 层（防长链爆炸耗死）
-        if depth >= 3 { return eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.user_random_scale); }
-        let stand_pat = eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.user_random_scale);
+        if depth >= 3 { return eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale); }
+        let stand_pat = eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale);
         if stand_pat >= beta { return beta; }
         let mut alpha = if stand_pat > alpha { stand_pat } else { alpha };
 
@@ -1345,7 +1407,7 @@ impl PvsSearcher {
                     _ => 3,
                 },
             };
-            if c.owner == Some(player) && c.count >= min_explosive && c.count < 4 {
+            if c.owner == Some(player) && c.count >= min_explosive && (c.count as u32) < cell_threshold(i, j, sz, self.border_mode, self.cap_mode) {
                 if n < moves_buf.len() { moves_buf[n] = (i, j); n += 1; }
             }
         }}
@@ -1390,13 +1452,13 @@ impl PvsSearcher {
             if use_qsearch {
                 return self.quiescence(board, sz, player, max_players, elim, alpha, beta, 0);
             }
-            return eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.user_random_scale);
+            return eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale);
         }
 
         let moves = self.get_moves_ordered(board, sz, player, depth);
         // 深层少分支，浅层多分支
         let max_branch = moves.len().min(8usize + (3usize).saturating_sub(depth) * 3);
-        if max_branch == 0 { return eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.user_random_scale); }
+        if max_branch == 0 { return eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale); }
 
         let mut best_score = i32::MIN + 1;
 
@@ -1469,7 +1531,7 @@ impl PvsSearcher {
                 let score = if depth > 0 {
                     -searcher.pvs(&child, sz, next, max_players, child_elim, depth - 1, i32::MIN + 1, i32::MAX - 1, false)
                 } else {
-                    eval_board(&child, player, gc, ml, bm, self.user_random_scale)
+                    eval_board(&child, player, gc, ml, bm, self.cap_mode, self.user_random_scale)
                 };
                 (score, m)
             })
@@ -1517,8 +1579,8 @@ impl XorShift {
 
 /// MCTS 常量
 const UCB_C: f64 = 2.0;
-const MCTS_ITER_PER_DEPTH: usize = 800; // iterations = depth * 800 → depth=1 -> 800, depth=10 -> 8000
-const MCTS_PLAYOUT_MAX: usize = 40;
+const MCTS_ITER_PER_DEPTH: usize = 400; // iterations = depth * 400（原 800 耗时过长，减半仍保留深度语义）
+const MCTS_PLAYOUT_MAX: usize = 24; // 模拟步数上限（原 40：链式大棋盘下是主要耗时，减到 24 兼顾速度与评估质量）
 const MCTS_TREE_MAX_NODES: usize = 2000; // 每棵树最大节点数（防内存暴涨）
 
 /// ─── MCTS 树节点（扁平向量存储） ───
@@ -1579,11 +1641,12 @@ impl MctsTree {
     }
 
     /// 获取节点的当前合法走法集（排除已展开的子节点）
+    /// 阈值感知：cap5 下 count==4 的引爆走法也包含在内
     fn untried_moves(&self, node: usize) -> Vec<(usize, usize)> {
-        let all = get_moves(&self.boards[node], self.sz, self.players[node], None);
-        let tried: std::collections::HashSet<(usize, usize)> =
-            self.children[node].iter().map(|e| (e.x, e.y)).collect();
-        all.into_iter().filter(|m| !tried.contains(m)).collect()
+        let all = get_moves(&self.boards[node], self.sz, self.players[node], None, self.border_mode, self.cap_mode);
+        let kids = &self.children[node];
+        // children 通常很小，线性扫描比 HashSet 更快（避免哈希分配）
+        all.into_iter().filter(|m| !kids.iter().any(|e| e.x == m.0 && e.y == m.1)).collect()
     }
 
     /// 节点是否终局
@@ -1612,14 +1675,14 @@ impl MctsTree {
             .max_by(|&(_, _, a), &(_, _, b)| self.ucb(node, a).partial_cmp(&self.ucb(node, b)).unwrap_or(std::cmp::Ordering::Equal))
     }
 
-    /// 展开一个节点：从未试走法中选一个（依 order_moves 排序），创建子节点
-    fn expand(&mut self, node: usize, _rng: &mut XorShift) -> Option<usize> {
+    /// 展开一个节点：从已算好的 untried 中选一个（依 order_moves 排序），创建子节点
+    /// 由 iterate 传入 untried，避免 select 阶段重复计算合法走法
+    fn expand_with(&mut self, node: usize, mut untried: Vec<(usize, usize)>) -> Option<usize> {
         if self.visits.len() >= self.max_nodes { return None; }
-        let mut untried = self.untried_moves(node);
         if untried.is_empty() { return None; }
 
-        // 用 order_moves 排序后，优先展开最有希望的走法
-        untried = order_moves(untried, &self.boards[node], self.sz, self.players[node]);
+        // 用 order_moves 排序后，优先展开最有希望的走法（阈值感知 + 回环邻居）
+        untried = order_moves(untried, &self.boards[node], self.sz, self.players[node], self.border_mode, self.cap_mode);
         let (mx, my) = untried[0];
 
         // 应用走法得到新状态
@@ -1651,7 +1714,7 @@ impl MctsTree {
             let untried = self.untried_moves(leaf);
             if !untried.is_empty() && self.visits[leaf] >= 3 {
                 // 访问足够次数后才展开（渐进展开，避免过早分裂）
-                if let Some(new_node) = self.expand(leaf, rng) {
+                if let Some(new_node) = self.expand_with(leaf, untried) {
                     path.push(new_node);
                     leaf = new_node;
                 }
@@ -1706,7 +1769,7 @@ fn mcts_playout(
             return if alive.first().copied() == Some(ai_player) { 1.0 } else { 0.0 };
         }
 
-        let moves = get_moves(&b, sz, cur, None);
+        let moves = get_moves(&b, sz, cur, None, border_mode, cap_mode);
         if moves.is_empty() {
             cur = next_live_player(&b, sz, cur, &elim, max_players);
             continue;
@@ -1753,7 +1816,7 @@ fn mcts_search(
     cap_mode: CapMode,
     first_move_pos: Option<(usize, usize)>,
 ) -> Option<(usize, usize)> {
-    let all_moves = get_moves(board, sz, ai_player, first_move_pos);
+    let all_moves = get_moves(board, sz, ai_player, first_move_pos, border_mode, cap_mode);
     if all_moves.is_empty() { return None; }
     if all_moves.len() == 1 { return Some(all_moves[0]); }
 
@@ -1763,7 +1826,7 @@ fn mcts_search(
     }
 
     // 走法排序，分枝限制
-    let ordered = order_moves(all_moves, board, sz, ai_player);
+    let ordered = order_moves(all_moves, board, sz, ai_player, border_mode, cap_mode);
     let branches = ordered.len().min(15);
     let iters_per = (iterations / branches).max(50);
     let max_nodes = MCTS_TREE_MAX_NODES / branches.max(1);
@@ -1891,10 +1954,10 @@ pub fn find_best_move(
 
 // ─── 策略算法（纯启发式规则，无需搜索） ───
 
-/// 统计 (i,j) 周围指定等级的对手棋子数量
-fn count_opponent_level_around(board: &GameBoard, sz: usize, i: usize, j: usize, player: usize, level: u8) -> i32 {
+/// 统计 (i,j) 周围指定等级的对手棋子数量（回环模式邻居按边界模式计算）
+fn count_opponent_level_around(board: &GameBoard, sz: usize, i: usize, j: usize, player: usize, level: u8, border_mode: BorderMode) -> i32 {
     let mut cnt = 0;
-    for (ni, nj) in nbrs(i, j, sz) {
+    for (ni, nj) in nbrs_with_mode(i, j, sz, border_mode) {
         let nc = &board[ni][nj];
         if nc.owner.is_some() && nc.owner != Some(player) && nc.count == level {
             cnt += 1;
@@ -1903,9 +1966,9 @@ fn count_opponent_level_around(board: &GameBoard, sz: usize, i: usize, j: usize,
     cnt
 }
 
-/// 检查 (i,j) 周围是否有指定等级的对手棋子
-fn has_opponent_level_near(board: &GameBoard, sz: usize, i: usize, j: usize, player: usize, level: u8) -> bool {
-    for (ni, nj) in nbrs(i, j, sz) {
+/// 检查 (i,j) 周围是否有指定等级的对手棋子（回环模式邻居按边界模式计算）
+fn has_opponent_level_near(board: &GameBoard, sz: usize, i: usize, j: usize, player: usize, level: u8, border_mode: BorderMode) -> bool {
+    for (ni, nj) in nbrs_with_mode(i, j, sz, border_mode) {
         let nc = &board[ni][nj];
         if nc.owner.is_some() && nc.owner != Some(player) && nc.count == level {
             return true;
@@ -1914,7 +1977,21 @@ fn has_opponent_level_near(board: &GameBoard, sz: usize, i: usize, j: usize, pla
     false
 }
 
+/// 统计 (i,j) 周围任意对手棋子数（回环模式邻居按边界模式计算）
+fn count_any_opponent_around(board: &GameBoard, sz: usize, i: usize, j: usize, player: usize, border_mode: BorderMode) -> i32 {
+    let mut cnt = 0;
+    for (ni, nj) in nbrs_with_mode(i, j, sz, border_mode) {
+        let nc = &board[ni][nj];
+        if nc.owner.is_some() && nc.owner != Some(player) {
+            cnt += 1;
+        }
+    }
+    cnt
+}
+
 /// 策略算法入口：纯启发式规则，无需搜索
+/// 阈值感知：把 cap4 模式的“即将爆炸”判断（三三相接）迁移到
+/// cap3（二二相接）与 cap5（四四相接）；回环模式上下左右判断与回环相符。
 pub fn find_best_move_strategy(
     board: &GameBoard,
     sz: usize,
@@ -1923,8 +2000,8 @@ pub fn find_best_move_strategy(
     _max_players: usize,
     _game_count: u32,
     _first_move_pos: Option<[usize; 2]>,
-    _border_mode: BorderMode,
-    _cap_mode: CapMode,
+    border_mode: BorderMode,
+    cap_mode: CapMode,
 ) -> Option<(usize, usize)> {
     // 收集己方棋子
     let mut mine: Vec<(usize, usize)> = Vec::new();
@@ -1941,38 +2018,22 @@ pub fn find_best_move_strategy(
         return first_move_center(board, sz);
     }
 
-        let mut rng = rand::thread_rng();
-    // 确定性伪随机（基于棋盘哈希），保持每次调用结果一致
-    let hash: u64 = board.iter().enumerate().flat_map(|(i, row)| {
-        row.iter().enumerate().map(move |(j, c)| {
-            ((i as u64).wrapping_mul(31).wrapping_add(j as u64))
-                .wrapping_mul(7)
-                .wrapping_add(c.owner.unwrap_or(99) as u64)
-                .wrapping_mul(c.count as u64)
-        })
-    }).fold(0u64, |a, b| a.wrapping_mul(6364136223846793005).wrapping_add(b));
+    let mut rng = rand::thread_rng();
 
-    let _rnd = |seed: u64| -> f64 {
-        let h = hash.wrapping_mul(seed.wrapping_add(1)).wrapping_add(seed ^ 0x9e3779b97f4a7c15);
-        ((h % 100) as f64) / 100.0
-    };
-    let _rnd_idx = |seed: u64, n: usize| -> usize {
-        if n <= 1 { return 0; }
-        let h = hash.wrapping_mul(seed.wrapping_add(1)).wrapping_add(seed ^ 0x9e3779b97f4a7c15);
-        (h as usize) % n
-    };
+    // 该格临界等级（再落一子即炸）：cap3→2、cap4→3、cap5→4；degrade 边界格子更低
+    let crit_of = |i: usize, j: usize| crit_level(i, j, sz, border_mode, cap_mode) as u8;
 
-    // 1. 三级棋子（count == 3）
-    // 优先引爆接近对手三级的棋子（触发连锁反应的起点）
-    let lv3: Vec<(usize, usize)> = mine.iter()
-        .filter(|&&(i, j)| board[i][j].count == 3)
+    // 1. 引爆临界棋子：己方 count == crit，优先选附近有对手 count == crit 的
+    //    cap4：三三相接；cap3：二二相接；cap5：四四相接
+    let crits: Vec<(usize, usize)> = mine.iter()
+        .filter(|&&(i, j)| board[i][j].count == crit_of(i, j))
         .copied()
         .collect();
-    if !lv3.is_empty() {
+    if !crits.is_empty() {
         let mut best = Vec::new();
         let mut best_cnt = -1i32;
-        for &(i, j) in &lv3 {
-            let cnt = count_opponent_level_around(board, sz, i, j, player, 3);
+        for &(i, j) in &crits {
+            let cnt = count_opponent_level_around(board, sz, i, j, player, crit_of(i, j), border_mode);
             if cnt > best_cnt {
                 best_cnt = cnt;
                 best = vec![(i, j)];
@@ -1985,28 +2046,22 @@ pub fn find_best_move_strategy(
         }
     }
 
-    // 2. 安全二级（count == 2，且附近没有对手三级）
-    let lv2: Vec<(usize, usize)> = mine.iter()
-        .filter(|&&(i, j)| board[i][j].count == 2)
+    // 2. 安全升级（count == crit-1，且附近没有对手临界棋子）
+    let subcrits: Vec<(usize, usize)> = mine.iter()
+        .filter(|&&(i, j)| board[i][j].count == crit_of(i, j).saturating_sub(1))
         .copied()
         .collect();
-    let safe_lv2: Vec<(usize, usize)> = lv2.iter()
-        .filter(|&&(i, j)| !has_opponent_level_near(board, sz, i, j, player, 3))
+    let safe_sub: Vec<(usize, usize)> = subcrits.iter()
+        .filter(|&&(i, j)| !has_opponent_level_near(board, sz, i, j, player, crit_of(i, j), border_mode))
         .copied()
         .collect();
-    if !safe_lv2.is_empty() {
+    if !safe_sub.is_empty() {
         let mut best = Vec::new();
         let mut best_score = f64::NEG_INFINITY;
-        for &(i, j) in &safe_lv2 {
+        for &(i, j) in &safe_sub {
             let edge = if i == 0 || i == sz - 1 || j == 0 || j == sz - 1 { 3.0 } else { 0.0 };
             let corner = if (i == 0 || i == sz - 1) && (j == 0 || j == sz - 1) { 5.0 } else { 0.0 };
-            let mut near_any_opp = 0i32;
-            for &(ni, nj) in &nbrs(i, j, sz) {
-                let nc = &board[ni][nj];
-                if nc.owner.is_some() && nc.owner != Some(player) {
-                    near_any_opp += 1;
-                }
-            }
+            let near_any_opp = count_any_opponent_around(board, sz, i, j, player, border_mode);
             let score = edge + corner - near_any_opp as f64 * 5.0 + rng.gen_range(0.0..1.0)*0.5;
             if score > best_score + 0.01 {
                 best_score = score;
@@ -2020,22 +2075,16 @@ pub fn find_best_move_strategy(
         }
     }
 
-    // 3. 一进二（升级一级棋子 count == 1）
-    let lv1: Vec<(usize, usize)> = mine.iter()
-        .filter(|&&(i, j)| board[i][j].count == 1)
+    // 3. 更安全的升级（count == crit-2；cap3 下 crit-2=0 不存在，自动跳过）
+    let sub2: Vec<(usize, usize)> = mine.iter()
+        .filter(|&&(i, j)| board[i][j].count == crit_of(i, j).saturating_sub(2))
         .copied()
         .collect();
-    if !lv1.is_empty() {
+    if !sub2.is_empty() {
         let mut best = Vec::new();
         let mut best_score = f64::NEG_INFINITY;
-        for &(i, j) in &lv1 {
-            let mut near_opp = 0i32;
-            for &(ni, nj) in &nbrs(i, j, sz) {
-                let nc = &board[ni][nj];
-                if nc.owner.is_some() && nc.owner != Some(player) {
-                    near_opp += 1;
-                }
-            }
+        for &(i, j) in &sub2 {
+            let near_opp = count_any_opponent_around(board, sz, i, j, player, border_mode);
             let score = -near_opp as f64 * 3.0 + rng.gen_range(0.0..1.0)*0.5 * 2.0;
             if score > best_score + 0.01 {
                 best_score = score;
@@ -2049,20 +2098,15 @@ pub fn find_best_move_strategy(
         }
     }
 
-    // 4. 下三级（将二级棋子升为三级 count == 2）
-    if !lv2.is_empty() {
+    // 4. 建立临界威胁（把 count == crit-1 升到 crit）
+    //    cap4：二升三；cap3：一升二（安全）；cap5：三升四。靠近对手建立威胁。
+    if !subcrits.is_empty() {
         let mut best = None;
         let mut best_score = f64::NEG_INFINITY;
-        for &(i, j) in &lv2 {
-            let mut near_opp = 0i32;
-            for &(ni, nj) in &nbrs(i, j, sz) {
-                let nc = &board[ni][nj];
-                if nc.owner.is_some() && nc.owner != Some(player) {
-                    near_opp += 5;
-                }
-            }
+        for &(i, j) in &subcrits {
+            let near_opp = count_any_opponent_around(board, sz, i, j, player, border_mode);
             let edge = if i == 0 || i == sz - 1 || j == 0 || j == sz - 1 { 2.0 } else { 0.0 };
-            let score = near_opp as f64 + edge + rng.gen_range(0.0..1.0)*0.5;
+            let score = near_opp as f64 * 5.0 + edge + rng.gen_range(0.0..1.0)*0.5;
             if score > best_score + 0.01 {
                 best_score = score;
                 best = Some((i, j));
@@ -2073,17 +2117,20 @@ pub fn find_best_move_strategy(
         }
     }
 
-    // 5. 随机选一个可下的棋子（count < 4）
+    // 5. 随机选一个可下的棋子（count < 本格阈值；cap3 下含临界 2，cap5 下含临界 4）
     let available: Vec<(usize, usize)> = mine.iter()
-        .filter(|&&(i, j)| board[i][j].count < 4)
+        .filter(|&&(i, j)| (board[i][j].count as u32) < cell_threshold(i, j, sz, border_mode, cap_mode))
         .copied()
         .collect();
     if !available.is_empty() {
         return Some(available[rng.gen_range(0..available.len())]);
     }
 
-    // 6. 保底：返回第一个棋子
-    mine.first().copied()
+    // 6. 保底：优先返回可下棋子；若棋盘存在 count>=阈值 的异常状态（如模拟器构造的
+    //    非法初始局面），仍返回第一个己方棋子让 process_click 按爆炸处理，避免无棋可下
+    mine.iter().copied()
+        .find(|&(i, j)| (board[i][j].count as u32) < cell_threshold(i, j, sz, border_mode, cap_mode))
+        .or_else(|| mine.first().copied())
 }
 
 // ─── 自对弈数据生成 (XGBoost 训练用) ───
@@ -2604,5 +2651,157 @@ mod tests {
             if r != base { diff = true; break; }
         }
         assert!(diff, "随机边界不同 seed 应有不同扩散结果");
+    }
+
+    // ── 11) 阈值感知走法生成：cap5 下 count==4 的引爆动作必须合法 ──
+    #[test]
+    fn get_moves_cap5_includes_explosive() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, 4); // 己方临界 count4（再落一子即炸）
+        let mvs5 = get_moves(&b, sz, 0, None, BorderMode::Default, CapMode::Cap5);
+        assert!(mvs5.contains(&(2, 2)), "cap5: count4 explosive move must be legal, got {:?}", mvs5);
+        // cap3 下 count4 不可能存在，也不应被允许
+        let mvs3 = get_moves(&b, sz, 0, None, BorderMode::Default, CapMode::Cap3);
+        assert!(!mvs3.contains(&(2, 2)), "cap3: count4 must not be legal");
+        // cap3 下临界 count2 的引爆动作合法（count < 3）
+        let mut b3 = mk_b(sz);
+        set(&mut b3, 2, 2, 0, 2);
+        let mvs3b = get_moves(&b3, sz, 0, None, BorderMode::Default, CapMode::Cap3);
+        assert!(mvs3b.contains(&(2, 2)), "cap3: count2 critical move must be legal");
+    }
+
+    // ── 12) 策略 AI：cap3 模式“二二相接”引爆、cap5 模式“四四相接”引爆 ──
+    #[test]
+    fn strategy_cap3_explodes_on_pair() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, 2); // 己方临界
+        set(&mut b, 2, 3, 1, 2); // 对手临界相邻
+        let mv = find_best_move_strategy(&b, sz, 0, &[], 2, 0, None, BorderMode::Default, CapMode::Cap3);
+        assert_eq!(mv, Some((2, 2)), "cap3 strategy should explode pair (2v2), got {:?}", mv);
+    }
+    #[test]
+    fn strategy_cap5_explodes_on_quad() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, 4); // 己方临界
+        set(&mut b, 2, 3, 1, 4); // 对手临界相邻
+        let mv = find_best_move_strategy(&b, sz, 0, &[], 2, 0, None, BorderMode::Default, CapMode::Cap5);
+        assert_eq!(mv, Some((2, 2)), "cap5 strategy should explode quad (4v4), got {:?}", mv);
+    }
+    #[test]
+    fn strategy_cap4_explodes_on_triple() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, 3);
+        set(&mut b, 2, 3, 1, 3);
+        let mv = find_best_move_strategy(&b, sz, 0, &[], 2, 0, None, BorderMode::Default, CapMode::Cap4);
+        assert_eq!(mv, Some((2, 2)), "cap4 strategy should explode triple (3v3), got {:?}", mv);
+    }
+
+    // ── 13) 策略 AI：cap3 下“建立临界”升 count1→2，不选 count2→3 的自爆走法 ──
+    #[test]
+    fn strategy_cap3_no_suicide() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, 1); // 己方 count1（升到 2 安全）
+        set(&mut b, 1, 1, 0, 2); // 己方 count2（cap3 下再落子自爆）
+        set(&mut b, 4, 4, 1, 1); // 远处对手
+        let mv = find_best_move_strategy(&b, sz, 0, &[], 2, 0, None, BorderMode::Default, CapMode::Cap3);
+        assert_eq!(mv, Some((2, 2)), "cap3 strategy must upgrade 1->2, not suicide 2->3, got {:?}", mv);
+    }
+
+    // ── 14) 回环模式：策略 AI 的上下左右判断与回环相符（最上行上方=最下行） ──
+    #[test]
+    fn strategy_wrap_neighbors_loop() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        // 己方 (0,2) count1（cap3 下安全升级位）；对手临界 count2 在 (4,2)（wrap 中位于其正上方）
+        set(&mut b, 0, 2, 0, 1);
+        set(&mut b, 4, 2, 1, 2);
+        // wrap：对手临界贴着己方安全位 → 步骤2 排除（不安全），应走建立临界（也是 (0,2)）或引爆
+        let mv_wrap = find_best_move_strategy(&b, sz, 0, &[], 2, 0, None, BorderMode::Wrap, CapMode::Cap3);
+        // 不允许升级到会引爆的位置？(0,2) 1->2 安全，仍是最优（建立临界靠近对手）
+        assert_eq!(mv_wrap, Some((0, 2)), "wrap: expected (0,2), got {:?}", mv_wrap);
+        // default 模式下 (4,2) 不在 (0,2) 邻域 → 无对手临近 → 仍是 (0,2)
+        let mv_def = find_best_move_strategy(&b, sz, 0, &[], 2, 0, None, BorderMode::Default, CapMode::Cap3);
+        assert_eq!(mv_def, Some((0, 2)), "default: expected (0,2), got {:?}", mv_def);
+    }
+    #[test]
+    fn strategy_wrap_detects_wrapped_threat() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        // 己方临界 count2 在 (0,2)，对手临界 count2 在 (4,2)：wrap 下二者相邻 → 应引爆
+        set(&mut b, 0, 2, 0, 2);
+        set(&mut b, 4, 2, 1, 2);
+        let mv = find_best_move_strategy(&b, sz, 0, &[], 2, 0, None, BorderMode::Wrap, CapMode::Cap3);
+        assert_eq!(mv, Some((0, 2)), "wrap: wrapped adjacency should trigger explosion, got {:?}", mv);
+    }
+
+    // ── 15) MCTS 在 cap5 下能够执行引爆走法（count==4 合法） ──
+    #[test]
+    fn mcts_cap5_can_explode() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, 4);
+        set(&mut b, 2, 3, 1, 4);
+        let mv = find_best_move_mcts(&b, sz, 0, 2, &[], 2, BorderMode::Default, CapMode::Cap5);
+        assert_eq!(mv, Some((2, 2)), "cap5 MCTS should pick explosive move, got {:?}", mv);
+    }
+
+    // ── 16) PVS 在 cap5 下能够执行引爆走法 ──
+    #[test]
+    fn pvs_cap5_can_explode() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, 4);
+        set(&mut b, 2, 3, 1, 4);
+        let mv = find_best_move_pvs(&b, sz, 0, 2, &[], 2, 0, true, BorderMode::Default, CapMode::Cap5, 0);
+        assert_eq!(mv, Some((2, 2)), "cap5 PVS should pick explosive move, got {:?}", mv);
+    }
+
+    // ── 17) Alpha-Beta 在 cap5 下能够执行引爆走法 ──
+    // ── MCTS 性能基准（手动运行：cargo test --release mcts_bench -- --ignored --nocapture） ──
+    #[test]
+    #[ignore]
+    fn mcts_bench() {
+        use std::time::Instant;
+        let sz = 7;
+        for cm in [CapMode::Cap3, CapMode::Cap4, CapMode::Cap5] {
+            let mut b = mk_b(sz);
+            for i in 1..6 { for j in 1..6 {
+                if (i + j) % 2 == 0 { set(&mut b, i, j, (i % 2) as usize, 2); }
+            }}
+            for depth in [1usize, 2, 3] {
+                let t0 = Instant::now();
+                let mv = find_best_move_mcts(&b, sz, 0, depth, &[], 2, BorderMode::Default, cm);
+                let dt = t0.elapsed();
+                println!("MCTS {:?} depth={} → {:?}  耗时 {:?}", cm, depth, mv, dt);
+            }
+        }
+    }
+
+    // ── 18) 新 18 维训练模型与 Rust 端加载兼容（冒烟测试产物存在时验证） ──
+    #[test]
+    fn xgb_v2_model_loadable() {
+        let path = "/tmp/xgb_smoke.json";
+        if std::path::Path::new(path).exists() {
+            let eng = get_xgb_engine_for_test(path);
+            let feats = [0.0f32; FEAT_DIM];
+            let (raw, prob) = eng.predict(&feats);
+            assert!(raw.is_finite(), "raw={raw}");
+            assert!(prob.is_finite() && prob > 0.0 && prob < 1.0, "prob={prob}");
+        }
+    }
+
+    #[test]
+    fn alphabeta_cap5_can_explode() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, 4);
+        set(&mut b, 2, 3, 1, 4);
+        let mv = find_best_move(&b, sz, 0, 2, &[], 2, 0, None, true, BorderMode::Default, CapMode::Cap5, 0);
+        assert_eq!(mv, Some((2, 2)), "cap5 alphabeta should pick explosive move, got {:?}", mv);
     }
 }

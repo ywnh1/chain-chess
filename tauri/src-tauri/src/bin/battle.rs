@@ -7,6 +7,8 @@
 // {
 //   "size": 7,            // 棋盘大小
 //   "times": 10,          // 对局数
+//   "border": "default",  // 可选: default | wrap | bounce | degrade
+//   "cap": "4",           // 可选: 3 | 4 | 5
 //   "ai": [
 //     {"type":"alphabeta","depth":2,"use_ml_eval":true,"name":"ML"},
 //     {"type":"alphabeta","depth":2,"use_ml_eval":false,"name":"手写"}
@@ -20,8 +22,7 @@ use serde::Deserialize;
 use chain_chess_lib::*;
 
 use chain_chess_lib::BorderMode;
-
-const BORDER_MODE: BorderMode = BorderMode::Default;
+use chain_chess_lib::CapMode;
 
 /// AI 选手配置（来自 JSON）
 #[derive(Deserialize, Clone)]
@@ -42,8 +43,15 @@ fn default_true() -> bool { true }
 struct BattleConfig {
     size: usize,
     times: u32,
+    #[serde(default = "default_border")]
+    border: BorderMode,
+    #[serde(default = "default_cap")]
+    cap: CapMode,
     ai: Vec<AiPlayerConfig>,
 }
+
+fn default_border() -> BorderMode { BorderMode::Default }
+fn default_cap() -> CapMode { CapMode::Cap4 }
 
 fn play_game(
     board_size: usize,
@@ -51,13 +59,15 @@ fn play_game(
     configs: &[PlayerAiConfig; 2],
     first_player: usize,
     game_id: u32,
+    border_mode: BorderMode,
+    cap_mode: CapMode,
 ) -> Option<usize> {
     let mut board = vec![vec![Cell { owner: None, count: 0, th: None }; board_size]; board_size];
     let mut eliminated: Vec<usize> = Vec::new();
     let mut cur_player: usize = first_player;
 
     loop {
-        let legal_moves = get_moves(&board, board_size, cur_player, None);
+        let legal_moves = get_moves(&board, board_size, cur_player, None, border_mode, cap_mode);
         if legal_moves.is_empty() {
             let alive: Vec<usize> = (0..max_players)
                 .filter(|p| !eliminated.contains(p))
@@ -72,11 +82,11 @@ fn play_game(
         let chosen = find_best_move_by_alg(
             &board, board_size, cur_player, cfg,
             &eliminated, max_players, game_id, None,
-            BORDER_MODE, CapMode::Cap4, 0,  // battle 工具不配置随机刻度
+            border_mode, cap_mode, 0,  // battle 工具不配置随机刻度
         );
 
         let (mx, my) = chosen.unwrap_or_else(|| legal_moves[0]);
-        let (new_elim, _) = process_click(&mut board, board_size, mx, my, cur_player, max_players, BORDER_MODE, CapMode::Cap4, None);
+        let (new_elim, _) = process_click(&mut board, board_size, mx, my, cur_player, max_players, border_mode, cap_mode, None);
         for &e in &new_elim {
             if !eliminated.contains(&e) { eliminated.push(e); }
         }
@@ -153,6 +163,7 @@ fn main() {
     eprintln!("║       连锁棋 AI 对决基准测试             ║");
     eprintln!("╚══════════════════════════════════════════╝");
     eprintln!("  棋盘: {}×{}", board_size, board_size);
+    eprintln!("  边界: {:?}  阈值: {:?}", cfg.border, cfg.cap);
     eprintln!("  局数: {} (先手交替)", num_games);
     eprintln!("  AI 0: {}", name0);
     eprintln!("  AI 1: {}", name1);
@@ -168,7 +179,7 @@ fn main() {
         eprint!("  游戏 {}/{} ({}先手): ", game_id + 1, num_games,
             if first == 0 { &name0 } else { &name1 });
 
-        let winner = play_game(board_size, 2, &ai_configs, first, game_id);
+        let winner = play_game(board_size, 2, &ai_configs, first, game_id, cfg.border, cfg.cap);
 
         match winner {
             Some(w) => {
