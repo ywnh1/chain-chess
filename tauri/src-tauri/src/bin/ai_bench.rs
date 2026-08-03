@@ -7,7 +7,7 @@
 // {
 //   "size": 7, "games": 6, "mode": "ffa" | "duel",
 //   "borders": ["default","wrap","bounce","degrade"],
-//   "caps": ["3","4","5","mixed"],
+//   "caps": ["3","4","5"],
 //   "algs": ["strategy","alphabeta","pvs","mcts"],   // ffa 模式每玩家一算法
 //   "duelPairs": [["strategy","alphabeta"]],          // duel 模式（缺省自动全配对）
 //   "depth": 2, "mctsDepth": 1, "randomScale": 5, "useMlEval": true,
@@ -57,7 +57,7 @@ fn default_borders() -> Vec<BorderMode> {
     vec![BorderMode::Default, BorderMode::Wrap, BorderMode::Bounce, BorderMode::Degrade]
 }
 fn default_caps() -> Vec<CapMode> {
-    vec![CapMode::Cap3, CapMode::Cap4, CapMode::Cap5, CapMode::Mixed]
+    vec![CapMode::Cap3, CapMode::Cap4, CapMode::Cap5]
 }
 fn default_algs() -> Vec<String> {
     vec!["strategy".into(), "alphabeta".into(), "pvs".into(), "mcts".into()]
@@ -92,20 +92,9 @@ fn spread_starts(sz: usize, n: usize) -> Vec<(usize, usize)> {
     pos
 }
 
-/// 构造开局棋盘：mixed 模式按 seed 确定性分配每格阈值 3/4/5，然后放首子
-fn build_board(sz: usize, cm: CapMode, gc: u32) -> GameBoard {
-    let mut seed = gc;
-    let mut rnd = move || {
-        seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
-        (seed >> 8) % 3
-    };
-    let mixed = cm == CapMode::Mixed;
-    let board = (0..sz)
-        .map(|_| (0..sz)
-            .map(|_| Cell { owner: None, count: 0, th: if mixed { Some(3 + rnd() as u8) } else { None } })
-            .collect())
-        .collect::<GameBoard>();
-    board
+/// 构造开局空棋盘
+fn build_board(sz: usize, _cm: CapMode, _gc: u32) -> GameBoard {
+    vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz]
 }
 
 fn alg_depth(alg: &str, cfg: &BenchConfig) -> usize {
@@ -125,12 +114,11 @@ fn run_game(
     let mut board = build_board(sz, cm, gc);
     let starts = spread_starts(sz, max_players);
     for (p, &(x, y)) in starts.iter().enumerate() {
-        // 首子等级 = 阈值 n-1（cap3→2、cap4→3、cap5→4、mixed→所在格阈值-1）
+        // 首子等级 = 阈值 n-1（cap3→2、cap4→3、cap5→4）
         let th: u32 = match cm {
             CapMode::Cap3 => 3,
             CapMode::Cap4 => 4,
             CapMode::Cap5 => 5,
-            CapMode::Mixed => board[x][y].th.unwrap_or(4) as u32,
             CapMode::Random => 3, // 每步随机阈值模式：开局首子取中间等级
         };
         board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: board[x][y].th };
@@ -199,7 +187,7 @@ fn main() {
                         let (winner, steps, order) = run_game(cfg.size, *bm, *cm, gc, pair, &cfg);
                         emit(serde_json::json!({
                             "id": id, "bm": format!("{:?}", bm).to_lowercase(),
-                            "cm": match cm { CapMode::Cap3 => "3", CapMode::Cap4 => "4", CapMode::Cap5 => "5", CapMode::Mixed => "mixed", CapMode::Random => "random" },
+                            "cm": match cm { CapMode::Cap3 => "3", CapMode::Cap4 => "4", CapMode::Cap5 => "5", CapMode::Random => "random" },
                             "mode": "duel", "players": pair,
                             "winner": winner, "steps": steps, "order": order,
                         }));
@@ -220,7 +208,7 @@ fn main() {
                     emit(serde_json::json!({
                         "id": id,
                         "bm": format!("{:?}", bm).to_lowercase(),
-                        "cm": match cm { CapMode::Cap3 => "3", CapMode::Cap4 => "4", CapMode::Cap5 => "5", CapMode::Mixed => "mixed", CapMode::Random => "random" },
+                        "cm": match cm { CapMode::Cap3 => "3", CapMode::Cap4 => "4", CapMode::Cap5 => "5", CapMode::Random => "random" },
                         "mode": "ffa", "players": players,
                         "winner": winner, "steps": steps, "order": order,
                     }));

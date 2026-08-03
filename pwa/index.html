@@ -13,7 +13,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>连锁棋</title>
-<link rel="stylesheet" href="style.css?v=3.2.10">
+<link rel="stylesheet" href="style.css?v=3.3.5">
 </head>
 <body>
 <!-- 背景彩色光球容器 -->
@@ -83,7 +83,6 @@
       <button class="gb" data-value="3">3级</button>
       <button class="gb selected" data-value="4">4级</button>
       <button class="gb" data-value="5">5级</button>
-      <button class="gb" data-value="mixed">混合</button>
       <button class="gb" data-value="random">随机</button>
     </div>
     <p id="capModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
@@ -202,18 +201,6 @@
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll">
     <h2>设置</h2>
-
-    <div class="about-card">
-      <h3>外观</h3>
-      <div class="form-row">
-        <label style="flex:1">主题模式</label>
-        <div class="theme-group" id="themeGroup" style="display:flex;gap:6px">
-          <button class="tg-btn" data-value="light">浅色</button>
-          <button class="tg-btn" data-value="dark">深色</button>
-          <button class="tg-btn" data-value="system">跟随系统</button>
-        </div>
-      </div>
-    </div>
 
     <div class="about-card">
       <h3>游戏音效</h3>
@@ -600,16 +587,12 @@
   <div id="rpPlayers" class="player-bar"></div>
   <div class="replay-controls">
     <div class="rp-row">
-      <button class="glass-btn" onclick="rpJump(0)" title="跳到开头">⏮</button>
-      <button class="glass-btn" onclick="rpStep(-1)" title="上一步">◀</button>
-      <button class="glass-btn primary" id="rpPlayBtn" onclick="rpTogglePlay()" title="播放/暂停">▶</button>
-      <button class="glass-btn" onclick="rpStep(1)" title="下一步">▶</button>
-      <button class="glass-btn" onclick="rpJump(-1)" title="跳到结尾">⏭</button>
+      <button class="glass-btn primary" id="rpPlayBtn" onclick="rpTogglePlay()" title="暂停/播放">▶</button>
       <span class="rp-step-label" id="rpStepLabel">0 / 0</span>
     </div>
     <input type="range" id="rpSlider" min="0" max="0" value="0" aria-label="回放进度">
+    <div class="rp-ticks" id="rpTicks"></div>
     <div class="rp-row rp-opt-row">
-      <button class="glass-btn" id="rpAnimBtn" onclick="rpToggleAnim()" title="启/禁用落子动画">动画：开</button>
       <span class="rp-opt-label">倍速</span>
       <div class="btn-group" id="rpSpeedGroup">
         <button class="gb" data-value="0.5">0.5x</button>
@@ -856,7 +839,7 @@ window.closeUpdateModal = function() {
 window.confirmUpdate = function() { startDownload(); };
 })();
 </script>
-<script src="engine.js?v=3.2.2"></script>
-<script src="app.js?v=3.2.1"></script>
+<script src="engine.js?v=3.3.5"></script>
+<script src="app.js?v=3.3.5"></script>
 </body>
 </html>

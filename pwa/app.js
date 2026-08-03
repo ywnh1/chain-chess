@@ -66,10 +66,9 @@ const BORDER_MODE_DESC = {
   'random': '随机边界：每次爆炸随机选择一种边界行为（默认 / 回环 / 反弹）',
 };
 const CAP_MODE_DESC = {
-  '3': '速爆：3 级即爆，爆炸时随机一个方向的格子被直接清空；首子为 2 级',
+  '3': '速爆：3 级即爆，爆炸时随机一个方向加 0（该格不变），其余方向加 1；首子为 2 级',
   '4': '标准规则：达到 4 子即爆，向上下左右各扩散一个棋子；首子为 3 级',
-  '5': '重炮：5 级才爆，爆炸时随机一个方向的格子直接变成 2 级；首子为 4 级',
-  'mixed': '混合棋盘：开局每格确定阈值 3 / 4 / 5，之后不变；首子为所在格阈值减 1',
+  '5': '重炮：5 级才爆，爆炸时随机一个方向加 2（空格变 2 级、有棋子升 2 级），其余方向加 1；首子为 4 级',
   'random': '随机：每步各自随机 3 / 4 / 5 级爆炸；首子为随机阈值减 1',
 };
 // 根据棋盘大小返回最大允许玩家人数
@@ -104,7 +103,7 @@ function applyTheme(theme){
   }catch(e){}
   // 游戏进行中：setBg 设置的内联背景会覆盖主题背景，切主题时用当前玩家色重新刷新
   try{
-    if(gameMode&&!gameOver&&typeof curPlayer!=='undefined'&&typeof setBg==='function')setBg(curPlayer);
+    if(gameMode&&!gameOver&&typeof curPlayer==='number'&&curPlayer>=0&&curPlayer<COLORS.length&&typeof setBg==='function')setBg(curPlayer);
   }catch(e){}
 }
 
@@ -130,22 +129,6 @@ function updateDogBarkRow(){
 
 // 渲染设置页（每次进入时同步 UI 状态并绑定事件）
 function renderSettingsPage(){
-  // 主题按钮
-  const tg=document.getElementById('themeGroup');
-  if(tg){
-    tg.querySelectorAll('.tg-btn').forEach(function(b){
-      b.classList.toggle('selected',b.dataset.value===appSettings.theme);
-    });
-    tg.querySelectorAll('.tg-btn').forEach(function(b){
-      b.onclick=function(){
-        tg.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
-        this.classList.add('selected');
-        appSettings.theme=this.dataset.value;
-        applyTheme(appSettings.theme);
-        saveSettings();
-      };
-    });
-  }
   // 震动开关
   const vt=document.getElementById('vibrateToggle');
   if(vt){
@@ -362,7 +345,7 @@ let autoSkipChain=false;
  
 // 棋盘边界模式
 let borderMode='default';
-// 爆炸阈值模式（独立设置）：3=3级炸 / 4=默认4级 / 5=5级炸 / mixed=每格随机3/4/5
+// 爆炸阈值模式（独立设置）：3=3级炸 / 4=默认4级 / 5=5级炸 / random=每步随机3/4/5
 let capMode='4';
 
 // 首子落位（用于限制其他玩家落子）
@@ -1004,8 +987,9 @@ function compactHistory(history, playerCount){
       if(d){pieces[p][t]=d.pieces||0;points[p][t]=d.points||0}
     }
     const mv=history[t].mv;
-    if(mv&&mv.x!==undefined&&mv.y!==undefined&&mv.player!==undefined){
-      mvList[t]=[mv.x,mv.y,mv.player,mv.seed!==undefined?mv.seed:0];
+    if(mv&&(mv.x!==undefined||Array.isArray(mv))){
+      // 兼容对象 {x,y,player,seed} 与数组 [x,y,player,seed]（tauri round_history 存数组）
+      mvList[t]=Array.isArray(mv)?[mv[0],mv[1],mv[2],mv[3]||0]:[mv.x,mv.y,mv.player,mv.seed!==undefined?mv.seed:0];
     }
   }
   return {c:true,t:n,p:pieces,pt:points,m:mvList};
@@ -1073,7 +1057,7 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
         borderMode: borderMode || 'default',
         capMode: capMode || '4',
         winner: winner !== null && winner !== undefined ? winner : null,
-        colorNames: toColorNamesArray(_colorNames),
+        colorNames: toColorNamesArray(window._colorNames || COLOR_NAMES),
         chainStats: chainStats,
         maxChain: maxChainOverall,
         finished: true,
@@ -1363,13 +1347,10 @@ function nbrs8(i,j,s){
   }
   return r;
 }
-// 混合模式(mixed)下每格固定爆炸阈值 3/4/5；用 gameCount 作确定性种子，保证回放复现一致
-function mkBoard(s,cm,gc){
-  let seed=(gc||0)>>>0;
-  const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+// 创建空棋盘（每格 owner=null、count=0；保留 th 字段以兼容旧历史数据，但不再生成阈值）
+function mkBoard(s){
   return Array.from({length:s},()=>Array.from({length:s},()=>{
-    const th=(cm==='mixed')?(3+Math.floor(rnd()*3)):undefined;
-    return {owner:null,count:0,th};
+    return {owner:null,count:0,th:undefined};
   }));
 }
 function hasPieces(p,b){
@@ -1455,7 +1436,7 @@ function resetRoundHistory(){
 
 // 边界模式感知的爆炸阈值
 function capForMode(i,j,sz,bm,cell){
-  if(capMode==='mixed')return (cell&&cell.th)||4;
+  void cell;
   if(capMode==='random')return 3+Math.floor(Math.random()*3);  // 随机模式：每步随机 3/4/5
   if(capMode==='3')return 3;
   if(capMode==='5')return 5;
@@ -1472,11 +1453,12 @@ function capForMode(i,j,sz,bm,cell){
 // 边界模式感知的邻居函数
 function nbrsForMode(i,j,sz,bm){
   if(bm==='random'){
-    // 随机边界：每次爆炸随机选择一种边界行为（default/wrap/bounce；degrade 邻居同 default）
-    const r=Math.floor(Math.random()*3);
+    // 随机边界：每次爆炸随机选择一种边界行为（default/wrap/bounce/degrade；degrade 邻居同 default）
+    const r=Math.floor(Math.random()*4);
     if(r===0)return nbrsForMode(i,j,sz,'default');
     if(r===1)return nbrsForMode(i,j,sz,'wrap');
-    return nbrsForMode(i,j,sz,'bounce');
+    if(r===2)return nbrsForMode(i,j,sz,'bounce');
+    return nbrsForMode(i,j,sz,'default');   // degrade：邻居同 default
   }
   if(bm==='wrap'){
     let up=i===0?sz-1:i-1;
@@ -1517,14 +1499,16 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
   // 是否需要跳过连炸动画：autoSkipChain 为持久开关，chainSkipAll 为当前动画内点击「跳过动画」临时置位
   const wantSkip=()=>chainSkipAll||autoSkipChain;
   if(anim&&!wantSkip())showSkipBtn(true);
+  let bm=borderMode||'default';   // 必须在使用前定义（首子分支会引用 bm，避免 TDZ 异常）
   let c=b[x][y];
+  let isFirstMove=false;
   if(c.owner===null){
     let anyPieces=false;
     for(let r of b)for(let cl of r)if(cl.owner!==null)anyPieces=true;
     if(!anyPieces) firstMovePos=[x,y];
-    let first = !hasPieces(pl,b);
+    isFirstMove = !hasPieces(pl,b);
     c.owner=pl;
-    c.count=first?capForMode(x,y,s,bm,c)-1:1;  // 首子等级 = 阈值 n-1（临界态）
+    c.count=isFirstMove?capForMode(x,y,s,bm,c)-1:1;  // 首子等级 = 阈值 n-1（临界态）
   }
   else if(c.owner===pl)c.count++
   else return[];
@@ -1534,22 +1518,92 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
 
   let had=new Set();
   for(let row of b)for(let cl of row)if(cl.owner!==null)had.add(cl.owner);
-  let chain=[[x,y]];
+  let chain=isFirstMove?[]:[[x,y]];   // 首子放置不进连锁（临界态，本步仅放置）
   let chainCount=0;
-  let bm=borderMode||'default';
   let animDelay=(anim==='explode')?220:0;
+
+  // ── 引擎快照动画路径 ──
+  // Rust 引擎返回连锁逐步快照（steps）与爆炸格坐标（exploded）时，动画按引擎真实结果渲染，
+  // 杜绝 JS 模拟与引擎随机不一致导致的 cap3/cap5 特殊格方向跳变；
+  // 无动画模式（AI 快速对战等 anim=null）同样以引擎快照为准，避免 JS 模拟中间态
+  // 与引擎最终结果不一致造成"炸开一瞬间后回退"
+  const snapSteps = (rustResult && Array.isArray(rustResult.steps) && rustResult.steps.length>0) ? rustResult.steps : null;
+  const snapExploded = (rustResult && Array.isArray(rustResult.exploded)) ? rustResult.exploded : null;
+  if(snapSteps){
+    chainCount = (rustResult && rustResult.chainCount) || snapSteps.length;
+    for(let k=0;k<snapSteps.length;k++){
+      // 应用引擎快照棋盘（每一步爆炸后的真实状态）
+      const snap = snapSteps[k];
+      for(let i=0;i<size;i++)for(let j=0;j<size;j++)b[i][j]=snap[i][j];
+      // 爆炸特效位置以引擎返回的坐标为准
+      let ex=x,ey=y;
+      if(snapExploded && snapExploded[k]){
+        ex=snapExploded[k][0]; ey=snapExploded[k][1];
+      }
+      const skipNow=wantSkip();
+      if(!anim){
+        // 无动画模式：只推进数据，不逐帧渲染（末尾统一渲染引擎最终棋盘）
+      }else if(anim&&skipNow){
+        // 跳过模式：不播特效、不逐帧渲染、不等待，连锁瞬间完成（末尾统一渲染一次）
+      }else if(anim==='explode'){
+        playExplosion();
+        let el=cells?.[ex]?.[ey];
+        renderBoard(false);
+        if(el){addShockwave(el,playerColor);addParticles(el,playerColor,8)}
+        if(el)el.classList.add('explode');
+        await sleep(animDelay);
+        if(el)el.classList.remove('explode');
+      }else if(anim){
+        playExplosion();
+        let el=cells?.[ex]?.[ey];if(el)el.classList.add('explode');
+        renderBoard(false);
+        await sleep(150);
+        if(el)el.classList.remove('explode');
+      }else{
+        renderBoard(false);
+      }
+    }
+    // 矫正到引擎最终棋盘（快照最后一步即最终态，再矫正一次保证一致）
+    if(finalBoard){
+      for(let i=0;i<size;i++) for(let j=0;j<size;j++) b[i][j]=finalBoard[i][j];
+      renderBoard(true);
+    }else if(anim&&chainCount>0&&wantSkip()){
+      renderBoard(true);
+    }else if(!anim&&chainCount>0){
+      // 无动画模式兜底：确保最终棋盘已渲染（引擎结果）
+      renderBoard(true);
+    }
+    // 记录连爆统计
+    if(chainCount>0){
+      if(!chainStats[pl]) chainStats[pl]={triggered:0,maxChain:0};
+      chainStats[pl].triggered++;
+      if(chainCount>chainStats[pl].maxChain) chainStats[pl].maxChain=chainCount;
+      if(chainCount>maxChainOverall.length) maxChainOverall={player:pl,length:chainCount};
+    }
+    if(finalBoard&&rustResult&&rustResult.eliminated)return rustResult.eliminated;
+    let nowSnap=new Set();
+    for(let row of b)for(let cl of row)if(cl.owner!==null)nowSnap.add(cl.owner);
+    return[...had].filter(p=>!nowSnap.has(p));
+  }
 
   let chainGuard=0; // 连锁防御上限：防止特定棋盘结构下无限互炸导致动画/点击卡死
   while(chain.length){
     if(++chainGuard>100000)break;
-    let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=capForMode(cx,cy,s,bm,cell);
+    let[cx,cy]=chain.shift(),cell=b[cx][cy];
+    // 随机边界模式：每次爆炸随机一种边界行为（与引擎 gen_range(0..4) 对齐：default/wrap/bounce/degrade）
+    let effBm=bm;
+    if(bm==='random'){
+      const rr=Math.floor(Math.random()*4);
+      effBm=rr===0?'default':rr===1?'wrap':rr===2?'bounce':'degrade';
+    }
+    let capv=capForMode(cx,cy,s,effBm,cell);
     if(cell.count>=capv){
       cell.count=0;cell.owner=null;
       chainCount++;
       const skipNow=wantSkip();
       // 爆炸扩散到邻居（按边界模式）
-      let targets=[...nbrsForMode(cx,cy,s,bm)];
-      // 速爆(cap3)：随机一个扩散格被清空；重炮(cap5)：随机一个扩散格直接变 2 级
+      let targets=[...nbrsForMode(cx,cy,s,effBm)];
+      // 速爆(cap3)：随机一个方向"加 0"（该格完全不变）；重炮(cap5)：随机一个方向"加 2"
       let special=-1;
       if((capMode==='3'||capMode==='5')&&targets.length>0){
         special=Math.floor(Math.random()*targets.length);
@@ -1559,10 +1613,11 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
         let nc=b[nx][ny];
         if(ti===special){
           if(capMode==='3'){
-            nc.owner=null;nc.count=0;
+            // 加 0：该格完全不变（空格保持空、有棋子保持原样），不入连锁
             continue;
           }else{
-            nc.owner=pl;nc.count=2;
+            // 加 2：空格变 2 级，有棋子原等级 +2
+            nc.owner=pl;nc.count=(nc.count||0)+2;
             chain.push([nx,ny]);
             continue;
           }
@@ -1587,7 +1642,8 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
         await sleep(150);
         if(el)el.classList.remove('explode');
       }else{
-        renderBoard(false);
+        // 无动画模式：不逐帧渲染 JS 模拟中间态（cap3/cap5 随机特殊格下与引擎
+        // 最终结果可能不一致，避免"炸开一瞬间后回退"的视觉闪烁）
       }
     }
   }
@@ -1597,9 +1653,14 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
     for(let i=0;i<size;i++) for(let j=0;j<size;j++){
       b[i][j]=finalBoard[i][j];
     }
-    if(!anim||chainCount===0||wantSkip())renderBoard(true);
+    // 矫正后始终渲染引擎真实结果：动画播放路径下此前依赖逐帧渲染 JS 模拟态，
+    // 与引擎结果（尤其 cap3/cap5 随机特殊格）可能不一致，导致动画结束后棋盘停留错误状态
+    renderBoard(true);
   }else if(anim&&chainCount>0&&wantSkip()){
     // 跳过模式未逐帧渲染，补一次最终棋盘渲染
+    renderBoard(true);
+  }else if(!anim&&chainCount>0){
+    // 无动画模式兜底：确保 JS 模拟结果（引擎调用失败时）已渲染
     renderBoard(true);
   }
 
@@ -1763,6 +1824,7 @@ function isLightTheme(){
 }
 function setBg(pl){
   let h=COLORS[pl];
+  if(!h||typeof h!=='string'||h.length!==7)return;  // 防御无效玩家索引：不设置背景，避免残留旧色
   let r=parseInt(h.substr(1,2),16),g=parseInt(h.substr(3,2),16),b=parseInt(h.substr(5,2),16);
   if(isLightTheme()){
     // 亮色主题：向白色混合出浅色氛围背景（避免内联深色背景锁死主题切换）
@@ -1869,7 +1931,7 @@ async function requestAiSuggestion(){
   const args={
     board:board,size:size,player:pid,depth:depth,
     eliminated:[...eliminatedPlayers],maxPlayers:maxPlayers,
-    borderMode:borderMode,gameCount:gameCount,firstMovePos:firstMovePos,
+    borderMode:borderMode,capMode:capMode,gameCount:gameCount,firstMovePos:firstMovePos,
     randomScale:10,useMlEval:useMlEval
   };
   if(alg==='pvs')args.algorithm=alg;
@@ -3860,7 +3922,7 @@ let _rp=null;
 /** history 中是否存在可回放的落子数据（mv） */
 function hasReplayMoves(history){
   if(!Array.isArray(history)||history.length<2)return false;
-  return history.some(h=>h&&h.mv&&h.mv.x!==undefined&&h.mv.y!==undefined);
+  return history.some(h=>h&&h.mv&&((h.mv.x!==undefined&&h.mv.y!==undefined)||(Array.isArray(h.mv)&&h.mv.length>=3)));
 }
 
 /**
@@ -3892,7 +3954,6 @@ function openReplay(cfg){
     curPlayer:0,
     playing:false,
     token:0,
-    anim:true,
     speed:1,
     ck:new Map(),                  // checkpoint: step -> board 克隆（每 100 步）
   };
@@ -3912,10 +3973,21 @@ function openReplay(cfg){
   // 重置控件
   const slider=document.getElementById('rpSlider');
   slider.min=0;slider.max=_rp.total;slider.value=0;
-  const animBtn=document.getElementById('rpAnimBtn');
-  animBtn.textContent='动画：开';
-  animBtn.classList.remove('anim-off');
-  _rp.anim=true;
+  // 进度条：拖动中预览步数并立即暂停播放；点击/松开才真正跳转（避免逐帧触发重放）
+  // 注意：拖动中不能调用 rpUpdateUI()——它会按 _rp.step 把 slider.value 拉回当前步，覆盖拖动目标
+  slider.oninput=function(){
+    if(!_rp)return;
+    if(_rp.playing){
+      _rp.playing=false;
+      rpCancel();
+      const playBtn=document.getElementById('rpPlayBtn');
+      if(playBtn){playBtn.textContent='▶';playBtn.classList.remove('playing');}
+    }
+    const label=document.getElementById('rpStepLabel');
+    if(label)label.textContent=this.value+' / '+_rp.total;
+  };
+  slider.onchange=function(){rpSeek(this.value)};
+  rpBuildTicks();
   rpRenderPlayers();
   rpRenderBoard(true);
   rpUpdateUI();
@@ -3930,6 +4002,8 @@ function closeReplay(){
   if(bd)bd.replaceChildren();
   const pp=document.getElementById('rpPlayers');
   if(pp)pp.innerHTML='';
+  const ticks=document.getElementById('rpTicks');
+  if(ticks)ticks.innerHTML='';
 }
 /** 渲染回放棋盘（popX/popY 为落子格，加 pop 动画） */
 function rpRenderBoard(force,popX,popY){
@@ -3969,6 +4043,28 @@ function rpRenderPlayers(){
     el.appendChild(t);
   }
 }
+/** 构建进度条步数刻度：步数少时逐格显示，多时等分取关键点 */
+function rpBuildTicks(){
+  const ticks=document.getElementById('rpTicks');
+  if(!ticks||!_rp)return;
+  ticks.innerHTML='';
+  const total=_rp.total;
+  let marks;
+  if(total<=10){
+    marks=[];
+    for(let i=0;i<=total;i++)marks.push(i);
+  }else{
+    marks=[];
+    for(let i=0;i<=4;i++)marks.push(Math.round(total*i/4));
+  }
+  marks=[...new Set(marks)];
+  for(const m of marks){
+    const d=document.createElement('div');
+    d.className='rp-tick';
+    d.textContent=m;
+    ticks.appendChild(d);
+  }
+}
 /** 更新进度条/步数标签/播放按钮 */
 function rpUpdateUI(){
   if(!_rp)return;
@@ -3977,7 +4073,10 @@ function rpUpdateUI(){
   const slider=document.getElementById('rpSlider');
   if(slider&&Number(slider.value)!==_rp.step)slider.value=_rp.step;
   const playBtn=document.getElementById('rpPlayBtn');
-  if(playBtn)playBtn.textContent=_rp.playing?'⏸':'▶';
+  if(playBtn){
+    playBtn.textContent=_rp.playing?'⏸':'▶';
+    playBtn.classList.toggle('playing',_rp.playing);
+  }
 }
 function rpReadSpeed(){
   const s=document.querySelector('#rpSpeedGroup .gb.selected');
@@ -3993,7 +4092,8 @@ async function rpGoTo(target, animate){
   const hist=_rp.history;
   if(target>_rp.total)target=_rp.total;
   if(target<0)target=0;
-  // 后退：从最近 checkpoint 重建
+  if(target===_rp.step)return;   // 已在目标步：无需操作
+  // 后退：从最近 checkpoint 重建（不渲染，待推进到目标后一次渲染）
   if(target<_rp.step){
     let from=0;
     for(const[k]of _rp.ck){if(k<=target&&k>from)from=k;}
@@ -4002,19 +4102,18 @@ async function rpGoTo(target, animate){
       _rp.curPlayer=0;
     }else{
       _rp.board=cloneBoard(_rp.ck.get(from));
-      _rp.curPlayer=(hist[from]&&hist[from].mv)?hist[from].mv.player:0;
+      const fromMv=hist[from]&&hist[from].mv;
+      _rp.curPlayer=fromMv?(Array.isArray(fromMv)?fromMv[2]:fromMv.player):0;
     }
     _rp.step=from;
-    rpRenderBoard();
-    rpRenderPlayers();
-    rpUpdateUI();
     if(token!==_rp.token)return;
   }
   while(_rp.step<target){
     if(token!==_rp.token)return;
     const k=_rp.step+1;
-    const mv=hist[k]&&hist[k].mv;
-    if(!mv){_rp.step=k;rpRenderBoard();rpRenderPlayers();rpUpdateUI();continue;}
+    const rawMv=hist[k]&&hist[k].mv;
+    if(!rawMv){_rp.step=k;if(animate){rpRenderBoard();rpRenderPlayers();rpUpdateUI();}continue;}
+    const mv=Array.isArray(rawMv)?{x:rawMv[0],y:rawMv[1],player:rawMv[2],seed:rawMv[3]||0}:rawMv;
     try{
       const r=await tauriInvoke('process_move',{
         board:_rp.board,size:_rp.size,x:mv.x,y:mv.y,
@@ -4028,21 +4127,26 @@ async function rpGoTo(target, animate){
       _rp.curPlayer=mv.player;
       _rp.step=k;
       if(k%100===0)_rp.ck.set(k,cloneBoard(_rp.board));
-      if(animate&&_rp.anim){
-        rpRenderBoard(true,mv.x,mv.y);   // 落子格 pop 动画
-      }else{
+      if(animate){
+        // 恒定无落子动画：逐步渲染棋盘，让播放有过程感
         rpRenderBoard(true);
+        rpRenderPlayers();
+        rpUpdateUI();
       }
-      rpRenderPlayers();
-      rpUpdateUI();
     }catch(e){
       logWarn('Replay move failed at step',k,e);
       break;
     }
     if(animate){
-      const delay=(_rp.anim?520:36)/_rp.speed;
+      const delay=500/_rp.speed;  // 每步停顿：0.5x=1s / 1x=500ms / 2x=250ms / 4x=125ms
       if(delay>0)await rpSleep(delay);
     }
+  }
+  // 非动画模式（单步/拖动/跳转）：一次渲染最终状态，避免后退时“先跳回 checkpoint 再快速重放”
+  if(!animate){
+    rpRenderBoard(true);
+    rpRenderPlayers();
+    rpUpdateUI();
   }
 }
 /** 重置到 step（先回到开头再推进） */
@@ -4081,36 +4185,17 @@ function rpTogglePlay(){
     return;
   }
   if(_rp.step>=_rp.total){
-    // 已到末尾：从开头重播
+    // 已到末尾：从开头重播（同步回开始 + 直接播放，避免异步竞态导致棋盘状态错乱）
     _rp.playing=true;
     rpUpdateUI();
-    rpResetTo(0,true).then(()=>{
-      if(_rp&&_rp.playing)rpPlayLoop();
-    });
+    rpCancel();
+    rpResetTo(0,false);
+    rpPlayLoop();
     return;
   }
   _rp.playing=true;
   rpUpdateUI();
   rpPlayLoop();
-}
-/** 单步前进/后退 */
-function rpStep(d){
-  if(!_rp)return;
-  _rp.playing=false;
-  rpCancel();
-  const target=Math.max(0,Math.min(_rp.total,_rp.step+d));
-  // 单步/拖动/跳转一律即时跳转（动画仅用于播放模式，避免长距离后退逐帧播放卡顿）
-  rpGoTo(target,false);
-  rpUpdateUI();
-}
-/** 跳转（0=开头，-1=末尾） */
-function rpJump(target){
-  if(!_rp)return;
-  _rp.playing=false;
-  rpCancel();
-  if(target===0)rpResetTo(0,false);
-  else rpGoTo(_rp.total,false);
-  rpUpdateUI();
 }
 /** 进度条拖动 */
 function rpSeek(val){
@@ -4118,17 +4203,7 @@ function rpSeek(val){
   const target=parseInt(val,10)||0;
   _rp.playing=false;
   rpCancel();
-  if(target<_rp.step)rpResetTo(target,false);
-  else rpGoTo(target,false);
+  // 前进/后退统一走 rpGoTo（内部按需从 checkpoint 重建，非动画模式只渲染最终状态）
+  rpGoTo(target,false);
   rpUpdateUI();
-}
-/** 启/禁用动画 */
-function rpToggleAnim(){
-  if(!_rp)return;
-  _rp.anim=!_rp.anim;
-  const btn=document.getElementById('rpAnimBtn');
-  if(btn){
-    btn.textContent=_rp.anim?'动画：开':'动画：关';
-    btn.classList.toggle('anim-off',!_rp.anim);
-  }
 }

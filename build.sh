@@ -13,7 +13,7 @@ set -e
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="chainchess"
-VERSION="3.3.1"
+VERSION="3.3.2"
 
 CARGO_CONFIG="tauri/src-tauri/.cargo/config.toml"
 CARGO_TOML="tauri/src-tauri/Cargo.toml"
@@ -492,11 +492,10 @@ echo ""
 if [ "$APK" = true ] && [ -d "/storage/emulated/0/用户" ]; then
   cp "$OUTPUT" /storage/emulated/0/用户/
   echo "  📱 已复制到 /storage/emulated/0/用户/"
-  better-rm release 2>/dev/null || true
 fi
 if [ -f "update.json" ] && [ -d "../chain-chess-release" ]; then
   cp update.json ../chain-chess-release
   echo "  🌐 已复制到 ../chain-chess-release"
-  better-rm -s update.json 2>/dev/null || true
+#  better-rm update.json 2>/dev/null || true
 fi
 echo ""

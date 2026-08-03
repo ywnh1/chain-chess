@@ -32,7 +32,7 @@ pub enum BorderMode {
     Random,
 }
 
-/// 爆炸阈值模式（独立于边界模式）：3 级炸 / 4 级炸（默认）/ 5 级炸 / 混合（每格随机 3/4/5）
+/// 爆炸阈值模式（独立于边界模式）：3 级炸 / 4 级炸（默认）/ 5 级炸 / 随机（每步随机 3/4/5）
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 pub enum CapMode {
     #[serde(rename = "3")]
@@ -41,9 +41,6 @@ pub enum CapMode {
     Cap4,
     #[serde(rename = "5")]
     Cap5,
-    /// 混合：开局每格确定阈值，之后不变
-    #[serde(rename = "mixed")]
-    Mixed,
     /// 随机：每步各自随机阈值 3/4/5
     #[serde(rename = "random")]
     Random,
@@ -56,7 +53,7 @@ impl Default for CapMode {
 pub struct Cell {
     pub owner: Option<usize>,
     pub count: u8,
-    /// 混合模式(mixed)下每格固定爆炸阈值（3/4/5），其它模式为 None
+    /// 旧版本混合模式(mixed)遗留的每格阈值字段；已停用，保留仅为兼容旧历史数据反序列化
     #[serde(default)]
     pub th: Option<u8>,
 }
@@ -72,10 +69,12 @@ pub struct ChainStatsPlayer {
     pub max_chain: u32,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MaxChain {
+    #[serde(default)]
     pub player: Option<usize>,
+    #[serde(default)]
     pub length: u32,
 }
 
@@ -109,9 +108,19 @@ pub struct HistoryRecord {
     pub player_count: u32,
     pub ai_count: u32,
     pub board_size: u32,
+    /// 边界模式（默认/回环/反弹/降级/随机）
+    #[serde(default)]
+    pub border_mode: Option<String>,
+    /// 爆炸阈值模式（3/4/5/random）
+    #[serde(default)]
+    pub cap_mode: Option<String>,
+    #[serde(default)]
     pub winner: Option<usize>,
+    #[serde(default)]
     pub color_names: Vec<String>,
+    #[serde(default)]
     pub chain_stats: std::collections::HashMap<String, ChainStatsPlayer>,
+    #[serde(default)]
     pub max_chain: MaxChain,
     #[serde(default)]
     pub history: serde_json::Value,
@@ -136,6 +145,12 @@ pub struct ProcessMoveResult {
     pub chain_count: u32,
     pub game_over: bool,
     pub winner: Option<usize>,
+    /// 连锁逐步棋盘快照：每一步爆炸后的棋盘（前端动画按此渲染，保证与引擎结果一致）
+    #[serde(default)]
+    pub steps: Vec<GameBoard>,
+    /// 每次爆炸的格子坐标（与 steps 一一对应）
+    #[serde(default)]
+    pub exploded: Vec<(usize, usize)>,
 }
 
 // ─── State ───
@@ -174,7 +189,7 @@ async fn process_move(
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut b = board.clone();
         let cap_mode = cap_mode.unwrap_or_default();
-        let (eliminated, chain_count, killed_by) = process_click_with_killer(&mut b, size, x, y, player, max_players, border_mode, cap_mode, seed);
+        let (eliminated, chain_count, killed_by, steps, exploded) = process_click_with_snapshots(&mut b, size, x, y, player, max_players, border_mode, cap_mode, seed);
         let game_over = eliminated.len() >= max_players.saturating_sub(1);
         let winner = if game_over {
             // find the remaining player
@@ -192,6 +207,8 @@ async fn process_move(
             killed_by,
             game_over,
             winner,
+            steps,
+            exploded,
         }
     })
     .await
@@ -500,6 +517,9 @@ async fn save_game_history(
     record: HistoryRecord,
 ) -> Result<(), String> {
     let path = state.history_file.lock().map_err(|e| e.to_string())?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
     let mut history: Vec<HistoryRecord> = if path.exists() {
         let content = fs::read_to_string(&*path).map_err(|e| e.to_string())?;
         serde_json::from_str(&content).unwrap_or_default()
@@ -521,7 +541,19 @@ async fn load_game_history(
         return Ok(Vec::new());
     }
     let content = fs::read_to_string(&*path).map_err(|e| e.to_string())?;
-    let history: Vec<HistoryRecord> = serde_json::from_str(&content).unwrap_or_default();
+    // 整体解析失败时降级为逐条容错解析：单条损坏/旧格式记录不再清空整个历史列表
+    let history: Vec<HistoryRecord> = serde_json::from_str(&content).unwrap_or_else(|_| {
+        serde_json::from_str::<serde_json::Value>(&content)
+            .ok()
+            .and_then(|v| v.as_array().cloned())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| serde_json::from_value::<HistoryRecord>(item.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    });
     Ok(history)
 }
 
@@ -855,20 +887,23 @@ async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, String
 
     // 桌面端按平台选择 URL：Windows → windows，其余 → linux
     let platform_key = if cfg!(target_os = "windows") { "windows" } else { "linux" };
+    // 平台条目缺失（如该平台尚未发布安装包）时 url 为空；serde_json::Value 索引缺失返回 Null，不会 panic
     let url = update_data["platforms"][platform_key]["url"]
         .as_str()
         .unwrap_or("")
         .to_string();
 
-    let available = match (
-        Version::parse(&current_ver),
-        Version::parse(&remote_version),
-    ) {
-        (Ok(current), Ok(remote)) => remote >= current,
-        _ => {
-            !remote_version.is_empty()
-        }
-    };
+    // 无当前平台下载包（url 为空）→ 不视为可更新，避免 available=true + url="" 的空链接状态
+    let available = !url.is_empty()
+        && match (
+            Version::parse(&current_ver),
+            Version::parse(&remote_version),
+        ) {
+            (Ok(current), Ok(remote)) => remote >= current,
+            _ => {
+                !remote_version.is_empty()
+            }
+        };
 
     Ok(UpdateInfo {
         available,
@@ -1366,10 +1401,9 @@ fn is_in_any_restricted_zone(board: &GameBoard, sz: usize, x: usize, y: usize) -
     false
 }
 
-/// 计算格子的爆炸阈值：混合读每格 th；cap3/cap5 固定；随机每步随机 3/4/5；默认(4)保留降级边界位置修正
-fn explosion_threshold(cell: &Cell, x: usize, y: usize, sz: usize, border_mode: BorderMode, cap_mode: CapMode, rng: &mut Box<dyn rand::RngCore>) -> u32 {
+/// 计算格子的爆炸阈值：cap3/cap5 固定；随机每步随机 3/4/5；默认(4)保留降级边界位置修正
+fn explosion_threshold(_cell: &Cell, x: usize, y: usize, sz: usize, border_mode: BorderMode, cap_mode: CapMode, rng: &mut Box<dyn rand::RngCore>) -> u32 {
     match cap_mode {
-        CapMode::Mixed => cell.th.map(|t| t as u32).unwrap_or(4),
         CapMode::Cap3 => 3,
         CapMode::Cap5 => 5,
         CapMode::Random => 3 + rng.gen_range(0..3),
@@ -1384,7 +1418,7 @@ fn explosion_threshold(cell: &Cell, x: usize, y: usize, sz: usize, border_mode: 
     }
 }
 
-pub fn process_click_with_killer(
+fn process_click_with_killer_inner(
     board: &mut GameBoard,
     sz: usize,
     x: usize,
@@ -1394,13 +1428,18 @@ pub fn process_click_with_killer(
     border_mode: BorderMode,
     cap_mode: CapMode,
     seed: Option<u64>,
-) -> (Vec<usize>, u32, Vec<(usize, usize)>) {
+    collect: bool,
+) -> (Vec<usize>, u32, Vec<(usize, usize)>, Vec<GameBoard>, Vec<(usize, usize)>) {
     // collect owners before
     let before: HashSet<usize> = board
         .iter()
         .flatten()
         .filter_map(|c| c.owner)
         .collect();
+
+    // 连锁逐步快照：前端动画按引擎真实结果渲染，杜绝 cap3/cap5 随机特殊格方向跳变
+    let mut steps: Vec<GameBoard> = Vec::new();
+    let mut exploded: Vec<(usize, usize)> = Vec::new();
 
     // check first move (no pieces yet) BEFORE mutable borrow
     let is_first = board[x][y].owner.is_none() && !has_pieces(board, player);
@@ -1422,7 +1461,7 @@ pub fn process_click_with_killer(
         } else if cell.owner == Some(player) {
             cell.count += 1;
         } else {
-            return (vec![], 0, vec![]);
+            return (vec![], 0, vec![], steps, exploded);
         }
     }
 
@@ -1508,8 +1547,8 @@ pub fn process_click_with_killer(
                 _ => (nbrs(cx, cy, sz), vec![]),  // 默认/降级：标准邻居扩散
             };
 
-            // 速爆(cap3)：随机一个扩散格被清空（不产生棋子，其原棋子被炸没）
-            // 重炮(cap5)：随机一个扩散格直接变成 2 级
+            // 速爆(cap3)：随机一个扩散格加 0（该方向完全不变，不产生棋子）
+            // 重炮(cap5)：随机一个扩散格加 2（空格变 2 级；有棋子则在原等级上加 2）
             let special = match cap_mode {
                 CapMode::Cap3 | CapMode::Cap5 => {
                     if targets.is_empty() {
@@ -1524,20 +1563,20 @@ pub fn process_click_with_killer(
             let mut apply = |board: &mut GameBoard, nx: usize, ny: usize, ti: usize, owner: usize, last_killer: &mut HashMap<usize, usize>| {
                 if let Some(sp) = special {
                     if ti == sp {
-                        if let Some(pv) = board[nx][ny].owner {
-                            if pv != owner { last_killer.insert(pv, owner); }
-                        }
                         if cap_mode == CapMode::Cap3 {
-                            // 随机空一格：整格清空，不入连锁
-                            board[nx][ny].owner = None;
-                            board[nx][ny].count = 0;
+                            // 速爆(cap3)：随机一个方向"加 0"——该格完全不变（空格保持空，
+                            // 有棋子保持原样），不产生棋子、不入连锁
+                            return;
                         } else {
-                            // 随机一个是 2 级：覆盖为 2
+                            // 重炮(cap5)：随机一个方向"加 2"——空格变 2 级，有棋子原等级 +2
+                            if let Some(pv) = board[nx][ny].owner {
+                                if pv != owner { last_killer.insert(pv, owner); }
+                            }
                             board[nx][ny].owner = Some(owner);
-                            board[nx][ny].count = 2;
+                            board[nx][ny].count = board[nx][ny].count.saturating_add(2);
                             chain.push_back((nx, ny));
+                            return;
                         }
-                        return;
                     }
                 }
                 if let Some(pv) = board[nx][ny].owner {
@@ -1560,6 +1599,12 @@ pub fn process_click_with_killer(
                     board[nx][ny].count = board[nx][ny].count.saturating_add(1);
                 }
             }
+
+            // 记录本次爆炸后的棋盘快照（供前端动画渲染，保证与引擎最终结果一致）
+            if collect {
+                steps.push(board.clone());
+                exploded.push((cx, cy));
+            }
         }
     }
 
@@ -1579,7 +1624,40 @@ pub fn process_click_with_killer(
             killed_by.push((victim, killer));
         }
     }
+    (eliminated, chain_count, killed_by, steps, exploded)
+}
+
+/// 原公开版本：不收集快照（AI 搜索 / 基准测试等内部调用，性能关键路径）
+pub fn process_click_with_killer(
+    board: &mut GameBoard,
+    sz: usize,
+    x: usize,
+    y: usize,
+    player: usize,
+    _max_players: usize,
+    border_mode: BorderMode,
+    cap_mode: CapMode,
+    seed: Option<u64>,
+) -> (Vec<usize>, u32, Vec<(usize, usize)>) {
+    let (eliminated, chain_count, killed_by, _, _) =
+        process_click_with_killer_inner(board, sz, x, y, player, _max_players, border_mode, cap_mode, seed, false);
     (eliminated, chain_count, killed_by)
+}
+
+/// 带连锁逐步快照的版本：steps 为每一步爆炸后的棋盘，exploded 为对应爆炸格坐标
+/// （前端动画按引擎真实结果渲染，杜绝 JS 模拟与引擎随机不一致导致的方向跳变）
+pub fn process_click_with_snapshots(
+    board: &mut GameBoard,
+    sz: usize,
+    x: usize,
+    y: usize,
+    player: usize,
+    max_players: usize,
+    border_mode: BorderMode,
+    cap_mode: CapMode,
+    seed: Option<u64>,
+) -> (Vec<usize>, u32, Vec<(usize, usize)>, Vec<GameBoard>, Vec<(usize, usize)>) {
+    process_click_with_killer_inner(board, sz, x, y, player, max_players, border_mode, cap_mode, seed, true)
 }
 
 /// 无击败者信息的简单版本（供 AI 搜索/基准测试等内部调用）
@@ -1992,7 +2070,6 @@ impl PvsSearcher {
             let min_explosive = match self.cap_mode {
                 CapMode::Cap3 => 1,
                 CapMode::Cap5 => 3,
-                CapMode::Mixed => 2,
                 CapMode::Random => 2,
                 CapMode::Cap4 => match self.border_mode {
                     BorderMode::Degrade => {
@@ -2942,21 +3019,89 @@ pub fn generate_selfplay_data(
 mod tests {
     use super::*;
 
+    // ── 历史记录序列化兼容性（前端 saveGameHistory 发送的完整字段，含 Rust 未定义字段） ──
+    #[test]
+    fn history_record_deserialize_frontend_payload() {
+        let json = r#"{
+            "id": 1723000000000,
+            "time": "2026/08/03 10:00:00",
+            "mode": "local",
+            "aiAlgorithm": "",
+            "aiDepth": 0,
+            "gameCount": 0,
+            "playerCount": 2,
+            "aiCount": 0,
+            "boardSize": 7,
+            "borderMode": "default",
+            "capMode": "4",
+            "winner": 0,
+            "colorNames": ["玩家 1", "玩家 2"],
+            "chainStats": {"0": {"triggered": 1, "maxChain": 2}},
+            "maxChain": {"player": 0, "length": 2},
+            "finished": true,
+            "history": {"c": true, "t": 3, "p": [[1,2],[0,0]], "pt": [[1,1],[0,0]], "m": [[0,0,0,0], null]},
+            "playerTypes": ["human", "human"],
+            "killedBy": {}
+        }"#;
+        let r: HistoryRecord = serde_json::from_str(json).expect("前端完整 record 应能反序列化");
+        assert_eq!(r.id, 1723000000000);
+        assert_eq!(r.player_count, 2);
+        assert_eq!(r.winner, Some(0));
+        assert_eq!(r.finished, Some(true));
+        assert_eq!(r.max_chain.player, Some(0));
+        assert_eq!(r.chain_stats.get("0").map(|c| c.max_chain), Some(2));
+        // 未知字段被忽略（borderMode/capMode/playerTypes/killedBy 不会导致解析失败）
+        assert!(r.history.is_object());
+        // round trip：序列化后再反序列化
+        let s = serde_json::to_string(&r).unwrap();
+        let r2: HistoryRecord = serde_json::from_str(&s).unwrap();
+        assert_eq!(r2.id, r.id);
+    }
+
+    // ── 旧版记录（缺 finished/history/gameState）应能解析，不拖垮整个历史文件 ──
+    #[test]
+    fn history_record_old_format_compat() {
+        let json = r#"{
+            "id": 1,
+            "time": "2026/01/01 00:00:00",
+            "mode": "ai",
+            "aiAlgorithm": "alphabeta",
+            "aiDepth": 2,
+            "playerCount": 2,
+            "aiCount": 1,
+            "boardSize": 7,
+            "winner": null,
+            "colorNames": ["玩家 1", "AI 2"],
+            "chainStats": {},
+            "maxChain": {"player": null, "length": 0}
+        }"#;
+        let r: HistoryRecord = serde_json::from_str(json).expect("旧格式记录应能解析（缺字段走默认值）");
+        assert_eq!(r.finished, None);
+        assert_eq!(r.game_state, None);
+        assert!(r.history.is_null() || r.history.is_object(), "history 缺省应为 null 或对象");
+    }
+
+    // ── 历史文件整体解析：一条坏记录不应清空整个列表（load_game_history 兼容） ──
+    #[test]
+    fn history_list_partial_bad_record() {
+        let json = r#"[
+            {"id": 1, "time": "a", "mode": "local", "aiAlgorithm": "", "aiDepth": 0,
+             "playerCount": 2, "aiCount": 0, "boardSize": 5, "winner": null,
+             "colorNames": [], "chainStats": {}, "maxChain": {"player": null, "length": 0}},
+            "垃圾数据"
+        ]"#;
+        let v: Result<Vec<HistoryRecord>, _> = serde_json::from_str(json);
+        // 当前实现是整文件解析，坏记录会导致整个列表为空 —— 记录现状（防御方案见前端）
+        let _ = v;
+    }
+
     const ALL_BM: [BorderMode; 4] = [BorderMode::Default, BorderMode::Wrap, BorderMode::Bounce, BorderMode::Degrade];
-    const ALL_CM: [CapMode; 4] = [CapMode::Cap3, CapMode::Cap4, CapMode::Cap5, CapMode::Mixed];
 
     fn mk_b(sz: usize) -> GameBoard {
         vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz]
     }
-    fn mk_b_mixed(sz: usize, th: u8) -> GameBoard {
-        // 混合棋盘：全部格子同阈值 th（便于精确断言），模拟 mixed 模式每格固定阈值
-        vec![vec![Cell { owner: None, count: 0, th: Some(th) }; sz]; sz]
-    }
     fn set(b: &mut GameBoard, x: usize, y: usize, owner: usize, count: u8) {
         b[x][y] = Cell { owner: Some(owner), count, th: None };
-    }
-    fn set_th(b: &mut GameBoard, x: usize, y: usize, owner: usize, count: u8, th: u8) {
-        b[x][y] = Cell { owner: Some(owner), count, th: Some(th) };
     }
     fn do_click(b: &GameBoard, sz: usize, x: usize, y: usize, pl: usize, max: usize, bm: BorderMode, cm: CapMode, seed: Option<u64>) -> (GameBoard, Vec<usize>, Vec<(usize, usize)>) {
         let mut nb = b.clone();
@@ -3012,27 +3157,6 @@ mod tests {
             assert_eq!(nb[2][2].count, 4);
         }
     }
-    #[test]
-    fn threshold_mixed_all_borders() {
-        for &bm in &ALL_BM {
-            // th=3 格：2 子 +1 → 3 炸
-            let sz = 5;
-            let mut b = mk_b_mixed(sz, 3);
-            set_th(&mut b, 2, 2, 0, 2, 3);
-            let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, bm, CapMode::Mixed, Some(1));
-            assert!(nb[2][2].owner.is_none(), "mixed th3 {bm:?} boom fail");
-            // th=4 格：3 子 +1 → 4 炸
-            let mut b4 = mk_b_mixed(sz, 4);
-            set_th(&mut b4, 2, 2, 0, 3, 4);
-            let (nb4, _, _) = do_click(&b4, sz, 2, 2, 0, 2, bm, CapMode::Mixed, Some(1));
-            assert!(nb4[2][2].owner.is_none(), "mixed th4 {bm:?} boom fail");
-            // th=5 格：3 子 +1 → 4 不炸
-            let mut b5 = mk_b_mixed(sz, 5);
-            set_th(&mut b5, 2, 2, 0, 3, 5);
-            let (nb5, _, _) = do_click(&b5, sz, 2, 2, 0, 2, bm, CapMode::Mixed, Some(1));
-            assert_eq!(nb5[2][2].count, 4, "mixed th5 {bm:?} early boom");
-        }
-    }
     /// capMode 优先于 degrade 位置修正（cap3 在 degrade 角落仍 3 级炸）
     #[test]
     fn capmode_overrides_degrade() {
@@ -3080,9 +3204,9 @@ mod tests {
         }
     }
 
-    // ── 3) 随机行为：cap3 空一格 / cap5 变 2 级，全边界模式 ──
+    // ── 3) 随机行为：cap3 随机一边加 0 / cap5 随机一边加 2，全边界模式 ──
     #[test]
-    fn cap3_random_clear_all_borders() {
+    fn cap3_random_zero_add_all_borders() {
         for &bm in &ALL_BM {
             let sz = 5;
             let mut b = mk_b(sz);
@@ -3097,7 +3221,7 @@ mod tests {
         }
     }
     #[test]
-    fn cap5_random_two_all_borders() {
+    fn cap5_random_plus_two_all_borders() {
         for &bm in &ALL_BM {
             let sz = 5;
             let mut b = mk_b(sz);
@@ -3129,6 +3253,50 @@ mod tests {
         assert!(cleared_positions.len() > 1, "different seeds should vary cleared cell");
     }
 
+    // ── 3b) 加 0 / 加 2 作用于"有棋子"的格子（不清空、不强制等级） ──
+    #[test]
+    fn cap3_zero_keeps_owned_cell() {
+        // 上邻居是玩家1 的 1 级格：cap3 特殊格若选中它，应"加 0"（保持 1:1），不是清空
+        let sz = 5;
+        for seed in 0..40u64 {
+            let mut b = mk_b(sz);
+            set(&mut b, 2, 2, 0, 2);          // 落子 → 3 → 爆炸
+            set(&mut b, 1, 2, 1, 1);          // 上邻居：玩家1 1 级
+            let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap3, Some(seed));
+            let up = nb[1][2];
+            // 爆炸后上邻居只可能有两种结果：
+            //  - 特殊格加 0：保持玩家1 count1（原样）
+            //  - 普通加 1：变成玩家0 count2（覆盖+1）
+            assert!(
+                (up.owner == Some(1) && up.count == 1) || (up.owner == Some(0) && up.count == 2),
+                "cap3 上邻居不应被清空: got {:?}", up
+            );
+        }
+    }
+    #[test]
+    fn cap5_two_adds_on_owned_cell() {
+        // 上邻居是玩家1 的 1 级格：cap5 特殊格若选中它，应"加 2"变 3 级（0:3），不是强制 2 级
+        let sz = 5;
+        let mut hit_plus2 = false;
+        for seed in 0..60u64 {
+            let mut b = mk_b(sz);
+            set(&mut b, 2, 2, 0, 4);          // 落子 → 5 → 爆炸
+            set(&mut b, 1, 2, 1, 1);          // 上邻居：玩家1 1 级
+            let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap5, Some(seed));
+            let up = nb[1][2];
+            //  - 特殊格加 2：玩家0 count3（1+2，覆盖）
+            //  - 普通加 1：玩家0 count2
+            if up.owner == Some(0) && up.count == 3 {
+                hit_plus2 = true;
+            }
+            assert!(
+                up.owner == Some(0) && (up.count == 2 || up.count == 3),
+                "cap5 上邻居应为覆盖+1或+2: got {:?}", up
+            );
+        }
+        assert!(hit_plus2, "cap5 特殊格应至少一次加 2（1 级格 → 3 级）");
+    }
+
     // ── 4) 淘汰与击败者 ──
     #[test]
     fn elimination_and_killer() {
@@ -3155,18 +3323,32 @@ mod tests {
         let _ = nb;
     }
 
-    // ── 6) 混合棋盘 th 与其它 capMode 隔离 ──
+    // ── 11) HistoryRecord camelCase 序列化/反序列化（tauri 历史记录保存链路） ──
     #[test]
-    fn mixed_th_ignored_in_fixed_capmode() {
-        let sz = 5;
-        // cap4 模式下即使格子带 th=3 也按 4 级炸
-        let mut b = mk_b_mixed(sz, 3);
-        set_th(&mut b, 2, 2, 0, 3, 3);
-        let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap4, Some(1));
-        assert!(nb[2][2].owner.is_none(), "cap4 ignores th=3 (count3+1=4 booms by cap4)");
-        let mut b2 = mk_b_mixed(sz, 5);
-        set_th(&mut b2, 2, 2, 0, 2, 5);
-        let (nb2, _, _) = do_click(&b2, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap4, Some(1));
-        assert_eq!(nb2[2][2].count, 3, "cap4 ignores th=5 (count2+1=3 no boom)");
+    fn history_record_camelcase_roundtrip() {
+        let json = r#"{
+            "id": 123, "time": "2026-08-03 12:00", "mode": "ai",
+            "aiAlgorithm": "alphabeta", "aiDepth": 2, "gameCount": 1,
+            "playerCount": 4, "aiCount": 3, "boardSize": 7,
+            "borderMode": "wrap", "capMode": "5",
+            "winner": 0, "colorNames": ["红","黄","蓝","绿"],
+            "history": {"c":true,"t":2,"p":[],"pt":[],"m":[]},
+            "finished": true
+        }"#;
+        // 反序列化（模拟 app.js 传的 camelCase record）
+        let rec: HistoryRecord = serde_json::from_str(json).unwrap();
+        assert_eq!(rec.border_mode.as_deref(), Some("wrap"), "borderMode 应反序列化");
+        assert_eq!(rec.cap_mode.as_deref(), Some("5"), "capMode 应反序列化");
+        assert_eq!(rec.board_size, 7);
+        assert_eq!(rec.ai_depth, 2);
+        assert_eq!(rec.ai_algorithm, "alphabeta");
+        assert_eq!(rec.player_count, 4);
+        // 序列化回 camelCase（模拟 load_game_history 返回）
+        let out = serde_json::to_value(&rec).unwrap();
+        assert_eq!(out["borderMode"], "wrap", "序列化应输出 camelCase borderMode");
+        assert_eq!(out["capMode"], "5");
+        assert_eq!(out["boardSize"], 7);
+        assert_eq!(out["aiAlgorithm"], "alphabeta");
+        assert_eq!(out["playerCount"], 4);
     }
 }

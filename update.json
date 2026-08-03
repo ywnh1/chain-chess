@@ -1,19 +1,15 @@
 {
-  "version": "3.3.1",
-  "notes": "Add random gameplay modes (per-move random explosion threshold, per-move random border behavior; mixed mode keeps fixed thresholds); first move level = threshold-1; update AI benchmark page with board-mode test; refine dark button styling; fix light theme switch inside game under system theme",
+  "version": "3.3.2",
+  "notes": "Fix cap3/cap5 special-cell rule (add 0 / add 2 on the chosen direction, no direction jump); fix explosion rollback in no-animation path (render engine snapshot results); align JS random border mode with engine (4 behaviors); remove mixed mode; add chain snapshot rendering; optimize AI search performance; history records tolerant to single bad entry; replay slider ticks and drag improvements; safe skip update check when the platform has no package",
   "pub_date": "2026-08-03T00:00:00Z",
   "platforms": {
-    "linux": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.1/chainchess-3.3.1.AppImage",
+    "android": {
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.2/chainchess-3.3.2.apk",
       "size": 0
     },
-    "android": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.1/chainchess-3.3.1.apk",
-      "size": 11539524
-    },
     "windows": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.1/chainchess-3.3.1.exe",
-      "size": 10780672
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.2/chainchess-3.3.2.exe",
+      "size": 0
     }
   }
 }

@@ -1448,10 +1448,34 @@ html:not([data-theme]){color-scheme:light dark}
   background:#fff;border:2px solid var(--accent);
   cursor:pointer;
 }
+/* 进度条步数刻度 */
+.rp-ticks{
+  display:flex;justify-content:space-between;
+  font-size:.65rem;color:var(--dim);
+  padding:0 4px;margin-top:-2px;
+  user-select:none;pointer-events:none;
+}
+.rp-tick{line-height:1}
+
 .rp-opt-row{justify-content:center}
 .rp-opt-label{font-size:.75rem;color:var(--dim);font-weight:600}
 .rp-opt-row .btn-group .gb{
   padding:5px 10px;font-size:.75rem;
 }
-#rpAnimBtn{padding:5px 12px;font-size:.75rem}
-#rpAnimBtn.anim-off{opacity:.55}
+
+
+/* ═══ 回放覆盖层 · UX 优化 ═══ */
+/* 倍速组不继承 btn-group 的 width:100%（否则会挤爆整行、挤压动画按钮） */
+#rpSpeedGroup{width:auto;flex:1;flex-wrap:nowrap}
+#rpSpeedGroup .gb{min-width:44px;padding:6px 10px}
+/* 辅助控制行：倍速居中 */
+.rp-opt-row{justify-content:center}
+/* 播放按钮：播放中金色高亮，暂停恢复默认 */
+#rpPlayBtn.playing{
+  border-color:rgba(240,179,75,.55);color:var(--accent);
+  box-shadow:0 0 14px rgba(240,179,75,.18),inset 0 1px 0 rgba(255,255,255,.1);
+}
+
+
+/* 回放控制按钮：边界禁用态（灰显 + 不可点击） */
+.replay-overlay button:disabled{opacity:.35;cursor:default;pointer-events:none}
