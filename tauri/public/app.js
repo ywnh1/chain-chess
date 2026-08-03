@@ -4279,12 +4279,14 @@ function rpTogglePlay(){
   rpPlayLoop();
 }
 /** 进度条拖动 */
-function rpSeek(val){
+async function rpSeek(val){
   if(!_rp)return;
   const target=parseInt(val,10)||0;
   _rp.playing=false;
   rpCancel();
   // 前进/后退统一走 rpGoTo（内部按需从 checkpoint 重建，非动画模式只渲染最终状态）
-  rpGoTo(target,false);
+  // 必须 await 完成后再更新 UI：rpGoTo 会先把 _rp.step 设为 checkpoint/0 再逐步推进，
+  // 若提前调用 rpUpdateUI()，进度条会被拉到中间值（先跳回先前位置再跳向目标）
+  await rpGoTo(target,false);
   rpUpdateUI();
 }
