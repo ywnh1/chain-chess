@@ -1,15 +1,16 @@
 #!/bin/sh
 # build.sh - 编译并签名连锁棋（APK / Windows exe / PWA zip）
-# 用法: ./build.sh [--apk] [--exe] [--zip] [--all] [--native] [--release] <keystore_password>
+# 用法: ./build.sh [选项] <keystore_password>    （./build.sh -h 查看完整帮助）
 # 仅支持 release 构建（debug 模式已移除）
-#       ./build.sh --apk chainchess      # 编译安卓 APK 到 release/，更新 update.json 的 android size
-#       ./build.sh --exe                 # 编译 Windows exe 到 release/，更新 update.json 的 windows size
-#       ./build.sh --zip                 # 打包 PWA zip 到 release/（update.json 无 pwa 条目，不更新 size）
-#       ./build.sh --all chainchess      # 编译 apk + exe + zip 全部到 release/，只更新本次编译的 size
-#       ./build.sh --native chainchess   # 编译安卓 Native APK 到 release/，不碰 update.json
-#       ./build.sh --release chainchess  # 编译除 Native 外所有（apk+exe+zip），全部更新 size，
-#                                        #   并发布：release/ → /storage/emulated/0/用户/，
-#                                        #   update.json + PWA 必要内容 → ../chain-chess-release
+#       ./build.sh -a chainchess      # 编译安卓 APK 到 release/，更新 update.json 的 android size
+#       ./build.sh -e                 # 编译 Windows exe 到 release/，更新 update.json 的 windows size
+#       ./build.sh -z                 # 打包 PWA zip 到 release/（update.json 无 pwa 条目，不更新 size）
+#       ./build.sh -A chainchess      # 编译 apk + exe + zip 全部到 release/，只更新本次编译的 size
+#       ./build.sh -n chainchess      # 编译安卓 Native APK 到 release/，不碰 update.json
+#       ./build.sh -r chainchess      # 编译除 Native 外所有（apk+exe+zip），全部更新 size，
+#                                     #   并发布：release/ → /storage/emulated/0/用户/，
+#                                     #   update.json + PWA 必要内容 → ../chain-chess-release
+#       ./build.sh -V                 # 打印当前项目版本号
 
 set -e
 
@@ -47,24 +48,75 @@ ZIP=false
 ALL=false
 NATIVE=false
 PUBLISH=false
+HELP=false
+SHOW_VERSION=false
 PASSWORD=""
 
 for arg in "$@"; do
   case "$arg" in
-    --apk) APK=true ;;
-    --exe) EXE=true ;;
-    --zip) ZIP=true ;;
-    --all) ALL=true ;;
-    --native) NATIVE=true ;;
-    --release) PUBLISH=true ;;
+    --apk|-a)     APK=true ;;
+    --exe|-e)     EXE=true ;;
+    --zip|-z)     ZIP=true ;;
+    --all|-A)     ALL=true ;;
+    --native|-n)  NATIVE=true ;;
+    --release|-r) PUBLISH=true ;;
+    --help|-h)    HELP=true ;;
+    --version|-V) SHOW_VERSION=true ;;
     -*)
       echo "❌ 未知参数: $arg"
-      echo "用法: $0 [--apk] [--exe] [--zip] [--all] [--native] [--release] <keystore_password>"
+      echo "用法: $0 [选项] <keystore_password>   （-h 查看帮助）"
       exit 1
       ;;
     *) PASSWORD="$arg"
   esac
 done
+
+# ── 帮助 / 版本：打印后立即退出（优先级最高，不触发默认构建）──
+if [ "$HELP" = true ]; then
+  cat <<'HELP_EOF'
+用法: $0 [选项] <keystore_password>
+
+编译并签名连锁棋（APK / Windows exe / PWA zip）到 release/，
+并按模式更新 update.json 的安装包大小条目。
+
+选项:
+  -a, --apk <密码>     编译安卓 APK，更新 update.json 的 android size
+  -e, --exe            编译 Windows exe（cargo-xwin），更新 windows size
+  -z, --zip            打包 PWA zip（无平台条目，不更新 size）
+  -A, --all <密码>     编译 apk + exe + zip 全部，只更新本次编译的 size
+  -n, --native <密码>  编译安卓 Native APK，不碰 update.json
+  -r, --release <密码> 编译除 Native 外所有，全部更新 size，并发布：
+                       release/ → /storage/emulated/0/用户/
+                       update.json + PWA 必要内容 → ../chain-chess-release
+  -h, --help           显示本帮助
+  -V, --version        打印当前项目版本号（来自 Cargo.toml，回退 update.json）
+
+示例:
+  $0 -a chainchess          # 仅编译 APK
+  $0 -e                     # 仅编译 Windows exe
+  $0 -z                     # 仅打包 PWA zip
+  $0 -A chainchess          # 编译全部（apk+exe+zip），不发布
+  $0 -n chainchess          # 编译 Native APK，不碰 update.json
+  $0 -r chainchess          # 编译全部 + 更新全部 size + 发布
+  $0 -V                     # 打印项目版本号
+HELP_EOF
+  exit 0
+fi
+
+if [ "$SHOW_VERSION" = true ]; then
+  # 当前项目版本号：优先 Cargo.toml（代码版本），回退 update.json（发布版本），再回退脚本内 VERSION
+  if [ -f "tauri/src-tauri/Cargo.toml" ]; then
+    PROJECT_VER=$(sed -n 's/^version = "\([0-9][^"]*\)"/\1/p' "tauri/src-tauri/Cargo.toml" | head -1)
+  fi
+  if [ -z "$PROJECT_VER" ] && [ -f "update.json" ] && command -v jq >/dev/null 2>&1; then
+    PROJECT_VER=$(jq -r '.version' update.json 2>/dev/null | sed 's/^null$//')
+  fi
+  if [ -z "$PROJECT_VER" ]; then
+    PROJECT_VER="$VERSION"
+  fi
+  echo "$PROJECT_VER"
+  exit 0
+fi
 
 # 模式语义展开
 # --all: apk + exe + zip；--release: apk + exe + zip + 发布动作
