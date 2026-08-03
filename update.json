@@ -1,18 +1,18 @@
 {
-  "version": "3.3.0",
-  "notes": "Add Windows desktop support (auto-update now picks the correct platform package, per-platform download links), fix desktop icon display, build script supports APK/exe dual-platform",
-  "pub_date": "2026-08-02T00:00:00Z",
+  "version": "3.3.1",
+  "notes": "Add random gameplay modes (per-move random explosion threshold, per-move random border behavior; mixed mode keeps fixed thresholds); first move level = threshold-1; update AI benchmark page with board-mode test; refine dark button styling; fix light theme switch inside game under system theme",
+  "pub_date": "2026-08-03T00:00:00Z",
   "platforms": {
     "linux": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.0/chainchess-3.3.0.AppImage",
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.1/chainchess-3.3.1.AppImage",
       "size": 0
     },
     "android": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.0/chainchess-3.3.0.apk",
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.1/chainchess-3.3.1.apk",
       "size": 11539524
     },
     "windows": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.0/chainchess-3.3.0.exe",
+      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.1/chainchess-3.3.1.exe",
       "size": 10780672
     }
   }

@@ -63,6 +63,14 @@ const BORDER_MODE_DESC = {
   'wrap': '回环模式：棋子达到 4 子即爆，爆炸会穿过边界到达对面，棋盘变成甜甜圈',
   'bounce': '反弹模式：达到 4 子即爆，边界处能量反弹集中：边上出一颗二级棋子和两颗一级棋子，角上出两颗二级棋子',
   'degrade': '降级模式：中央区域 4 子即爆，边界处降为 3 子即爆，角落处仅需 2 子即爆',
+  'random': '随机边界：每次爆炸随机选择一种边界行为（默认 / 回环 / 反弹）',
+};
+const CAP_MODE_DESC = {
+  '3': '速爆：3 级即爆，爆炸时随机一个方向的格子被直接清空；首子为 2 级',
+  '4': '标准规则：达到 4 子即爆，向上下左右各扩散一个棋子；首子为 3 级',
+  '5': '重炮：5 级才爆，爆炸时随机一个方向的格子直接变成 2 级；首子为 4 级',
+  'mixed': '混合棋盘：开局每格确定阈值 3 / 4 / 5，之后不变；首子为所在格阈值减 1',
+  'random': '随机：每步各自随机 3 / 4 / 5 级爆炸；首子为随机阈值减 1',
 };
 // 根据棋盘大小返回最大允许玩家人数
 function getMaxPlayersBySize(boardSize){
@@ -93,6 +101,10 @@ function applyTheme(theme){
     document.querySelectorAll('.orb').forEach(function(el){
       el.style.opacity=lightNow?(0.45+Math.random()*0.15).toFixed(2):(0.75+Math.random()*0.2).toFixed(2);
     });
+  }catch(e){}
+  // 游戏进行中：setBg 设置的内联背景会覆盖主题背景，切主题时用当前玩家色重新刷新
+  try{
+    if(gameMode&&!gameOver&&typeof curPlayer!=='undefined'&&typeof setBg==='function')setBg(curPlayer);
   }catch(e){}
 }
 
@@ -350,6 +362,8 @@ let autoSkipChain=false;
  
 // 棋盘边界模式
 let borderMode='default';
+// 爆炸阈值模式（独立设置）：3=3级炸 / 4=默认4级 / 5=5级炸 / mixed=每格随机3/4/5
+let capMode='4';
 
 // 首子落位（用于限制其他玩家落子）
 let firstMovePos=null;
@@ -400,6 +414,9 @@ document.addEventListener('click',function(e){
   }else if(container.id==='borderModeGroup'){
     const descEl=document.getElementById('borderModeDesc');
     if(descEl&&BORDER_MODE_DESC[t.dataset.value]){descEl.textContent=BORDER_MODE_DESC[t.dataset.value];}
+  }else if(container.id==='capModeGroup'){
+    const descEl=document.getElementById('capModeDesc');
+    if(descEl&&CAP_MODE_DESC[t.dataset.value]){descEl.textContent=CAP_MODE_DESC[t.dataset.value];}
   }else if(t.classList.contains('size-btn')||t.classList.contains('gb'))setTimeout(setupLobbySync,10);
 });
 
@@ -670,7 +687,29 @@ function loadHistoryList(){
         <div class="h-info">${modeLabel} · ${r.boardSize}×${r.boardSize} · ${r.playerCount}人${r.aiCount>0?(' · AI×'+r.aiCount):''}</div>
         <div class="h-winner" style="color:${winnerColor}">${winnerName}</div>
         <div class="h-details">${r.aiAlgorithm?('算法: '+r.aiAlgorithm):''}${r.aiDepth>0?(' · 深度: '+r.aiDepth):''}</div>
+        <div style="margin-top:6px"><button class="glass-btn primary" id="replayFromListBtn" style="padding:5px 12px;font-size:.75rem">▶ 回放</button></div>
       `;
+      // 回放按钮（不触发条目详情跳转）
+      const rbtn=div.querySelector('#replayFromListBtn');
+      if(rbtn){
+        rbtn.id='';
+        rbtn.onclick=function(e){
+          e.stopPropagation();
+          const rid=parseInt(div.dataset.recordId);
+          const rec=_historyRecords[rid];
+          if(!rec)return;
+          const historyData=expandHistory(rec.history, rec.playerCount||maxPlayers);
+          openReplay({
+            size: rec.boardSize || 7,
+            maxPlayers: rec.playerCount || 2,
+            borderMode: rec.borderMode || 'default',
+            capMode: rec.capMode || '4',
+            gameCount: rec.gameCount || 0,
+            colorNames: rec.colorNames,
+            history: historyData,
+          });
+        };
+      }
       // 复选框点击
       const chk=div.querySelector('.sel-chk');
       if(chk)chk.onclick=function(e){e.stopPropagation();if(!_multiSelectActive)enterMultiSelect();toggleSelection(r.id)};
@@ -960,7 +999,14 @@ function compactHistory(history, playerCount){
       if(d){pieces[p][t]=d.pieces||0;points[p][t]=d.points||0}
     }
   }
-  return {c:true,t:n,p:pieces,pt:points};
+  const mvList=new Array(n).fill(null);
+  for(let t=0;t<n;t++){
+    const mv=history[t].mv;
+    if(mv&&mv.x!==undefined&&mv.y!==undefined&&mv.player!==undefined){
+      mvList[t]=[mv.x,mv.y,mv.player,mv.seed!==undefined?mv.seed:0];
+    }
+  }
+  return {c:true,t:n,p:pieces,pt:points,m:mvList};
 }
 // 将紧凑格式展开为逐回合快照格式（供图表渲染用）
 function expandHistory(compact, playerCount){
@@ -975,7 +1021,9 @@ function expandHistory(compact, playerCount){
         points:(compact.pt&&compact.pt[p]?compact.pt[p][t]:0),
       };
     }
-    history.push({turn:t, snapshot});
+    const m=compact.m&&compact.m[t];
+    const mv=(m&&m.length>=3)?{x:m[0],y:m[1],player:m[2],seed:(m.length>=4?m[3]:0)}:null;
+    history.push({turn:t, snapshot, mv});
   }
   return history;
 }
@@ -1020,6 +1068,8 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
         playerCount: maxPlayers,
         aiCount: aiPlayers.size,
         boardSize: size,
+        borderMode: borderMode || 'default',
+        capMode: capMode || '4',
         winner: winner !== null && winner !== undefined ? winner : null,
         colorNames: toColorNamesArray(_colorNames),
         chainStats: chainStats,
@@ -1088,6 +1138,7 @@ async function saveUnfinishedGameHistory(){
     chainStats: _chainStats,
     maxChainOverall: _maxChainOverall,
     gameCount: _gameCount,
+    capMode: capMode || '4',
     aiAlgorithm: _aiAlgorithm,
     aiDepth: _aiDepth,
     colorNames: toColorNamesArray(_colorNames),
@@ -1177,6 +1228,7 @@ function loadGameFromState(saved){
   aiAlgorithm = saved.aiAlgorithm || "";
   aiDepth = saved.aiDepth || 0;
   borderMode = saved.borderMode || "default";
+  capMode = saved.capMode || "4";
 
   document.getElementById("pauseBtn").textContent = "暂停";
   _originPage = gameMode === "ai" ? "aiLobby" : (gameMode === "eve" ? "eveLobby" : "localLobby");
@@ -1242,6 +1294,7 @@ function saveCurrentGameState(historyOverride){
     maxChainOverall: maxChainOverall ? {...maxChainOverall} : {player:null,length:0},
     gameCount: gameCount || 0,
     borderMode: borderMode || 'default',
+    capMode: capMode || '4',
     aiAlgorithm: aiAlgorithm || '',
     aiDepth: aiDepth || 0,
     colorNames: _colorNames || COLOR_NAMES,
@@ -1308,8 +1361,14 @@ function nbrs8(i,j,s){
   }
   return r;
 }
-function mkBoard(s){
-  return Array.from({length:s},()=>Array.from({length:s},()=>({owner:null,count:0})));
+// 混合模式(mixed)下每格固定爆炸阈值 3/4/5；用 gameCount 作确定性种子，保证回放复现一致
+function mkBoard(s,cm,gc){
+  let seed=(gc||0)>>>0;
+  const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+  return Array.from({length:s},()=>Array.from({length:s},()=>{
+    const th=(cm==='mixed')?(3+Math.floor(rnd()*3)):undefined;
+    return {owner:null,count:0,th};
+  }));
 }
 function hasPieces(p,b){
   for(let r of b)for(let c of r)if(c.owner===p)return true;
@@ -1343,14 +1402,14 @@ function isInRestrictedZone(x,y,sz,b){
 const HISTORY_MEM_MAX=500;  // 内存上限，超出则刷盘
 const HISTORY_MEM_KEEP=100; // 刷盘后保留条数
 
-function recordHistory(){
+function recordHistory(mv){
   let sn={};
   for(let p=0;p<maxPlayers;p++){
     let pieces=0,points=0;
     for(let r of board)for(let c of r)if(c.owner===p){pieces++;points+=c.count}
     sn[p]={pieces,points};
   }
-  gameHistory.push({turn:gameHistory.length,snapshot:sn});
+  gameHistory.push({turn:gameHistory.length,snapshot:sn,mv:mv||null});
   // 超过内存上限→异步溢出到磁盘（不阻塞落子）
   if(gameHistory.length>HISTORY_MEM_MAX){
     setTimeout(()=>flushOverflowHistory(),0);
@@ -1393,7 +1452,12 @@ function resetRoundHistory(){
 
 
 // 边界模式感知的爆炸阈值
-function capForMode(i,j,sz,bm){
+function capForMode(i,j,sz,bm,cell){
+  if(capMode==='mixed')return (cell&&cell.th)||4;
+  if(capMode==='random')return 3+Math.floor(Math.random()*3);  // 随机模式：每步随机 3/4/5
+  if(capMode==='3')return 3;
+  if(capMode==='5')return 5;
+  // 默认(4)：保留降级边界的位置修正
   if(bm==='degrade'){
     let onCorner=(i===0||i===sz-1)&&(j===0||j===sz-1);
     let onEdge=i===0||i===sz-1||j===0||j===sz-1;
@@ -1405,6 +1469,13 @@ function capForMode(i,j,sz,bm){
 
 // 边界模式感知的邻居函数
 function nbrsForMode(i,j,sz,bm){
+  if(bm==='random'){
+    // 随机边界：每次爆炸随机选择一种边界行为（default/wrap/bounce；degrade 邻居同 default）
+    const r=Math.floor(Math.random()*3);
+    if(r===0)return nbrsForMode(i,j,sz,'default');
+    if(r===1)return nbrsForMode(i,j,sz,'wrap');
+    return nbrsForMode(i,j,sz,'bounce');
+  }
   if(bm==='wrap'){
     let up=i===0?sz-1:i-1;
     let down=i+1>=sz?0:i+1;
@@ -1451,7 +1522,7 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
     if(!anyPieces) firstMovePos=[x,y];
     let first = !hasPieces(pl,b);
     c.owner=pl;
-    c.count=first?3:1;
+    c.count=first?capForMode(x,y,s,bm,c)-1:1;  // 首子等级 = 阈值 n-1（临界态）
   }
   else if(c.owner===pl)c.count++
   else return[];
@@ -1469,14 +1540,32 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
   let chainGuard=0; // 连锁防御上限：防止特定棋盘结构下无限互炸导致动画/点击卡死
   while(chain.length){
     if(++chainGuard>100000)break;
-    let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=capForMode(cx,cy,s,bm);
+    let[cx,cy]=chain.shift(),cell=b[cx][cy],capv=capForMode(cx,cy,s,bm,cell);
     if(cell.count>=capv){
       cell.count=0;cell.owner=null;
       chainCount++;
       const skipNow=wantSkip();
       // 爆炸扩散到邻居（按边界模式）
-      for(let[nx,ny]of nbrsForMode(cx,cy,s,bm)){
-        let nc=b[nx][ny];nc.owner=pl;nc.count++;
+      let targets=[...nbrsForMode(cx,cy,s,bm)];
+      // 速爆(cap3)：随机一个扩散格被清空；重炮(cap5)：随机一个扩散格直接变 2 级
+      let special=-1;
+      if((capMode==='3'||capMode==='5')&&targets.length>0){
+        special=Math.floor(Math.random()*targets.length);
+      }
+      for(let ti=0;ti<targets.length;ti++){
+        let[nx,ny]=targets[ti];
+        let nc=b[nx][ny];
+        if(ti===special){
+          if(capMode==='3'){
+            nc.owner=null;nc.count=0;
+            continue;
+          }else{
+            nc.owner=pl;nc.count=2;
+            chain.push([nx,ny]);
+            continue;
+          }
+        }
+        nc.owner=pl;nc.count++;
         chain.push([nx,ny]);
       }
       if(anim&&skipNow){
@@ -1665,7 +1754,24 @@ function drawDots(p,n){
   else{addDot(p,34,34);addDot(p,66,34);addDot(p,34,66);addDot(p,66,66)}
 }
 function addDot(p,x,y){let d=document.createElement('div');d.className='dot';d.style.left=x+'%';d.style.top=y+'%';p.appendChild(d)}
-function setBg(pl){let h=COLORS[pl];let r=parseInt(h.substr(1,2),16)*.85,g=parseInt(h.substr(3,2),16)*.85,b=parseInt(h.substr(5,2),16)*.85;document.body.style.background=`radial-gradient(ellipse 80% 50% at 50% -20%, rgba(240,179,75,.04) 0%, transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%, rgba(95,195,195,.03) 0%, transparent 70%),rgb(${r|0},${g|0},${b|0})`}
+// 当前是否为亮色主题（手动亮色，或跟随系统且系统为亮色）
+function isLightTheme(){
+  const t=(appSettings&&appSettings.theme)||'system';
+  return t==='light'||(t==='system'&&window.matchMedia('(prefers-color-scheme: light)').matches);
+}
+function setBg(pl){
+  let h=COLORS[pl];
+  let r=parseInt(h.substr(1,2),16),g=parseInt(h.substr(3,2),16),b=parseInt(h.substr(5,2),16);
+  if(isLightTheme()){
+    // 亮色主题：向白色混合出浅色氛围背景（避免内联深色背景锁死主题切换）
+    const m=0.72;
+    r=Math.round(r+(255-r)*m);g=Math.round(g+(255-g)*m);b=Math.round(b+(255-b)*m);
+    document.body.style.background=`radial-gradient(ellipse 80% 50% at 50% -20%, rgba(240,179,75,.10) 0%, transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%, rgba(95,195,195,.08) 0%, transparent 70%),rgb(${r},${g},${b})`;
+  }else{
+    r=Math.round(r*.85);g=Math.round(g*.85);b=Math.round(b*.85);
+    document.body.style.background=`radial-gradient(ellipse 80% 50% at 50% -20%, rgba(240,179,75,.04) 0%, transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%, rgba(95,195,195,.03) 0%, transparent 70%),rgb(${r},${g},${b})`;
+  }
+}
 function renderPlayerBar(){
   let el=document.getElementById('playerBar');el.innerHTML='';
   let cnt={};
@@ -1823,13 +1929,17 @@ async function fastFinish(){
       curPlayer:curPlayer,
       eliminated:[...eliminatedPlayers],
       borderMode:borderMode,
+      capMode:capMode,
       firstMovePos:firstMovePos,
       gameCount:gameCount,
       aiConfigs:cfgArg
     });
     board=r.board;
     eliminatedPlayers=new Set(r.eliminatedOrder||[]);
-    gameHistory=(r.history||[]).map(function(h){return {turn:h.turn,snapshot:h.snapshot}});
+    // 保留真实落子步骤，追加模拟步骤（带每步落子 mv，供回放使用）
+    const simHist=(r.history||[]).map(function(h){return {turn:h.turn,snapshot:h.snapshot,mv:h.mv?{x:h.mv[0],y:h.mv[1],player:h.mv[2],seed:h.mv[3]||0}:null}});
+    const baseTurn=gameHistory.length;
+    gameHistory=[...gameHistory,...simHist.map(function(h){return {...h,turn:baseTurn+h.turn}})];
     chainStats=r.chainStats||{};
     maxChainOverall=r.maxChain||{player:null,length:0};
     eliminationRounds=[r.eliminatedOrder||[]];
@@ -1932,12 +2042,15 @@ async function triggerAI(){
   const aiClickEl=cells?.[x]?.[y];
   if(aiClickEl)addRipple(aiClickEl);
   playClick();
+  const rndSeed=(Math.floor(Math.random()*0x7fffffff))>>>0;
   let elim, killedBy;
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
       player:curPlayer,maxPlayers:maxPlayers,
-      borderMode:borderMode
+      borderMode:borderMode,
+      capMode:capMode,
+      seed:rndSeed
     });
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
     board=result.board;
@@ -1947,7 +2060,7 @@ async function triggerAI(){
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
   }
   handleEliminations(elim, killedBy, curPlayer);
-  recordHistory();
+  recordHistory({x:x,y:y,player:curPlayer,seed:rndSeed});
   renderBoard(true);
   let alive=[];
   for(let p=0;p<maxPlayers;p++){
@@ -2109,12 +2222,15 @@ async function replayAiMove(move){
   let el=cells?.[x]?.[y];
   if(el)addRipple(el);
   playClick();
+  const rndSeed=(Math.floor(Math.random()*0x7fffffff))>>>0;
   let elim, killedBy;
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
       player:curPlayer,maxPlayers:maxPlayers,
-      borderMode:borderMode
+      borderMode:borderMode,
+      capMode:capMode,
+      seed:rndSeed
     });
     elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer],result);
     board=result.board;
@@ -2124,7 +2240,7 @@ async function replayAiMove(move){
     elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer]);
   }
   handleEliminations(elim, killedBy, curPlayer);
-  recordHistory();
+  recordHistory({x:x,y:y,player:curPlayer,seed:rndSeed});
   renderBoard(true);
   let alive=[];
   for(let p=0;p<maxPlayers;p++){
@@ -2246,12 +2362,15 @@ async function localClick(x,y){
     playClick();
     const clickEl=cells?.[x]?.[y];
     if(clickEl)addRipple(clickEl);
+    const rndSeed=(Math.floor(Math.random()*0x7fffffff))>>>0;
     let elim, killedBy;
     try {
       let result=await tauriInvoke('process_move',{
         board:board,size:size,x:x,y:y,
         player:curPlayer,maxPlayers:maxPlayers,
-        borderMode:borderMode
+        borderMode:borderMode,
+        capMode:capMode,
+        seed:rndSeed
       });
       elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
       board=result.board;
@@ -2261,7 +2380,7 @@ async function localClick(x,y){
       elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
     }
     handleEliminations(elim, killedBy, curPlayer);
-    recordHistory();
+    recordHistory({x:x,y:y,player:curPlayer,seed:rndSeed});
     renderBoard(true);
     let alive=[];
     for(let p=0;p<maxPlayers;p++){
@@ -2298,12 +2417,15 @@ async function localClick(x,y){
   // 落子波纹视觉反馈
   const clickEl=cells?.[x]?.[y];
   if(clickEl)addRipple(clickEl);
+  const rndSeed=(Math.floor(Math.random()*0x7fffffff))>>>0;
   let elim, killedBy;
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
       player:curPlayer,maxPlayers:maxPlayers,
-      borderMode:borderMode
+      borderMode:borderMode,
+      capMode:capMode,
+      seed:rndSeed
     });
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
     board=result.board;
@@ -2313,7 +2435,7 @@ async function localClick(x,y){
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
   }
   handleEliminations(elim, killedBy, curPlayer);
-  recordHistory();
+  recordHistory({x:x,y:y,player:curPlayer,seed:rndSeed});
   renderBoard(true);
   let alive=[];
   for(let p=0;p<maxPlayers;p++){
@@ -2844,6 +2966,7 @@ function renderGameCharts(container, history, opts){
 // 根据保存的配置直接重开游戏（不再读 DOM，确保与上次配置完全一致）
 function replayGame(){
   const c=_lastGameConfig;
+  if(c&&c.capMode)capMode=c.capMode;
   if(!c)return;
   _colorNames=c.colorNames||null;
   if(c.mode==='ai'){
@@ -2983,6 +3106,25 @@ async function showSettlement(winner,colorNames,history){
     chainStats, maxChain: maxChainOverall, showTitle: false, _noBack: true, _noGrid: true,
     onReplay: () => { Router.navigate(_originPage || 'welcome'); }
   });
+  // 回放对局按钮
+  if(hasReplayMoves(fullHistory)){
+    const replayBtn = document.createElement('button');
+    replayBtn.className = 'glass-btn primary';
+    replayBtn.textContent = '▶ 回放对局';
+    replayBtn.style.marginTop = '6px';
+    replayBtn.onclick = () => {
+      openReplay({
+        size: size,
+        maxPlayers: maxPlayers,
+        borderMode: borderMode || 'default',
+        capMode: capMode || '4',
+        gameCount: gameCount || 0,
+        colorNames: _colorNames || colorNames || COLOR_NAMES,
+        history: fullHistory,
+      });
+    };
+    inner.appendChild(replayBtn);
+  }
   // 返回主菜单按钮
   const homeBtn = document.createElement('button');
   homeBtn.className = 'glass-btn primary';
@@ -3047,6 +3189,24 @@ function showHistoryDetail(r){
     chainStats: r.chainStats, maxChain: r.maxChain,
     showTitle: false, _noBack: true, _noGrid: true,
   });
+  // 回放对局按钮（从记录中的落子数据重放）
+  if(hasReplayMoves(historyData)){
+    const replayBtn = document.createElement('button');
+    replayBtn.className = 'glass-btn primary';
+    replayBtn.textContent = '▶ 回放对局';
+    replayBtn.onclick = () => {
+      openReplay({
+        size: r.boardSize || size,
+        maxPlayers: histPlayerCnt,
+        borderMode: r.borderMode || 'default',
+        capMode: r.capMode || '4',
+        gameCount: r.gameCount || 0,
+        colorNames: r.colorNames,
+        history: historyData,
+      });
+    };
+    inner.appendChild(replayBtn);
+  }
   // 添加"关闭"按钮（还原 maxPlayers）
   const closeBtn = document.createElement('button');
   closeBtn.className = 'glass-btn primary';
@@ -3257,6 +3417,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+    {v:'v3.3.1 · 第 36 版',desc:'新增随机玩法：爆炸阈值每步随机、棋盘边界每步随机、混合保持开局确定；首子等级改为阈值减一；关于页 AI 评测更新、暗色按钮质感优化、修复系统主题下游戏内亮色切换失效'},
     {v:'v3.3.0 · 第 35 版',desc:'新增Windows桌面版支持（自动更新适配、按平台提供对应安装包）、修复桌面图标显示、构建脚本支持APK/exe双平台'},
     {v:'v3.2.3 · 第 34 版',desc:'新增局内AI走法建议（按钮选择算法与深度、仅提示当前一步）、修复弹窗弹出闪烁、随机刻度设置真正生效、PWA离线缓存修复、AI介绍内容更新'},
     {v:'v3.2.2 · 第 33 版',desc:'新增大狗叫音频主题（爆炸音效可选3种叫声模式）、新增静音主题、音效主题按钮两行排版优化'},
@@ -3510,7 +3671,8 @@ function startLocalFromSetup(sz,cnt){
   undoStack=[];
   size=sz;maxPlayers=cnt;
   borderMode=getSelStr('borderModeGroup')||'default';
-  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  capMode=getSelStr('capModeGroup')||'4';
+  board=mkBoard(size,capMode,gameCount);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='local';_originPage='gameSetup';
   aiPlayers=new Set();aiThinking=false;
@@ -3527,7 +3689,7 @@ function startLocalFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
-  _lastGameConfig={mode:'local',size,maxPlayers,colorNames,borderMode};
+  _lastGameConfig={mode:'local',size,maxPlayers,colorNames,borderMode,capMode};
 }
 function startAIFromSetup(sz,cnt){
   clearSavedGameState();
@@ -3536,7 +3698,8 @@ function startAIFromSetup(sz,cnt){
   undoStack=[];
   size=sz;maxPlayers=cnt;
   borderMode=getSelStr('borderModeGroup')||'default';
-  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  capMode=getSelStr('capModeGroup')||'4';
+  board=mkBoard(size,capMode,gameCount);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='ai';_originPage='gameSetup';
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
@@ -3563,7 +3726,7 @@ function startAIFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode};
+  _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode,capMode};
 }
 function startEveFromSetup(sz,cnt){
   clearSavedGameState();
@@ -3572,7 +3735,8 @@ function startEveFromSetup(sz,cnt){
   undoStack=[];
   size=sz;maxPlayers=cnt;
   borderMode=getSelStr('borderModeGroup')||'default';
-  board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  capMode=getSelStr('capModeGroup')||'4';
+  board=mkBoard(size,capMode,gameCount);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='eve';_originPage='gameSetup';
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
@@ -3593,7 +3757,7 @@ function startEveFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode};
+  _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode,capMode};
 }
 window.addEventListener('popstate',()=>{
   const cur = Router._current;
@@ -3612,6 +3776,15 @@ window.addEventListener('popstate',()=>{
     if(fsOverlay){
       window._chartFsState=0;
       fsOverlay.remove();
+      handled = true;
+    }
+  }
+
+  if(!handled){
+    // 1.2) 对局回放覆盖层 — 关闭回放，不切页面
+    var rpOverlay=document.getElementById('replayOverlay');
+    if(rpOverlay && rpOverlay.style.display==='flex'){
+      if(typeof closeReplay==='function') closeReplay();
       handled = true;
     }
   }
@@ -3676,3 +3849,283 @@ window.addEventListener('popstate',()=>{
   history.pushState(null, '');
   history.pushState(null, '');
 });
+
+/* ═══════════════════ 对局回放 ═══════════════════ */
+// 回放状态（覆盖层模式，不占用路由）
+let _rp=null;
+
+/** history 中是否存在可回放的落子数据（mv） */
+function hasReplayMoves(history){
+  if(!Array.isArray(history)||history.length<2)return false;
+  return history.some(h=>h&&h.mv&&h.mv.x!==undefined&&h.mv.y!==undefined);
+}
+
+/**
+ * 打开回放覆盖层
+ * cfg: {size, maxPlayers, borderMode, colorNames, history}
+ * history: [{turn, snapshot, mv:{x,y,player}}]，第 0 条为初始状态（mv=null）
+ */
+function openReplay(cfg){
+  const history=cfg&&cfg.history;
+  if(!hasReplayMoves(history)){
+    try{showToast('该记录无棋谱数据，无法回放')}catch(e){alert('该记录无棋谱数据，无法回放')}
+    return;
+  }
+  const size=cfg.size||7;
+  const maxPlayers=cfg.maxPlayers||2;
+  const ov=document.getElementById('replayOverlay');
+  _rp={
+    size,
+    maxPlayers,
+    borderMode:cfg.borderMode||'default',
+    capMode:cfg.capMode||'4',
+    gameCount:cfg.gameCount||0,
+    colorNames:cfg.colorNames||null,
+    history,
+    total:history.length-1,        // 落子步数（第 0 条为初始状态）
+    step:0,
+    board:mkBoard(size,cfg.capMode||'4',cfg.gameCount||0),
+    cells:null,
+    curPlayer:0,
+    playing:false,
+    token:0,
+    anim:true,
+    speed:1,
+    ck:new Map(),                  // checkpoint: step -> board 克隆（每 100 步）
+  };
+  // 构建回放棋盘 DOM
+  const bd=document.getElementById('rpBoard');
+  bd.replaceChildren();
+  bd.style.gridTemplateColumns=`repeat(${size},1fr)`;
+  _rp.cells=[];
+  for(let i=0;i<size;i++){
+    const row=[];
+    for(let j=0;j<size;j++){
+      const el=document.createElement('div');el.className='cell';
+      bd.appendChild(el);row.push(el);
+    }
+    _rp.cells.push(row);
+  }
+  // 重置控件
+  const slider=document.getElementById('rpSlider');
+  slider.min=0;slider.max=_rp.total;slider.value=0;
+  const animBtn=document.getElementById('rpAnimBtn');
+  animBtn.textContent='动画：开';
+  animBtn.classList.remove('anim-off');
+  _rp.anim=true;
+  rpRenderPlayers();
+  rpRenderBoard(true);
+  rpUpdateUI();
+  ov.style.display='flex';
+}
+function closeReplay(){
+  if(_rp){_rp.playing=false;_rp.token++;}
+  _rp=null;
+  const ov=document.getElementById('replayOverlay');
+  if(ov)ov.style.display='none';
+  const bd=document.getElementById('rpBoard');
+  if(bd)bd.replaceChildren();
+  const pp=document.getElementById('rpPlayers');
+  if(pp)pp.innerHTML='';
+}
+/** 渲染回放棋盘（popX/popY 为落子格，加 pop 动画） */
+function rpRenderBoard(force,popX,popY){
+  if(!_rp)return;
+  const bd=_rp.board;
+  for(let i=0;i<_rp.size;i++)for(let j=0;j<_rp.size;j++){
+    const el=_rp.cells[i][j],d=bd[i][j];
+    el.innerHTML='';
+    if(d.owner!==null){
+      if(d.owner===_rp.curPlayer){
+        const bg=document.createElement('div');bg.className='bg p'+d.owner;
+        el.appendChild(bg);
+      }
+      const p=document.createElement('div');p.className='piece p'+d.owner;
+      el.appendChild(p);
+      drawDots(p,d.count);
+      if(popX!==undefined&&i===popX&&j===popY)p.classList.add('pop');
+    }
+  }
+}
+/** 渲染回放玩家条 */
+function rpRenderPlayers(){
+  const el=document.getElementById('rpPlayers');
+  if(!el||!_rp)return;
+  el.innerHTML='';
+  const cnt={};
+  for(let p=0;p<_rp.maxPlayers;p++)cnt[p]=0;
+  for(const row of _rp.board)for(const c of row)if(c.owner!==null)cnt[c.owner]++;
+  for(let p=0;p<_rp.maxPlayers;p++){
+    const t=document.createElement('span');t.className='player-tag';
+    if(p===_rp.curPlayer)t.classList.add('active');
+    if(cnt[p]===0&&_rp.total>0)t.classList.add('elim');
+    t.style.background=COLORS_LIGHT[p];
+    t.style.color=COLORS[p];
+    const label=(_rp.colorNames&&_rp.colorNames[p])||('玩家 '+(p+1));
+    t.textContent=`${label} ${cnt[p]}`;
+    el.appendChild(t);
+  }
+}
+/** 更新进度条/步数标签/播放按钮 */
+function rpUpdateUI(){
+  if(!_rp)return;
+  const label=document.getElementById('rpStepLabel');
+  if(label)label.textContent=`${_rp.step} / ${_rp.total}`;
+  const slider=document.getElementById('rpSlider');
+  if(slider&&Number(slider.value)!==_rp.step)slider.value=_rp.step;
+  const playBtn=document.getElementById('rpPlayBtn');
+  if(playBtn)playBtn.textContent=_rp.playing?'⏸':'▶';
+}
+function rpReadSpeed(){
+  const s=document.querySelector('#rpSpeedGroup .gb.selected');
+  return s?parseFloat(s.dataset.value)||1:1;
+}
+function rpSleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function rpCancel(){if(_rp)_rp.token++}
+
+/** 从最近 checkpoint（或开头）重建到目标步之前的棋盘，再逐步推进到 target */
+async function rpGoTo(target, animate){
+  if(!_rp)return;
+  const token=_rp.token;
+  const hist=_rp.history;
+  if(target>_rp.total)target=_rp.total;
+  if(target<0)target=0;
+  // 后退：从最近 checkpoint 重建
+  if(target<_rp.step){
+    let from=0;
+    for(const[k]of _rp.ck){if(k<=target&&k>from)from=k;}
+    if(from===0){
+      _rp.board=mkBoard(_rp.size,_rp.capMode,_rp.gameCount);
+      _rp.curPlayer=0;
+    }else{
+      _rp.board=cloneBoard(_rp.ck.get(from));
+      _rp.curPlayer=(hist[from]&&hist[from].mv)?hist[from].mv.player:0;
+    }
+    _rp.step=from;
+    rpRenderBoard();
+    rpRenderPlayers();
+    rpUpdateUI();
+    if(token!==_rp.token)return;
+  }
+  while(_rp.step<target){
+    if(token!==_rp.token)return;
+    const k=_rp.step+1;
+    const mv=hist[k]&&hist[k].mv;
+    if(!mv){_rp.step=k;rpRenderBoard();rpRenderPlayers();rpUpdateUI();continue;}
+    try{
+      const r=await tauriInvoke('process_move',{
+        board:_rp.board,size:_rp.size,x:mv.x,y:mv.y,
+        player:mv.player,maxPlayers:_rp.maxPlayers,
+        borderMode:_rp.borderMode,
+        capMode:_rp.capMode,
+        seed:(mv.seed!==undefined&&mv.seed!==null)?mv.seed:undefined
+      });
+      if(token!==_rp.token)return;
+      _rp.board=r.board;
+      _rp.curPlayer=mv.player;
+      _rp.step=k;
+      if(k%100===0)_rp.ck.set(k,cloneBoard(_rp.board));
+      if(animate&&_rp.anim){
+        rpRenderBoard(true,mv.x,mv.y);   // 落子格 pop 动画
+      }else{
+        rpRenderBoard(true);
+      }
+      rpRenderPlayers();
+      rpUpdateUI();
+    }catch(e){
+      logWarn('Replay move failed at step',k,e);
+      break;
+    }
+    if(animate){
+      const delay=(_rp.anim?520:36)/_rp.speed;
+      if(delay>0)await rpSleep(delay);
+    }
+  }
+}
+/** 重置到 step（先回到开头再推进） */
+async function rpResetTo(step, animate){
+  if(!_rp)return;
+  rpCancel();
+  const token=_rp.token;
+  _rp.board=mkBoard(_rp.size,_rp.capMode,_rp.gameCount);
+  _rp.curPlayer=0;
+  _rp.step=0;
+  _rp.ck.clear();
+  rpRenderBoard(true);
+  rpRenderPlayers();
+  rpUpdateUI();
+  if(step>0)await rpGoTo(step,animate);
+}
+/** 播放主循环 */
+async function rpPlayLoop(){
+  if(!_rp)return;
+  const token=_rp.token;
+  _rp.speed=rpReadSpeed();
+  while(_rp&&_rp.playing&&_rp.step<_rp.total){
+    if(_rp.token!==token)return;
+    await rpGoTo(_rp.step+1,true);
+    if(_rp.token!==token)return;
+  }
+  if(_rp&&_rp.step>=_rp.total){_rp.playing=false;rpUpdateUI();}
+}
+/** 播放/暂停切换 */
+function rpTogglePlay(){
+  if(!_rp)return;
+  if(_rp.playing){
+    _rp.playing=false;
+    rpCancel();
+    rpUpdateUI();
+    return;
+  }
+  if(_rp.step>=_rp.total){
+    // 已到末尾：从开头重播
+    _rp.playing=true;
+    rpUpdateUI();
+    rpResetTo(0,true).then(()=>{
+      if(_rp&&_rp.playing)rpPlayLoop();
+    });
+    return;
+  }
+  _rp.playing=true;
+  rpUpdateUI();
+  rpPlayLoop();
+}
+/** 单步前进/后退 */
+function rpStep(d){
+  if(!_rp)return;
+  _rp.playing=false;
+  rpCancel();
+  const target=Math.max(0,Math.min(_rp.total,_rp.step+d));
+  // 单步/拖动/跳转一律即时跳转（动画仅用于播放模式，避免长距离后退逐帧播放卡顿）
+  rpGoTo(target,false);
+  rpUpdateUI();
+}
+/** 跳转（0=开头，-1=末尾） */
+function rpJump(target){
+  if(!_rp)return;
+  _rp.playing=false;
+  rpCancel();
+  if(target===0)rpResetTo(0,false);
+  else rpGoTo(_rp.total,false);
+  rpUpdateUI();
+}
+/** 进度条拖动 */
+function rpSeek(val){
+  if(!_rp)return;
+  const target=parseInt(val,10)||0;
+  _rp.playing=false;
+  rpCancel();
+  if(target<_rp.step)rpResetTo(target,false);
+  else rpGoTo(target,false);
+  rpUpdateUI();
+}
+/** 启/禁用动画 */
+function rpToggleAnim(){
+  if(!_rp)return;
+  _rp.anim=!_rp.anim;
+  const btn=document.getElementById('rpAnimBtn');
+  if(btn){
+    btn.textContent=_rp.anim?'动画：开':'动画：关';
+    btn.classList.toggle('anim-off',!_rp.anim);
+  }
+}

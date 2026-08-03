@@ -1,0 +1,1835 @@
+{
+ "config": {
+  "size": 7,
+  "games": 6,
+  "mode": "ffa",
+  "borders": [
+   "default",
+   "wrap",
+   "bounce",
+   "degrade"
+  ],
+  "caps": [
+   "3",
+   "4",
+   "5",
+   "mixed"
+  ],
+  "algs": [
+   "strategy",
+   "alphabeta",
+   "pvs",
+   "mcts"
+  ],
+  "depth": 2,
+  "mctsDepth": 1,
+  "randomScale": 5,
+  "useMlEval": true,
+  "seed": 0
+ },
+ "results": [
+  {
+   "bm": "default",
+   "cm": "3",
+   "id": 0,
+   "mode": "ffa",
+   "order": [
+    3,
+    0,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 599,
+   "winner": 2
+  },
+  {
+   "bm": "default",
+   "cm": "3",
+   "id": 1,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 322,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "3",
+   "id": 2,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 258,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "3",
+   "id": 3,
+   "mode": "ffa",
+   "order": [
+    0,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 159,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "3",
+   "id": 4,
+   "mode": "ffa",
+   "order": [
+    0,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 418,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "3",
+   "id": 5,
+   "mode": "ffa",
+   "order": [
+    0,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 234,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 6,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 143,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 7,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 106,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 8,
+   "mode": "ffa",
+   "order": [
+    1,
+    3,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 168,
+   "winner": 2
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 9,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 218,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 10,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 258,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 11,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 152,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "5",
+   "id": 12,
+   "mode": "ffa",
+   "order": [
+    3,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 281,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "5",
+   "id": 13,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 296,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "5",
+   "id": 14,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 303,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "5",
+   "id": 15,
+   "mode": "ffa",
+   "order": [
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 287,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "5",
+   "id": 16,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 291,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "5",
+   "id": 17,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 265,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "mixed",
+   "id": 18,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 219,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "mixed",
+   "id": 19,
+   "mode": "ffa",
+   "order": [
+    1,
+    0,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 80,
+   "winner": 3
+  },
+  {
+   "bm": "default",
+   "cm": "mixed",
+   "id": 20,
+   "mode": "ffa",
+   "order": [
+    3,
+    0,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 61,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "mixed",
+   "id": 21,
+   "mode": "ffa",
+   "order": [
+    3,
+    0,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 70,
+   "winner": 2
+  },
+  {
+   "bm": "default",
+   "cm": "mixed",
+   "id": 22,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 154,
+   "winner": 3
+  },
+  {
+   "bm": "default",
+   "cm": "mixed",
+   "id": 23,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 86,
+   "winner": 3
+  },
+  {
+   "bm": "wrap",
+   "cm": "3",
+   "id": 24,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 172,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "3",
+   "id": 25,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 208,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "3",
+   "id": 26,
+   "mode": "ffa",
+   "order": [
+    0,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 91,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "3",
+   "id": 27,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 208,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "3",
+   "id": 28,
+   "mode": "ffa",
+   "order": [
+    1,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 1000,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "3",
+   "id": 29,
+   "mode": "ffa",
+   "order": [
+    0,
+    3,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 886,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 30,
+   "mode": "ffa",
+   "order": [
+    3,
+    1,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 89,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 31,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 85,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 32,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 85,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 33,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 87,
+   "winner": 3
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 34,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 87,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 35,
+   "mode": "ffa",
+   "order": [
+    3,
+    1,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 90,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "5",
+   "id": 36,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 145,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "5",
+   "id": 37,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 170,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "5",
+   "id": 38,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 228,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "5",
+   "id": 39,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 255,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "5",
+   "id": 40,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 170,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "5",
+   "id": 41,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 298,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "mixed",
+   "id": 42,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 68,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "mixed",
+   "id": 43,
+   "mode": "ffa",
+   "order": [
+    0,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 47,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "mixed",
+   "id": 44,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 56,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "mixed",
+   "id": 45,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 73,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "mixed",
+   "id": 46,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 147,
+   "winner": 3
+  },
+  {
+   "bm": "wrap",
+   "cm": "mixed",
+   "id": 47,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 41,
+   "winner": 0
+  },
+  {
+   "bm": "bounce",
+   "cm": "3",
+   "id": 48,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 213,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "3",
+   "id": 49,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 375,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "3",
+   "id": 50,
+   "mode": "ffa",
+   "order": [
+    0,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 444,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "3",
+   "id": 51,
+   "mode": "ffa",
+   "order": [
+    0,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 450,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "3",
+   "id": 52,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 411,
+   "winner": 3
+  },
+  {
+   "bm": "bounce",
+   "cm": "3",
+   "id": 53,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 301,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "4",
+   "id": 54,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 129,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "4",
+   "id": 55,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 113,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "4",
+   "id": 56,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 147,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "4",
+   "id": 57,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 122,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "4",
+   "id": 58,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 114,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "4",
+   "id": 59,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 120,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "5",
+   "id": 60,
+   "mode": "ffa",
+   "order": [
+    2,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 309,
+   "winner": 0
+  },
+  {
+   "bm": "bounce",
+   "cm": "5",
+   "id": 61,
+   "mode": "ffa",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 281,
+   "winner": 0
+  },
+  {
+   "bm": "bounce",
+   "cm": "5",
+   "id": 62,
+   "mode": "ffa",
+   "order": [
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 267,
+   "winner": 0
+  },
+  {
+   "bm": "bounce",
+   "cm": "5",
+   "id": 63,
+   "mode": "ffa",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 288,
+   "winner": 0
+  },
+  {
+   "bm": "bounce",
+   "cm": "5",
+   "id": 64,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 244,
+   "winner": 0
+  },
+  {
+   "bm": "bounce",
+   "cm": "5",
+   "id": 65,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 269,
+   "winner": 0
+  },
+  {
+   "bm": "bounce",
+   "cm": "mixed",
+   "id": 66,
+   "mode": "ffa",
+   "order": [
+    1,
+    0,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 45,
+   "winner": 3
+  },
+  {
+   "bm": "bounce",
+   "cm": "mixed",
+   "id": 67,
+   "mode": "ffa",
+   "order": [
+    0,
+    2,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 66,
+   "winner": 3
+  },
+  {
+   "bm": "bounce",
+   "cm": "mixed",
+   "id": 68,
+   "mode": "ffa",
+   "order": [
+    1,
+    0,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 67,
+   "winner": 3
+  },
+  {
+   "bm": "bounce",
+   "cm": "mixed",
+   "id": 69,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 88,
+   "winner": 1
+  },
+  {
+   "bm": "bounce",
+   "cm": "mixed",
+   "id": 70,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 44,
+   "winner": 3
+  },
+  {
+   "bm": "bounce",
+   "cm": "mixed",
+   "id": 71,
+   "mode": "ffa",
+   "order": [
+    0,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 44,
+   "winner": 2
+  },
+  {
+   "bm": "degrade",
+   "cm": "3",
+   "id": 72,
+   "mode": "ffa",
+   "order": [
+    0,
+    3,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 577,
+   "winner": 2
+  },
+  {
+   "bm": "degrade",
+   "cm": "3",
+   "id": 73,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 107,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "3",
+   "id": 74,
+   "mode": "ffa",
+   "order": [
+    2,
+    1,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 199,
+   "winner": 3
+  },
+  {
+   "bm": "degrade",
+   "cm": "3",
+   "id": 75,
+   "mode": "ffa",
+   "order": [
+    2,
+    0,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 177,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "3",
+   "id": 76,
+   "mode": "ffa",
+   "order": [
+    0,
+    1,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 178,
+   "winner": 2
+  },
+  {
+   "bm": "degrade",
+   "cm": "3",
+   "id": 77,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 333,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "4",
+   "id": 78,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 61,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "4",
+   "id": 79,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 78,
+   "winner": 0
+  },
+  {
+   "bm": "degrade",
+   "cm": "4",
+   "id": 80,
+   "mode": "ffa",
+   "order": [
+    1,
+    0,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 75,
+   "winner": 3
+  },
+  {
+   "bm": "degrade",
+   "cm": "4",
+   "id": 81,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 79,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "4",
+   "id": 82,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 66,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "4",
+   "id": 83,
+   "mode": "ffa",
+   "order": [
+    0,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 74,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "5",
+   "id": 84,
+   "mode": "ffa",
+   "order": [
+    1,
+    2,
+    3
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 263,
+   "winner": 0
+  },
+  {
+   "bm": "degrade",
+   "cm": "5",
+   "id": 85,
+   "mode": "ffa",
+   "order": [
+    1,
+    2
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 288,
+   "winner": 0
+  },
+  {
+   "bm": "degrade",
+   "cm": "5",
+   "id": 86,
+   "mode": "ffa",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 287,
+   "winner": 0
+  },
+  {
+   "bm": "degrade",
+   "cm": "5",
+   "id": 87,
+   "mode": "ffa",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 289,
+   "winner": 0
+  },
+  {
+   "bm": "degrade",
+   "cm": "5",
+   "id": 88,
+   "mode": "ffa",
+   "order": [],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 253,
+   "winner": 0
+  },
+  {
+   "bm": "degrade",
+   "cm": "5",
+   "id": 89,
+   "mode": "ffa",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 254,
+   "winner": 0
+  },
+  {
+   "bm": "degrade",
+   "cm": "mixed",
+   "id": 90,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 116,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "mixed",
+   "id": 91,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 112,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "mixed",
+   "id": 92,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 90,
+   "winner": 0
+  },
+  {
+   "bm": "degrade",
+   "cm": "mixed",
+   "id": 93,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 102,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "mixed",
+   "id": 94,
+   "mode": "ffa",
+   "order": [
+    3,
+    2,
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 83,
+   "winner": 1
+  },
+  {
+   "bm": "degrade",
+   "cm": "mixed",
+   "id": 95,
+   "mode": "ffa",
+   "order": [
+    2,
+    3,
+    1
+   ],
+   "players": [
+    "strategy",
+    "alphabeta",
+    "pvs",
+    "mcts"
+   ],
+   "steps": 94,
+   "winner": 0
+  }
+ ]
+}

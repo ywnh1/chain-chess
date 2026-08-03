@@ -28,6 +28,23 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   --glass-shadow:0 6px 36px rgba(0,0,0,.40),inset 0 1.5px 0 rgba(255,255,255,.06);
   --glass-shine:var(--glass-w-06);
   --glass-edge:var(--glass-w-12);
+  --danger:#ff8a8a;
+  /* 按钮（暗色）玻璃质感 */
+  --btn-glass:linear-gradient(180deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,.05) 50%,rgba(255,255,255,.02) 100%);
+  --btn-glass-hover:linear-gradient(180deg,rgba(255,255,255,.20) 0%,rgba(255,255,255,.08) 55%,rgba(255,255,255,.03) 100%);
+  --btn-border:rgba(255,255,255,.17);
+  --btn-border-hover:rgba(255,255,255,.32);
+  --btn-shadow:0 2px 10px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(0,0,0,.26);
+  --btn-shadow-hover:0 6px 22px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.22);
+  --btn-shadow-active:inset 0 2px 8px rgba(0,0,0,.40),inset 0 1px 0 rgba(255,255,255,.04);
+  --btn-primary-bg:linear-gradient(180deg,rgba(140,222,222,.26) 0%,rgba(95,195,195,.13) 60%,rgba(72,162,172,.10) 100%);
+  --btn-primary-bg-hover:linear-gradient(180deg,rgba(155,232,232,.32) 0%,rgba(95,195,195,.19) 60%,rgba(86,178,188,.12) 100%);
+  --btn-primary-glow:0 2px 14px rgba(95,195,195,.16),inset 0 1px 0 rgba(255,255,255,.20),inset 0 -1px 0 rgba(0,0,0,.20);
+  --btn-danger-bg:linear-gradient(180deg,rgba(255,132,132,.22) 0%,rgba(255,84,84,.12) 60%,rgba(226,64,64,.10) 100%);
+  --btn-danger-bg-hover:linear-gradient(180deg,rgba(255,150,150,.28) 0%,rgba(255,98,98,.17) 60%,rgba(238,72,72,.12) 100%);
+  --btn-danger-glow:0 2px 14px rgba(255,90,90,.14),inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.20);
+  --btn-gold-bg:linear-gradient(180deg,rgba(240,179,75,.26) 0%,rgba(240,179,75,.11) 100%);
+  --btn-gold-glow:0 2px 14px rgba(240,179,75,.20),inset 0 1px 0 rgba(255,255,255,.16);
   --liquid-iris:linear-gradient(135deg,rgba(180,140,255,.10) 0%,rgba(240,179,75,.08) 50%,rgba(95,195,195,.10) 100%);
   --liquid-blur:24px;
   --overlay-bg:linear-gradient(135deg,rgba(15,15,19,.38) 0%,rgba(22,24,30,.30) 50%,rgba(20,18,24,.25) 100%);
@@ -295,7 +312,7 @@ body::after{content:'';position:fixed;inset:0;
   width:min(88vw,440px);
   height:min(88vw,440px);
 }
-#board{width:100%;height:100%;display:grid;gap:min(1.6vw,8px);touch-action:manipulation;contain:layout style paint}
+#board,.replay-board{width:100%;height:100%;display:grid;gap:min(1.6vw,8px);touch-action:manipulation;contain:layout style paint}
 .cell{
   background:var(--glass-w-05);
   border-radius:min(2.2vw,10px);
@@ -385,13 +402,13 @@ body{padding-top:env(safe-area-inset-top,20px)}
   box-shadow:0 8px 32px rgba(0,0,0,.4);
 }
 /* 统一玻璃小按钮（历史页、各处操作按钮） */
-.glass-btn{border:1px solid var(--glass-border);background-image:var(--liquid-iris),var(--glass-w-06);background-origin:padding-box;color:var(--text);padding:6px 12px;border-radius:var(--radius-sm);font-size:var(--text-sm);cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);font-weight:var(--weight-medium);font-family:var(--font);touch-action:manipulation;min-height:36px;display:inline-flex;align-items:center;justify-content:center;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow)}
-.glass-btn:hover{border-color:var(--glass-w-16);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
-.glass-btn:active{transform:scale(.95);transition:all .06s ease}
-.glass-btn.primary{border-color:rgba(95,195,195,.2);background:rgba(95,195,195,.12);color:var(--accent2)}
-.glass-btn.primary:hover{background:rgba(95,195,195,.2);border-color:rgba(95,195,195,.3)}
-.glass-btn.danger{border-color:rgba(255,80,80,.2);background:rgba(255,80,80,.12);color:rgba(255,100,100,.9)}
-.glass-btn.danger:hover{background:rgba(255,80,80,.2);border-color:rgba(255,80,80,.4)}
+.glass-btn{border:1px solid var(--btn-border);background-image:var(--btn-glass),var(--liquid-iris);background-color:rgba(255,255,255,.02);background-origin:border-box;color:var(--text);padding:6px 12px;border-radius:var(--radius-sm);font-size:var(--text-sm);cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);font-weight:var(--weight-medium);font-family:var(--font);touch-action:manipulation;min-height:36px;display:inline-flex;align-items:center;justify-content:center;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--btn-shadow)}
+.glass-btn:hover{border-color:var(--btn-border-hover);background-image:var(--btn-glass-hover),var(--liquid-iris);box-shadow:var(--btn-shadow-hover);transform:translateY(-1px)}
+.glass-btn:active{transform:scale(.96);box-shadow:var(--btn-shadow-active);transition:all .08s ease}
+.glass-btn.primary{border-color:rgba(95,195,195,.42);background-image:var(--btn-primary-bg),var(--liquid-iris);background-color:rgba(95,195,195,.06);color:var(--accent2);box-shadow:var(--btn-primary-glow)}
+.glass-btn.primary:hover{border-color:rgba(95,195,195,.58);background-image:var(--btn-primary-bg-hover),var(--liquid-iris);box-shadow:0 5px 26px rgba(95,195,195,.32),inset 0 1px 0 rgba(255,255,255,.24)}
+.glass-btn.danger{border-color:rgba(255,96,96,.40);background-image:var(--btn-danger-bg),var(--liquid-iris);background-color:rgba(255,84,84,.05);color:var(--danger);box-shadow:var(--btn-danger-glow)}
+.glass-btn.danger:hover{border-color:rgba(255,110,110,.55);background-image:var(--btn-danger-bg-hover),var(--liquid-iris);box-shadow:0 5px 26px rgba(255,90,90,.28),inset 0 1px 0 rgba(255,255,255,.2)}
 /* 暂停覆盖 — 浮动液态玻璃面板，居中显示，周边可见棋盘 */
 #pauseOverlay.settlement{
   position:fixed;
@@ -748,41 +765,42 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* 棋盘大小网格 */
 .size-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%}
 .size-btn{
-  padding:10px 4px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);
-  background-image:var(--liquid-iris),var(--glass-w-06);background-origin:padding-box;
+  padding:10px 4px;border-radius:var(--radius-sm);border:1px solid var(--btn-border);
+  background-image:var(--btn-glass),var(--liquid-iris);background-origin:border-box;
   color:var(--text);font-size:.78rem;font-weight:500;
   cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);text-align:center;font-family:var(--font);
   backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
-  box-shadow:var(--glass-shadow);touch-action:manipulation;
+  box-shadow:var(--btn-shadow);touch-action:manipulation;
 }
 .size-btn:hover{border-color:var(--glass-w-16);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
 .size-btn:active{transform:scale(.93);transition:all .06s ease}
-.size-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
+.size-btn.selected{background-image:var(--btn-gold-bg);border-color:rgba(240,179,75,.55);color:var(--accent);box-shadow:var(--btn-gold-glow)}
 
 /* 按钮组（AI 数量、玩家数量） */
 .btn-group{display:flex;gap:6px;flex-wrap:wrap;width:100%}
 .btn-group .gb{
-  flex:1;min-width:44px;padding:9px 6px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);
-  background-image:var(--liquid-iris),var(--glass-w-06);background-origin:padding-box;
+  flex:1;min-width:44px;padding:9px 6px;border-radius:var(--radius-sm);border:1px solid var(--btn-border);
+  background-image:var(--btn-glass),var(--liquid-iris);background-origin:border-box;
   color:var(--text);font-size:.78rem;font-weight:500;
   cursor:pointer;transition:.35s cubic-bezier(.22,1,.36,1);text-align:center;font-family:var(--font);
   backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));
-  box-shadow:var(--glass-shadow);touch-action:manipulation;
+  box-shadow:var(--btn-shadow);touch-action:manipulation;
 }
-.btn-group .gb:hover{border-color:var(--glass-w-16);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04)}
-.btn-group .gb:active{transform:scale(.93);transition:all .06s ease}
-.btn-group .gb.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(240,179,75,.15)}
+.btn-group .gb:hover{border-color:var(--btn-border-hover);background-image:var(--btn-glass-hover),var(--liquid-iris);box-shadow:var(--btn-shadow-hover);transform:translateY(-1px)}
+.btn-group .gb:active{transform:scale(.93);box-shadow:var(--btn-shadow-active);transition:all .08s ease}
+.btn-group .gb.selected{background-image:var(--btn-gold-bg);border-color:rgba(240,179,75,.55);color:var(--accent);box-shadow:var(--btn-gold-glow)}
 .border-mode-group .gb{flex:1;font-size:.73rem;padding:7px 4px;min-width:0;white-space:nowrap}
 
 /* 评估函数切换按钮 */
 .toggle-group{display:flex;gap:4px;flex-wrap:wrap}
 .toggle-group .tg-btn{
-  background:var(--glass-w-04);border:1px solid var(--glass-w-08);
+  background:var(--glass-w-06);border:1px solid var(--btn-border);
   border-radius:var(--radius-sm);padding:6px 14px;font-size:.8rem;
-  color:var(--dim);cursor:pointer;transition:all .15s ease;
+  color:var(--text);cursor:pointer;transition:all .15s ease;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
 }
-.toggle-group .tg-btn:hover{background:var(--glass-w-08);color:var(--text)}
-.toggle-group .tg-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
+.toggle-group .tg-btn:hover{background:var(--glass-w-10);color:var(--text);border-color:var(--btn-border-hover)}
+.toggle-group .tg-btn.selected{background-image:var(--btn-gold-bg);border-color:rgba(240,179,75,.55);color:var(--accent);box-shadow:var(--btn-gold-glow)}
 .toggle-group .tg-btn:active{transform:scale(.93)}
 
 /* 算法选择卡片 */
@@ -821,11 +839,12 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .eve-ai-row:hover{border-color:var(--glass-w-14);box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .eve-ai-row .alg-mini{display:flex;gap:4px;flex:1}
 .eve-ai-row .alg-mini .am-btn{
-  flex:1;padding:4px 6px;border-radius:6px;border:1px solid var(--glass-w-08);
-  background:var(--glass-w-04);color:var(--dim);font-size:.7rem;font-weight:500;
+  flex:1;padding:4px 6px;border-radius:6px;border:1px solid var(--btn-border);
+  background:var(--glass-w-06);color:var(--text);font-size:.7rem;font-weight:500;
   cursor:pointer;transition:.1s;text-align:center;font-family:var(--font);white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
 }
-.eve-ai-row .alg-mini .am-btn:hover{background:var(--glass-w-08)}
+.eve-ai-row .alg-mini .am-btn:hover{background:var(--glass-w-10);border-color:var(--btn-border-hover)}
 .eve-ai-row .alg-mini .am-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
 .eve-ai-row .depth-mini{display:flex;align-items:center;gap:2px}
 .eve-ai-row .depth-mini .dm-btn{
@@ -838,7 +857,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .eve-ai-row .depth-mini.hidden{display:none}
 
 /* 全局 am-btn（支持 eve 行和 modal 弹窗） */
-.am-btn{flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--glass-w-08);
+.am-btn{flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--btn-border);
   background:var(--glass-w-04);color:var(--dim);font-size:.72rem;font-weight:500;
   cursor:pointer;transition:.1s;text-align:center;font-family:var(--font);white-space:nowrap}
 .am-btn:hover{background:var(--glass-w-08)}
@@ -880,6 +899,22 @@ body{padding-top:env(safe-area-inset-top,20px)}
     --glass-w-16:rgba(0,0,0,.16);
     --glass-w-18:rgba(0,0,0,.18);
     --glass-w-20:rgba(0,0,0,.20);
+    --danger:#c0392b;
+    --btn-glass:linear-gradient(180deg,rgba(255,255,255,.92) 0%,rgba(255,255,255,.68) 100%);
+    --btn-glass-hover:linear-gradient(180deg,#fff 0%,rgba(255,255,255,.82) 100%);
+    --btn-border:rgba(0,0,0,.13);
+    --btn-border-hover:rgba(0,0,0,.26);
+    --btn-shadow:0 2px 8px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(0,0,0,.04);
+    --btn-shadow-hover:0 4px 16px rgba(0,0,0,.10),inset 0 1px 0 #fff;
+    --btn-shadow-active:inset 0 2px 6px rgba(0,0,0,.10),inset 0 1px 0 rgba(255,255,255,.8);
+    --btn-primary-bg:linear-gradient(180deg,rgba(26,139,127,.14) 0%,rgba(26,139,127,.06) 100%);
+    --btn-primary-bg-hover:linear-gradient(180deg,rgba(26,139,127,.20) 0%,rgba(26,139,127,.09) 100%);
+    --btn-primary-glow:0 2px 10px rgba(26,139,127,.12),inset 0 1px 0 rgba(255,255,255,.9);
+    --btn-danger-bg:linear-gradient(180deg,rgba(192,57,43,.12) 0%,rgba(192,57,43,.05) 100%);
+    --btn-danger-bg-hover:linear-gradient(180deg,rgba(192,57,43,.18) 0%,rgba(192,57,43,.08) 100%);
+    --btn-danger-glow:0 2px 10px rgba(192,57,43,.10),inset 0 1px 0 rgba(255,255,255,.9);
+    --btn-gold-bg:linear-gradient(180deg,rgba(192,104,7,.14) 0%,rgba(192,104,7,.06) 100%);
+    --btn-gold-glow:0 2px 10px rgba(192,104,7,.12),inset 0 1px 0 rgba(255,255,255,.85);
   }
   html:not([data-theme='dark']) body::before{background:
     radial-gradient(ellipse 70% 50% at 50% -10%,rgba(217,119,6,.06) 0%,transparent 70%),
@@ -925,6 +960,22 @@ body.light-mode{
     --glass-w-16:rgba(0,0,0,.16);
     --glass-w-18:rgba(0,0,0,.18);
     --glass-w-20:rgba(0,0,0,.20);
+    --danger:#c0392b;
+    --btn-glass:linear-gradient(180deg,rgba(255,255,255,.92) 0%,rgba(255,255,255,.68) 100%);
+    --btn-glass-hover:linear-gradient(180deg,#fff 0%,rgba(255,255,255,.82) 100%);
+    --btn-border:rgba(0,0,0,.13);
+    --btn-border-hover:rgba(0,0,0,.26);
+    --btn-shadow:0 2px 8px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(0,0,0,.04);
+    --btn-shadow-hover:0 4px 16px rgba(0,0,0,.10),inset 0 1px 0 #fff;
+    --btn-shadow-active:inset 0 2px 6px rgba(0,0,0,.10),inset 0 1px 0 rgba(255,255,255,.8);
+    --btn-primary-bg:linear-gradient(180deg,rgba(26,139,127,.14) 0%,rgba(26,139,127,.06) 100%);
+    --btn-primary-bg-hover:linear-gradient(180deg,rgba(26,139,127,.20) 0%,rgba(26,139,127,.09) 100%);
+    --btn-primary-glow:0 2px 10px rgba(26,139,127,.12),inset 0 1px 0 rgba(255,255,255,.9);
+    --btn-danger-bg:linear-gradient(180deg,rgba(192,57,43,.12) 0%,rgba(192,57,43,.05) 100%);
+    --btn-danger-bg-hover:linear-gradient(180deg,rgba(192,57,43,.18) 0%,rgba(192,57,43,.08) 100%);
+    --btn-danger-glow:0 2px 10px rgba(192,57,43,.10),inset 0 1px 0 rgba(255,255,255,.9);
+    --btn-gold-bg:linear-gradient(180deg,rgba(192,104,7,.14) 0%,rgba(192,104,7,.06) 100%);
+    --btn-gold-glow:0 2px 10px rgba(192,104,7,.12),inset 0 1px 0 rgba(255,255,255,.85);
   }
   body.light-mode::before{background:
     radial-gradient(ellipse 70% 50% at 50% -10%,rgba(217,119,6,.06) 0%,transparent 70%),
@@ -1335,3 +1386,72 @@ html[data-theme='dark']{color-scheme:dark}
 html[data-theme='light']{color-scheme:light}
 body.light-mode{color-scheme:light}
 html:not([data-theme]){color-scheme:light dark}
+
+/* ═══════ 对局回放覆盖层 ═══════ */
+.replay-overlay{
+  position:fixed;inset:0;z-index:1600;
+  background:rgba(8,8,12,.92);
+  -webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:14px 16px;
+  padding-top:calc(14px + env(safe-area-inset-top,0px));
+  padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  animation:fadeIn .25s ease;
+}
+.replay-header{
+  width:min(88vw,440px);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;margin-bottom:2px;
+}
+.replay-title{
+  font-size:1.05rem;font-weight:var(--weight-bold);color:var(--text);
+  letter-spacing:.5px;
+}
+.replay-spacer{width:88px}
+.replay-overlay .board-wrap{width:min(82vw,400px);height:min(82vw,400px)}
+.replay-overlay .cell{cursor:default}
+.replay-controls{
+  width:min(88vw,440px);
+  display:flex;flex-direction:column;gap:8px;
+  background:var(--glass-w-06);
+  border:1px solid var(--glass-w-08);
+  border-radius:14px;
+  padding:12px 14px;
+  box-shadow:inset 0 1px 0 var(--glass-w-03),0 0 0 1px rgba(200,215,255,.02);
+}
+.rp-row{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.rp-row .glass-btn{
+  min-width:42px;padding:8px 10px;font-size:.95rem;
+}
+.rp-step-label{
+  font-size:.8rem;color:var(--dim);font-weight:600;
+  min-width:64px;text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+#rpSlider{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:5px;border-radius:3px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  outline:none;cursor:pointer;
+}
+#rpSlider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:18px;height:18px;border-radius:50%;
+  background:#fff;border:2px solid var(--accent);
+  box-shadow:0 2px 8px rgba(0,0,0,.45);
+  cursor:pointer;
+}
+#rpSlider::-moz-range-thumb{
+  width:16px;height:16px;border-radius:50%;
+  background:#fff;border:2px solid var(--accent);
+  cursor:pointer;
+}
+.rp-opt-row{justify-content:center}
+.rp-opt-label{font-size:.75rem;color:var(--dim);font-weight:600}
+.rp-opt-row .btn-group .gb{
+  padding:5px 10px;font-size:.75rem;
+}
+#rpAnimBtn{padding:5px 12px;font-size:.75rem}
+#rpAnimBtn.anim-off{opacity:.55}

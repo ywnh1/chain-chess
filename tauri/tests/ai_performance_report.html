@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>连锁棋 · AI 实力测试分析报告</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0f0f15;--card:#1a1a22;--text:#e8e6e3;--dim:#9a97a5;--line:#2a2a35}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'PingFang SC','Microsoft YaHei',system-ui,sans-serif;margin:0;padding:24px 16px;line-height:1.7}
+.wrap{max-width:980px;margin:0 auto}
+h1{font-size:1.6rem;margin:0 0 4px}
+h2{font-size:1.15rem;margin:34px 0 10px;padding-left:10px;border-left:4px solid #5fc3c3}
+.sub{color:var(--dim);font-size:.85rem;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:14px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+canvas{max-height:300px}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{border:1px solid var(--line);padding:7px 10px;text-align:center}
+th{background:#22222c;color:var(--dim);font-weight:600}
+.kpi{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0}
+.kpi .box{flex:1;min-width:150px;background:#14141c;border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+.kpi .num{font-size:1.7rem;font-weight:700}
+.kpi .lbl{color:var(--dim);font-size:.78rem}
+.hl{color:#5fc3c3;font-weight:700}
+.warn{background:rgba(240,179,75,.08);border:1px solid rgba(240,179,75,.3);border-radius:10px;padding:10px 14px;margin:10px 0;font-size:.88rem}
+ul{margin:8px 0;padding-left:20px}
+li{margin:4px 0}
+p{margin:8px 0}
+.small{color:var(--dim);font-size:.78rem}
+code{background:#22222c;padding:1px 5px;border-radius:4px;font-size:.8em}
+</style></head><body><div class="wrap">
+<h1>♟ 连锁棋 · AI 实力测试分析报告</h1>
+<div class="sub">tauri 端引擎 · 7×7 棋盘 · 4 算法混战（每算法一名）· 4 边界 × 4 阈值 = 16 组合 × 6 局 = 96 局<br>
+搜索配置：A-B / PVS 深度 2 · MCTS 深度 1（800 迭代）· 随机刻度 5% · 初始首子合法分散布局</div>
+
+<h2>一、总体格局</h2>
+<div class="kpi">
+  <div class="box"><div class="num" style="color:#5fc3c3">47.9%</div><div class="lbl">Alpha-Beta 胜率（46/96）</div></div>
+  <div class="box"><div class="num" style="color:#f0b34b">33.3%</div><div class="lbl">策略算法胜率（32/96）</div></div>
+  <div class="box"><div class="num" style="color:#ff8a8a">12.5%</div><div class="lbl">MCTS 胜率（12/96）</div></div>
+  <div class="box"><div class="num" style="color:#b48cff">6.2%</div><div class="lbl">PVS 胜率（6/96）</div></div>
+</div>
+<div class="grid">
+<div class="card"><canvas id="cWin"></canvas><p class="small" style="text-align:center">各算法总胜场（/96）</p></div>
+<div class="card"><canvas id="cRank"></canvas><p class="small" style="text-align:center">平均淘汰名次（4=最后存活，1=最先出局）</p></div>
+</div>
+<p><span class="hl">A-B 一枝独秀</span>：近半数对局由 Alpha-Beta 取胜，且平均淘汰名次最高（2.85）——既赢得最多，又通常活得最久。<span class="hl">PVS 全面垫底</span>（6.2% 胜率、平均第 2.02 名出局），与 A-B 同为 α-β 系搜索却表现悬殊，值得单独立项排查。</p>
+
+<h2>二、阈值模式（速爆 / 标准 / 重炮 / 混合）的影响</h2>
+<div class="card"><canvas id="cCm"></canvas><p class="small" style="text-align:center">各阈值模式下算法胜场分布（每模式 24 局）</p></div>
+<div class="warn">⚠ <b>重大异常：重炮 5（5 级才炸）模式下，策略算法 24/24 全胜，A-B / PVS / MCTS 全灭。</b>4 种边界模式无一例外（默认 6/6、回环 6/6、反弹 6/6、降级 6/6），对局步数普遍拉长到 250~310 步。</div>
+<p><b>疑似根因（AI 搜索硬编码了 4 级阈值假设）</b>：</p>
+<ul>
+<li><b>威胁判断失真</b>：PVS 的启发式把「count ≥ 3 的己方格」视为即将爆炸（<code>min_explosive=3</code>），但重炮模式下要 5 级才炸——搜索把算力花在"永远不会爆"的格子上，错失真正积攒到 4 级的临界格（count=4 只差一步就炸，却被当安全处理）。</li>
+<li><b>评估函数假设 4 级阈值</b>：手写评估 / XGBoost 按「4 子即爆」的先验打分，重炮模式的慢节奏堆积局面被严重低估。</li>
+<li><b>策略算法天然适合慢局</b>：启发式"保守积累、等待大爆发"的打法在 5 级阈值拉长的对局里恰好匹配；搜索算法因错误的爆炸先验反而频繁送子。</li>
+</ul>
+<p>这暴露了引擎的一个真实适配缺口：<b>AI 搜索的启发式没有随 capMode 校准</b>。修复方向：让 <code>min_explosive</code>、评估函数与当前阈值模式联动（按 capMode 推导"临界等级"）。</p>
+<p>反观 <span class="hl">混合模式（每格随机 3/4/5）下 MCTS 表现最好</span>（8/24，33%，高于其整体 12.5%）：蒙特卡洛随机模拟不依赖"固定阈值"先验，天然适应每格阈值不确定的棋盘——这是 MCTS 在该模式下的结构性优势。</p>
+
+<h2>三、边界模式（默认 / 回环 / 反弹 / 降级）的影响</h2>
+<div class="card"><canvas id="cBm"></canvas><p class="small" style="text-align:center">各边界模式下算法胜场分布（每模式 24 局）</p></div>
+<p>边界模式对实力格局影响较小（A-B 在 46%~50% 间波动），但有一个值得注意的细节：<span class="hl">回环模式下策略算法的表现显著提升</span>（11/24，与 A-B 打平，占其总胜场 32 局的 1/3 以上）——回环边界让爆炸更容易跨盘面传播，保守型策略在中长局的回环棋盘上收益更大。</p>
+
+<h2>四、分棋盘组合胜率热力图</h2>
+<div class="card"><table id="heatTable"></table>
+<p class="small" style="text-align:center">每格 = 该组合（6 局）胜率最高的算法与胜场（背景色深度 = 胜率）</p></div>
+
+<h2>五、对局节奏（平均步数）</h2>
+<div class="grid">
+<div class="card"><canvas id="cStepsCm"></canvas><p class="small" style="text-align:center">按阈值模式的平均步数</p></div>
+<div class="card"><canvas id="cStepsBm"></canvas><p class="small" style="text-align:center">按边界模式的平均步数</p></div>
+</div>
+<div class="card"><table id="stepsTable"></table></div>
+<p>节奏呈两极：<span class="hl">混合模式最快</span>（平均 86 步/局，随机低阈值格大量引爆加速终结）；<span class="hl">速爆 3 反而最慢</span>（平均 347 步，回环+速爆甚至有一局打到 1000 步上限）——3 级即炸让连锁频繁触发，但 4 人混战中棋子被反复炸散、难以有人被彻底吃光，形成"低效僵持"。<span class="hl">重炮 5 步数也偏长</span>（平均 262 步），且伴随策略算法统治，是当前最有问题的组合。</p>
+
+<h2>六、A-B vs 策略：争胜与存活的分化</h2>
+<div class="card"><canvas id="cVs"></canvas><p class="small" style="text-align:center">同一局内 A-B 与策略的相对名次（96 局）</p></div>
+<p>有趣的分化：A-B 赢下 46 局（总胜率第一），但在两两比较中，<span class="hl">策略"名次更高"的次数反而更多</span>（53 vs 41）——A-B 更擅长"锁定胜局"（激进扩张、主动引爆），策略更擅长"活得久"（保守、少惹事）。这与「A-B 靠评估深度取胜、策略靠稳健存活拿名次」的画像一致。</p>
+
+<h2>七、结论与建议</h2>
+<ul>
+<li><b>当前版本实力排序</b>：Alpha-Beta &gt; 策略 &gt; MCTS &gt; PVS（总体胜率 47.9% / 33.3% / 12.5% / 6.2%）。</li>
+<li><b>首要问题</b>：重炮 5 模式下搜索算法全灭，强烈指向 AI 搜索对爆炸阈值的硬编码假设——建议优先修 <code>min_explosive</code> 与评估函数随 capMode 校准，再复测该模式。</li>
+<li><b>PVS 需专项排查</b>：同为 α-β 系却大幅落后 A-B，疑与 killer/history 启发或评估入口差异有关。</li>
+<li><b>MCTS 潜力</b>：混合棋盘下表现突出，值得在深度配置上调优后重点观察。</li>
+<li><b>对局节奏</b>：速爆 3 的"僵持"与 1000 步上限命中，提示该模式下应研究终结机制（如提高连锁伤害或引入平局判定）。</li>
+</ul>
+<p class="small">数据源：tauri/tests/ai_report.json（96 局原始对局）· 由 ai_bench（tauri 端引擎）生成 · 报告时间 2026-08-03</p>
+</div>
+<script>
+const D = {"algs": ["strategy", "alphabeta", "pvs", "mcts"], "labels": ["策略", "A-B", "PVS", "MCTS"], "colors": ["#f0b34b", "#5fc3c3", "#b48cff", "#ff8a8a"], "wins": [32, 46, 6, 12], "winRate": [33.3, 47.9, 6.2, 12.5], "avgRank": [2.88, 2.85, 2.02, 2.55], "cmOrder": ["3", "4", "5", "mixed"], "cmLabels": ["速爆3", "标准4", "重炮5", "混合"], "cmWin": [[1, 18, 3, 2], [3, 18, 1, 2], [24, 0, 0, 0], [4, 10, 2, 8]], "bmOrder": ["default", "wrap", "bounce", "degrade"], "bmLabels": ["默认", "回环", "反弹", "降级"], "bmWin": [[6, 12, 3, 3], [11, 11, 0, 2], [6, 12, 1, 5], [9, 11, 2, 2]], "stepsCm": [347, 114, 262, 86], "stepsBm": [226, 199, 206, 176], "cell": {"default|3": {"strategy": 0, "alphabeta": 5, "pvs": 1, "mcts": 0}, "default|4": {"strategy": 0, "alphabeta": 5, "pvs": 1, "mcts": 0}, "default|5": {"strategy": 6, "alphabeta": 0, "pvs": 0, "mcts": 0}, "default|mixed": {"strategy": 0, "alphabeta": 2, "pvs": 1, "mcts": 3}, "wrap|3": {"strategy": 1, "alphabeta": 5, "pvs": 0, "mcts": 0}, "wrap|4": {"strategy": 2, "alphabeta": 3, "pvs": 0, "mcts": 1}, "wrap|5": {"strategy": 6, "alphabeta": 0, "pvs": 0, "mcts": 0}, "wrap|mixed": {"strategy": 2, "alphabeta": 3, "pvs": 0, "mcts": 1}, "bounce|3": {"strategy": 0, "alphabeta": 5, "pvs": 0, "mcts": 1}, "bounce|4": {"strategy": 0, "alphabeta": 6, "pvs": 0, "mcts": 0}, "bounce|5": {"strategy": 6, "alphabeta": 0, "pvs": 0, "mcts": 0}, "bounce|mixed": {"strategy": 0, "alphabeta": 1, "pvs": 1, "mcts": 4}, "degrade|3": {"strategy": 0, "alphabeta": 3, "pvs": 2, "mcts": 1}, "degrade|4": {"strategy": 1, "alphabeta": 4, "pvs": 0, "mcts": 1}, "degrade|5": {"strategy": 6, "alphabeta": 0, "pvs": 0, "mcts": 0}, "degrade|mixed": {"strategy": 2, "alphabeta": 4, "pvs": 0, "mcts": 0}}, "cellG": {"default|3": 6, "default|4": 6, "default|5": 6, "default|mixed": 6, "wrap|3": 6, "wrap|4": 6, "wrap|5": 6, "wrap|mixed": 6, "bounce|3": 6, "bounce|4": 6, "bounce|5": 6, "bounce|mixed": 6, "degrade|3": 6, "degrade|4": 6, "degrade|5": 6, "degrade|mixed": 6}, "cellSteps": {"default|3": 332, "default|4": 174, "default|5": 287, "default|mixed": 112, "wrap|3": 428, "wrap|4": 87, "wrap|5": 211, "wrap|mixed": 72, "bounce|3": 366, "bounce|4": 124, "bounce|5": 276, "bounce|mixed": 59, "degrade|3": 262, "degrade|4": 72, "degrade|5": 272, "degrade|mixed": 100}, "abVsSt": [41, 53, 2]};
+const AL = D.labels, COL = D.colors;
+new Chart(document.getElementById('cWin'),{type:'bar',data:{labels:AL,datasets:[{data:D.wins,backgroundColor:COL,borderRadius:8}]},options:{plugins:{legend:{display:false},title:{display:true,text:'总胜场 / 96',color:'#9a97a5'}},scales:{y:{beginAtZero:true,ticks:{stepSize:10,color:'#9a97a5'},grid:{color:'#2a2a35'}},x:{ticks:{color:'#9a97a5'}}}}});
+new Chart(document.getElementById('cRank'),{type:'bar',data:{labels:AL,datasets:[{data:D.avgRank,backgroundColor:COL,borderRadius:8}]},options:{plugins:{legend:{display:false},title:{display:true,text:'平均淘汰名次（越高越好）',color:'#9a97a5'}},scales:{y:{min:1,max:4,ticks:{color:'#9a97a5'},grid:{color:'#2a2a35'}},x:{ticks:{color:'#9a97a5'}}}}});
+new Chart(document.getElementById('cCm'),{type:'bar',data:{labels:D.cmLabels,datasets:AL.map((a,i)=>({label:a,data:D.cmWin.map(row=>row[i]),backgroundColor:COL[i]}))},options:{plugins:{legend:{position:'bottom'},title:{display:true,text:'各阈值模式下的胜场（每模式 24 局）',color:'#9a97a5'}},scales:{x:{stacked:true,ticks:{color:'#9a97a5'}},y:{stacked:true,beginAtZero:true,ticks:{color:'#9a97a5'},grid:{color:'#2a2a35'}}}}});
+new Chart(document.getElementById('cBm'),{type:'bar',data:{labels:D.bmLabels,datasets:AL.map((a,i)=>({label:a,data:D.bmWin.map(row=>row[i]),backgroundColor:COL[i]}))},options:{plugins:{legend:{position:'bottom'},title:{display:true,text:'各边界模式下的胜场（每模式 24 局）',color:'#9a97a5'}},scales:{x:{stacked:true,ticks:{color:'#9a97a5'}},y:{stacked:true,beginAtZero:true,ticks:{color:'#9a97a5'},grid:{color:'#2a2a35'}}}}});
+new Chart(document.getElementById('cStepsCm'),{type:'bar',data:{labels:D.cmLabels,datasets:[{data:D.stepsCm,backgroundColor:'#5fc3c3',borderRadius:8}]},options:{plugins:{legend:{display:false},title:{display:true,text:'平均步数（按阈值）',color:'#9a97a5'}},scales:{y:{beginAtZero:true,ticks:{color:'#9a97a5'},grid:{color:'#2a2a35'}},x:{ticks:{color:'#9a97a5'}}}}});
+new Chart(document.getElementById('cStepsBm'),{type:'bar',data:{labels:D.bmLabels,datasets:[{data:D.stepsBm,backgroundColor:'#b48cff',borderRadius:8}]},options:{plugins:{legend:{display:false},title:{display:true,text:'平均步数（按边界）',color:'#9a97a5'}},scales:{y:{beginAtZero:true,ticks:{color:'#9a97a5'},grid:{color:'#2a2a35'}},x:{ticks:{color:'#9a97a5'}}}}});
+new Chart(document.getElementById('cVs'),{type:'doughnut',data:{labels:['A-B 名次更高','策略名次更高','平局'],datasets:[{data:D.abVsSt,backgroundColor:['#5fc3c3','#f0b34b','#9a97a5']}]},options:{plugins:{legend:{position:'bottom'},title:{display:true,text:'同局内 A-B vs 策略 相对名次',color:'#9a97a5'}}}});
+const bmOrder=D.bmOrder, cmOrder=D.cmOrder;
+let ht='<tr><th>边界 \\ 阈值</th>'+cmOrder.map(c=>'<th>'+D.cmLabels[cmOrder.indexOf(c)]+'</th>').join('')+'</tr>';
+for(const b of bmOrder){
+  let row='<tr><th>'+D.bmLabels[bmOrder.indexOf(b)]+'</th>';
+  for(const c of cmOrder){
+    const key=b+'|'+c, cell=D.cell[key], g=D.cellG[key];
+    const best=Object.entries(cell).sort((x,y)=>y[1]-x[1])[0];
+    const pct=Math.round(best[1]/g*100);
+    const base={alphabeta:'95,195,195',strategy:'240,179,75',mcts:'255,138,138',pvs:'180,140,255'}[best[0]];
+    const color='rgba('+base+','+(0.18+0.55*pct/100).toFixed(2)+')';
+    row+='<td style="background:'+color+'">'+AL[AL.indexOf(best[0])]+' '+best[1]+'/'+g+'</td>';
+  }
+  row+='</tr>'; ht+=row;
+}
+document.getElementById('heatTable').innerHTML=ht;
+let st='<tr><th>边界 \\ 阈值</th>'+cmOrder.map(c=>'<th>'+D.cmLabels[cmOrder.indexOf(c)]+'</th>').join('')+'</tr>';
+for(const b of bmOrder){
+  let row='<tr><th>'+D.bmLabels[bmOrder.indexOf(b)]+'</th>';
+  for(const c of cmOrder){ row+='<td>'+D.cellSteps[b+'|'+c]+'</td>'; }
+  st+=row+'</tr>';
+}
+document.getElementById('stepsTable').innerHTML=st;
+</script></body></html>

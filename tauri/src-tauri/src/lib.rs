@@ -7,6 +7,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use rand::Rng;
+use rand::SeedableRng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -26,12 +27,38 @@ pub enum BorderMode {
     Bounce,
     #[serde(rename = "degrade")]
     Degrade,
+    /// 随机：每次爆炸随机选择一种边界行为
+    #[serde(rename = "random")]
+    Random,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+/// 爆炸阈值模式（独立于边界模式）：3 级炸 / 4 级炸（默认）/ 5 级炸 / 混合（每格随机 3/4/5）
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+pub enum CapMode {
+    #[serde(rename = "3")]
+    Cap3,
+    #[serde(rename = "4")]
+    Cap4,
+    #[serde(rename = "5")]
+    Cap5,
+    /// 混合：开局每格确定阈值，之后不变
+    #[serde(rename = "mixed")]
+    Mixed,
+    /// 随机：每步各自随机阈值 3/4/5
+    #[serde(rename = "random")]
+    Random,
+}
+impl Default for CapMode {
+    fn default() -> Self { CapMode::Cap4 }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Cell {
     pub owner: Option<usize>,
     pub count: u8,
+    /// 混合模式(mixed)下每格固定爆炸阈值（3/4/5），其它模式为 None
+    #[serde(default)]
+    pub th: Option<u8>,
 }
 
 pub type GameBoard = Vec<Vec<Cell>>;
@@ -64,6 +91,9 @@ pub struct PlayerSnapshot {
 pub struct TurnHistory {
     pub turn: u32,
     pub snapshot: std::collections::HashMap<String, PlayerSnapshot>,
+    /// 本步落子 (x, y, player, rng_seed)，初始状态为 None
+    #[serde(default)]
+    pub mv: Option<[u64; 4]>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -138,10 +168,13 @@ async fn process_move(
     player: usize,
     max_players: usize,
     border_mode: BorderMode,
+    cap_mode: Option<CapMode>,
+    seed: Option<u64>,
 ) -> Result<ProcessMoveResult, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut b = board.clone();
-        let (eliminated, chain_count, killed_by) = process_click_with_killer(&mut b, size, x, y, player, max_players, border_mode);
+        let cap_mode = cap_mode.unwrap_or_default();
+        let (eliminated, chain_count, killed_by) = process_click_with_killer(&mut b, size, x, y, player, max_players, border_mode, cap_mode, seed);
         let game_over = eliminated.len() >= max_players.saturating_sub(1);
         let winner = if game_over {
             // find the remaining player
@@ -176,13 +209,15 @@ async fn ai_move(
     eliminated: Vec<usize>,
     max_players: usize,
     border_mode: BorderMode,
+    cap_mode: Option<CapMode>,
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
     use_ml_eval: bool,
     random_scale: u32,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval, border_mode, random_scale)
+        let cap_mode = cap_mode.unwrap_or_default();
+        find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval, border_mode, cap_mode, random_scale)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -203,19 +238,21 @@ async fn ai_move_v2(
     eliminated: Vec<usize>,
     max_players: usize,
     border_mode: BorderMode,
+    cap_mode: Option<CapMode>,
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
     algorithm: String,
     use_ml_eval: bool,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let cap_mode = cap_mode.unwrap_or_default();
         if algorithm == "pvs" {
             // PVS (NegaMax) + Killer/History + QSearch
-            let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval, border_mode, random_scale);
+            let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval, border_mode, cap_mode, random_scale);
             searcher.find_best(&board, size, player, max_players, &eliminated, depth)
         } else {
             // 默认使用 Alpha-Beta（原 find_best_move）
-            find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval, border_mode, random_scale)
+            find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval, border_mode, cap_mode, random_scale)
         }
     })
     .await
@@ -235,11 +272,13 @@ async fn ai_move_strategy(
     eliminated: Vec<usize>,
     max_players: usize,
     border_mode: BorderMode,
+    cap_mode: Option<CapMode>,
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        find_best_move_strategy(&board, size, player, &eliminated, max_players, game_count, first_move_pos, border_mode)
+        let cap_mode = cap_mode.unwrap_or_default();
+        find_best_move_strategy(&board, size, player, &eliminated, max_players, game_count, first_move_pos, border_mode, cap_mode)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -262,22 +301,21 @@ pub struct SimulateResult {
     pub history: Vec<TurnHistory>,
 }
 
-/// 一键终局：场上只剩 AI 时，后端无动画直接模拟到分出胜负。
+/// 一键终局：场上只剩 AI 时，无动画直接模拟到分出胜负（纯逻辑，供命令与 ai_bench 基准测试复用）。
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
-async fn simulate_to_end(
+pub fn simulate_to_end(
     board: GameBoard,
     size: usize,
     max_players: usize,
     cur_player: usize,
     eliminated: Vec<usize>,
     border_mode: BorderMode,
+    cap_mode: CapMode,
     first_move_pos: Option<[usize; 2]>,
     game_count: u32,
     ai_configs: std::collections::HashMap<String, serde_json::Value>,
-) -> Result<SimulateResult, String> {
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        let mut b = board.clone();
+) -> SimulateResult {
+    let mut b = board.clone();
         let mut elim = eliminated.clone();
         let mut killed_by: Vec<(usize, usize)> = Vec::new();
         let mut chain_stats: std::collections::HashMap<String, ChainStatsPlayer> = std::collections::HashMap::new();
@@ -333,17 +371,17 @@ async fn simulate_to_end(
             let use_ml_eval = cfg.get("useMlEval").and_then(|v| v.as_bool()).unwrap_or(true);
 
             let mv = match alg.as_str() {
-                "mcts" => find_best_move_mcts(&b, size, cur, depth, &elim, max_players, border_mode),
+                "mcts" => find_best_move_mcts(&b, size, cur, depth, &elim, max_players, border_mode, cap_mode),
                 "pvs" => {
                     let rnd = cfg.get("randomScale").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                    let mut searcher = PvsSearcher::new(cur, gc, use_ml_eval, border_mode, rnd);
+                    let mut searcher = PvsSearcher::new(cur, gc, use_ml_eval, border_mode, cap_mode, rnd);
                     searcher.find_best(&b, size, cur, max_players, &elim, depth)
                 }
                 "alphabeta" => {
                     let rnd = cfg.get("randomScale").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                    find_best_move(&b, size, cur, depth, &elim, max_players, gc, first_move_pos, use_ml_eval, border_mode, rnd)
+                    find_best_move(&b, size, cur, depth, &elim, max_players, gc, first_move_pos, use_ml_eval, border_mode, cap_mode, rnd)
                 },
-                _ => find_best_move_strategy(&b, size, cur, &elim, max_players, gc, first_move_pos, border_mode),
+                _ => find_best_move_strategy(&b, size, cur, &elim, max_players, gc, first_move_pos, border_mode, cap_mode),
             };
             let Some((x, y)) = mv else {
                 no_move_round += 1;
@@ -364,8 +402,10 @@ async fn simulate_to_end(
             };
             no_move_round = 0;
 
+            // 每步随机事件的确定性种子（供回放复现）：由局号与步号派生
+            let step_seed = (gc as u64).wrapping_mul(1000003u64).wrapping_add(history.len() as u64);
             let (elims, chain_count, kbs) =
-                process_click_with_killer(&mut b, size, x, y, cur, max_players, border_mode);
+                process_click_with_killer(&mut b, size, x, y, cur, max_players, border_mode, cap_mode, Some(step_seed));
             killed_by.extend(kbs);
             for e in elims {
                 if !elim.contains(&e) {
@@ -398,16 +438,34 @@ async fn simulate_to_end(
                 }
                 sn.insert(p.to_string(), PlayerSnapshot { pieces, points });
             }
-            history.push(TurnHistory { turn: history.len() as u32, snapshot: sn });
+            history.push(TurnHistory { turn: history.len() as u32, snapshot: sn, mv: Some([x as u64, y as u64, cur as u64, step_seed]) });
 
             gc += 1;
             let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
             cur = alive[(idx + 1) % alive.len()];
         }
+}
+
+/// 一键终局命令（前端入口）：线程池中执行 simulate_to_end
+#[allow(clippy::too_many_arguments)]
+#[tauri::command(rename = "simulate_to_end")]
+async fn simulate_to_end_cmd(
+    board: GameBoard,
+    size: usize,
+    max_players: usize,
+    cur_player: usize,
+    eliminated: Vec<usize>,
+    border_mode: BorderMode,
+    cap_mode: Option<CapMode>,
+    first_move_pos: Option<[usize; 2]>,
+    game_count: u32,
+    ai_configs: std::collections::HashMap<String, serde_json::Value>,
+) -> Result<SimulateResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        simulate_to_end(board, size, max_players, cur_player, eliminated, border_mode, cap_mode.unwrap_or_default(), first_move_pos, game_count, ai_configs)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
-
     Ok(result)
 }
 
@@ -421,9 +479,11 @@ async fn ai_move_mcts(
     eliminated: Vec<usize>,
     max_players: usize,
     border_mode: BorderMode,
+    cap_mode: Option<CapMode>,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        find_best_move_mcts(&board, size, player, depth, &eliminated, max_players, border_mode)
+        let cap_mode = cap_mode.unwrap_or_default();
+        find_best_move_mcts(&board, size, player, depth, &eliminated, max_players, border_mode, cap_mode)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -912,7 +972,7 @@ pub fn run() {
             ai_move_v2,
             ai_move_mcts,
             ai_move_strategy,
-            simulate_to_end,
+            simulate_to_end_cmd,
             load_settings,
             save_settings,
             check_update,
@@ -1306,7 +1366,35 @@ fn is_in_any_restricted_zone(board: &GameBoard, sz: usize, x: usize, y: usize) -
     false
 }
 
-pub fn process_click_with_killer(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize, _max_players: usize, border_mode: BorderMode) -> (Vec<usize>, u32, Vec<(usize, usize)>) {
+/// 计算格子的爆炸阈值：混合读每格 th；cap3/cap5 固定；随机每步随机 3/4/5；默认(4)保留降级边界位置修正
+fn explosion_threshold(cell: &Cell, x: usize, y: usize, sz: usize, border_mode: BorderMode, cap_mode: CapMode, rng: &mut Box<dyn rand::RngCore>) -> u32 {
+    match cap_mode {
+        CapMode::Mixed => cell.th.map(|t| t as u32).unwrap_or(4),
+        CapMode::Cap3 => 3,
+        CapMode::Cap5 => 5,
+        CapMode::Random => 3 + rng.gen_range(0..3),
+        CapMode::Cap4 => match border_mode {
+            BorderMode::Degrade => {
+                let on_corner = (x == 0 || x == sz - 1) && (y == 0 || y == sz - 1);
+                let on_edge = x == 0 || x == sz - 1 || y == 0 || y == sz - 1;
+                if on_corner { 2 } else if on_edge { 3 } else { 4 }
+            }
+            _ => 4,
+        },
+    }
+}
+
+pub fn process_click_with_killer(
+    board: &mut GameBoard,
+    sz: usize,
+    x: usize,
+    y: usize,
+    player: usize,
+    _max_players: usize,
+    border_mode: BorderMode,
+    cap_mode: CapMode,
+    seed: Option<u64>,
+) -> (Vec<usize>, u32, Vec<(usize, usize)>) {
     // collect owners before
     let before: HashSet<usize> = board
         .iter()
@@ -1317,12 +1405,20 @@ pub fn process_click_with_killer(board: &mut GameBoard, sz: usize, x: usize, y: 
     // check first move (no pieces yet) BEFORE mutable borrow
     let is_first = board[x][y].owner.is_none() && !has_pieces(board, player);
 
+    // 随机事件（速爆/重炮/随机模式）驱动：seed 有值则确定性可复现（回放/AI 搜索），否则真随机
+    let mut rng: Box<dyn rand::RngCore> = match seed {
+        Some(se) => Box::new(rand::rngs::StdRng::seed_from_u64(se)),
+        None => Box::new(rand::rngs::StdRng::from_entropy()),
+    };
+
     // place / upgrade
     {
         let cell = &mut board[x][y];
         if cell.owner.is_none() {
             cell.owner = Some(player);
-            cell.count = if is_first { 3 } else { 1 };
+            // 首子等级 = 阈值 n-1（临界态：再落一子即炸）；其余落子 +1
+            let th = explosion_threshold(cell, x, y, sz, border_mode, cap_mode, &mut rng);
+            cell.count = if is_first { th.saturating_sub(1) as u8 } else { 1 };
         } else if cell.owner == Some(player) {
             cell.count += 1;
         } else {
@@ -1334,7 +1430,11 @@ pub fn process_click_with_killer(board: &mut GameBoard, sz: usize, x: usize, y: 
     let mut chain: VecDeque<(usize, usize)> = VecDeque::new();
     // victim -> killer：记录每个玩家最后一次被谁覆盖棋子（最后覆盖者即击败者）
     let mut last_killer: HashMap<usize, usize> = HashMap::new();
-    chain.push_back((x, y));
+    // 首子放置不进连锁（首子等级 = 阈值 n-1 为临界态，本步仅"放置"；
+    // 避免 random 模式下首子阈值与连锁阈值不一致导致首子立即爆炸）
+    if !is_first {
+        chain.push_back((x, y));
+    }
     let mut chain_count: u32 = 0;
     // 连锁防御上限：正常对局连锁远低于此值；
     // 防特定棋盘结构（相邻格子互相供能）下无限互炸导致死锁/卡死
@@ -1344,37 +1444,34 @@ pub fn process_click_with_killer(board: &mut GameBoard, sz: usize, x: usize, y: 
     while let Some((cx, cy)) = chain.pop_front() {
         chain_steps += 1;
         if chain_steps > MAX_CHAIN_STEPS { break; }
-        // 降级边界模式：角上阈值=2，边上阈值=3，中央阈值=4
-        let threshold = match border_mode {
-            BorderMode::Degrade => {
-                let on_corner = (cx == 0 || cx == sz-1) && (cy == 0 || cy == sz-1);
-                let on_edge = cx == 0 || cx == sz-1 || cy == 0 || cy == sz-1;
-                if on_corner { 2 } else if on_edge { 3 } else { 4 }
-            }
-            _ => 4,
+        // 随机边界模式：每次爆炸随机选择一种边界行为；其余模式固定
+        let eff_bm = match border_mode {
+            BorderMode::Random => match rng.gen_range(0..4) {
+                0 => BorderMode::Default,
+                1 => BorderMode::Wrap,
+                2 => BorderMode::Bounce,
+                _ => BorderMode::Degrade,
+            },
+            _ => border_mode,
         };
+        // 爆炸阈值（混合读每格 th；cap3/cap5 固定；随机每步随机 3/4/5；默认保留降级位置修正）
+        let threshold = explosion_threshold(&board[cx][cy], cx, cy, sz, eff_bm, cap_mode, &mut rng);
 
-        if board[cx][cy].count >= threshold {
+        if board[cx][cy].count as u32 >= threshold {
             let owner = board[cx][cy].owner.unwrap();
             board[cx][cy].count = 0;
             board[cx][cy].owner = None;
             chain_count += 1;
 
-            match border_mode {
+            // ── 按有效边界模式生成扩散目标；cap3/cap5 的随机特殊格对所有边界模式生效 ──
+            let (targets, bounce_extra): (Vec<(usize, usize)>, Vec<(usize, usize)>) = match eff_bm {
                 BorderMode::Wrap => {
                     // 回环边界：向四个方向爆炸，边界处回环到对面
                     let up = if cx == 0 { sz - 1 } else { cx - 1 };
                     let down = if cx + 1 >= sz { 0 } else { cx + 1 };
                     let left = if cy == 0 { sz - 1 } else { cy - 1 };
                     let right = if cy + 1 >= sz { 0 } else { cy + 1 };
-                    for &(nx, ny) in &[(up, cy), (down, cy), (cx, left), (cx, right)] {
-                        if let Some(pv) = board[nx][ny].owner {
-                            if pv != owner { last_killer.insert(pv, owner); }
-                        }
-                        board[nx][ny].owner = Some(owner);
-                        board[nx][ny].count = board[nx][ny].count.saturating_add(1);
-                        chain.push_back((nx, ny));
-                    }
+                    (vec![(up, cy), (down, cy), (cx, left), (cx, right)], vec![])
                 }
                 BorderMode::Bounce => {
                     // 反弹边界：出界的爆炸能量反弹到正对的邻居上
@@ -1386,40 +1483,81 @@ pub fn process_click_with_killer(board: &mut GameBoard, sz: usize, x: usize, y: 
                         (cx, cy + 1),
                     ];
                     let opposite = [1usize, 0, 3, 2];
-                    let mut has_valid = false;
-                    // 第一遍：所有有效方向 + 基础能量 1
+                    let mut targets = Vec::with_capacity(4);
                     for &(nx, ny) in &dirs {
                         if nx < sz && ny < sz {
-                            has_valid = true;
-                            if let Some(pv) = board[nx][ny].owner {
-                                if pv != owner { last_killer.insert(pv, owner); }
-                            }
-                            board[nx][ny].owner = Some(owner);
-                            board[nx][ny].count = board[nx][ny].count.saturating_add(1);
-                            chain.push_back((nx, ny));
+                            targets.push((nx, ny));
                         }
                     }
-                    if !has_valid { continue; }
-                    // 第二遍：出界方向的能量反弹到正对方向（额外 +1）
-                    for (i, &(nx, ny)) in dirs.iter().enumerate() {
-                        if nx >= sz || ny >= sz {
-                            let (ox, oy) = dirs[opposite[i]];
-                            if ox < sz && oy < sz {
-                                board[ox][oy].count = board[ox][oy].count.saturating_add(1);
+                    if targets.is_empty() {
+                        (targets, vec![])
+                    } else {
+                        // 第二遍：出界方向的能量反弹到正对方向（额外 +1）
+                        let mut extra = Vec::with_capacity(4);
+                        for (i, &(nx, ny)) in dirs.iter().enumerate() {
+                            if nx >= sz || ny >= sz {
+                                let (ox, oy) = dirs[opposite[i]];
+                                if ox < sz && oy < sz {
+                                    extra.push((ox, oy));
+                                }
                             }
                         }
+                        (targets, extra)
                     }
                 }
-                _ => {
-                    // 默认边界 / 降级边界：标准邻居扩散
-                    for (nx, ny) in nbrs(cx, cy, sz) {
+                _ => (nbrs(cx, cy, sz), vec![]),  // 默认/降级：标准邻居扩散
+            };
+
+            // 速爆(cap3)：随机一个扩散格被清空（不产生棋子，其原棋子被炸没）
+            // 重炮(cap5)：随机一个扩散格直接变成 2 级
+            let special = match cap_mode {
+                CapMode::Cap3 | CapMode::Cap5 => {
+                    if targets.is_empty() {
+                        None
+                    } else {
+                        Some(rng.gen_range(0..targets.len()))
+                    }
+                }
+                _ => None,
+            };
+
+            let mut apply = |board: &mut GameBoard, nx: usize, ny: usize, ti: usize, owner: usize, last_killer: &mut HashMap<usize, usize>| {
+                if let Some(sp) = special {
+                    if ti == sp {
                         if let Some(pv) = board[nx][ny].owner {
                             if pv != owner { last_killer.insert(pv, owner); }
                         }
-                        board[nx][ny].owner = Some(owner);
-                        board[nx][ny].count = board[nx][ny].count.saturating_add(1);
-                        chain.push_back((nx, ny));
+                        if cap_mode == CapMode::Cap3 {
+                            // 随机空一格：整格清空，不入连锁
+                            board[nx][ny].owner = None;
+                            board[nx][ny].count = 0;
+                        } else {
+                            // 随机一个是 2 级：覆盖为 2
+                            board[nx][ny].owner = Some(owner);
+                            board[nx][ny].count = 2;
+                            chain.push_back((nx, ny));
+                        }
+                        return;
                     }
+                }
+                if let Some(pv) = board[nx][ny].owner {
+                    if pv != owner { last_killer.insert(pv, owner); }
+                }
+                board[nx][ny].owner = Some(owner);
+                board[nx][ny].count = board[nx][ny].count.saturating_add(1);
+                chain.push_back((nx, ny));
+            };
+
+            for (ti, &(nx, ny)) in targets.iter().enumerate() {
+                apply(&mut *board, nx, ny, ti, owner, &mut last_killer);
+            }
+            // 反弹能量（跳过特殊格：被清空/置 2 的格不再接收反弹能量）
+            for &(nx, ny) in &bounce_extra {
+                let is_special = special.is_some_and(|sp| {
+                    targets.get(sp).map_or(false, |&(sx, sy)| sx == nx && sy == ny)
+                });
+                if !is_special {
+                    board[nx][ny].count = board[nx][ny].count.saturating_add(1);
                 }
             }
         }
@@ -1445,8 +1583,18 @@ pub fn process_click_with_killer(board: &mut GameBoard, sz: usize, x: usize, y: 
 }
 
 /// 无击败者信息的简单版本（供 AI 搜索/基准测试等内部调用）
-pub fn process_click(board: &mut GameBoard, sz: usize, x: usize, y: usize, player: usize, max_players: usize, border_mode: BorderMode) -> (Vec<usize>, u32) {
-    let (eliminated, chain_count, _) = process_click_with_killer(board, sz, x, y, player, max_players, border_mode);
+pub fn process_click(
+    board: &mut GameBoard,
+    sz: usize,
+    x: usize,
+    y: usize,
+    player: usize,
+    max_players: usize,
+    border_mode: BorderMode,
+    cap_mode: CapMode,
+    seed: Option<u64>,
+) -> (Vec<usize>, u32) {
+    let (eliminated, chain_count, _) = process_click_with_killer(board, sz, x, y, player, max_players, border_mode, cap_mode, seed);
     (eliminated, chain_count)
 }
 
@@ -1574,6 +1722,7 @@ struct GameState {
     game_count: u32,
     use_ml_eval: bool,
     border_mode: BorderMode,
+    cap_mode: CapMode,
     user_random_scale: u32,
 }
 
@@ -1598,7 +1747,7 @@ impl AlphaBeta<(usize, usize)> for GameState {
 
     fn set(&mut self, m: &(usize, usize)) {
         let (x, y) = *m;
-        let (elim, _chain) = process_click(&mut self.board, self.sz, x, y, self.player, self.max_players, self.border_mode);
+        let (elim, _chain) = process_click(&mut self.board, self.sz, x, y, self.player, self.max_players, self.border_mode, self.cap_mode, Some(0));
         for &e in &elim {
             if !self.eliminated.contains(&e) {
                 self.eliminated.push(e);
@@ -1738,11 +1887,12 @@ struct PvsSearcher {
     ai_player: usize,
     use_ml_eval: bool,
     border_mode: BorderMode,
+    cap_mode: CapMode,
     user_random_scale: u32,
 }
 
 impl PvsSearcher {
-    fn new(ai_player: usize, game_count: u32, use_ml_eval: bool, border_mode: BorderMode, user_random_scale: u32) -> Self {
+    fn new(ai_player: usize, game_count: u32, use_ml_eval: bool, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> Self {
         Self {
             game_count,
             killers: [[None; PVS_MAX_DEPTH]; 2],
@@ -1750,6 +1900,7 @@ impl PvsSearcher {
             ai_player,
             use_ml_eval,
             border_mode,
+            cap_mode,
             user_random_scale,
         }
     }
@@ -1838,11 +1989,17 @@ impl PvsSearcher {
             let c = &board[i][j];
             let on_corner_deg = (i == 0 || i == sz-1) && (j == 0 || j == sz-1);
             let on_edge_deg = i == 0 || i == sz-1 || j == 0 || j == sz-1;
-            let min_explosive = match self.border_mode {
-                BorderMode::Degrade => {
-                    if on_corner_deg { 1 } else if on_edge_deg { 2 } else { 3 }
-                }
-                _ => 3,
+            let min_explosive = match self.cap_mode {
+                CapMode::Cap3 => 1,
+                CapMode::Cap5 => 3,
+                CapMode::Mixed => 2,
+                CapMode::Random => 2,
+                CapMode::Cap4 => match self.border_mode {
+                    BorderMode::Degrade => {
+                        if on_corner_deg { 1 } else if on_edge_deg { 2 } else { 3 }
+                    }
+                    _ => 3,
+                },
             };
             if c.owner == Some(player) && c.count >= min_explosive && c.count < 4 {
                 if n < moves_buf.len() { moves_buf[n] = (i, j); n += 1; }
@@ -1851,7 +2008,7 @@ impl PvsSearcher {
 
         for &m in &moves_buf[..n] {
             let mut child = board.clone();
-            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode);
+            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode, self.cap_mode, Some(0));
             let mut child_elim = elim;
             for &e in &new_elim { child_elim.add(e); }
             let next = next_live_player_es(&child, sz, player, child_elim, max_players);
@@ -1901,7 +2058,7 @@ impl PvsSearcher {
 
         for (idx, &m) in moves[..max_branch].iter().enumerate() {
             let mut child = board.clone();
-            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode);
+            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode, self.cap_mode, Some(0));
             let mut child_elim = elim;
             for &e in &new_elim { child_elim.add(e); }
             let next = next_live_player_es(&child, sz, player, child_elim, max_players);
@@ -1959,12 +2116,12 @@ impl PvsSearcher {
             .par_iter()
             .map(|&m| {
                 let mut child = board.clone();
-                let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode);
+                let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode, self.cap_mode, Some(0));
                 let mut child_elim = elim_root;
                 for &e in &new_elim { child_elim.add(e); }
                 let next = next_live_player_es(&child, sz, player, child_elim, max_players);
 
-                let mut searcher = PvsSearcher::new(ai_player, gc, ml, bm, self.user_random_scale);
+                let mut searcher = PvsSearcher::new(ai_player, gc, ml, bm, self.cap_mode, self.user_random_scale);
                 let score = if depth > 0 {
                     -searcher.pvs(&child, sz, next, max_players, child_elim, depth - 1, i32::MIN + 1, i32::MAX - 1, false)
                 } else {
@@ -2043,10 +2200,11 @@ struct MctsTree {
     ai_player: usize,
     max_nodes: usize,
     border_mode: BorderMode,
+    cap_mode: CapMode,
 }
 
 impl MctsTree {
-    fn new(board: GameBoard, eliminated: Vec<usize>, player: usize, sz: usize, max_players: usize, ai_player: usize, max_nodes: usize, border_mode: BorderMode) -> Self {
+    fn new(board: GameBoard, eliminated: Vec<usize>, player: usize, sz: usize, max_players: usize, ai_player: usize, max_nodes: usize, border_mode: BorderMode, cap_mode: CapMode) -> Self {
         Self {
             visits: vec![0],
             wins: vec![0.0],
@@ -2059,6 +2217,7 @@ impl MctsTree {
             ai_player,
             max_nodes,
             border_mode,
+            cap_mode,
         }
     }
 
@@ -2122,7 +2281,7 @@ impl MctsTree {
         // 应用走法得到新状态
         let mut new_board = self.boards[node].clone();
         let mut new_elim = self.eliminateds[node].clone();
-        let (new_elim_players, _) = process_click(&mut new_board, self.sz, mx, my, self.players[node], self.max_players, self.border_mode);
+        let (new_elim_players, _) = process_click(&mut new_board, self.sz, mx, my, self.players[node], self.max_players, self.border_mode, self.cap_mode, Some(0));
         for &e in &new_elim_players {
             if !new_elim.contains(&e) { new_elim.push(e); }
         }
@@ -2167,7 +2326,7 @@ impl MctsTree {
         let score = mcts_playout(
             &self.boards[leaf], self.sz, self.players[leaf],
             &self.eliminateds[leaf], self.max_players, self.ai_player, rng,
-            self.border_mode,
+            self.border_mode, self.cap_mode,
         );
 
         // 3) BACKPROPAGATE
@@ -2189,6 +2348,7 @@ fn mcts_playout(
     ai_player: usize,
     rng: &mut XorShift,
     border_mode: BorderMode,
+    cap_mode: CapMode,
 ) -> f64 {
     let mut b = board.clone();
     let mut elim = eliminated.to_vec();
@@ -2210,7 +2370,7 @@ fn mcts_playout(
 
         let idx = rng.next_usize(moves.len());
         let (x, y) = moves[idx];
-        let (new_elim, _) = process_click(&mut b, sz, x, y, cur, max_players, border_mode);
+        let (new_elim, _) = process_click(&mut b, sz, x, y, cur, max_players, border_mode, cap_mode, Some(0));
         for &e in &new_elim {
             if !elim.contains(&e) { elim.push(e); }
         }
@@ -2246,6 +2406,7 @@ fn mcts_search(
     eliminated: &[usize],
     max_players: usize,
     border_mode: BorderMode,
+    cap_mode: CapMode,
     first_move_pos: Option<(usize, usize)>,
 ) -> Option<(usize, usize)> {
     let all_moves = get_moves(board, sz, ai_player, first_move_pos);
@@ -2269,14 +2430,14 @@ fn mcts_search(
         // 应用根走法得到子树根状态
         let mut b = board.clone();
         let mut elim = eliminated.to_vec();
-        let (new_elim, _) = process_click(&mut b, sz, mx, my, ai_player, max_players, border_mode);
+        let (new_elim, _) = process_click(&mut b, sz, mx, my, ai_player, max_players, border_mode, cap_mode, Some(0));
         for &e in &new_elim {
             if !elim.contains(&e) { elim.push(e); }
         }
         let next_p = next_live_player(&b, sz, ai_player, &elim, max_players);
 
         // 构建子树
-        let mut tree = MctsTree::new(b, elim, next_p, sz, max_players, ai_player, max_nodes, border_mode);
+        let mut tree = MctsTree::new(b, elim, next_p, sz, max_players, ai_player, max_nodes, border_mode, cap_mode);
         let mut rng = XorShift::seed(rand::thread_rng().gen::<u64>());
 
         for _ in 0..iters_per {
@@ -2306,9 +2467,10 @@ pub fn find_best_move_mcts(
     eliminated: &[usize],
     max_players: usize,
     border_mode: BorderMode,
+    cap_mode: CapMode,
 ) -> Option<(usize, usize)> {
     let iterations = depth.max(1) * MCTS_ITER_PER_DEPTH;
-    mcts_search(board, sz, player, iterations, eliminated, max_players, border_mode, None)
+    mcts_search(board, sz, player, iterations, eliminated, max_players, border_mode, cap_mode, None)
 }
 
 /// 获取下一个活跃玩家（在 process_click 后调用）
@@ -2364,6 +2526,7 @@ pub fn find_best_move(
     _first_move_pos: Option<[usize; 2]>,
     use_ml_eval: bool,
     border_mode: BorderMode,
+    cap_mode: CapMode,
     user_random_scale: u32,
 ) -> Option<(usize, usize)> {
     let state = GameState {
@@ -2376,6 +2539,7 @@ pub fn find_best_move(
         game_count,
         use_ml_eval,
         border_mode,
+        cap_mode,
         user_random_scale,
     };
     state.run(depth)
@@ -2416,6 +2580,7 @@ pub fn find_best_move_strategy(
     _game_count: u32,
     _first_move_pos: Option<[usize; 2]>,
     _border_mode: BorderMode,
+    _cap_mode: CapMode,
 ) -> Option<(usize, usize)> {
     // 收集己方棋子
     let mut mine: Vec<(usize, usize)> = Vec::new();
@@ -2617,9 +2782,10 @@ pub fn find_best_move_pvs(
     game_count: u32,
     use_ml_eval: bool,
     border_mode: BorderMode,
+    cap_mode: CapMode,
     user_random_scale: u32,
 ) -> Option<(usize, usize)> {
-    let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval, border_mode, user_random_scale);
+    let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval, border_mode, cap_mode, user_random_scale);
     searcher.find_best(board, sz, player, max_players, eliminated, depth)
 }
 
@@ -2633,20 +2799,21 @@ pub fn find_best_move_by_alg(
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
     border_mode: BorderMode,
+    cap_mode: CapMode,
     user_random_scale: u32,
 ) -> Option<(usize, usize)> {
     match config.algorithm.as_str() {
         "alphabeta" => {
-            find_best_move(board, sz, player, config.depth, eliminated, max_players, game_count, first_move_pos, config.use_ml_eval, border_mode, user_random_scale)
+            find_best_move(board, sz, player, config.depth, eliminated, max_players, game_count, first_move_pos, config.use_ml_eval, border_mode, cap_mode, user_random_scale)
         }
         "pvs" => {
-            find_best_move_pvs(board, sz, player, config.depth, eliminated, max_players, game_count, config.use_ml_eval, border_mode, user_random_scale)
+            find_best_move_pvs(board, sz, player, config.depth, eliminated, max_players, game_count, config.use_ml_eval, border_mode, cap_mode, user_random_scale)
         }
         "mcts" => {
-            find_best_move_mcts(board, sz, player, config.depth, eliminated, max_players, border_mode)
+            find_best_move_mcts(board, sz, player, config.depth, eliminated, max_players, border_mode, cap_mode)
         }
         _ => {
-            find_best_move_strategy(board, sz, player, eliminated, max_players, game_count, first_move_pos, border_mode)
+            find_best_move_strategy(board, sz, player, eliminated, max_players, game_count, first_move_pos, border_mode, cap_mode)
         }
     }
 }
@@ -2685,7 +2852,7 @@ pub fn generate_selfplay_data(
         }
 
         let mut board = vec![
-            vec![Cell { owner: None, count: 0 }; board_size];
+            vec![Cell { owner: None, count: 0, th: None }; board_size];
             board_size
         ];
         let mut eliminated: Vec<usize> = Vec::new();
@@ -2712,7 +2879,7 @@ pub fn generate_selfplay_data(
             let chosen = find_best_move_by_alg(
                 &board, board_size, cur_player, config,
                 &eliminated, max_players, game_count, first_move_arr,
-                border_mode, 0,  // battle 模式不配置随机刻度，保持确定性
+                border_mode, CapMode::Cap4, 0,  // battle 模式不配置随机刻度，保持确定性
             );
 
             let (mx, my) = chosen.unwrap_or_else(|| {
@@ -2725,7 +2892,7 @@ pub fn generate_selfplay_data(
                 .filter(|p| !eliminated.contains(p) && has_pieces(&board, *p))
                 .collect();
 
-            let (new_elim, _chain_count) = process_click(&mut board, board_size, mx, my, cur_player, max_players, border_mode);
+            let (new_elim, _chain_count) = process_click(&mut board, board_size, mx, my, cur_player, max_players, border_mode, CapMode::Cap4, None);
             for &e in &new_elim {
                 if !eliminated.contains(&e) { eliminated.push(e); }
             }
@@ -2768,4 +2935,238 @@ pub fn generate_selfplay_data(
     writer.flush().map_err(|e| format!("flush failed: {}", e))?;
     eprintln!("  [done] {} games, {} steps -> {}", num_games, total_steps, output_path);
     Ok(total_steps)
+}
+
+// ═══════════════════ 规则完备性测试（borderMode × capMode 全组合） ═══════════════════
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ALL_BM: [BorderMode; 4] = [BorderMode::Default, BorderMode::Wrap, BorderMode::Bounce, BorderMode::Degrade];
+    const ALL_CM: [CapMode; 4] = [CapMode::Cap3, CapMode::Cap4, CapMode::Cap5, CapMode::Mixed];
+
+    fn mk_b(sz: usize) -> GameBoard {
+        vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz]
+    }
+    fn mk_b_mixed(sz: usize, th: u8) -> GameBoard {
+        // 混合棋盘：全部格子同阈值 th（便于精确断言），模拟 mixed 模式每格固定阈值
+        vec![vec![Cell { owner: None, count: 0, th: Some(th) }; sz]; sz]
+    }
+    fn set(b: &mut GameBoard, x: usize, y: usize, owner: usize, count: u8) {
+        b[x][y] = Cell { owner: Some(owner), count, th: None };
+    }
+    fn set_th(b: &mut GameBoard, x: usize, y: usize, owner: usize, count: u8, th: u8) {
+        b[x][y] = Cell { owner: Some(owner), count, th: Some(th) };
+    }
+    fn do_click(b: &GameBoard, sz: usize, x: usize, y: usize, pl: usize, max: usize, bm: BorderMode, cm: CapMode, seed: Option<u64>) -> (GameBoard, Vec<usize>, Vec<(usize, usize)>) {
+        let mut nb = b.clone();
+        let (elim, _cc, kb) = process_click_with_killer(&mut nb, sz, x, y, pl, max, bm, cm, seed);
+        (nb, elim, kb)
+    }
+    /// 某个格子在孤立场景（邻居全空）下，落子后是否触发爆炸
+    fn boom_check(bm: BorderMode, cm: CapMode, start_count: u8, seed: u64) -> (bool, GameBoard) {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, start_count);
+        let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, bm, cm, Some(seed));
+        (nb[2][2].owner.is_none(), nb)
+    }
+
+    // ── 1) 阈值正确性：所有 borderMode × capMode 组合 ──
+    #[test]
+    fn threshold_cap3_all_borders() {
+        for &bm in &ALL_BM {
+            // 2 子 +1 → 3 炸（cap3 阈值）
+            let (boom, _) = boom_check(bm, CapMode::Cap3, 2, 1);
+            assert!(boom, "cap3 {bm:?}: count2+1 should boom");
+            // 1 子 +1 → 2 不炸
+            let (boom2, nb) = boom_check(bm, CapMode::Cap3, 1, 1);
+            assert!(!boom2, "cap3 {bm:?}: count1+1 should not boom");
+            assert_eq!(nb[2][2].count, 2);
+        }
+    }
+    #[test]
+    fn threshold_cap4_all_borders() {
+        for &bm in &ALL_BM {
+            // 3 子 +1 → 4 炸；degrade 中央阈值仍 4
+            let (boom, _) = boom_check(bm, CapMode::Cap4, 3, 1);
+            assert!(boom, "cap4 {bm:?}: count3+1 should boom");
+            let (boom2, nb) = boom_check(bm, CapMode::Cap4, 2, 1);
+            assert!(!boom2, "cap4 {bm:?}: count2+1 should not boom");
+            assert_eq!(nb[2][2].count, 3);
+        }
+        // degrade：角上 1 子 +1 → 2 炸（位置修正）
+        let mut b = mk_b(5);
+        set(&mut b, 0, 0, 0, 1);
+        let (nb, _, _) = do_click(&b, 5, 0, 0, 0, 2, BorderMode::Degrade, CapMode::Cap4, Some(1));
+        assert!(nb[0][0].owner.is_none(), "degrade corner count1+1 should boom");
+    }
+    #[test]
+    fn threshold_cap5_all_borders() {
+        for &bm in &ALL_BM {
+            // 4 子 +1 → 5 炸
+            let (boom, _) = boom_check(bm, CapMode::Cap5, 4, 1);
+            assert!(boom, "cap5 {bm:?}: count4+1 should boom");
+            let (boom2, nb) = boom_check(bm, CapMode::Cap5, 3, 1);
+            assert!(!boom2, "cap5 {bm:?}: count3+1 should not boom");
+            assert_eq!(nb[2][2].count, 4);
+        }
+    }
+    #[test]
+    fn threshold_mixed_all_borders() {
+        for &bm in &ALL_BM {
+            // th=3 格：2 子 +1 → 3 炸
+            let sz = 5;
+            let mut b = mk_b_mixed(sz, 3);
+            set_th(&mut b, 2, 2, 0, 2, 3);
+            let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, bm, CapMode::Mixed, Some(1));
+            assert!(nb[2][2].owner.is_none(), "mixed th3 {bm:?} boom fail");
+            // th=4 格：3 子 +1 → 4 炸
+            let mut b4 = mk_b_mixed(sz, 4);
+            set_th(&mut b4, 2, 2, 0, 3, 4);
+            let (nb4, _, _) = do_click(&b4, sz, 2, 2, 0, 2, bm, CapMode::Mixed, Some(1));
+            assert!(nb4[2][2].owner.is_none(), "mixed th4 {bm:?} boom fail");
+            // th=5 格：3 子 +1 → 4 不炸
+            let mut b5 = mk_b_mixed(sz, 5);
+            set_th(&mut b5, 2, 2, 0, 3, 5);
+            let (nb5, _, _) = do_click(&b5, sz, 2, 2, 0, 2, bm, CapMode::Mixed, Some(1));
+            assert_eq!(nb5[2][2].count, 4, "mixed th5 {bm:?} early boom");
+        }
+    }
+    /// capMode 优先于 degrade 位置修正（cap3 在 degrade 角落仍 3 级炸）
+    #[test]
+    fn capmode_overrides_degrade() {
+        let mut b = mk_b(5);
+        set(&mut b, 0, 0, 0, 2);
+        let (nb, _, _) = do_click(&b, 5, 0, 0, 0, 2, BorderMode::Degrade, CapMode::Cap3, Some(1));
+        assert!(nb[0][0].owner.is_none(), "cap3+degrade corner count2+1 should boom");
+        let mut b5 = mk_b(5);
+        set(&mut b5, 0, 0, 0, 1);
+        let (nb5, _, _) = do_click(&b5, 5, 0, 0, 0, 2, BorderMode::Degrade, CapMode::Cap5, Some(1));
+        assert_eq!(nb5[0][0].count, 2, "cap5+degrade corner count1+1 should NOT boom");
+    }
+
+    // ── 2) 边界模式扩散正确性 ──
+    #[test]
+    fn diffusion_default_wrap_bounce() {
+        // default：角落爆炸向 2 个邻居扩散
+        let mut b = mk_b(5);
+        set(&mut b, 0, 0, 0, 3);
+        let (nb, _, _) = do_click(&b, 5, 0, 0, 0, 2, BorderMode::Default, CapMode::Cap4, Some(1));
+        assert_eq!(nb[1][0].count, 1);
+        assert_eq!(nb[0][1].count, 1);
+        assert!(nb[0][0].owner.is_none());
+        // wrap：角落爆炸回环到对面
+        let mut bw = mk_b(5);
+        set(&mut bw, 0, 0, 0, 3);
+        let (nbw, _, _) = do_click(&bw, 5, 0, 0, 0, 2, BorderMode::Wrap, CapMode::Cap4, Some(1));
+        assert_eq!(nbw[1][0].count, 1);
+        assert_eq!(nbw[0][1].count, 1);
+        assert_eq!(nbw[4][0].count, 1, "wrap corner should wrap to bottom");
+        assert_eq!(nbw[0][4].count, 1, "wrap corner should wrap to right");
+        // bounce：角落爆炸，有效方向 (1,0),(0,1) 各 +1（基础），上/左出界能量反弹到正对方向再 +1
+        let mut bb = mk_b(5);
+        set(&mut bb, 0, 0, 0, 3);
+        let (nbb, _, _) = do_click(&bb, 5, 0, 0, 0, 2, BorderMode::Bounce, CapMode::Cap4, Some(1));
+        assert_eq!(nbb[1][0].count, 2, "bounce corner: (1,0) gets base+rebound");
+        assert_eq!(nbb[0][1].count, 2, "bounce corner: (0,1) gets base+rebound");
+        assert!(nbb[0][0].owner.is_none());
+        // 中央爆炸无出界：4 方向各 +1（无反弹）
+        let mut bc = mk_b(5);
+        set(&mut bc, 2, 2, 0, 3);
+        let (nbc, _, _) = do_click(&bc, 5, 2, 2, 0, 2, BorderMode::Bounce, CapMode::Cap4, Some(1));
+        for (x, y) in [(1usize, 2usize), (3, 2), (2, 1), (2, 3)] {
+            assert_eq!(nbc[x][y].count, 1, "bounce center: no rebound");
+        }
+    }
+
+    // ── 3) 随机行为：cap3 空一格 / cap5 变 2 级，全边界模式 ──
+    #[test]
+    fn cap3_random_clear_all_borders() {
+        for &bm in &ALL_BM {
+            let sz = 5;
+            let mut b = mk_b(sz);
+            set(&mut b, 2, 2, 0, 2);
+            let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, bm, CapMode::Cap3, Some(42));
+            let dirs = [(1usize, 2usize), (3, 2), (2, 1), (2, 3)];
+            let own0 = dirs.iter().filter(|(x, y)| nb[*x][*y].owner == Some(0)).count();
+            let empty = dirs.iter().filter(|(x, y)| nb[*x][*y].owner.is_none()).count();
+            assert_eq!(own0, 3, "cap3 {bm:?}: exactly 3 dirs get piece");
+            assert_eq!(empty, 1, "cap3 {bm:?}: exactly 1 dir cleared");
+            assert!(nb[2][2].owner.is_none());
+        }
+    }
+    #[test]
+    fn cap5_random_two_all_borders() {
+        for &bm in &ALL_BM {
+            let sz = 5;
+            let mut b = mk_b(sz);
+            set(&mut b, 2, 2, 0, 4);
+            let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, bm, CapMode::Cap5, Some(77));
+            let dirs = [(1usize, 2usize), (3, 2), (2, 1), (2, 3)];
+            let two = dirs.iter().filter(|(x, y)| nb[*x][*y].count == 2).count();
+            let one = dirs.iter().filter(|(x, y)| nb[*x][*y].count == 1).count();
+            assert_eq!(two, 1, "cap5 {bm:?}: exactly 1 dir becomes level 2");
+            assert_eq!(one, 3, "cap5 {bm:?}: other 3 dirs +1");
+        }
+    }
+    #[test]
+    fn randomness_deterministic_by_seed() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        set(&mut b, 2, 2, 0, 2);
+        let (nb1, _, _) = do_click(&b, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap3, Some(42));
+        let (nb2, _, _) = do_click(&b, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap3, Some(42));
+        assert_eq!(nb1, nb2, "same seed must give same result");
+        // 遍历多个 seed，应出现不同的清空格位置
+        let mut cleared_positions = std::collections::HashSet::new();
+        for seed in 0..12u64 {
+            let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap3, Some(seed));
+            for (x, y) in [(1usize, 2usize), (3, 2), (2, 1), (2, 3)] {
+                if nb[x][y].owner.is_none() { cleared_positions.insert((x, y)); }
+            }
+        }
+        assert!(cleared_positions.len() > 1, "different seeds should vary cleared cell");
+    }
+
+    // ── 4) 淘汰与击败者 ──
+    #[test]
+    fn elimination_and_killer() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        // 玩家1 只有 1 颗子，被玩家0 爆炸覆盖 → 淘汰
+        set(&mut b, 2, 2, 0, 3);
+        set(&mut b, 2, 3, 1, 1);
+        let (nb, elim, kb) = do_click(&b, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap4, Some(1));
+        assert_eq!(nb[2][2].owner, None);
+        assert_eq!(elim, vec![1], "player1 should be eliminated");
+        assert!(kb.contains(&(1, 0)), "killer of player1 should be player0: {:?}", kb);
+    }
+
+    // ── 5) 死锁防御：低阈值相邻互供能棋盘不卡死 ──
+    #[test]
+    fn no_deadlock_low_threshold() {
+        let sz = 5;
+        let mut b = mk_b(sz);
+        // 3×3 区域全部 2 子同玩家：cap3 下任何落子都引爆大规模连锁
+        for i in 1..4 { for j in 1..4 { set(&mut b, i, j, 0, 2); } }
+        let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap3, Some(1));
+        // 跑完不 panic 即通过（MAX_CHAIN_STEPS 防御生效）
+        let _ = nb;
+    }
+
+    // ── 6) 混合棋盘 th 与其它 capMode 隔离 ──
+    #[test]
+    fn mixed_th_ignored_in_fixed_capmode() {
+        let sz = 5;
+        // cap4 模式下即使格子带 th=3 也按 4 级炸
+        let mut b = mk_b_mixed(sz, 3);
+        set_th(&mut b, 2, 2, 0, 3, 3);
+        let (nb, _, _) = do_click(&b, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap4, Some(1));
+        assert!(nb[2][2].owner.is_none(), "cap4 ignores th=3 (count3+1=4 booms by cap4)");
+        let mut b2 = mk_b_mixed(sz, 5);
+        set_th(&mut b2, 2, 2, 0, 2, 5);
+        let (nb2, _, _) = do_click(&b2, sz, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap4, Some(1));
+        assert_eq!(nb2[2][2].count, 3, "cap4 ignores th=5 (count2+1=3 no boom)");
+    }
 }

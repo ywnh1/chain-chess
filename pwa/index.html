@@ -13,7 +13,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>连锁棋</title>
-<link rel="stylesheet" href="style.css?v=3.2.1">
+<link rel="stylesheet" href="style.css?v=3.2.10">
 </head>
 <body>
 <!-- 背景彩色光球容器 -->
@@ -70,9 +70,24 @@
       <button class="gb" data-value="wrap">回环边界</button>
       <button class="gb" data-value="bounce">反弹边界</button>
       <button class="gb" data-value="degrade">降级边界</button>
+      <button class="gb" data-value="random">随机边界</button>
     </div>
     <p id="borderModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
       标准模式：达到 4 子即爆，边界处正常扩散
+    </p>
+  </div>
+
+  <!-- 爆炸阈值模式（独立于边界模式） -->
+  <div class="form-row"><label>爆炸阈值</label>
+    <div id="capModeGroup" class="btn-group">
+      <button class="gb" data-value="3">3级</button>
+      <button class="gb selected" data-value="4">4级</button>
+      <button class="gb" data-value="5">5级</button>
+      <button class="gb" data-value="mixed">混合</button>
+      <button class="gb" data-value="random">随机</button>
+    </div>
+    <p id="capModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
+      标准规则：达到 4 子即爆，向上下左右扩散
     </p>
   </div>
 
@@ -252,7 +267,7 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.0</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.1</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -356,143 +371,139 @@
 
 <!-- About Changelog page (二级) -->
 <div id="about-benchmark" class="screen">
-  <button class="back glass-btn" onclick="Router.back()">&larr; 返回</button>
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll">
     <h2>AI 性能评测</h2>
-    <div class="about-card">
-      <h3 style="font-size:1.05rem;margin-bottom:8px">🏆 AI 战力排行</h3>
-      <p style="font-size:.82rem;color:var(--dim);margin-bottom:10px">
-        循环赛 · 7×7 棋盘 · 每对 20 局 · 先手交替 · <strong>共 560 局</strong>
-      </p>
+<div class="about-card">
+        <h3 style="font-size:1.05rem;margin-bottom:8px">🧪 棋盘模式 AI 实力测试（96 局）</h3>
+        <p style="font-size:.82rem;color:var(--dim);margin-bottom:10px">
+          4 种边界 × 4 种爆炸阈值 = 16 组合 · 每组合 6 局 · 4 算法混战（每算法一名）· 7×7 棋盘<br>
+          A-B / PVS 深度 2 · MCTS 深度 1 · 随机刻度 5% · 首子合法分散布局
+        </p>
 
-      <!-- 排行榜 -->
-      <table style="width:100%;font-size:.82rem;border-collapse:collapse">
-        <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
-          <th style="text-align:left;padding:5px 6px;width:28px">#</th>
-          <th style="text-align:left;padding:5px 6px">AI 选手</th>
-          <th style="text-align:right;padding:5px 6px">胜</th>
-          <th style="text-align:right;padding:5px 6px">负</th>
-          <th style="text-align:right;padding:5px 6px">胜率</th>
-        </tr>
+        <h4 style="margin:10px 0 6px;font-size:.95rem">📊 总体胜率</h4>
+        <table style="width:100%;font-size:.82rem;border-collapse:collapse">
+          <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+            <th style="text-align:left;padding:5px 6px;width:30px">#</th>
+            <th style="text-align:left;padding:5px 6px">算法</th>
+            <th style="text-align:right;padding:5px 6px">胜场</th>
+            <th style="text-align:right;padding:5px 6px">胜率</th>
+            <th style="text-align:right;padding:5px 6px">平均淘汰名次</th>
+          </tr>
         <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
           <td style="padding:4px 6px">🥇</td>
-          <td style="padding:4px 6px"><strong>Alpha-Beta d=3 ML</strong></td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">128</td>
-          <td style="padding:4px 6px;text-align:right;color:#ff7070">12</td>
-          <td style="padding:4px 6px;text-align:right;font-weight:bold">91.4%</td>
+          <td style="padding:4px 6px"><strong>A-B</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">46</td>
+          <td style="padding:4px 6px;text-align:right">47.9%</td>
+          <td style="padding:4px 6px;text-align:right">2.85</td>
         </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
           <td style="padding:4px 6px">🥈</td>
-          <td style="padding:4px 6px"><strong>Alpha-Beta d=2 ML</strong></td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">99</td>
-          <td style="padding:4px 6px;text-align:right;color:#ff7070">41</td>
-          <td style="padding:4px 6px;text-align:right;font-weight:bold">70.7%</td>
+          <td style="padding:4px 6px"><strong>策略</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">32</td>
+          <td style="padding:4px 6px;text-align:right">33.3%</td>
+          <td style="padding:4px 6px;text-align:right">2.88</td>
         </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
           <td style="padding:4px 6px">🥉</td>
-          <td style="padding:4px 6px"><strong>PVS d=2 ML</strong></td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">98</td>
-          <td style="padding:4px 6px;text-align:right;color:#ff7070">42</td>
-          <td style="padding:4px 6px;text-align:right;font-weight:bold">70.0%</td>
+          <td style="padding:4px 6px"><strong>MCTS</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">12</td>
+          <td style="padding:4px 6px;text-align:right">12.5%</td>
+          <td style="padding:4px 6px;text-align:right">2.55</td>
         </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
           <td style="padding:4px 6px">4</td>
-          <td style="padding:4px 6px">PVS d=3 ML</td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">93</td>
-          <td style="padding:4px 6px;text-align:right;color:#ff7070">47</td>
-          <td style="padding:4px 6px;text-align:right">66.4%</td>
+          <td style="padding:4px 6px"><strong>PVS</strong></td>
+          <td style="padding:4px 6px;text-align:right;color:#70d070">6</td>
+          <td style="padding:4px 6px;text-align:right">6.2%</td>
+          <td style="padding:4px 6px;text-align:right">2.02</td>
         </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-          <td style="padding:4px 6px">5</td>
-          <td style="padding:4px 6px">PVS d=2 手写</td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">69</td>
-          <td style="padding:4px 6px;text-align:right;color:#ff7070">71</td>
-          <td style="padding:4px 6px;text-align:right">49.3%</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-          <td style="padding:4px 6px">6</td>
-          <td style="padding:4px 6px">Alpha-Beta d=2 手写</td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">49</td>
-          <td style="padding:4px 6px;text-align:right;color:#ff7070">91</td>
-          <td style="padding:4px 6px;text-align:right">35.0%</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-          <td style="padding:4px 6px">7</td>
-          <td style="padding:4px 6px">MCTS d=2</td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">13</td>
-          <td style="padding:4px 6px;text-align:right;color:#ff7070">127</td>
-          <td style="padding:4px 6px;text-align:right">9.3%</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 6px">8</td>
-          <td style="padding:4px 6px">策略算法</td>
-          <td style="padding:4px 6px;text-align:right;color:#70d070">11</td>
-          <td style="padding:4px 6px;text-align:right;color:#ff7070">129</td>
-          <td style="padding:4px 6px;text-align:right">7.9%</td>
-        </tr>
-      </table>
+        </table>
 
-      <h4 style="margin-top:16px;margin-bottom:8px;font-size:.95rem">🔍 关键发现</h4>
-      <ul style="font-size:.8rem;line-height:1.7;padding-left:16px;margin:0">
-        <li><strong>AB d=3 ML 稳居榜首</strong> — 91.4% 胜率碾压全场，仅输 12 局</li>
-        <li><strong>PVS ≈ Alpha-Beta 同深度持平</strong> — PVS d=2 ML (70.0%) vs AB d=2 ML (70.7%)，差距不足 1%</li>
-        <li><strong>PVS d=3 没能超越 d=2</strong> — 66.4% 反低于 70.0%，PVS 的 null-window 剪枝在深层的分支限制过紧，丢失最佳走法</li>
-        <li><strong>ML > 手写评估（约 2:1）</strong> — AB d=2 ML (70.7%) vs AB d=2 手写 (35.0%)；PVS d=2 ML (70.0%) vs PVS d=2 手写 (49.3%)</li>
-        <li><strong>PVS 手写 > AB 手写</strong> — PVS d=2 手写 (49.3%) 明显优于 AB d=2 手写 (35.0%)，Killer/History 启发在弱评估下优势更突出</li>
-        <li><strong>MCTS 和策略算法</strong> 为非搜索型 AI，棋力偏弱但各有用途：策略最快，MCTS 可发现非直觉走法</li>
-      </ul>
+        <h4 style="margin:14px 0 6px;font-size:.95rem">🗺️ 分棋盘组合胜率（胜者算法）</h4>
+        <table style="width:100%;font-size:.78rem;border-collapse:collapse">
+          <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+            <th style="text-align:left;padding:5px 6px">边界 \ 阈值</th>
+            <th style="padding:5px 6px">速爆3</th>
+            <th style="padding:5px 6px">标准4</th>
+            <th style="padding:5px 6px">重炮5</th>
+            <th style="padding:5px 6px">混合</th>
+          </tr>
+  <tr><th style="text-align:left;padding:5px 6px">默认</th>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.64);font-weight:600">A-B 5/6</td>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.64);font-weight:600">A-B 5/6</td>
+        <td style="padding:4px 6px;background:rgba(240,179,75,0.73);font-weight:600">策略 6/6</td>
+        <td style="padding:4px 6px;background:rgba(255,138,138,0.46);font-weight:600">MCTS 3/6</td>
+  </tr>
+  <tr><th style="text-align:left;padding:5px 6px">回环</th>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.64);font-weight:600">A-B 5/6</td>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.46);font-weight:600">A-B 3/6</td>
+        <td style="padding:4px 6px;background:rgba(240,179,75,0.73);font-weight:600">策略 6/6</td>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.46);font-weight:600">A-B 3/6</td>
+  </tr>
+  <tr><th style="text-align:left;padding:5px 6px">反弹</th>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.64);font-weight:600">A-B 5/6</td>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.73);font-weight:600">A-B 6/6</td>
+        <td style="padding:4px 6px;background:rgba(240,179,75,0.73);font-weight:600">策略 6/6</td>
+        <td style="padding:4px 6px;background:rgba(255,138,138,0.55);font-weight:600">MCTS 4/6</td>
+  </tr>
+  <tr><th style="text-align:left;padding:5px 6px">降级</th>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.46);font-weight:600">A-B 3/6</td>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.55);font-weight:600">A-B 4/6</td>
+        <td style="padding:4px 6px;background:rgba(240,179,75,0.73);font-weight:600">策略 6/6</td>
+        <td style="padding:4px 6px;background:rgba(95,195,195,0.55);font-weight:600">A-B 4/6</td>
+  </tr>
+        </table>
 
-      <h4 style="margin-top:16px;margin-bottom:6px;font-size:.95rem">⚔️ 重点对局详解</h4>
-      <table style="width:100%;font-size:.8rem;border-collapse:collapse;margin-top:4px">
-        <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
-          <th style="text-align:left;padding:4px 6px">对战</th>
-          <th style="text-align:center;padding:4px 6px">比分</th>
-          <th style="text-align:right;padding:4px 6px">均时</th>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-          <td style="padding:3px 6px">AB d=3 ML vs PVS d=3 ML</td>
-          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#ff7070">20 : 0</td>
-          <td style="padding:3px 6px;text-align:right">1.24s</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-          <td style="padding:3px 6px">AB d=3 ML vs AB d=2 ML</td>
-          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#70d070">12 : 8</td>
-          <td style="padding:3px 6px;text-align:right">1.10s</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-          <td style="padding:3px 6px">PVS d=2 ML vs AB d=2 ML</td>
-          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#70d070">11 : 9</td>
-          <td style="padding:3px 6px;text-align:right">0.29s</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-          <td style="padding:3px 6px">PVS d=2 手写 vs AB d=2 手写</td>
-          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#70d070">17 : 3</td>
-          <td style="padding:3px 6px;text-align:right">0.69s</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-          <td style="padding:3px 6px">PVS d=2 ML vs PVS d=3 ML</td>
-          <td style="padding:3px 6px;text-align:center;color:#f0d060">10 : 10</td>
-          <td style="padding:3px 6px;text-align:right">0.21s</td>
-        </tr>
-        <tr>
-          <td style="padding:3px 6px">AB d=3 ML vs PVS d=2 ML</td>
-          <td style="padding:3px 6px;text-align:center;font-weight:bold;color:#ff7070">19 : 1</td>
-          <td style="padding:3px 6px;text-align:right">0.08s</td>
-        </tr>
-      </table>
+        <h4 style="margin:14px 0 6px;font-size:.95rem">⏱️ 平均对局步数</h4>
+        <table style="width:100%;font-size:.78rem;border-collapse:collapse">
+          <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+            <th style="text-align:left;padding:5px 6px">边界 \ 阈值</th>
+            <th style="padding:5px 6px">速爆3</th>
+            <th style="padding:5px 6px">标准4</th>
+            <th style="padding:5px 6px">重炮5</th>
+            <th style="padding:5px 6px">混合</th>
+          </tr>
+  <tr><th style="text-align:left;padding:5px 6px">默认</th>
+        <td style="padding:4px 6px;text-align:right">331</td>
+        <td style="padding:4px 6px;text-align:right">174</td>
+        <td style="padding:4px 6px;text-align:right">287</td>
+        <td style="padding:4px 6px;text-align:right">111</td>
+  </tr>
+  <tr><th style="text-align:left;padding:5px 6px">回环</th>
+        <td style="padding:4px 6px;text-align:right">427</td>
+        <td style="padding:4px 6px;text-align:right">87</td>
+        <td style="padding:4px 6px;text-align:right">211</td>
+        <td style="padding:4px 6px;text-align:right">72</td>
+  </tr>
+  <tr><th style="text-align:left;padding:5px 6px">反弹</th>
+        <td style="padding:4px 6px;text-align:right">365</td>
+        <td style="padding:4px 6px;text-align:right">124</td>
+        <td style="padding:4px 6px;text-align:right">276</td>
+        <td style="padding:4px 6px;text-align:right">59</td>
+  </tr>
+  <tr><th style="text-align:left;padding:5px 6px">降级</th>
+        <td style="padding:4px 6px;text-align:right">261</td>
+        <td style="padding:4px 6px;text-align:right">72</td>
+        <td style="padding:4px 6px;text-align:right">272</td>
+        <td style="padding:4px 6px;text-align:right">99</td>
+  </tr>
+        </table>
+        <p style="font-size:.75rem;color:var(--dim);margin-top:4px">平均 202 步/局</p>
 
-      <h4 style="margin-top:16px;margin-bottom:6px;font-size:.95rem">📊 数据总览</h4>
-      <div style="font-size:.8rem;line-height:1.7;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px">
-        <strong>总对局</strong> 560 局 · <strong>总耗时</strong> 358.6s · <strong>平均</strong> 0.64s/局<br>
-        <strong>测试环境</strong> 7×7 棋盘 · depth=2/3 · ML / 手写双评估
+        <h4 style="margin:14px 0 6px;font-size:.95rem">🔍 关键发现</h4>
+        <ul style="font-size:.8rem;line-height:1.7;padding-left:16px;margin:0">
+          <li><strong>Alpha-Beta 综合最强</strong> — 47.9% 胜率居首，且平均淘汰名次最高（2.85），赢得多又活得久</li>
+          <li><strong>⚠ 重炮5（5级才炸）模式策略算法 24/24 全胜</strong> — 4 种边界无一例外；疑似 AI 搜索硬编码"4 级阈值"假设（min_explosive=3、评估函数未随 capMode 校准），搜索算法在该模式下频繁送子</li>
+          <li><strong>MCTS 在混合棋盘表现最好</strong> — 8/24（33%）远超其整体 12.5%；随机模拟不依赖固定阈值先验，天然适应每格随机 3/4/5 的棋盘</li>
+          <li><strong>PVS 全面垫底</strong> — 6.2% 胜率、平均第 2.02 名出局，与 A-B 同为 α-β 系却差距悬殊，需专项排查</li>
+          <li><strong>节奏两极</strong> — 混合最快（86 步/局），速爆3 反而最慢（347 步，回环+速爆有 1 局打到 1000 步上限的"低效僵持"）</li>
+        </ul>
+        <p style="font-size:.75rem;color:var(--dim);margin-top:12px">测试时间: 2026-08-03 ｜ 脚本: ai_strength.py（tauri 端引擎 ai_bench）· 完整报告与数据见 tauri/tests/ 目录</p>
       </div>
-      <p style="font-size:.75rem;color:var(--dim);margin-top:12px">测试时间: 2026-07-29 ｜ 脚本: test_ai.py（8 AI × 循环赛 × 28 对）</p>
-    </div>
   </div>
 </div>
 
-
-<!-- About changelog (二级) -->
 <div id="about-changelog" class="screen">
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll" id="changelogContainer">
@@ -576,6 +587,38 @@
 <div id="checkout" class="screen">
   <div id="chkOuterTitle"></div>
   <div id="checkoutContent" class="chk-scroll"></div>
+</div>
+
+<!-- Replay Overlay (对局回放) -->
+<div id="replayOverlay" class="replay-overlay" style="display:none">
+  <div class="replay-header">
+    <button class="back glass-btn" onclick="closeReplay()">← 返回</button>
+    <div class="replay-title">对局回放</div>
+    <div class="replay-spacer"></div>
+  </div>
+  <div class="board-wrap"><div id="rpBoard" class="replay-board"></div></div>
+  <div id="rpPlayers" class="player-bar"></div>
+  <div class="replay-controls">
+    <div class="rp-row">
+      <button class="glass-btn" onclick="rpJump(0)" title="跳到开头">⏮</button>
+      <button class="glass-btn" onclick="rpStep(-1)" title="上一步">◀</button>
+      <button class="glass-btn primary" id="rpPlayBtn" onclick="rpTogglePlay()" title="播放/暂停">▶</button>
+      <button class="glass-btn" onclick="rpStep(1)" title="下一步">▶</button>
+      <button class="glass-btn" onclick="rpJump(-1)" title="跳到结尾">⏭</button>
+      <span class="rp-step-label" id="rpStepLabel">0 / 0</span>
+    </div>
+    <input type="range" id="rpSlider" min="0" max="0" value="0" aria-label="回放进度">
+    <div class="rp-row rp-opt-row">
+      <button class="glass-btn" id="rpAnimBtn" onclick="rpToggleAnim()" title="启/禁用落子动画">动画：开</button>
+      <span class="rp-opt-label">倍速</span>
+      <div class="btn-group" id="rpSpeedGroup">
+        <button class="gb" data-value="0.5">0.5x</button>
+        <button class="gb selected" data-value="1">1x</button>
+        <button class="gb" data-value="2">2x</button>
+        <button class="gb" data-value="4">4x</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 

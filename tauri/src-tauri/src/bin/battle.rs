@@ -52,7 +52,7 @@ fn play_game(
     first_player: usize,
     game_id: u32,
 ) -> Option<usize> {
-    let mut board = vec![vec![Cell { owner: None, count: 0 }; board_size]; board_size];
+    let mut board = vec![vec![Cell { owner: None, count: 0, th: None }; board_size]; board_size];
     let mut eliminated: Vec<usize> = Vec::new();
     let mut cur_player: usize = first_player;
 
@@ -72,11 +72,11 @@ fn play_game(
         let chosen = find_best_move_by_alg(
             &board, board_size, cur_player, cfg,
             &eliminated, max_players, game_id, None,
-            BORDER_MODE, 0,  // battle 工具不配置随机刻度
+            BORDER_MODE, CapMode::Cap4, 0,  // battle 工具不配置随机刻度
         );
 
         let (mx, my) = chosen.unwrap_or_else(|| legal_moves[0]);
-        let (new_elim, _) = process_click(&mut board, board_size, mx, my, cur_player, max_players, BORDER_MODE);
+        let (new_elim, _) = process_click(&mut board, board_size, mx, my, cur_player, max_players, BORDER_MODE, CapMode::Cap4, None);
         for &e in &new_elim {
             if !eliminated.contains(&e) { eliminated.push(e); }
         }

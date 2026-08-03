@@ -1,5 +1,5 @@
 /* sw.js — 连锁棋 PWA Service Worker（离线缓存） */
-const CACHE_NAME = 'chain-chess-v3.2.3';
+const CACHE_NAME = 'chain-chess-v3.2.10';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -43,7 +43,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;   // 跨域不缓存
 
-  // ignoreSearch: HTML 引用带 ?v= 版本号（style.css?v=3.2.1），预缓存键无查询串。
+  // ignoreSearch: HTML 引用带 ?v= 版本号（style.css?v=3.2.10），预缓存键无查询串。
   // 默认 Cache API 匹配区分查询串，会导致预缓存永不命中；忽略查询串后二者互通。
   event.respondWith(
     caches.match(req, { ignoreSearch: true }).then((cached) => {
