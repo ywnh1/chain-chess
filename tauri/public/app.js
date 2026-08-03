@@ -62,24 +62,28 @@ const BORDER_MODE_DESC = {
   'default': '标准模式：达到 4 子即爆，边界处正常扩散',
   'wrap': '回环模式：棋子达到 4 子即爆，爆炸会穿过边界到达对面，棋盘变成甜甜圈',
   'bounce': '反弹模式：达到 4 子即爆，边界处能量反弹集中：边上出一颗二级棋子和两颗一级棋子，角上出两颗二级棋子',
-  'degrade': '降级模式：中央区域 4 子即爆，边界处降为 3 子即爆，角落处仅需 2 子即爆',
+  'degrade': '降级模式：中央区域 4 子即爆，边界处降为 3 子即爆，角落处仅需 2 子即爆（与 3/5 级爆炸互斥）',
   'random': '随机边界：开局时随机确定一种边界模式，整局不再改变（默认 / 回环 / 反弹 / 降级）',
 };
 const CAP_MODE_DESC = {
-  '3': '速爆：3 级即爆，爆炸时随机一个方向加 0（该格不变），其余方向加 1；首子为 2 级',
+  '3': '速爆：3 级即爆，爆炸时随机一个方向加 0（该格不变），其余方向加 1；首子为 2 级（与降级边界互斥）',
   '4': '标准规则：达到 4 子即爆，向上下左右各扩散一个棋子；首子为 3 级',
-  '5': '重炮：5 级才爆，爆炸时随机一个方向加 2（空格变 2 级、有棋子升 2 级），其余方向加 1；首子为 4 级',
+  '5': '重炮：5 级才爆，爆炸时随机一个方向加 2（空格变 2 级、有棋子升 2 级），其余方向加 1；首子为 4 级（与降级边界互斥）',
   'random': '随机阈值：开局时随机确定 3 / 4 / 5 级之一，整局不再改变；首子为该阈值减 1',
 };
 // 随机模式解析：开局瞬间用时间戳种子随机确定具体模式，整局不再改变。
 // 解析后与直接选中该模式完全一致（随机只发生在开始的一瞬间）。
 function resolveRandomBorder(){
-  const opts=['default','wrap','bounce','degrade'];
+  // 降级边界与 3/5 级爆炸互斥：阈值模式为 3/5（显式选择）时，随机边界排除降级
+  const opts=(capMode==='3'||capMode==='5')
+    ?['default','wrap','bounce']
+    :['default','wrap','bounce','degrade'];
   let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
   return opts[s%opts.length];
 }
 function resolveRandomCap(){
-  const opts=['3','4','5'];
+  // 降级边界与 3/5 级爆炸互斥：边界为降级时，随机阈值只取 4 级（degrade 仅与 4 级兼容）
+  const opts=borderMode==='degrade'?['4']:['3','4','5'];
   let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
   return opts[s%opts.length];
 }
@@ -389,6 +393,44 @@ function getSelStr(containerId){
   const s=c.querySelector('.selected');
   return s?s.dataset.value:'strategy';
 }
+// 降级边界与 3/5 级爆炸互斥：设置界面联动禁用 + 冲突纠正
+// 规则：选择降级边界 → 3/5 级不可选；选择 3/5 级 → 降级边界不可选；后点者生效，另一方弹回兼容值
+function updateModeConflictUI(caller){
+  const borderGroup=document.getElementById('borderModeGroup');
+  const capGroup=document.getElementById('capModeGroup');
+  if(!borderGroup||!capGroup)return;
+  let selB=borderGroup.querySelector('.selected');
+  let selC=capGroup.querySelector('.selected');
+  let bv=selB?selB.dataset.value:null;
+  let cv=selC?selC.dataset.value:null;
+  // 纠正已选冲突（degrade + 3/5 并存）
+  if(bv==='degrade'&&(cv==='3'||cv==='5')){
+    if(caller==='cap'){
+      // 用户刚选 3/5：降级边界不可用，弹回默认边界
+      const bd=borderGroup.querySelector('.gb[data-value="default"]');
+      if(bd)setSelected(borderGroup,bd);
+      const d=document.getElementById('borderModeDesc');
+      if(d&&BORDER_MODE_DESC['default'])d.textContent=BORDER_MODE_DESC['default'];
+    }else{
+      // 用户刚选降级边界（或初始化）：阈值弹回 4
+      const c4=capGroup.querySelector('.gb[data-value="4"]');
+      if(c4)setSelected(capGroup,c4);
+      const d=document.getElementById('capModeDesc');
+      if(d&&CAP_MODE_DESC['4'])d.textContent=CAP_MODE_DESC['4'];
+    }
+    // 纠正后重读选中值
+    selB=borderGroup.querySelector('.selected'); selC=capGroup.querySelector('.selected');
+    bv=selB?selB.dataset.value:null; cv=selC?selC.dataset.value:null;
+  }
+  // 禁用联动：cap 为 3/5 → degrade 不可选；border 为 degrade → 3/5 不可选
+  const cap35=cv==='3'||cv==='5';
+  borderGroup.querySelectorAll('.gb').forEach(function(b){
+    b.disabled=(b.dataset.value==='degrade'&&cap35);
+  });
+  capGroup.querySelectorAll('.gb').forEach(function(b){
+    b.disabled=((b.dataset.value==='3'||b.dataset.value==='5')&&bv==='degrade');
+  });
+}
 // 设置选中状态
 function setSelected(container, target){
   const sel = target.matches('.size-btn,.gb') ? '.size-btn,.gb' : '.' + target.className.split(' ')[0];
@@ -409,9 +451,11 @@ document.addEventListener('click',function(e){
   }else if(container.id==='borderModeGroup'){
     const descEl=document.getElementById('borderModeDesc');
     if(descEl&&BORDER_MODE_DESC[t.dataset.value]){descEl.textContent=BORDER_MODE_DESC[t.dataset.value];}
+    updateModeConflictUI('border');
   }else if(container.id==='capModeGroup'){
     const descEl=document.getElementById('capModeDesc');
     if(descEl&&CAP_MODE_DESC[t.dataset.value]){descEl.textContent=CAP_MODE_DESC[t.dataset.value];}
+    updateModeConflictUI('cap');
   }else if(t.classList.contains('size-btn')||t.classList.contains('gb'))setTimeout(setupLobbySync,10);
 });
 
@@ -524,7 +568,7 @@ Router.register('welcome', {
 
 Router.register('gameSetup', {
   back: 'welcome',
-  enter() { document.body.style.background=''; setTimeout(setupLobbySync, 20); },
+  enter() { document.body.style.background=''; setTimeout(setupLobbySync, 20); setTimeout(updateModeConflictUI, 20); },
   leave() {}
 });
 
@@ -1224,6 +1268,8 @@ function loadGameFromState(saved){
   aiDepth = saved.aiDepth || 0;
   borderMode = saved.borderMode || "default";
   capMode = saved.capMode || "4";
+  // 降级边界与 3/5 级爆炸互斥：旧存档冲突时降级优先，阈值归 4
+  if(borderMode==='degrade'&&(capMode==='3'||capMode==='5'))capMode='4';
 
   document.getElementById("pauseBtn").textContent = "暂停";
   _originPage = gameMode === "ai" ? "aiLobby" : (gameMode === "eve" ? "eveLobby" : "localLobby");

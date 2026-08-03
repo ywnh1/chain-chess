@@ -789,6 +789,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 .btn-group .gb:hover{border-color:var(--btn-border-hover);background-image:var(--btn-glass-hover),var(--liquid-iris);box-shadow:var(--btn-shadow-hover);transform:translateY(-1px)}
 .btn-group .gb:active{transform:scale(.93);box-shadow:var(--btn-shadow-active);transition:all .08s ease}
 .btn-group .gb.selected{background-image:var(--btn-gold-bg);border-color:rgba(240,179,75,.55);color:var(--accent);box-shadow:var(--btn-gold-glow)}
+.btn-group .gb:disabled{opacity:.35;cursor:default;pointer-events:none;transform:none;box-shadow:var(--btn-shadow)}
 .border-mode-group .gb{flex:1;font-size:.73rem;padding:7px 4px;min-width:0;white-space:nowrap}
 
 /* 评估函数切换按钮 */
