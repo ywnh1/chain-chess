@@ -5,11 +5,11 @@
   "platforms": {
     "android": {
       "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.2/chainchess-3.3.2.apk",
-      "size": 0
+      "size": 11592772
     },
     "windows": {
       "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.2/chainchess-3.3.2.exe",
-      "size": 0
+      "size": 10839040
     }
   }
 }
