@@ -63,14 +63,26 @@ const BORDER_MODE_DESC = {
   'wrap': '回环模式：棋子达到 4 子即爆，爆炸会穿过边界到达对面，棋盘变成甜甜圈',
   'bounce': '反弹模式：达到 4 子即爆，边界处能量反弹集中：边上出一颗二级棋子和两颗一级棋子，角上出两颗二级棋子',
   'degrade': '降级模式：中央区域 4 子即爆，边界处降为 3 子即爆，角落处仅需 2 子即爆',
-  'random': '随机边界：每次爆炸随机选择一种边界行为（默认 / 回环 / 反弹）',
+  'random': '随机边界：开局时随机确定一种边界模式，整局不再改变（默认 / 回环 / 反弹 / 降级）',
 };
 const CAP_MODE_DESC = {
   '3': '速爆：3 级即爆，爆炸时随机一个方向加 0（该格不变），其余方向加 1；首子为 2 级',
   '4': '标准规则：达到 4 子即爆，向上下左右各扩散一个棋子；首子为 3 级',
   '5': '重炮：5 级才爆，爆炸时随机一个方向加 2（空格变 2 级、有棋子升 2 级），其余方向加 1；首子为 4 级',
-  'random': '随机：每步各自随机 3 / 4 / 5 级爆炸；首子为随机阈值减 1',
+  'random': '随机阈值：开局时随机确定 3 / 4 / 5 级之一，整局不再改变；首子为该阈值减 1',
 };
+// 随机模式解析：开局瞬间用时间戳种子随机确定具体模式，整局不再改变。
+// 解析后与直接选中该模式完全一致（随机只发生在开始的一瞬间）。
+function resolveRandomBorder(){
+  const opts=['default','wrap','bounce','degrade'];
+  let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
+  return opts[s%opts.length];
+}
+function resolveRandomCap(){
+  const opts=['3','4','5'];
+  let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
+  return opts[s%opts.length];
+}
 // 根据棋盘大小返回最大允许玩家人数
 function getMaxPlayersBySize(boardSize){
   if(boardSize===5)return 5;
@@ -3031,8 +3043,12 @@ function renderGameCharts(container, history, opts){
 // 根据保存的配置直接重开游戏（不再读 DOM，确保与上次配置完全一致）
 function replayGame(){
   const c=_lastGameConfig;
-  if(c&&c.capMode)capMode=c.capMode;
   if(!c)return;
+  if(c.capMode)capMode=c.capMode;
+  if(c.borderMode)borderMode=c.borderMode;
+  // 随机模式：再来一局同样在开局瞬间重新随机确定，整局不再改变
+  if(capMode==='random')capMode=resolveRandomCap();
+  if(borderMode==='random')borderMode=resolveRandomBorder();
   _colorNames=c.colorNames||null;
   if(c.mode==='ai'){
     clearBoardDOM();
@@ -3735,8 +3751,13 @@ function startLocalFromSetup(sz,cnt){
   resetRoundHistory();
   undoStack=[];
   size=sz;maxPlayers=cnt;
-  borderMode=getSelStr('borderModeGroup')||'default';
-  capMode=getSelStr('capModeGroup')||'4';
+  const userBorderMode=getSelStr('borderModeGroup')||'default';
+  const userCapMode=getSelStr('capModeGroup')||'4';
+  borderMode=userBorderMode;
+  capMode=userCapMode;
+  // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
+  if(borderMode==='random')borderMode=resolveRandomBorder();
+  if(capMode==='random')capMode=resolveRandomCap();
   board=mkBoard(size,capMode,gameCount);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='local';_originPage='gameSetup';
@@ -3754,7 +3775,7 @@ function startLocalFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
-  _lastGameConfig={mode:'local',size,maxPlayers,colorNames,borderMode,capMode};
+  _lastGameConfig={mode:'local',size,maxPlayers,colorNames,borderMode:userBorderMode,capMode:userCapMode};
 }
 function startAIFromSetup(sz,cnt){
   clearSavedGameState();
@@ -3762,8 +3783,13 @@ function startAIFromSetup(sz,cnt){
   resetRoundHistory();
   undoStack=[];
   size=sz;maxPlayers=cnt;
-  borderMode=getSelStr('borderModeGroup')||'default';
-  capMode=getSelStr('capModeGroup')||'4';
+  const userBorderMode=getSelStr('borderModeGroup')||'default';
+  const userCapMode=getSelStr('capModeGroup')||'4';
+  borderMode=userBorderMode;
+  capMode=userCapMode;
+  // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
+  if(borderMode==='random')borderMode=resolveRandomBorder();
+  if(capMode==='random')capMode=resolveRandomCap();
   board=mkBoard(size,capMode,gameCount);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='ai';_originPage='gameSetup';
@@ -3791,7 +3817,7 @@ function startAIFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode,capMode};
+  _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode:userBorderMode,capMode:userCapMode};
 }
 function startEveFromSetup(sz,cnt){
   clearSavedGameState();
@@ -3799,8 +3825,13 @@ function startEveFromSetup(sz,cnt){
   resetRoundHistory();
   undoStack=[];
   size=sz;maxPlayers=cnt;
-  borderMode=getSelStr('borderModeGroup')||'default';
-  capMode=getSelStr('capModeGroup')||'4';
+  const userBorderMode=getSelStr('borderModeGroup')||'default';
+  const userCapMode=getSelStr('capModeGroup')||'4';
+  borderMode=userBorderMode;
+  capMode=userCapMode;
+  // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
+  if(borderMode==='random')borderMode=resolveRandomBorder();
+  if(capMode==='random')capMode=resolveRandomCap();
   board=mkBoard(size,capMode,gameCount);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='eve';_originPage='gameSetup';
@@ -3822,7 +3853,7 @@ function startEveFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode,capMode};
+  _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode:userBorderMode,capMode:userCapMode};
 }
 window.addEventListener('popstate',()=>{
   const cur = Router._current;

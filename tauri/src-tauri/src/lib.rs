@@ -27,7 +27,8 @@ pub enum BorderMode {
     Bounce,
     #[serde(rename = "degrade")]
     Degrade,
-    /// 随机：每次爆炸随机选择一种边界行为
+    /// 随机：每次爆炸随机选择一种边界行为（引擎层语义，供 AI 基准/工具直接调用；
+    /// 产品层开局时由前端用时间戳种子解析为固定边界，整局不再改变，不再传入本值）
     #[serde(rename = "random")]
     Random,
 }
@@ -41,7 +42,8 @@ pub enum CapMode {
     Cap4,
     #[serde(rename = "5")]
     Cap5,
-    /// 随机：每步各自随机阈值 3/4/5
+    /// 随机：每步各自随机阈值 3/4/5（引擎层语义，供 AI 基准/工具直接调用；
+    /// 产品层开局时由前端用时间戳种子解析为固定阈值，整局不再改变，不再传入本值）
     #[serde(rename = "random")]
     Random,
 }
