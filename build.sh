@@ -1,12 +1,15 @@
 #!/bin/sh
-# build.sh - 编译并签名连锁棋（APK / Windows exe）
-# 用法: ./build.sh [--apk] [--exe] [--native] [--release] <keystore_password>
+# build.sh - 编译并签名连锁棋（APK / Windows exe / PWA zip）
+# 用法: ./build.sh [--apk] [--exe] [--zip] [--all] [--native] [--release] <keystore_password>
 # 仅支持 release 构建（debug 模式已移除）
-#       ./build.sh --apk chainchess           # 仅构建 APK（签名，需 keystore 密码）
-#       ./build.sh --exe                      # 仅构建 Windows exe（cargo-xwin 交叉编译，无需密码）
-#       ./build.sh --apk --exe chainchess     # 同时构建 APK + exe（默认）
-#       ./build.sh --native chainchess        # release + target-cpu=native 极致优化（仅 APK）
-#       ./build.sh --native --release chainchess
+#       ./build.sh --apk chainchess      # 编译安卓 APK 到 release/，更新 update.json 的 android size
+#       ./build.sh --exe                 # 编译 Windows exe 到 release/，更新 update.json 的 windows size
+#       ./build.sh --zip                 # 打包 PWA zip 到 release/（update.json 无 pwa 条目，不更新 size）
+#       ./build.sh --all chainchess      # 编译 apk + exe + zip 全部到 release/，只更新本次编译的 size
+#       ./build.sh --native chainchess   # 编译安卓 Native APK 到 release/，不碰 update.json
+#       ./build.sh --release chainchess  # 编译除 Native 外所有（apk+exe+zip），全部更新 size，
+#                                        #   并发布：release/ → /storage/emulated/0/用户/，
+#                                        #   update.json + PWA 必要内容 → ../chain-chess-release
 
 set -e
 
@@ -31,55 +34,71 @@ if [ -z "${ANDROID_HOME}" ] && [ -d "$HOME/Android/Sdk" ]; then
 fi
 
 # ── 参数解析 ──────────────────────────────────────────────
-# --apk  : 构建 Android APK（需 keystore 密码）
-# --exe  : 构建 Windows exe（cargo-xwin）
-# --pwa  : 仅打包 PWA zip（不编译）
-# --all  : 打包全部（不编译）：pwa zip + 登记 release/ 已编译的 apk/exe size 到 update.json
-# --release: 启用 release 激进优化（fat LTO 等，编译慢但性能/体积最优）
-# --native : target-cpu=native 极致优化，自动视为 --release（仅 APK 生效）
+# --apk    : 编译 Android APK（需 keystore 密码）→ 更新 android size
+# --exe    : 编译 Windows exe（cargo-xwin）→ 更新 windows size
+# --zip    : 打包 PWA zip（不编译 wasm，用 pkg/ 已编译产物）→ 无 size 条目
+# --all    : apk + exe + zip 全部编译到 release/，只更新本次新编译内容的 size
+# --native : 编译 Android Native APK，不碰 update.json
+# --release: 编译除 Native 外所有（apk+exe+zip），全部更新 size，并发布
+#            （release/ → /storage/emulated/0/用户/，update.json + PWA → ../chain-chess-release）
 APK=false
 EXE=false
-PWA=false
+ZIP=false
 ALL=false
-RELEASE=true
 NATIVE=false
+PUBLISH=false
 PASSWORD=""
 
 for arg in "$@"; do
   case "$arg" in
     --apk) APK=true ;;
     --exe) EXE=true ;;
-    --pwa) PWA=true ;;
+    --zip) ZIP=true ;;
     --all) ALL=true ;;
-    --release) RELEASE=true ;;
     --native) NATIVE=true ;;
+    --release) PUBLISH=true ;;
     -*)
       echo "❌ 未知参数: $arg"
-      echo "用法: $0 [--apk] [--exe] [--native] [--release] <keystore_password>"
+      echo "用法: $0 [--apk] [--exe] [--zip] [--all] [--native] [--release] <keystore_password>"
       exit 1
       ;;
     *) PASSWORD="$arg"
   esac
 done
 
-# 未指定平台时默认 APK + exe 都构建（--all / --pwa 除外）
-if [ "$ALL" = false ] && [ "$PWA" = false ] && [ "$APK" = false ] && [ "$EXE" = false ]; then
+# 模式语义展开
+# --all: apk + exe + zip；--release: apk + exe + zip + 发布动作
+if [ "$ALL" = true ]; then
+  APK=true; EXE=true; ZIP=true
+fi
+if [ "$PUBLISH" = true ]; then
+  APK=true; EXE=true; ZIP=true
+fi
+# --native: 编译 native APK
+if [ "$NATIVE" = true ]; then
+  APK=true
+fi
+# 未指定平台时默认 APK + exe 都构建
+if [ "$APK" = false ] && [ "$EXE" = false ] && [ "$ZIP" = false ]; then
   APK=true
   EXE=true
 fi
-
-# --native 自动 release
-if [ "$NATIVE" = true ]; then
-  RELEASE=true
+# --native 与 --all / --release 互斥（--release 定义即为"除 Native 外所有"）
+if [ "$NATIVE" = true ] && { [ "$ALL" = true ] || [ "$PUBLISH" = true ]; }; then
+  echo "❌ 参数冲突: --native 与 --all / --release 互斥"
+  echo "   --native 单独编译 Native APK；--all / --release 编译普通 apk + exe + zip"
+  exit 1
 fi
 
-# APK 构建需要 keystore 密码
+# APK 构建需要 keystore 密码（普通 APK / native APK 都需要）
 if [ "$APK" = true ]; then
   if [ -z "$PASSWORD" ]; then
-    echo "用法: $0 [--apk] [--exe] [--native] [--release] <keystore_password>"
-    echo "       $0 --apk chainchess"
+    echo "用法: $0 --apk <keystore_password>"
+    echo "       $0 --all <keystore_password>"
+    echo "       $0 --native <keystore_password>"
+    echo "       $0 --release <keystore_password>"
     echo "       $0 --exe"
-    echo "       $0 --native chainchess"
+    echo "       $0 --zip"
     exit 1
   fi
 
@@ -88,52 +107,45 @@ if [ "$APK" = true ]; then
     exit 1
   fi
 fi
-
 START_EPOCH=$(date +%s)
 
 # ── 构建模式提示 ──────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ "$APK" = true ] && [ "$EXE" = true ]; then
+if [ "$PUBLISH" = true ]; then
+  echo "  📦 构建目标: APK + Windows exe + PWA zip（发布模式）"
+elif [ "$ALL" = true ]; then
+  echo "  📦 构建目标: APK + Windows exe + PWA zip（全部，不发布）"
+elif [ "$APK" = true ] && [ "$EXE" = true ]; then
   echo "  📦 构建目标: APK + Windows exe"
+elif [ "$APK" = true ] && [ "$NATIVE" = true ]; then
+  echo "  📦 构建目标: Native APK（不更新 update.json）"
 elif [ "$APK" = true ]; then
   echo "  📦 构建目标: APK"
-else
+elif [ "$EXE" = true ]; then
   echo "  📦 构建目标: Windows exe"
+else
+  echo "  📦 构建目标: PWA zip"
 fi
-if [ "$APK" = true ] && [ "$NATIVE" = true ]; then
-  echo "  🚀 APK 模式: release + native（target-cpu=native 极致优化）"
+if [ "$NATIVE" = true ]; then
+  echo "  🚀 APK 模式: release + native（target-cpu=native 极致优化，不碰 update.json）"
+fi
+if [ "$PUBLISH" = true ]; then
+  echo "  🚀 发布动作: release/ → /storage/emulated/0/用户/，update.json + PWA → ../chain-chess-release"
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-
 # ════════════════════════════════════════════════════════
-# 步骤 0: --pwa / --all 版本管理 + 打包（不编译）
-# --pwa: 仅打包 pwa zip；--all: pwa zip + 登记 release/ 已编译 apk/exe size
+# 步骤 Z: 打包 PWA zip（--zip / --all / --release）
+# PWA 是静态资源 + 预编译 wasm（pkg/），"编译"即打包发布 zip；update.json 无 pwa 平台条目，不更新 size
 # ════════════════════════════════════════════════════════
-if [ "$PWA" = true ] || [ "$ALL" = true ]; then
-  echo ""
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  if [ "$ALL" = true ]; then
-    echo "  📦 --all 模式：打包全部（pwa zip + 登记 apk/exe，不编译）"
-  else
-    echo "  📦 --pwa 模式：仅打包 PWA zip（不编译）"
-  fi
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo ""
-
-  # 确保 update.json 存在且版本正确
-  if [ ! -f "update.json" ]; then
-    echo "❌ 错误: 找不到 update.json"
-    exit 1
-  fi
-  VERSION=$(jq -r '.version' update.json)
-  echo "  📋 update.json 版本: ${VERSION}"
-
-  # ── 打包 PWA zip（与现有结构一致：顶层目录带版本号）──
+if [ "$ZIP" = true ]; then
   PWA_ZIP="release/chain-chess-pwa-v${VERSION}.zip"
   echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "  📦 打包 PWA: ${PWA_ZIP}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
   if [ -d "pwa" ]; then
     TMPPKG=$(mktemp -d)
     cp -r pwa "$TMPPKG/chain-chess-pwa-v${VERSION}"
@@ -143,43 +155,13 @@ if [ "$PWA" = true ] || [ "$ALL" = true ]; then
     rm -rf "$TMPPKG"
     PWA_BYTES=$(stat -c %s "$PWA_ZIP" 2>/dev/null || echo 0)
     echo "  ✅ PWA zip 打包完成 (${PWA_BYTES} bytes)"
-  else
-    echo "  ⚠️  未找到 pwa/ 目录，跳过"
-  fi
-
-  # ── 登记已编译产物 size 到 update.json（仅 --all）──
-  if [ "$ALL" = true ]; then
     echo ""
-    for PLAT in "android:apk" "windows:exe"; do
-      KEY=${PLAT%%:*}; EXT=${PLAT##*:}
-      FILE="release/${PRODUCT}-${VERSION}.${EXT}"
-      if [ -f "$FILE" ]; then
-        SZ=$(stat -c %s "$FILE")
-        jq --argjson sz "$SZ" --arg url "https://gitee.com/ywnh1/chain-chess-release/releases/download/v${VERSION}/${PRODUCT}-${VERSION}.${EXT}" \
-           --arg plat "$KEY" '.platforms[$plat] = {url: $url, size: $sz}' \
-           update.json > tmp.json && mv tmp.json update.json
-        echo "  📄 update.json: ${KEY}.size = ${SZ} (${FILE})"
-      else
-        echo "  ⚠️  未找到 ${FILE}，跳过（请先编译或运行 ./build.sh --apk / --exe）"
-      fi
-    done
+  else
+    echo "  ⚠️  未找到 pwa/ 目录，跳过 PWA 打包"
+    echo ""
   fi
-
-  # ── 展示最终 update.json ──
-  echo ""
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  📄 最终 update.json"
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  batcat update.json 2>/dev/null || cat update.json
-  echo ""
-  echo "  📌 上传到 Gitee Release 前请确认："
-  echo "     1. update.json → 提交到 chain-chess-release 仓库 main 分支"
-  echo "     2. release/ 下产物 → 上传到 Gitee Release 附件 (tag: v${VERSION})"
-  echo ""
-  exit 0
 fi
 
-# ════════════════════════════════════════════════════════
 # 步骤 1: 构建 Windows exe（cargo-xwin 交叉编译）
 # 说明：x86_64-pc-windows-msvc target 已通过 rustup 安装，
 #       cargo-xwin 负责提供 MSVC CRT/SDK 并调用 clang-cl。
@@ -221,8 +203,6 @@ if [ "$EXE" = true ]; then
     echo ""
   fi
 fi
-
-# ════════════════════════════════════════════════════════
 # 步骤 2: 构建 Android APK
 # ════════════════════════════════════════════════════════
 if [ "$APK" = true ]; then
@@ -450,6 +430,12 @@ echo "  大小: ${FILESIZE}"
 echo "  耗时: ${ELAPSED}s"
 
 # ── 步骤 6: 更新 update.json（APK 大小）──────────────────
+# native 模式不碰 update.json（native 产物无对应发布条目）
+if [ "$NATIVE" = true ]; then
+  echo ""
+  echo "  🚫 --native 模式：跳过 update.json 更新"
+  echo ""
+else
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  📄 验证 update.json"
@@ -474,28 +460,55 @@ if [ -f "update.json" ]; then
     echo "     3. ${EXE_OUTPUT##release/} → 上传到 Gitee Release 附件（Windows）"
   fi
   echo ""
-else
-  echo "update.json不存在"
-fi
+  else
+    echo "update.json不存在"
+  fi
+fi # end APK 更新（native 跳过）
 
 fi # end APK
-
 # ── 收尾：展示全部产物 ────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  📦 release/ 目录产物"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-ls -lh release/ 2>/dev/null | grep -E "chainchess|\.exe" || true
+ls -lh release/ 2>/dev/null | grep -E "chainchess|chain-chess-pwa" || true
 echo ""
 
-# 尝试复制 APK 到 Android 设备（仅当路径存在时）
-if [ "$APK" = true ] && [ -d "/storage/emulated/0/用户" ]; then
-  cp "$OUTPUT" /storage/emulated/0/用户/
-  echo "  📱 已复制到 /storage/emulated/0/用户/"
-fi
-if [ -f "update.json" ] && [ -d "../chain-chess-release" ]; then
-  cp update.json ../chain-chess-release
-  echo "  🌐 已复制到 ../chain-chess-release"
-#  better-rm update.json 2>/dev/null || true
+# ── 发布动作（仅 --release）────────────────────────────────
+if [ "$PUBLISH" = true ]; then
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  🚀 发布：release/ → /storage/emulated/0/用户/"
+  echo "        update.json + PWA 必要内容 → ../chain-chess-release"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+
+  # 1) 复制 release/ 全部产物到 Android 设备目录（仅当路径存在时）
+  if [ -d "/storage/emulated/0/用户" ]; then
+    cp -f release/chainchess-*.apk release/chainchess-*.exe release/chain-chess-pwa-*.zip /storage/emulated/0/用户/ 2>/dev/null || true
+    echo "  📱 release/ 产物已复制到 /storage/emulated/0/用户/"
+  else
+    echo "  ⚠️  未找到 /storage/emulated/0/用户/，跳过设备复制"
+  fi
+
+  # 2) 复制 update.json + PWA 必要内容到发布仓库（仅当仓库存在时）
+  if [ -d "../chain-chess-release" ]; then
+    if [ -f "update.json" ]; then
+      cp -f update.json ../chain-chess-release/
+      echo "  📄 update.json 已复制到 ../chain-chess-release"
+    else
+      echo "  ⚠️  未找到 update.json，跳过（发布仓库将缺少更新数据）"
+    fi
+    # PWA 必要内容：运行所需文件（排除 wasm 源码 / pkg-node / 仓库自有文档 .git 等）
+    for f in index.html app.js style.css engine.js sw.js manifest.webmanifest; do
+      [ -f "pwa/$f" ] && cp -f "pwa/$f" ../chain-chess-release/
+    done
+    cp -rf pwa/icons ../chain-chess-release/ 2>/dev/null || true
+    cp -rf pwa/audio ../chain-chess-release/ 2>/dev/null || true
+    cp -rf pwa/pkg ../chain-chess-release/ 2>/dev/null || true
+    echo "  🌐 PWA 必要内容已复制到 ../chain-chess-release"
+  else
+    echo "  ⚠️  未找到 ../chain-chess-release，跳过仓库复制"
+  fi
+  echo ""
 fi
 echo ""
