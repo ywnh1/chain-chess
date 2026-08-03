@@ -4171,7 +4171,9 @@ async function rpGoTo(target, animate){
       break;
     }
     if(animate){
-      const delay=500/_rp.speed;  // 每步停顿：0.5x=1s / 1x=500ms / 2x=250ms / 4x=125ms
+      // 实时读取当前倍速：播放中点击倍速按钮立即生效（按钮只改 DOM 选中态，
+      // 不能依赖 rpPlayLoop 启动时快照的 _rp.speed）
+      const delay=500/rpReadSpeed();  // 每步停顿：0.5x=1s / 1x=500ms / 2x=250ms / 4x=125ms
       if(delay>0)await rpSleep(delay);
     }
   }
