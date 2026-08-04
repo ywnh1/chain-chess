@@ -70,8 +70,9 @@ xgb_model_board.json
 prompt.md
 .codewhale/
 
-.html.bak*.out
+.html.bak
+*.out
 
 # ─── PWA（pwa/ 目录） ───
-pwa/wasm/target/
-pwa/pkg-node/
+doc/wasm/target/
+doc/pkg-node/
