@@ -74,5 +74,5 @@ prompt.md
 *.out
 
 # ─── PWA（pwa/ 目录） ───
-doc/wasm/target/
-doc/pkg-node/
+docs/wasm/target/
+docs/pkg-node/
