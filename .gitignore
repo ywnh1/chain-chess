@@ -73,6 +73,11 @@ prompt.md
 .html.bak
 *.out
 
-# ─── PWA（pwa/ 目录） ───
+# ─── PWA / Wasm ───
+# docs/pkg/ 是 wasm-pack 生成的发布版 Wasm（浏览器版），PWA 运行必需 —— 必须提交，不要忽略
+# 注意：wasm-pack 每次运行会在 docs/pkg/.gitignore 写入 '*' 导致发布产物被忽略，
+#       若重跑 wasm-pack 生成到 docs/pkg/，请删除该文件再提交 docs/pkg/ 内容
+# Rust 编译中间产物（构建内容，不上传）
 docs/wasm/target/
+# Node 版 pkg（不上传，仅浏览器版 docs/pkg/ 需要上传）
 docs/pkg-node/
