@@ -1,15 +1,15 @@
 {
-  "version": "3.3.3",
-  "notes": "Rewrite AI benchmark page (432-game pairwise duel, win-rate ranking, full report); add AI strength test tool; fix cap3/cap5 battles (explosive-move threshold); migrate strategy AI (2v2/4v4 adjacency); fix wrap-border neighbor logic; speed up MCTS; fix data-gen progress bar",
-  "pub_date": "2026-08-03T00:00:00Z",
+  "version": "3.3.4",
+  "notes": "Add device performance test page upgrade: introduce Tauri tech stack and performance optimizations; show warning dialog (long duration, high CPU, possible lag) and test principle before each benchmark; polish WebView FPS and AI benchmark UX",
+  "pub_date": "2026-08-04T00:00:00Z",
   "platforms": {
     "android": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.3/chainchess-3.3.3.apk",
-      "size": 11592772
+      "url": "https://ywnh1.free.leoi.org",
+      "size": 11637828
     },
     "windows": {
-      "url": "https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.3/chainchess-3.3.3.exe",
-      "size": 10838528
+      "url": "https://ywnh1.free.leoi.org",
+      "size": 10860544
     }
   }
 }

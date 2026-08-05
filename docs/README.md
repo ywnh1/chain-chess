@@ -6,8 +6,8 @@
 ## 架构
 
 ```
-pwa/
-├── index.html / style.css / app.js   # 前端 UI（复制自 tauri/public，做了最小改造）
+docs/                                 # 本目录（PWA 独立构建）
+├── index.html / style.css / app.js   # 前端 UI（与 tauri/public 同步维护，最小改造）
 ├── engine.js                         # 桥接层：模拟 Tauri invoke()
 ├── manifest.webmanifest / sw.js      # PWA 清单 + Service Worker（离线缓存）
 ├── icons/                            # PWA 图标（192/512/maskable）
@@ -25,15 +25,16 @@ pwa/
 ## 迁移方案
 
 核心决策：**游戏引擎（规则 + AI）用 Rust 编译成 WASM**，而不是用 JS 重写。
-`tauri/src-tauri/src/lib.rs` 的 2755 行中，纯逻辑部分（游戏规则、
+`tauri/src-tauri/src/lib.rs` 中，纯逻辑部分（游戏规则、
 Alpha-Beta / PVS / MCTS / 策略搜索、XGBoost 机器学习评估）被提取为
-`pwa/wasm` crate，通过 `wasm-bindgen` 导出 4 个函数：
+本目录的 `wasm/` crate，通过 `wasm-bindgen` 导出：
 
 | WASM 导出 | 对应 Tauri 命令 |
 |---|---|
 | `process_move_cmd` | `process_move` |
 | `ai_move_cmd`（按 `algorithm` 分派） | `ai_move` / `ai_move_v2` / `ai_move_mcts` / `ai_move_strategy` |
 | `simulate_to_end_cmd` | `simulate_to_end` |
+| `bench_ai_game_cmd` | `bench_ai_game`（设备性能检测 · AI 计算基准） |
 | `engine_version` | — |
 
 Tauri 特定功能由 `engine.js` 在浏览器侧等价实现：
@@ -44,17 +45,18 @@ Tauri 特定功能由 `engine.js` 在浏览器侧等价实现：
 | 导出对话框（`export_game_history_dialog`） | Blob 下载（返回 `fallback:字节数`，兼容前端） |
 | `import_game_history` | 按 `id` 去重合并 |
 | 触觉反馈（haptics 插件） | 前端已有 `navigator.vibrate` 回退，无需改动 |
-| 更新机制（check/download/install） | 降级：更新提示仍显示，下载按钮提示"测试模式" |
+| 更新机制（check/download/install） | 降级：更新提示仍显示，下载按钮跳转下载中心 |
 | `exit_app` | 无操作 |
 
-前端接入方式：`pwa/app.js` 的 `tauriInvoke()` 增加降级分支——非 Tauri
+前端接入方式：`app.js` 的 `tauriInvoke()` 增加降级分支——非 Tauri
 环境转调 `window.ChainEngine.webInvoke(cmd, args)`。原 Tauri 调用路径
 不受影响（若本页面运行在 Tauri WebView 里，行为与原来完全一致）。
 
 ## 构建 WASM 引擎
 
 ```bash
-cd pwa/wasm
+# 在 docs/ 目录内执行
+cd wasm
 wasm-pack build --target web --out-dir ../pkg --release
 # 本地测试用（可选）：
 wasm-pack build --target nodejs --out-dir ../pkg-node --release
@@ -74,7 +76,7 @@ wasm-pack build --target nodejs --out-dir ../pkg-node --release
 PWA 必须通过 HTTP(S) 访问（动态 import + wasm fetch 在 `file://` 下不可用）：
 
 ```bash
-cd pwa
+# 在 docs/ 目录内执行
 python3 -m http.server 8899
 # 浏览器打开 http://localhost:8899
 ```
@@ -90,13 +92,13 @@ python3 -m http.server 8899
   集中封装，改动点很小）。
 - **AI 速度**：WASM 版去掉了根级并行搜索（rayon），深度大的 AI 思考会比
   Tauri 桌面版慢（浏览器单线程），移动端尤其明显。深度 ≤ 3 时体感无差。
-- **更新提示**：PWA 下的"检查更新"仍指向 Android/Linux 安装包，对网页无
-  实际意义，仅提示"测试模式"，不影响使用。
+- **更新提示**：PWA 同样参与更新检查，发现新版本后点击"下载更新"跳转
+  下载中心页（`https://ywnh1.free.leoi.org`）选择平台。
 - **导出路径**：Tauri 版弹出系统对话框选路径；PWA 版直接下载到下载目录。
 
 ## 与 Tauri 版同步维护
 
-引擎源码 `pwa/wasm/src/lib.rs` 是从 `tauri/src-tauri/src/lib.rs` 提取的快照。
+引擎源码 `wasm/src/lib.rs` 是从 `tauri/src-tauri/src/lib.rs` 提取的快照。
 若 Tauri 版修改了游戏规则或 AI 逻辑，需要重新提取：
 
 ```bash
@@ -104,11 +106,11 @@ python3 - <<'EOF'   # 见下方说明：行区间随上游变动需调整
 EOF
 ```
 
-提取规则（`tauri/src-tauri/src/lib.rs` 1-indexed 行号）：
-- 核心类型：19–111（BorderMode / Cell / GameBoard / ProcessMoveResult 等）
-- SimulateResult：252–263
-- `simulate_to_end` 纯函数体：279–401（去掉 `spawn_blocking` 包装）
-- 纯逻辑主体：938–2636（XGBoost 引擎 → `find_best_move_by_alg`）
+提取按**函数/类型名**定位（行号随上游变动，勿依赖具体行号）：
+- 核心类型：`BorderMode` / `CapMode` / `Cell` / `GameBoard` / `ProcessMoveResult` 等
+- 结构体：`SimulateResult` 及其历史类型
+- 纯函数：`simulate_to_end`（去掉 `spawn_blocking` 包装）
+- 纯逻辑主体：XGBoost 引擎 → `find_best_move_by_alg`（含各算法搜索函数）
 
 提取后需人工处理：rayon `par_iter()` → `iter()`、`std::fs` 函数加
 `#[cfg(not(target_arch = "wasm32"))]`。建议在修改 Tauri 引擎时同步跑一遍

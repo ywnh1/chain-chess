@@ -77,6 +77,8 @@
       json = m.process_move_cmd(JSON.stringify(args || {}));
     } else if (cmd === 'simulate_to_end') {
       json = m.simulate_to_end_cmd(JSON.stringify(args || {}));
+    } else if (cmd === 'bench_ai_game') {
+      json = m.bench_ai_game_cmd(JSON.stringify(args || {}));
     } else {
       // ai_move / ai_move_v2 / ai_move_mcts / ai_move_strategy
       const a = Object.assign({}, args);
@@ -119,6 +121,17 @@
       case 'ai_move_strategy':
       case 'simulate_to_end':
         return engineInvoke(cmd, args);
+
+      // 设备性能检测：AI 单局基准（前端传 {config, gameCount}，扁平化后转 WASM；
+      // wasm32 无标准时钟，由 JS 端 performance.now() 计时）
+      case 'bench_ai_game': {
+        const flat = Object.assign({}, args.config || {}, { gameCount: args.gameCount });
+        const t0 = performance.now();
+        return engineInvoke('bench_ai_game', flat).then(function (data) {
+          data.elapsedMs = performance.now() - t0;
+          return data;
+        });
+      }
 
       // 设置
       case 'load_settings':

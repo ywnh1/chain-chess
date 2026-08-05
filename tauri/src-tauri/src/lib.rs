@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Instant;
 use rand::Rng;
 use rand::SeedableRng;
 use rayon::prelude::*;
@@ -488,6 +489,126 @@ async fn simulate_to_end_cmd(
     Ok(result)
 }
 
+// ─── 设备性能检测：AI 计算基准（单局） ───
+// 前端逐局调用 bench_ai_game，每局返回精简计时结果；进度条由前端按局刷新。
+// 首子布局与 bin/ai_bench.rs 保持一致（内圈均匀散布，切比雪夫距离 ≥3）。
+
+/// 合法首子布局：内圈均匀散布，彼此切比雪夫距离 ≥3（符合「首子 12 格限制」）
+pub fn spread_starts(sz: usize, n: usize) -> Vec<(usize, usize)> {
+    let mut pos: Vec<(usize, usize)> = Vec::new();
+    let cx = sz as f64 / 2.0 - 0.5;
+    let cy = sz as f64 / 2.0 - 0.5;
+    let r = (cx.min(cy) * 0.72).max(0.5);
+    for i in 0..n {
+        let ang = 2.0 * std::f64::consts::PI * i as f64 / n as f64 - std::f64::consts::FRAC_PI_2;
+        let mut x = (cx + r * ang.cos()).round() as usize;
+        let mut y = (cy + r * ang.sin()).round() as usize;
+        x = x.min(sz - 1);
+        y = y.min(sz - 1);
+        let mut guard = 0usize;
+        while pos.iter().any(|&(px, py)| {
+            px.abs_diff(x).max(py.abs_diff(y)) < 3
+        }) && guard < 100 {
+            x = (x + 3) % sz;
+            y = (y + 2) % sz;
+            guard += 1;
+        }
+        pos.push((x, y));
+    }
+    pos
+}
+
+/// 单个玩家的 AI 配置（设备性能检测页生成）
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiBenchPlayer {
+    pub algorithm: String,
+    #[serde(default)]
+    pub depth: Option<usize>,
+    #[serde(default)]
+    pub random_scale: Option<u32>,
+    #[serde(default)]
+    pub use_ml_eval: Option<bool>,
+}
+
+/// 单局 AI 基准配置
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiBenchGameConfig {
+    pub size: usize,
+    pub players: Vec<AiBenchPlayer>,
+    #[serde(default = "default_bench_border")]
+    pub border_mode: BorderMode,
+    #[serde(default = "default_bench_cap")]
+    pub cap_mode: CapMode,
+}
+
+fn default_bench_border() -> BorderMode { BorderMode::Default }
+fn default_bench_cap() -> CapMode { CapMode::Cap4 }
+
+/// 单局结果（Rust 端计时，精确反映引擎计算耗时）
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiBenchGameResult {
+    pub elapsed_ms: f64,
+    pub steps: usize,
+    pub winner: Option<usize>,
+}
+
+/// 单局 AI 基准命令：构造首子布局后全速模拟到终局，返回引擎耗时与结果
+#[tauri::command(rename = "bench_ai_game")]
+async fn bench_ai_game(
+    config: AiBenchGameConfig,
+    game_count: u32,
+) -> Result<AiBenchGameResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        run_ai_bench_game(&config, game_count)
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?;
+    Ok(result)
+}
+
+fn run_ai_bench_game(cfg: &AiBenchGameConfig, game_count: u32) -> AiBenchGameResult {
+    let sz = cfg.size;
+    let max_players = cfg.players.len();
+    if sz < 5 || max_players < 2 {
+        return AiBenchGameResult { elapsed_ms: 0.0, steps: 0, winner: None };
+    }
+    let mut board: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz];
+    let starts = spread_starts(sz, max_players);
+    // 首子等级 = 阈值 n-1（cap3→2、cap4→3、cap5→4；随机模式取中间等级 3）
+    let th: u32 = match cfg.cap_mode {
+        CapMode::Cap3 => 3,
+        CapMode::Cap4 => 4,
+        CapMode::Cap5 => 5,
+        CapMode::Random => 3,
+    };
+    for (p, &(x, y)) in starts.iter().enumerate() {
+        board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: None };
+    }
+    let mut ai_configs: HashMap<String, serde_json::Value> = HashMap::new();
+    for (p, pl) in cfg.players.iter().enumerate() {
+        let is_mcts = pl.algorithm == "mcts";
+        ai_configs.insert(
+            p.to_string(),
+            serde_json::json!({
+                "algorithm": pl.algorithm,
+                "depth": pl.depth.unwrap_or(if is_mcts { 1 } else { 2 }),
+                "useMlEval": pl.use_ml_eval.unwrap_or(true),
+                "randomScale": pl.random_scale.unwrap_or(0),
+            }),
+        );
+    }
+    let t0 = Instant::now();
+    let r = simulate_to_end(board, sz, max_players, 0, Vec::new(), cfg.border_mode, cfg.cap_mode, None, game_count, ai_configs);
+    AiBenchGameResult {
+        elapsed_ms: t0.elapsed().as_secs_f64() * 1000.0,
+        steps: r.history.len(),
+        winner: r.winner,
+    }
+}
+
 #[tauri::command]
 async fn ai_move_mcts(
     _random_scale: u32,  // MCTS 不走 eval 随机，保留参数兼容前端
@@ -887,9 +1008,9 @@ async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, String
         .to_string();
     let notes = update_data["notes"].as_str().unwrap_or("").to_string();
 
-    // 桌面端按平台选择 URL：Windows → windows，其余 → linux
+    // 按平台选择 URL：Windows → windows，其余 → linux（各平台 url 统一指向下载中心）
     let platform_key = if cfg!(target_os = "windows") { "windows" } else { "linux" };
-    // 平台条目缺失（如该平台尚未发布安装包）时 url 为空；serde_json::Value 索引缺失返回 Null，不会 panic
+    // 平台条目缺失时 url 为空；serde_json::Value 索引缺失返回 Null，不会 panic
     let url = update_data["platforms"][platform_key]["url"]
         .as_str()
         .unwrap_or("")
@@ -923,46 +1044,7 @@ async fn check_update(_app_handle: tauri::AppHandle) -> Result<UpdateInfo, Strin
     Err("请使用前端 JS 检查更新".into())
 }
 
-/// 下载更新文件（桌面端用 reqwest 下载到应用数据目录）
-#[cfg(not(target_os = "android"))]
-#[tauri::command]
-async fn download_update(url: String, app_handle: tauri::AppHandle) -> Result<String, String> {
-    let filename = url
-        .rsplit('/')
-        .next()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("update");
-
-    let app_data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("获取数据目录失败: {}", e))?;
-    let download_dir = app_data_dir.join("downloads");
-    fs::create_dir_all(&download_dir).map_err(|e| format!("创建下载目录失败: {}", e))?;
-    let filepath = download_dir.join(filename);
-
-    let response = reqwest::get(&url)
-        .await
-        .map_err(|e| format!("下载失败: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("服务器返回 {}", response.status()));
-    }
-
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| format!("读取响应失败: {}", e))?;
-
-    let tmp_path = filepath.with_extension("tmp");
-    fs::write(&tmp_path, &bytes).map_err(|e| format!("写入文件失败: {}", e))?;
-    fs::rename(&tmp_path, &filepath).map_err(|e| format!("重命名失败: {}", e))?;
-
-    Ok(filepath.to_string_lossy().to_string())
-}
-
-/// Android 端下载：直接打开系统浏览器让用户手动下载
-#[cfg(target_os = "android")]
+/// 打开更新跳转目标（下载中心页）——所有平台统一，不分平台
 #[tauri::command]
 async fn download_update(url: String, app_handle: tauri::AppHandle) -> Result<String, String> {
     use tauri_plugin_opener::OpenerExt;
@@ -1010,6 +1092,7 @@ pub fn run() {
             ai_move_mcts,
             ai_move_strategy,
             simulate_to_end_cmd,
+            bench_ai_game,
             load_settings,
             save_settings,
             check_update,
@@ -3687,6 +3770,77 @@ mod tests {
                 }
                 let r = simulate_to_end(b.clone(), sz, max_players, 0, vec![], bm, cm, None, 0, cfg);
                 assert!(!r.history.is_empty(), "{bm:?}×{cm:?}: sim should produce history");
+            }
+        }
+    }
+
+    // ── 设备性能检测：AI 计算基准 ──
+    fn bench_cfg(players: Vec<(&str, usize)>) -> AiBenchGameConfig {
+        AiBenchGameConfig {
+            size: 7,
+            players: players.into_iter().map(|(alg, depth)| AiBenchPlayer {
+                algorithm: alg.to_string(),
+                depth: Some(depth),
+                random_scale: Some(0),
+                use_ml_eval: Some(true),
+            }).collect(),
+            border_mode: BorderMode::Default,
+            cap_mode: CapMode::Cap4,
+        }
+    }
+
+    #[test]
+    fn bench_ai_game_produces_winner_and_steps() {
+        let cfg = bench_cfg(vec![("strategy", 2), ("strategy", 2), ("alphabeta", 2), ("pvs", 2)]);
+        for gc in 0..5u32 {
+            let r = run_ai_bench_game(&cfg, gc);
+            assert!(r.elapsed_ms > 0.0, "局 {gc}: 引擎耗时应 > 0");
+            assert!(r.steps > 0, "局 {gc}: 应有落子步数");
+            assert!(r.winner.is_some(), "局 {gc}: 应有胜者");
+            let w = r.winner.unwrap();
+            assert!(w < 4, "局 {gc}: 胜者应在 0..4 内");
+        }
+    }
+
+    #[test]
+    fn bench_ai_game_seeds_vary_results() {
+        // 引擎含非确定性随机（MCTS / 随机逻辑），同 seed 不保证复现；
+        // 这里校验不同 seed 结果具备多样性且全部有效
+        let cfg = bench_cfg(vec![("strategy", 2), ("alphabeta", 2), ("pvs", 2), ("mcts", 1)]);
+        let mut seen = std::collections::HashSet::new();
+        for gc in 0..10u32 {
+            let r = run_ai_bench_game(&cfg, gc);
+            assert!(r.winner.is_some(), "局 {gc}: 应有胜者");
+            assert!(r.steps > 0, "局 {gc}: 应有步数");
+            seen.insert((r.winner, r.steps));
+        }
+        assert!(seen.len() >= 3, "10 局不同 seed 应产生至少 3 种不同结果，实际 {}", seen.len());
+    }
+
+    #[test]
+    fn bench_ai_game_mcts_included() {
+        let cfg = bench_cfg(vec![("mcts", 1), ("mcts", 1), ("strategy", 2), ("alphabeta", 2)]);
+        for gc in 0..3u32 {
+            let r = run_ai_bench_game(&cfg, gc);
+            assert!(r.winner.is_some(), "局 {gc}: MCTS 对局应有胜者");
+            assert!(r.steps > 0, "局 {gc}: MCTS 对局应有步数");
+        }
+    }
+
+    #[test]
+    fn bench_ai_game_spread_starts_valid() {
+        for &(sz, n) in &[(7usize, 4usize), (9, 6), (11, 6), (5, 2)] {
+            let pos = spread_starts(sz, n);
+            assert_eq!(pos.len(), n, "{sz}×{sz} {n} 人首子数量");
+            for &(x, y) in &pos {
+                assert!(x < sz && y < sz, "首子在界内");
+            }
+            // 两两切比雪夫距离 ≥3
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    let d = pos[i].0.abs_diff(pos[j].0).max(pos[i].1.abs_diff(pos[j].1));
+                    assert!(d >= 3, "{sz}×{sz}: 首子 ({:?}) 与 ({:?}) 距离 {d} < 3", pos[i], pos[j]);
+                }
             }
         }
     }

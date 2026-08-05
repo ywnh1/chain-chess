@@ -17,7 +17,7 @@ set -e
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="chainchess"
-VERSION="3.3.3"
+VERSION="3.3.4"
 
 CARGO_CONFIG="tauri/src-tauri/.cargo/config.toml"
 CARGO_TOML="tauri/src-tauri/Cargo.toml"
@@ -198,9 +198,9 @@ if [ "$ZIP" = true ]; then
   echo "  📦 打包 PWA: ${PWA_ZIP}"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
-  if [ -d "pwa" ]; then
+  if [ -d "docs" ]; then
     TMPPKG=$(mktemp -d)
-    cp -r pwa "$TMPPKG/chain-chess-pwa-v${VERSION}"
+    cp -r docs "$TMPPKG/chain-chess-pwa-v${VERSION}"
     # 排除 wasm 源码目录（含 target/vendor）与 pkg-node（仅发布编译好的 pkg/*.wasm）
     rm -rf "$TMPPKG/chain-chess-pwa-v${VERSION}/wasm" "$TMPPKG/chain-chess-pwa-v${VERSION}/pkg-node"
     (cd "$TMPPKG" && zip -qr "$OLDPWD/$PWA_ZIP" "chain-chess-pwa-v${VERSION}")
@@ -209,7 +209,7 @@ if [ "$ZIP" = true ]; then
     echo "  ✅ PWA zip 打包完成 (${PWA_BYTES} bytes)"
     echo ""
   else
-    echo "  ⚠️  未找到 pwa/ 目录，跳过 PWA 打包"
+    echo "  ⚠️  未找到 docs/ 目录，跳过 PWA 打包"
     echo ""
   fi
 fi
@@ -244,10 +244,9 @@ if [ "$EXE" = true ]; then
   echo "  ✅ Windows exe 构建完成: ${EXE_OUTPUT} (${EXE_SIZE})"
   echo ""
 
-  # 更新 update.json 的 windows 平台条目
+  # 更新 update.json 的 windows 平台条目（跳转目标统一为下载中心）
   if [ -f "update.json" ]; then
-    VERSION=$(jq -r '.version' update.json)
-    EXE_URL="https://gitee.com/ywnh1/chain-chess-release/releases/download/v${VERSION}/${PRODUCT}-${VERSION}.exe"
+    EXE_URL="https://ywnh1.free.leoi.org"
     jq --arg url "$EXE_URL" --argjson sz "$EXE_BYTES" \
        '.platforms.windows = {url: $url, size: $sz}' \
        update.json > tmp.json && mv tmp.json update.json
@@ -552,11 +551,11 @@ if [ "$PUBLISH" = true ]; then
     fi
     # PWA 必要内容：运行所需文件（排除 wasm 源码 / pkg-node / 仓库自有文档 .git 等）
     for f in index.html app.js style.css engine.js sw.js manifest.webmanifest; do
-      [ -f "pwa/$f" ] && cp -f "pwa/$f" ../chain-chess-release/
+      [ -f "docs/$f" ] && cp -f "docs/$f" ../chain-chess-release/
     done
-    cp -rf pwa/icons ../chain-chess-release/ 2>/dev/null || true
-    cp -rf pwa/audio ../chain-chess-release/ 2>/dev/null || true
-    cp -rf pwa/pkg ../chain-chess-release/ 2>/dev/null || true
+    cp -rf docs/icons ../chain-chess-release/ 2>/dev/null || true
+    cp -rf docs/audio ../chain-chess-release/ 2>/dev/null || true
+    cp -rf docs/pkg ../chain-chess-release/ 2>/dev/null || true
     echo "  🌐 PWA 必要内容已复制到 ../chain-chess-release"
   else
     echo "  ⚠️  未找到 ../chain-chess-release，跳过仓库复制"

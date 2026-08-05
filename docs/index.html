@@ -4,6 +4,25 @@
   SPDX-License-Identifier: MIT
 -->
 <html lang="zh">
+<!-- 51.la 站点统计（autoTrack 自动跟踪；失败时记录，测试版在应用内显示） -->
+<script charset="UTF-8" id="LA_COLLECT" src="https://sdk.51.la/js-sdk-pro.min.js"></script>
+<script>
+window.__LA_STATS__ = { ok: false };
+try {
+  LA.init({id:"3QmOPWHEuNfIW4mp",ck:"3QmOPWHEuNfIW4mp",autoTrack:true});
+  window.__LA_STATS__.ok = true;
+} catch (e) {
+  window.__LA_STATS__.error = String(e && e.message || e);
+  console.error('[51.la] 初始化失败:', e);
+}
+</script>
+<script>
+  window.__LA_STATS__ = window.__LA_STATS__ || {ok:false};
+  try {
+    if (window.LA) { LA.init({id:"3QmOPWHEuNfIW4mp",ck:"3QmOPWHEuNfIW4mp"}); window.__LA_STATS__.ok = true; }
+    else if (!window.__LA_STATS__.error) { window.__LA_STATS__.error = 'SDK 脚本未加载（LA 未定义）'; }
+  } catch (e) { window.__LA_STATS__.error = String(e && e.message || e); console.error('[51.la] 初始化失败:', e); }
+</script>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -237,12 +256,153 @@
       </div>
     </div>
 
+    <div class="about-card" style="cursor:pointer" onclick="Router.navigate('device-bench')">
+      <div class="form-row">
+        <label style="flex:1">设备性能检测</label>
+        <span style="color:var(--dim)">→</span>
+      </div>
+    </div>
+
     <div class="about-card" style="cursor:pointer" onclick="Router.navigate('about')">
       <div class="form-row">
         <label style="flex:1">关于连锁棋</label>
         <span style="color:var(--dim)">→</span>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Device Benchmark Screen (设备性能检测) -->
+<div id="device-bench" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>设备性能检测</h2>
+
+    <!-- 主视图：技术栈介绍 + 两个检测项目 -->
+    <div id="dbMain">
+      <div class="about-card">
+        <h3>🦀 Tauri 与技术栈</h3>
+        <p class="db-desc">连锁棋在性能上做了这些努力，下面的检测用来验证它们在你这台设备上的实际表现：</p>
+        <ul class="db-stack-list">
+          <li><strong>Tauri 2</strong> — Rust 内核 + 系统 WebView，相比传统 Electron 内存占用更低、启动更快</li>
+          <li><strong>Rust 引擎</strong> — 游戏规则与 AI 全部用 Rust 实现，编译为原生码；PWA 版编译为 WASM</li>
+          <li><strong>Rayon 多核并行</strong> — A-B / PVS / MCTS 根节点并行搜索，充分利用多核 CPU</li>
+          <li><strong>搜索剪枝</strong> — Alpha-Beta 剪枝、PVS 主变例搜索（Killer / History / 静止搜索）、MCTS 蒙特卡洛树搜索</li>
+          <li><strong>ML 评估</strong> — 内置 XGBoost 模型（18 维特征），AI 决策更准、收敛更快</li>
+          <li><strong>WebGL 渲染</strong> — 棋盘 Canvas 绘制 + 动画批处理，GPU 分担渲染压力</li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <h3>🌐 WebView 性能</h3>
+        <p class="db-desc">
+          基于 WebGL 体积着色器（光线步进分形）的 GPU / WebView 压力测试。
+          实时显示 FPS 与帧时间；结束后生成评测报告：平均 / 最低 / 1% Low FPS、
+          丢帧统计，以及 WebView 与设备信息（UA、WebGL 渲染器、分辨率、硬件并发等）。
+        </p>
+        <div class="form-row">
+          <label style="flex:1">测试时长</label>
+          <select id="dbWvDuration" class="bench-select">
+            <option value="15">15 秒</option>
+            <option value="30" selected>30 秒</option>
+            <option value="60">60 秒</option>
+          </select>
+        </div>
+        <button class="glass-btn primary" onclick="dbShowConfirm('webview')" style="width:100%;padding:9px 14px">▶ 开始 WebView 性能检测</button>
+      </div>
+
+      <div class="about-card">
+        <h3>🧠 AI 计算性能</h3>
+        <p class="db-desc">
+          使用 Rust 引擎全速模拟 AI 对局（首子分散布局，与 ai_bench 基准一致），
+          覆盖不同 AI 类型 / 棋盘大小 / 人数 / 搜索深度；默认 50 局，
+          每完成一局刷新进度，最后生成性能报告。
+        </p>
+        <div class="form-row">
+          <label style="flex:1">棋盘大小</label>
+          <select id="dbAiSize" class="bench-select">
+            <option value="7" selected>7×7</option>
+            <option value="9">9×9</option>
+            <option value="11">11×11</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label style="flex:1">AI 人数</label>
+          <select id="dbAiPlayers" class="bench-select">
+            <option value="2">2 人</option>
+            <option value="4" selected>4 人</option>
+            <option value="6">6 人</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label style="flex:1">AI 类型</label>
+          <select id="dbAiAlgs" class="bench-select">
+            <option value="strategy" selected>全部策略算法</option>
+            <option value="alphabeta">全部 A-B 剪枝</option>
+            <option value="pvs">全部 PVS</option>
+            <option value="mcts">全部 MCTS</option>
+            <option value="mixed">混合四算法混战</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label style="flex:1">搜索深度</label>
+          <select id="dbAiDepth" class="bench-select">
+            <option value="1">深度 1</option>
+            <option value="2" selected>深度 2</option>
+            <option value="3">深度 3</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label style="flex:1">局数</label>
+          <select id="dbAiGames" class="bench-select">
+            <option value="10">10 局</option>
+            <option value="30">30 局</option>
+            <option value="50" selected>50 局</option>
+            <option value="100">100 局</option>
+          </select>
+        </div>
+        <p class="db-note">提示：MCTS 固定 1 迭代档；深度 3 且大棋盘时单局耗时显著上升。</p>
+        <button class="glass-btn primary" onclick="dbShowConfirm('ai')" style="width:100%;padding:9px 14px">▶ 开始 AI 计算性能检测</button>
+      </div>
+    </div>
+
+    <!-- WebView 运行视图 -->
+    <div id="dbWvRun" style="display:none">
+      <div id="dbWvCanvasWrap">
+        <canvas id="dbWvCanvas" width="1024" height="1024"></canvas>
+        <div id="dbWvFpsBig"><span id="dbWvFpsNum">--</span><span class="db-wv-fps-unit">FPS</span></div>
+      </div>
+      <div id="dbWvStats">
+        <span>帧时间 <b id="dbWvFrameMs">--</b> ms</span>
+        <span>总帧 <b id="dbWvFrames">0</b></span>
+        <span>最低(1s) <b id="dbWvMinFps">--</b></span>
+      </div>
+      <div class="db-progress-track"><div id="dbWvBar" class="db-progress-fill"></div></div>
+      <div class="db-wv-time">已测试 <span id="dbWvElapsed">0.0</span> s / <span id="dbWvDurationLabel">30</span> s</div>
+      <button class="glass-btn primary" onclick="finishWebviewBench()" style="width:100%;padding:9px 14px">■ 结束并查看报告</button>
+    </div>
+
+    <!-- WebView 报告视图 -->
+    <div id="dbWvReport" style="display:none"></div>
+
+    <!-- AI 运行视图 -->
+    <div id="dbAiRun" style="display:none">
+      <div class="about-card">
+        <h3>🧠 AI 计算性能检测中…</h3>
+        <div class="db-progress-track" style="margin:10px 0"><div id="dbAiBar" class="db-progress-fill"></div></div>
+        <div class="db-ai-progress-row">
+          <span id="dbAiProgressLabel">0 / 50 局</span>
+          <span id="dbAiElapsedLabel">0.0 s</span>
+        </div>
+        <div id="dbAiLastGames" class="db-ai-last"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="glass-btn danger" onclick="stopAiBench()" style="flex:1">■ 停止并查看部分报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 报告视图 -->
+    <div id="dbAiReport" style="display:none"></div>
   </div>
 </div>
 
@@ -254,16 +414,16 @@
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.1</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.4</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
-      <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/nihao15900375400/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
+      <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/ywnh1/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
     </div>
 
     <!-- 游戏介绍 -->
     <div class="about-card">
       <h3>为什么玩连锁棋</h3>
-      <p>你点下的每一颗棋子，都可能引爆整张棋盘。每一次落子，都是在引爆点、扩散范围和对手布局之间做取舍。本地热座、人机对战、AI 斗蛐蛐三种模式，2~10 人同台博弈。纯客户端应用，无需服务器。</p>
+      <p>你点下的每一颗棋子，都可能引爆整张棋盘。每一次落子，都是在引爆点、扩散范围和对手布局之间做取舍。本地热座、人机对战、AI 斗蛐蛐三种模式，2~10 人同台博弈。桌面 / Android / 浏览器 PWA 三端运行，无需服务器，本地即可开局。</p>
     </div>
 
     <!-- 游戏规则（短卡片） -->
@@ -282,12 +442,14 @@
     <div class="about-card">
       <h3>功能亮点</h3>
       <p style="font-size:.82rem;line-height:1.7;margin:0">
-        🦀 <strong>Rust AI 引擎</strong> — 四款算法（策略 / A-B / PVS / MCTS），桌面端 A-B/PVS/MCTS Rayon 多核并行<br>
-        🎯 <strong>增强版 AI 评估</strong> — 位置权重 + 邻居威胁评分 + 爆发势能，ML 评估以 70% vs 35% 优势碾压手写版<br>
+        🦀 <strong>Rust AI 引擎</strong> — 四款算法（策略 / A-B / PVS / MCTS），桌面端 Rayon 多核并行，PWA 端 WASM 运行<br>
+        🎯 <strong>增强版 AI 评估</strong> — 位置权重 + 邻居威胁评分 + 爆发势能，内置 XGBoost ML 模型<br>
+        📊 <strong>AI 性能评测</strong> — 432 局两两对战报告：A-B 73.6% / PVS 71.3% 胜率断档领先<br>
+        🖥️ <strong>设备性能检测</strong> — WebView FPS 压力测试 + AI 计算基准（50 局），一键生成本机报告<br>
         💾 <strong>中断恢复</strong> — 异常退出自动保存，历史页面一键继续上次对局<br>
-        📊 <strong>结算图表</strong> — 棋子数和点数双折线图，支持全屏缩放与双指缩放<br>
+        📈 <strong>结算图表</strong> — 棋子数和点数双折线图，支持全屏缩放与双指缩放<br>
         🔊 <strong>合成音效</strong> — 落子、爆炸、淘汰、获胜各有独立音频反馈（Web Audio API）<br>
-        🎨 <strong>液态玻璃主题</strong> — 深色虹彩渐变玻璃 UI，背景 10 个彩色光球浮动
+        🌐 <strong>三端形态</strong> — 桌面 / Android / 浏览器 PWA，同一引擎，可离线游玩
       </p>
     </div>
 
@@ -338,7 +500,7 @@
       </div>
 
       <h3 class="ai-alg-title" style="color:var(--accent2)">🔬 PVS NegaMax · 精炼剪枝</h3>
-      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设最优走法已被首先搜索，后续走法用<strong>零窗口（Null Window）</strong>快速试探——要么迅速证明不比首走法好，要么触发重搜索。560 局基准测试中，PVS d=2 ML 以 70.0% 胜率持平 Alpha-Beta d=2 ML（70.7%），手写评估下 PVS（49.3%）反超 AB 手写（35.0%）。</p>
+      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设最优走法已被首先搜索，后续走法用<strong>零窗口（Null Window）</strong>快速试探——要么迅速证明不比首走法好，要么触发重搜索。432 局两两对战评测（ML 评估 · 深度 2）中，PVS 以 71.3% 胜率紧追 A-B 的 73.6%（详见「AI 性能评测」）。</p>
       <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
         <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录两条杀招走法 · <strong style="color:var(--accent2)">History 启发</strong> 全局走法成功率表<br>
         <strong style="color:var(--accent2)">QSearch 静止搜索</strong> 到底层只搜索爆炸性走法（限3层），消除水平线效应<br>
@@ -351,7 +513,7 @@
         <strong style="color:#c88cff">SELECT</strong> → <strong style="color:#c88cff">EXPAND</strong> → <strong style="color:#c88cff">PLAYOUT</strong> → <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
         UCB1 平衡探索与利用 · 随机 Playout（均匀随机模拟）· 渐进展开（≥3 次访问才展新分支）
       </div>
-      <p class="ai-alg-desc">Rust 实现，depth=1~10 对应 800~8000 次迭代，树节点上限 2000。无需人为设计评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
+      <p class="ai-alg-desc">Rust 实现，depth=1~10 对应 400~4000 次迭代，树节点上限 2000。无需人为设计评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
     </div>
   </div>
 </div>
@@ -1356,6 +1518,18 @@
   <p class="ff-sub">后端模拟 AI 对局至分出胜负，可能需要一些时间，请稍候</p>
 </div>
 
+<!-- 测试前确认弹窗：警告 + 测试原理（body 层，fixed 定位不受 screen transform 影响） -->
+    <!-- 测试前确认弹窗：警告 + 测试原理 -->
+    <div id="dbBenchConfirm" class="modal">
+      <div class="modal-inner">
+        <h3 id="dbConfirmTitle">开始检测</h3>
+        <div id="dbConfirmBody"></div>
+        <div class="modal-actions">
+          <button class="glass-btn" onclick="closeModal('dbBenchConfirm')">取消</button>
+          <button class="glass-btn primary" onclick="dbConfirmStartTest()">开始检测</button>
+        </div>
+      </div>
+    </div>
 <!-- Modal: Exit Confirmation (page 14) -->
 <div id="exitConfirm" class="modal">
   <div class="modal-inner">
@@ -1401,9 +1575,6 @@ function pickUpdateUrl(platforms) {
 /** 启动后静默检查 */
 // 手动检查更新：与自动检查不同，已是最新也提示结果
 function manualCheckUpdate(){
-  // PWA 版本无独立安装包，不弹更新提示（版本由浏览器缓存管理）
-  showUpdateResult('ok','PWA 版本无需检查更新');
-  return;
   showUpdateModal('检查中…','正在检查新版本，请稍候','');
   var xhr = new XMLHttpRequest();
   xhr.open('GET', 'https://gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json?ref=main', true);
@@ -1528,14 +1699,16 @@ function startDownload() {
       p.style.display = 'none';
     });
   } else {
+    // PWA / 浏览器环境：直接跳转下载中心
     p.style.display = 'none';
-    document.getElementById('updateModalTitle').textContent = '\u6d4b\u8bd5\u6a21\u5f0f';
-    document.getElementById('updateModalMsg').textContent = '\u975e Tauri \u73af\u5883\uff0c\u8bf7\u6784\u5efa APK \u6d4b\u8bd5';
+    window.open(_updUrl, '_blank', 'noopener');
+    document.getElementById('updateModalTitle').textContent = '\u94fe\u63a5\u5df2\u6253\u5f00';
+    document.getElementById('updateModalMsg').textContent = '\u8bf7\u5728\u6253\u5f00\u7684\u9875\u9762\u4e2d\u9009\u62e9\u5e73\u53f0\u4e0b\u8f7d';
     c.textContent = '\u5173\u95ed';
   }
 }
 
-// silentCheck(); // PWA 禁用自动更新检查
+silentCheck(); // PWA 启用自动更新检查
 // 暴露到全局（HTML onclick 需要）——必须放在 IIFE 内部，
 // 否则引用不到内部函数（此前 window.showToast = showToast 写在 IIFE 外，
 // 抛 ReferenceError 导致 closeUpdateModal 从未注册到全局）

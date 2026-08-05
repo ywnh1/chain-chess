@@ -12,6 +12,41 @@
     if(_w)_w.classList.add('active');
   }catch(e){}
 })();
+/* ═══════ 测试版错误显示：未捕获错误 / 未处理拒绝 / 51.la 统计失败均在 UI 显示 ═══════ */
+(function(){
+  var lastErr = ''; var lastTs = 0;
+  function dbgReport(msg){
+    try{
+      if(typeof showMsg === 'function'){
+        var m = String(msg);
+        if(m.length > 120) m = m.slice(0, 117) + '...';
+        showMsg(m, 'error');
+      }
+    }catch(_e){ try{ console.error(msg); }catch(__e){} }
+  }
+  // 同一错误 3 秒内只显示一次，避免刷屏
+  function dedup(msg){
+    var now = Date.now();
+    if(msg === lastErr && now - lastTs < 3000) return;
+    lastErr = msg; lastTs = now;
+    dbgReport(msg);
+  }
+  window.addEventListener('error', function(ev){
+    if(!ev || !ev.message) return;   // 资源加载错误（无 message）不显示，避免误报
+    dedup('⚠️ 测试版错误: ' + ev.message +
+      (ev.filename ? '（' + String(ev.filename).split('/').pop() + ':' + ev.lineno + '）' : ''));
+  });
+  window.addEventListener('unhandledrejection', function(ev){
+    var r = ev && ev.reason;
+    var msg = (r && (r.message || r)) || '未处理的 Promise 拒绝';
+    dedup('⚠️ 测试版错误: ' + String(msg));
+  });
+  // 51.la 统计初始化结果（脚本在 head 前执行，此处检查并显示）
+  if (window.__LA_STATS__ && !window.__LA_STATS__.ok) {
+    dedup('⚠️ 51.la 统计初始化失败: ' + (window.__LA_STATS__.error || '未知原因'));
+  }
+})();
+
 
 /* ═══════ 跟随系统颜色模式（仅读取 prefers-color-scheme） ═══════ */
 (function(){
@@ -617,6 +652,12 @@ Router.register('about-benchmark', {
   back: 'about',
   enter() { document.body.style.background='' },
   leave() {}
+});
+
+Router.register('device-bench', {
+  back: 'settings',
+  enter() { document.body.style.background=''; initDeviceBenchPage(); },
+  leave() { teardownDeviceBenchPage(); }
 });
 
 Router.register('checkout', {
@@ -3544,6 +3585,9 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+            {v:'v3.3.4 · 第 39 版',desc:'设备性能检测升级：新增 Tauri 技术栈与性能优化介绍、每项检测前弹窗说明测试原理并提示耗时与 CPU 占用、优化检测流程体验'},
+    {v:'v3.3.3 · 第 38 版',desc:'AI 评测页重写：两两对战432局胜率排行与完整报告、新增战力测试脚本；修复速爆/重炮模式对战与引爆判断、策略AI阈值迁移（二二/四四相接）、回环边界判断；优化MCTS搜索速度与数据生成进度条'},
+{v:'v3.3.2 · 第 37 版',desc:'修复速爆/重炮规则（特殊格改为加0/加2、方向不再跳变）、修复无动画时爆炸回退闪烁、随机边界行为与引擎一致；移除混合模式；优化AI搜索速度、历史记录容错（单条损坏不影响列表）、回放进度条拖动体验；更新检查平台缺失时安全跳过'},
     {v:'v3.3.1 · 第 36 版',desc:'新增随机玩法：爆炸阈值每步随机、棋盘边界每步随机、混合保持开局确定；首子等级改为阈值减一；关于页 AI 评测更新、暗色按钮质感优化、修复系统主题下游戏内亮色切换失效'},
     {v:'v3.3.0 · 第 35 版',desc:'新增Windows桌面版支持（自动更新适配、按平台提供对应安装包）、修复桌面图标显示、构建脚本支持APK/exe双平台'},
     {v:'v3.2.3 · 第 34 版',desc:'新增局内AI走法建议（按钮选择算法与深度、仅提示当前一步）、修复弹窗弹出闪烁、随机刻度设置真正生效、PWA离线缓存修复、AI介绍内容更新'},
@@ -3969,6 +4013,7 @@ window.addEventListener('popstate',()=>{
       'about-ai':      () => Router.switchPage('about'),            // 10 => 6
       'about-changelog': () => Router.switchPage('about'),          // 11 => 6
       'about-benchmark': () => Router.switchPage('about'),            // 12 => 6
+      'device-bench':  () => Router.switchPage('settings'),         // device-bench => settings
       'about-license': () => Router.switchPage('about'),            // 11 => 6
       'checkout':      () => {                                      // 7 => 5, 8 => 2/3/4
         const prev = Router._checkoutPrev;
@@ -4288,3 +4333,691 @@ async function rpSeek(val){
   await rpGoTo(target,false);
   rpUpdateUI();
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 设备性能检测（device-bench）
+//   WebView 性能：WebGL 体积着色器压力测试（cznull volumeshader_bm 内核）
+//   AI 计算性能：逐局调用 Rust 引擎 bench_ai_game，每局刷新进度
+// ═══════════════════════════════════════════════════════════════
+
+let dbWv = null;   // WebView 检测运行状态
+let dbAi = null;   // AI 检测运行状态
+
+function dbEl(id){ return document.getElementById(id); }
+
+function showDeviceBenchView(v){
+  const map = { main:'dbMain', wvRun:'dbWvRun', wvReport:'dbWvReport', aiRun:'dbAiRun', aiReport:'dbAiReport' };
+  for(const k in map){
+    const el = dbEl(map[k]);
+    if(el) el.style.display = (k === v) ? '' : 'none';
+  }
+}
+
+function initDeviceBenchPage(){
+  if(dbWv && dbWv.running) finishWebviewBench();
+  if(dbAi && dbAi.running) dbAi.cancelRequested = true;
+  showDeviceBenchView('main');
+}
+
+function teardownDeviceBenchPage(){
+  if(dbWv && dbWv.running){
+    dbWv.running = false;
+    if(dbWv.rafId) cancelAnimationFrame(dbWv.rafId);
+    dbWv = null;
+  }
+  if(dbAi && dbAi.running) dbAi.cancelRequested = true;
+}
+
+// ── WebView 性能检测 ─────────────────────────────────────────
+
+const DB_WV_VSHADER = [
+  "#version 100 \n",
+  "precision highp float;\n",
+  "attribute vec4 position;",
+  "varying vec3 dir, localdir;",
+  "uniform vec3 right, forward, up, origin;",
+  "uniform float x,y;",
+  "void main() {",
+  "   gl_Position = position; ",
+  "   dir = forward + right * position.x*x + up * position.y*y;",
+  "   localdir.x = position.x*x;",
+  "   localdir.y = position.y*y;",
+  "   localdir.z = -1.0;",
+  "} "
+].join('');
+
+const DB_WV_KERNEL = [
+  "float kernal(vec3 ver){\n",
+  "   vec3 a;\n",
+  "float b,c,d,e;\n",
+  "   a=ver;\n",
+  "   for(int i=0;i<5;i++){\n",
+  "       b=length(a);\n",
+  "       c=atan(a.y,a.x)*8.0;\n",
+  "       e=1.0/b;\n",
+  "       d=acos(a.z/b)*8.0;\n",
+  "       b=pow(b,8.0);\n",
+  "       a=vec3(b*sin(d)*cos(c),b*sin(d)*sin(c),b*cos(d))+ver;\n",
+  "       if(b>6.0){\n",
+  "           break;\n",
+  "       }\n",
+  "   }",
+  "   return 4.0-a.x*a.x-a.y*a.y-a.z*a.z;",
+  "}"
+].join('');
+
+const DB_WV_FSHADER = [
+  "#version 100 \n",
+  "#define PI 3.14159265358979324\n",
+  "#define M_L 0.3819660113\n",
+  "#define M_R 0.6180339887\n",
+  "#define MAXR 8\n",
+  "#define SOLVER 8\n",
+  "precision highp float;\n",
+  "float kernal(vec3 ver)\n;",
+  "uniform vec3 right, forward, up, origin;\n",
+  "varying vec3 dir, localdir;\n",
+  "uniform float len;\n",
+  "vec3 ver;\n",
+  "int sign;",
+  "float v, v1, v2;\n",
+  "float r1, r2, r3, r4, m1, m2, m3, m4;\n",
+  "vec3 n, reflect;\n",
+  "const float step = 0.002;\n",
+  "vec3 color;\n",
+  "void main() {\n",
+  "   color.r=0.0;\n",
+  "   color.g=0.0;\n",
+  "   color.b=0.0;\n",
+  "   sign=0;",
+  "   v1 = kernal(origin + dir * (step*len));\n",
+  "   v2 = kernal(origin);\n",
+  "   for (int k = 2; k < 1002; k++) {\n",
+  "      ver = origin + dir * (step*len*float(k));\n",
+  "      v = kernal(ver);\n",
+  "      if (v > 0.0 && v1 < 0.0) {\n",
+  "         r1 = step * len*float(k - 1);\n",
+  "         r2 = step * len*float(k);\n",
+  "         m1 = kernal(origin + dir * r1);\n",
+  "         m2 = kernal(origin + dir * r2);\n",
+  "         for (int l = 0; l < SOLVER; l++) {\n",
+  "            r3 = r1 * 0.5 + r2 * 0.5;\n",
+  "            m3 = kernal(origin + dir * r3);\n",
+  "            if (m3 > 0.0) {\n",
+  "               r2 = r3;\n",
+  "               m2 = m3;\n",
+  "            }\n",
+  "            else {\n",
+  "               r1 = r3;\n",
+  "               m1 = m3;\n",
+  "            }\n",
+  "         }\n",
+  "         if (r3 < 2.0 * len) {\n",
+  "               sign=1;",
+  "            break;\n",
+  "         }\n",
+  "      }\n",
+  "      if (v < v1&&v1>v2&&v1 < 0.0 && (v1*2.0 > v || v1 * 2.0 > v2)) {\n",
+  "         r1 = step * len*float(k - 2);\n",
+  "         r2 = step * len*(float(k) - 2.0 + 2.0*M_L);\n",
+  "         r3 = step * len*(float(k) - 2.0 + 2.0*M_R);\n",
+  "         r4 = step * len*float(k);\n",
+  "         m2 = kernal(origin + dir * r2);\n",
+  "         m3 = kernal(origin + dir * r3);\n",
+  "         for (int l = 0; l < MAXR; l++) {\n",
+  "            if (m2 > m3) {\n",
+  "               r4 = r3;\n",
+  "               r3 = r2;\n",
+  "               r2 = r4 * M_L + r1 * M_R;\n",
+  "               m3 = m2;\n",
+  "               m2 = kernal(origin + dir * r2);\n",
+  "            }\n",
+  "            else {\n",
+  "               r1 = r2;\n",
+  "               r2 = r3;\n",
+  "               r3 = r4 * M_R + r1 * M_L;\n",
+  "               m2 = m3;\n",
+  "               m3 = kernal(origin + dir * r3);\n",
+  "            }\n",
+  "         }\n",
+  "         if (m2 > 0.0) {\n",
+  "            r1 = step * len*float(k - 2);\n",
+  "            r2 = r2;\n",
+  "            m1 = kernal(origin + dir * r1);\n",
+  "            m2 = kernal(origin + dir * r2);\n",
+  "            for (int l = 0; l < SOLVER; l++) {\n",
+  "               r3 = r1 * 0.5 + r2 * 0.5;\n",
+  "               m3 = kernal(origin + dir * r3);\n",
+  "               if (m3 > 0.0) {\n",
+  "                  r2 = r3;\n",
+  "                  m2 = m3;\n",
+  "               }\n",
+  "               else {\n",
+  "                  r1 = r3;\n",
+  "                  m1 = m3;\n",
+  "               }\n",
+  "            }\n",
+  "            if (r3 < 2.0 * len&&r3> step*len) {\n",
+  "                   sign=1;",
+  "               break;\n",
+  "            }\n",
+  "         }\n",
+  "         else if (m3 > 0.0) {\n",
+  "            r1 = step * len*float(k - 2);\n",
+  "            r2 = r3;\n",
+  "            m1 = kernal(origin + dir * r1);\n",
+  "            m2 = kernal(origin + dir * r2);\n",
+  "            for (int l = 0; l < SOLVER; l++) {\n",
+  "               r3 = r1 * 0.5 + r2 * 0.5;\n",
+  "               m3 = kernal(origin + dir * r3);\n",
+  "               if (m3 > 0.0) {\n",
+  "                  r2 = r3;\n",
+  "                  m2 = m3;\n",
+  "               }\n",
+  "               else {\n",
+  "                  r1 = r3;\n",
+  "                  m1 = m3;\n",
+  "               }\n",
+  "            }\n",
+  "            if (r3 < 2.0 * len&&r3> step*len) {\n",
+  "                   sign=1;",
+  "               break;\n",
+  "            }\n",
+  "         }\n",
+  "      }\n",
+  "      v2 = v1;\n",
+  "      v1 = v;\n",
+  "   }\n",
+  "   if (sign==1) {\n",
+  "      ver = origin + dir*r3 ;\n",
+  "       r1=ver.x*ver.x+ver.y*ver.y+ver.z*ver.z;",
+  "      n.x = kernal(ver - right * (r3*0.00025)) - kernal(ver + right * (r3*0.00025));\n",
+  "      n.y = kernal(ver - up * (r3*0.00025)) - kernal(ver + up * (r3*0.00025));\n",
+  "      n.z = kernal(ver + forward * (r3*0.00025)) - kernal(ver - forward * (r3*0.00025));\n",
+  "      r3 = n.x*n.x+n.y*n.y+n.z*n.z;\n",
+  "      n = n * (1.0 / sqrt(r3));\n",
+  "      ver = localdir;\n",
+  "      r3 = ver.x*ver.x+ver.y*ver.y+ver.z*ver.z;\n",
+  "      ver = ver * (1.0 / sqrt(r3));\n",
+  "      reflect = n * (-2.0*dot(ver, n)) + ver;\n",
+  "      r3 = reflect.x*0.276+reflect.y*0.920+reflect.z*0.276;\n",
+  "      r4 = n.x*0.276+n.y*0.920+n.z*0.276;\n",
+  "      r3 = max(0.0,r3);\n",
+  "      r3 = r3 * r3*r3*r3;\n",
+  "      r3 = r3 * 0.45 + r4 * 0.25 + 0.3;\n",
+  "      n.x = sin(r1*10.0)*0.5+0.5;\n",
+  "      n.y = sin(r1*10.0+2.05)*0.5+0.5;\n",
+  "      n.z = sin(r1*10.0-2.05)*0.5+0.5;\n",
+  "      color = n*r3;\n",
+  "   }\n",
+  "   gl_FragColor = vec4(color.x, color.y, color.z, 1.0);",
+  "}"
+].join('');
+
+function dbWvCreateProgram(gl){
+  function compile(type, src){
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+      logWarn('dbWv shader compile error:', gl.getShaderInfoLog(sh));
+      return null;
+    }
+    return sh;
+  }
+  const vs = compile(gl.VERTEX_SHADER, DB_WV_VSHADER);
+  const fs = compile(gl.FRAGMENT_SHADER, DB_WV_FSHADER + DB_WV_KERNEL);
+  if(!vs || !fs) return null;
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+    logWarn('dbWv program link error:', gl.getProgramInfoLog(prog));
+    return null;
+  }
+  gl.useProgram(prog);
+  return prog;
+}
+
+function dbWvSetup(gl, prog){
+  const L = {
+    position: gl.getAttribLocation(prog, 'position'),
+    right: gl.getUniformLocation(prog, 'right'),
+    forward: gl.getUniformLocation(prog, 'forward'),
+    up: gl.getUniformLocation(prog, 'up'),
+    origin: gl.getUniformLocation(prog, 'origin'),
+    x: gl.getUniformLocation(prog, 'x'),
+    y: gl.getUniformLocation(prog, 'y'),
+    len: gl.getUniformLocation(prog, 'len')
+  };
+  const positions = [-1.0,-1.0,0.0, 1.0,-1.0,0.0, 1.0,1.0,0.0, -1.0,-1.0,0.0, 1.0,1.0,0.0, -1.0,1.0,0.0];
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+  gl.vertexAttribPointer(L.position, 3, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(L.position);
+  gl.viewport(0, 0, 1024, 1024);
+  return L;
+}
+
+
+let dbPendingTest = null;   // 待启动的检测类型：'webview' | 'ai'
+
+// 测试前确认弹窗：警告（耗时/CPU/卡顿）+ 测试原理
+function dbShowConfirm(type){
+  dbPendingTest = type;
+  const title = dbEl('dbConfirmTitle');
+  const body = dbEl('dbConfirmBody');
+  if(!title || !body) return;
+  if(type === 'webview'){
+    title.textContent = 'WebView 性能检测';
+    body.innerHTML =
+      '<div class="db-confirm-warn">⚠️ 检测期间设备可能：<b>耗时较长</b>（15~60 秒）、<b>CPU 占用高</b>、<b>界面卡顿</b>或发热</div>' +
+      '<div class="db-confirm-principle">' +
+      '<strong>测试原理</strong><br>' +
+      '渲染一个全屏 WebGL 体积着色器（光线步进分形）并持续旋转视角，逐帧记录帧间隔；' +
+      '通过平均 FPS、1% Low FPS 与丢帧率评估 WebView 的 GPU 渲染能力。' +
+      '</div>';
+  } else {
+    title.textContent = 'AI 计算性能检测';
+    body.innerHTML =
+      '<div class="db-confirm-warn">⚠️ 检测期间设备可能：<b>CPU 占用高</b>、<b>耗时较长</b>（50 局全速模拟）、<b>发热</b>或掉电加快</div>' +
+      '<div class="db-confirm-principle">' +
+      '<strong>测试原理</strong><br>' +
+      '用 Rust 引擎以分散首子布局全速模拟 AI 对局（可选棋盘 / 人数 / 算法 / 深度），逐局计时并统计各算法胜率与每步耗时，' +
+      '评估设备的 AI 计算性能。' +
+      '</div>';
+  }
+  openModal('dbBenchConfirm');
+}
+
+function dbConfirmStartTest(){
+  closeModal('dbBenchConfirm');
+  const t = dbPendingTest;
+  dbPendingTest = null;
+  if(t === 'webview') startWebviewBench();
+  else if(t === 'ai') startAiBench();
+}
+
+function startWebviewBench(){
+  if(dbWv && dbWv.running) return;
+  const dur = parseInt(dbEl('dbWvDuration').value, 10) || 30;
+  const canvas = dbEl('dbWvCanvas');
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if(!gl){
+    showMsg('当前 WebView 不支持 WebGL，无法进行性能检测', 'error');
+    return;
+  }
+  const prog = dbWvCreateProgram(gl);
+  if(!prog){
+    showMsg('WebGL 着色器编译失败，无法开始检测', 'error');
+    return;
+  }
+  const L = dbWvSetup(gl, prog);
+  dbWv = {
+    running: true, gl, prog, L, canvas,
+    durationMs: dur * 1000,
+    startTs: 0, lastTs: 0, endTs: 0,
+    frames: 0,
+    frameTimes: [],
+    secFps: [],
+    curSecFrames: 0, curSecStart: 0,
+    ang1: 2.8, ang2: 0.4, len: 1.6, cenx: 0, ceny: 0, cenz: 0,
+    lastUiUpdate: 0,
+    rafId: 0
+  };
+  dbEl('dbWvDurationLabel').textContent = dur;
+  showDeviceBenchView('wvRun');
+  dbWv.startTs = performance.now();
+  dbWv.curSecStart = dbWv.startTs;
+  dbWv.rafId = requestAnimationFrame(dbWvFrame);
+}
+
+function dbWvFrame(ts){
+  if(!dbWv || !dbWv.running) return;
+  const dt = ts - dbWv.lastTs;
+  dbWv.lastTs = ts;
+  if(dbWv.frames > 0){
+    dbWv.frameTimes.push(dt);
+    dbWv.curSecFrames++;
+  }
+  dbWv.frames++;
+  if(ts - dbWv.curSecStart >= 1000){
+    dbWv.secFps.push(dbWv.curSecFrames * 1000 / (ts - dbWv.curSecStart));
+    dbWv.curSecFrames = 0;
+    dbWv.curSecStart = ts;
+  }
+  // 渲染一帧（cznull 体积着色器基准核心）
+  dbWv.ang1 += 0.01;
+  const gl = dbWv.gl, L = dbWv.L;
+  gl.uniform1f(L.x, 1.0);
+  gl.uniform1f(L.y, 1.0);
+  gl.uniform1f(L.len, dbWv.len);
+  gl.uniform3f(L.origin,
+    dbWv.len * Math.cos(dbWv.ang1) * Math.cos(dbWv.ang2) + dbWv.cenx,
+    dbWv.len * Math.sin(dbWv.ang2) + dbWv.ceny,
+    dbWv.len * Math.sin(dbWv.ang1) * Math.cos(dbWv.ang2) + dbWv.cenz);
+  gl.uniform3f(L.right, Math.sin(dbWv.ang1), 0, -Math.cos(dbWv.ang1));
+  gl.uniform3f(L.up, -Math.sin(dbWv.ang2)*Math.cos(dbWv.ang1), Math.cos(dbWv.ang2), -Math.sin(dbWv.ang2)*Math.sin(dbWv.ang1));
+  gl.uniform3f(L.forward, -Math.cos(dbWv.ang1)*Math.cos(dbWv.ang2), -Math.sin(dbWv.ang2), -Math.sin(dbWv.ang1)*Math.cos(dbWv.ang2));
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  gl.finish();
+
+  // UI 节流更新（250ms，避免 DOM 开销污染帧率测量）
+  if(ts - dbWv.lastUiUpdate >= 250){
+    dbWv.lastUiUpdate = ts;
+    dbWvUpdateUi(ts);
+  }
+  const elapsed = ts - dbWv.startTs;
+  if(elapsed >= dbWv.durationMs){
+    dbWv.running = false;
+    cancelAnimationFrame(dbWv.rafId);
+    dbWv.endTs = ts;
+    renderWvReport();
+    return;
+  }
+  dbWv.rafId = requestAnimationFrame(dbWvFrame);
+}
+
+function dbWvUpdateUi(ts){
+  const elapsed = (ts - dbWv.startTs) / 1000;
+  const recent = dbWv.frameTimes.slice(-30);
+  let acc = 0;
+  for(const t of recent) acc += t;
+  const avg = recent.length ? acc / recent.length : 0;
+  const fps = avg > 0 ? 1000 / avg : 0;
+  const numEl = dbEl('dbWvFpsNum');
+  if(numEl) numEl.textContent = Math.round(fps);
+  const big = dbEl('dbWvFpsBig');
+  if(big) big.className = fps >= 55 ? 'good' : (fps >= 30 ? 'mid' : 'bad');
+  const fm = dbEl('dbWvFrameMs'); if(fm) fm.textContent = avg.toFixed(1);
+  const fr = dbEl('dbWvFrames'); if(fr) fr.textContent = dbWv.frames;
+  const minFps = dbWv.secFps.length ? Math.min.apply(null, dbWv.secFps) : fps;
+  const mf = dbEl('dbWvMinFps'); if(mf) mf.textContent = Math.round(minFps);
+  const el2 = dbEl('dbWvElapsed'); if(el2) el2.textContent = elapsed.toFixed(1);
+  const bar = dbEl('dbWvBar');
+  if(bar) bar.style.width = Math.min(100, elapsed / (dbWv.durationMs / 1000) * 100).toFixed(1) + '%';
+}
+
+function finishWebviewBench(){
+  if(!dbWv || !dbWv.running) return;
+  dbWv.running = false;
+  if(dbWv.rafId) cancelAnimationFrame(dbWv.rafId);
+  dbWv.endTs = performance.now();
+  renderWvReport();
+}
+
+function dbWvPercentile(sorted, pct){
+  if(!sorted.length) return 0;
+  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * pct));
+  return sorted[idx];
+}
+
+function dbWvCollectInfo(){
+  const gl = dbWv ? dbWv.gl : null;
+  const info = {};
+  info.ua = navigator.userAgent || '';
+  info.platform = navigator.platform || '';
+  info.language = navigator.language || '';
+  info.screen = (window.screen && window.screen.width) ? window.screen.width + ' × ' + window.screen.height : '';
+  info.windowSize = (window.innerWidth || 0) + ' × ' + (window.innerHeight || 0);
+  info.dpr = window.devicePixelRatio || 1;
+  info.hardwareConcurrency = navigator.hardwareConcurrency || '-';
+  info.deviceMemory = navigator.deviceMemory || '-';
+  if(gl){
+    const get = function(p){
+      try{ const v = gl.getParameter(p); return (v === null || v === undefined) ? '-' : String(v); }
+      catch(e){ return '-'; }
+    };
+    info.glVersion = get(gl.VERSION);
+    info.glVendor = get(gl.VENDOR);
+    info.glRenderer = get(gl.RENDERER);
+    info.glslVersion = get(gl.SHADING_LANGUAGE_VERSION);
+    info.glMaxTexture = get(gl.MAX_TEXTURE_SIZE);
+  }
+  try{
+    if(performance.memory){
+      info.jsHeap = (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + ' MB / ' +
+                    (performance.memory.totalJSHeapSize / 1048576).toFixed(1) + ' MB';
+    }
+  }catch(e){}
+  // 解析 WebView 内核版本
+  const ua = info.ua;
+  const chromeM = ua.match(/Chrome\/([\d.]+)/);
+  const chrome = chromeM ? chromeM[1] : '';
+  let wvLabel;
+  if(/Android/.test(ua)){
+    wvLabel = 'Android WebView' + (chrome ? ' · Chrome/' + chrome : '');
+  } else if(/iPhone|iPad|iPod/.test(ua)){
+    wvLabel = 'WKWebView' + (chrome ? ' · Safari/' + chrome : '');
+  } else if(chrome){
+    wvLabel = 'Chromium 内核 · Chrome/' + chrome;
+  } else {
+    wvLabel = 'WebView / 浏览器';
+  }
+  info.webview = wvLabel;
+  return info;
+}
+
+function renderWvReport(){
+  const s = dbWv;
+  const durSec = Math.max(0.001, (s.endTs - s.startTs) / 1000);
+  const n = s.frameTimes.length;
+  const total = s.frameTimes.reduce(function(a, b){ return a + b; }, 0);
+  const avgMs = n ? total / n : 0;
+  const avgFps = avgMs > 0 ? 1000 / avgMs : 0;
+  const sorted = s.frameTimes.slice().sort(function(a, b){ return a - b; });
+  const p99Ms = dbWvPercentile(sorted, 0.99);
+  const onePctCount = Math.max(1, Math.floor(n * 0.01));
+  let worstSum = 0;
+  for(let i = Math.max(0, sorted.length - onePctCount); i < sorted.length; i++) worstSum += sorted[i];
+  const onePctAvgMs = worstSum / onePctCount;
+  const onePctFps = onePctAvgMs > 0 ? 1000 / onePctAvgMs : 0;
+  const minSecFps = s.secFps.length ? Math.min.apply(null, s.secFps) : avgFps;
+  const dropped = s.frameTimes.filter(function(t){ return t > 50; }).length;
+  const info = dbWvCollectInfo();
+
+  const fmt = function(v){ return v.toFixed(1); };
+  const row = function(k, v){ return '<div class="db-report-row"><span class="db-report-key">' + k + '</span><span class="db-report-val">' + v + '</span></div>'; };
+
+  let html = '';
+  html += '<div class="about-card"><h3>📊 WebView 性能报告</h3>' +
+    '<div class="db-report-grid">' +
+    '<div class="db-big-metric"><div class="db-big-num">' + fmt(avgFps) + '</div><div class="db-big-label">平均 FPS</div></div>' +
+    '<div class="db-big-metric"><div class="db-big-num">' + fmt(minSecFps) + '</div><div class="db-big-label">最低 FPS（1s 窗口）</div></div>' +
+    '<div class="db-big-metric"><div class="db-big-num">' + fmt(onePctFps) + '</div><div class="db-big-label">1% Low FPS</div></div>' +
+    '</div></div>';
+
+  html += '<div class="about-card"><h3>⏱ 表现统计</h3>' +
+    row('测试时长', durSec.toFixed(1) + ' s') +
+    row('总帧数', n + ' 帧') +
+    row('平均帧时间', fmt(avgMs) + ' ms') +
+    row('P99 帧时间', fmt(p99Ms) + ' ms') +
+    row('1% Low 帧时间', fmt(onePctAvgMs) + ' ms') +
+    row('丢帧数（帧时间 > 50ms）', dropped + ' 帧') +
+    '</div>';
+
+  html += '<div class="about-card"><h3>🌐 WebView 与设备信息</h3>' +
+    row('WebView', info.webview) +
+    row('User-Agent', '<span style="font-size:.68rem;word-break:break-all">' + info.ua + '</span>') +
+    row('平台 / 语言', info.platform + ' / ' + info.language) +
+    row('屏幕 / 窗口', info.screen + ' / ' + info.windowSize) +
+    row('DPR / 并发 / 内存', info.dpr + ' / ' + info.hardwareConcurrency + ' 核 / ' + info.deviceMemory + ' GB') +
+    (info.glVersion ? row('WebGL 版本', info.glVersion) : '') +
+    (info.glVendor ? row('GPU 厂商', info.glVendor) : '') +
+    (info.glRenderer ? row('GPU 渲染器', info.glRenderer) : '') +
+    (info.glslVersion ? row('GLSL 版本', info.glslVersion) : '') +
+    (info.glMaxTexture ? row('最大纹理尺寸', info.glMaxTexture) : '') +
+    (info.jsHeap ? row('JS 堆（已用/总量）', info.jsHeap) : '') +
+    '</div>';
+
+  html += '<div style="display:flex;gap:8px;margin-top:10px">' +
+    '<button class="glass-btn" onclick="showDeviceBenchView(\'main\');dbWv=null" style="flex:1">← 返回检测页</button>' +
+    '<button class="glass-btn primary" onclick="startWebviewBench()" style="flex:1">↻ 重新检测</button>' +
+    '</div>';
+
+  dbEl('dbWvReport').innerHTML = html;
+  showDeviceBenchView('wvReport');
+}
+
+// ── AI 计算性能检测 ──────────────────────────────────────────
+
+function dbBuildAiPlayers(algType, count, depth){
+  const ALGS = ['strategy', 'alphabeta', 'pvs', 'mcts'];
+  const players = [];
+  for(let i = 0; i < count; i++){
+    const alg = algType === 'mixed' ? ALGS[i % ALGS.length] : algType;
+    players.push({ algorithm: alg, depth: alg === 'mcts' ? 1 : depth });
+  }
+  return players;
+}
+
+function dbAlgName(alg){
+  return ({ strategy: '策略', alphabeta: 'A-B', pvs: 'PVS', mcts: 'MCTS' })[alg] || alg;
+}
+
+async function startAiBench(){
+  if(dbAi && dbAi.running){
+    showMsg('已有 AI 计算性能检测正在运行', 'warn');
+    return;
+  }
+  const size = parseInt(dbEl('dbAiSize').value, 10) || 7;
+  const count = parseInt(dbEl('dbAiPlayers').value, 10) || 4;
+  const algType = dbEl('dbAiAlgs').value || 'strategy';
+  const depth = parseInt(dbEl('dbAiDepth').value, 10) || 2;
+  const games = parseInt(dbEl('dbAiGames').value, 10) || 50;
+  const players = dbBuildAiPlayers(algType, count, depth);
+  const seed = (Date.now() % 100000) >>> 0;
+
+  dbAi = {
+    running: true, cancelRequested: false,
+    size, players, games, depth, algType, seed,
+    results: [], error: null,
+    startTs: performance.now()
+  };
+  dbEl('dbAiProgressLabel').textContent = '0 / ' + games + ' 局';
+  dbEl('dbAiElapsedLabel').textContent = '0.0 s';
+  dbEl('dbAiBar').style.width = '0%';
+  dbEl('dbAiLastGames').innerHTML = '';
+  showDeviceBenchView('aiRun');
+
+  const cfg = { size: size, players: players, borderMode: 'default', capMode: '4' };
+  for(let g = 0; g < games; g++){
+    if(dbAi.cancelRequested) break;
+    try{
+      const r = await tauriInvoke('bench_ai_game', { config: cfg, gameCount: seed + g });
+      dbAi.results.push({ id: g, elapsedMs: r.elapsedMs || 0, steps: r.steps || 0, winner: r.winner });
+    }catch(e){
+      logWarn('bench_ai_game failed:', e);
+      dbAi.error = String(e && e.message || e);
+      break;
+    }
+    dbUpdateAiProgress();
+    await sleep(0);
+  }
+  dbAi.running = false;
+  dbUpdateAiProgress();
+  renderAiBenchReport();
+}
+
+function dbUpdateAiProgress(){
+  if(!dbAi) return;
+  const done = dbAi.results.length;
+  const total = dbAi.games;
+  const pct = Math.min(100, done / total * 100);
+  const bar = dbEl('dbAiBar'); if(bar) bar.style.width = pct.toFixed(1) + '%';
+  const lbl = dbEl('dbAiProgressLabel');
+  if(lbl) lbl.textContent = done + ' / ' + total + ' 局' + (dbAi.cancelRequested ? '（已停止）' : '');
+  const el = dbEl('dbAiElapsedLabel');
+  if(el) el.textContent = ((performance.now() - dbAi.startTs) / 1000).toFixed(1) + ' s';
+  const recent = dbAi.results.slice(-5);
+  const wrap = dbEl('dbAiLastGames');
+  if(wrap){
+    wrap.innerHTML = recent.map(function(r){
+      const w = (r.winner !== null && r.winner !== undefined) ? ('胜者 ' + dbAlgName(dbAi.players[r.winner] && dbAi.players[r.winner].algorithm)) : '无胜者';
+      return '<div class="db-ai-last-row">#' + (r.id + 1) + ' · ' + (r.elapsedMs / 1000).toFixed(2) + ' s · ' + r.steps + ' 步 · ' + w + '</div>';
+    }).join('');
+  }
+}
+
+function stopAiBench(){
+  if(dbAi && dbAi.running){
+    dbAi.cancelRequested = true;
+  }
+}
+
+function renderAiBenchReport(){
+  const res = dbAi.results;
+  const players = dbAi.players;
+  const wallSec = (performance.now() - dbAi.startTs) / 1000;
+  const totalMs = res.reduce(function(s, r){ return s + r.elapsedMs; }, 0);
+  const avgMs = res.length ? totalMs / res.length : 0;
+  const totalSteps = res.reduce(function(s, r){ return s + r.steps; }, 0);
+  const avgSteps = res.length ? totalSteps / res.length : 0;
+
+  // 按算法聚合（胜负按玩家所属算法）
+  const algMap = {};
+  players.forEach(function(p){
+    if(!algMap[p.algorithm]){
+      algMap[p.algorithm] = { name: dbAlgName(p.algorithm), wins: 0, games: 0, totalMs: 0, players: [] };
+    }
+  });
+  players.forEach(function(p, i){
+    algMap[p.algorithm].games += res.length;
+    algMap[p.algorithm].players.push(i + 1);
+  });
+  res.forEach(function(r){
+    if(r.winner !== null && r.winner !== undefined && players[r.winner]){
+      algMap[players[r.winner].algorithm].wins++;
+    }
+  });
+  res.forEach(function(r){
+    players.forEach(function(p){ algMap[p.algorithm].totalMs += r.elapsedMs; });
+  });
+  const algs = Object.keys(algMap).map(function(k){ return algMap[k]; })
+    .sort(function(a, b){ return b.wins - a.wins; });
+
+  const row = function(k, v){ return '<div class="db-report-row"><span class="db-report-key">' + k + '</span><span class="db-report-val">' + v + '</span></div>'; };
+
+  let html = '';
+  html += '<div class="about-card"><h3>🧠 AI 计算性能报告</h3>' +
+    row('测试配置', dbAi.size + '×' + dbAi.size + ' 棋盘 · ' + players.length + ' 人 · 深度 ' + dbAi.depth + (dbAi.algType === 'mixed' ? ' · 混合四算法' : ' · ' + dbAlgName(dbAi.algType))) +
+    row('完成局数', res.length + ' / ' + dbAi.games + ' 局' + (dbAi.cancelRequested ? '（提前停止）' : '')) +
+    (dbAi.error ? row('错误', dbAi.error) : '') +
+    row('墙钟总耗时', wallSec.toFixed(1) + ' s') +
+    row('引擎总计算耗时', (totalMs / 1000).toFixed(2) + ' s') +
+    row('平均每局耗时', avgMs.toFixed(1) + ' ms') +
+    row('平均每局步数', avgSteps.toFixed(0) + ' 步') +
+    row('平均每步耗时', avgSteps > 0 ? (avgMs / avgSteps).toFixed(2) + ' ms' : '-') +
+    '</div>';
+
+  html += '<div class="about-card"><h3>🥇 算法胜负与耗时</h3>';
+  algs.forEach(function(a){
+    const wr = a.games > 0 ? (a.wins / a.games * 100).toFixed(1) + '%' : '-';
+    html += '<div class="db-alg-row">' +
+      '<div class="db-alg-head"><span class="db-alg-name">' + a.name + '</span>' +
+      '<span class="db-alg-win">' + a.wins + ' 胜 / ' + a.games + ' 局 · 胜率 ' + wr + '</span></div>' +
+      '<div class="db-progress-track" style="height:8px"><div class="db-progress-fill" style="width:' + (a.games ? (a.wins / a.games * 100) : 0) + '%"></div></div>' +
+      '<div class="db-alg-sub">平均局耗时 ' + (a.games ? (a.totalMs / a.games).toFixed(1) : 0) + ' ms</div>' +
+      '</div>';
+  });
+  html += '</div>';
+
+  // 每局明细（滚动列表）
+  html += '<div class="about-card"><h3>📋 每局明细（' + res.length + ' 局）</h3><div class="db-ai-detail">';
+  res.forEach(function(r){
+    const w = (r.winner !== null && r.winner !== undefined) ? dbAlgName(players[r.winner] && players[r.winner].algorithm) : '-';
+    html += '<div class="db-ai-detail-row">#' + (r.id + 1) + ' · <b>' + (r.elapsedMs / 1000).toFixed(2) + ' s</b> · ' + r.steps + ' 步 · 胜者 ' + w + '</div>';
+  });
+  html += '</div></div>';
+
+  html += '<div style="display:flex;gap:8px;margin-top:10px">' +
+    '<button class="glass-btn" onclick="showDeviceBenchView(\'main\');dbAi=null" style="flex:1">← 返回检测页</button>' +
+    '<button class="glass-btn primary" onclick="startAiBench()" style="flex:1">↻ 重新测试</button>' +
+    '</div>';
+
+  dbEl('dbAiReport').innerHTML = html;
+  showDeviceBenchView('aiReport');
+}
+

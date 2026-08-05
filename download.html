@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="♟ 连锁棋 · Chain Chess 下载中心 — Android / Windows / 浏览器 PWA，点击卡片前往 Gitee 下载最新版本">
+<title>♟ 连锁棋 · 下载中心</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
+<style>
+/* ═══ 连锁棋 · 液态玻璃主题（与 APP 一致） ═══ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:linear-gradient(160deg,#0f0f15 0%,#0a0a10 30%,#0e0a14 70%,#0f0f17 100%);
+  --bg-solid:#0f0f15;
+  --accent:#f0b34b;        /* 金 */
+  --accent2:#5fc3c3;       /* 青绿 */
+  --iris:#b48cff;          /* 虹彩紫 */
+  --text:#e8e6e3;
+  --dim:#7a7885;
+  --radius:16px;
+  --card:rgba(26,26,34,.82);
+  --font:'CustomFont','PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,-apple-system,sans-serif;
+  --ease:cubic-bezier(.34,1.56,.64,1);
+}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  body::before,.orbs{animation:none!important}
+}
+body{
+  font-family:var(--font);
+  color:var(--text);
+  background:var(--bg-solid);
+  background-image:var(--bg),
+    radial-gradient(ellipse 90% 60% at 20% 10%,rgba(160,120,255,.02) 0%,transparent 60%),
+    radial-gradient(ellipse 80% 50% at 80% 90%,rgba(95,195,195,.02) 0%,transparent 60%);
+  background-attachment:fixed;
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:28px 16px;
+  padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+  line-height:1.5;
+}
+/* 虹彩光斑背景（缓慢流动） */
+body::before{
+  content:'';position:fixed;inset:-25%;width:150%;height:150%;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -5%,rgba(240,179,75,.07) 0%,rgba(200,140,240,.03) 20%,transparent 70%),
+    radial-gradient(ellipse 60% 45% at 25% 85%,rgba(95,195,195,.06) 0%,rgba(160,120,255,.03) 30%,transparent 65%),
+    radial-gradient(ellipse 50% 35% at 75% 25%,rgba(160,120,255,.05) 0%,rgba(240,179,75,.02) 30%,transparent 60%),
+    radial-gradient(ellipse 40% 40% at 90% 65%,rgba(95,195,195,.04) 0%,rgba(200,140,240,.015) 40%,transparent 65%);
+  background-size:250% 250%;
+  animation:liquidDrift 25s ease-in-out infinite;
+}
+@keyframes liquidDrift{
+  0%,100%{background-position:50% 50%,50% 50%,50% 50%,50% 50%}
+  25%{background-position:40% 45%,55% 55%,60% 40%,45% 60%}
+  50%{background-position:55% 55%,45% 45%,40% 60%,60% 40%}
+  75%{background-position:45% 60%,60% 40%,55% 55%,40% 45%}
+}
+/* 彩色光球 */
+.orbs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.orbs span{
+  position:absolute;border-radius:50%;
+  filter:blur(70px);opacity:.45;
+  animation:orbFloat 14s ease-in-out infinite;
+}
+.orbs .o1{width:220px;height:220px;background:#b48cff;top:-60px;left:8%;animation-duration:16s}
+.orbs .o2{width:180px;height:180px;background:#f0b34b;bottom:8%;right:6%;animation-duration:13s;animation-delay:-4s}
+.orbs .o3{width:160px;height:160px;background:#5fc3c3;top:22%;right:16%;animation-duration:18s;animation-delay:-7s}
+.orbs .o4{width:200px;height:200px;background:#ff8ad8;bottom:-40px;left:22%;animation-duration:15s;animation-delay:-2s}
+.orbs .o5{width:140px;height:140px;background:#6aa9ff;top:55%;left:4%;animation-duration:17s;animation-delay:-9s}
+.orbs .o6{width:170px;height:170px;background:#7ee0a3;top:6%;right:38%;animation-duration:14s;animation-delay:-5s}
+@keyframes orbFloat{
+  0%,100%{transform:translate(0,0) scale(1)}
+  33%{transform:translate(28px,-34px) scale(1.08)}
+  66%{transform:translate(-22px,26px) scale(.94)}
+}
+main{position:relative;z-index:1;width:100%;max-width:920px;display:flex;flex-direction:column;align-items:center}
+/* 标题 */
+header{text-align:center;margin-bottom:34px}
+header h1{
+  font-size:2.1rem;font-weight:700;letter-spacing:-.02em;
+  text-shadow:0 0 24px rgba(240,179,75,.25);
+}
+header .subtitle{
+  margin-top:6px;color:var(--dim);font-size:.95rem;letter-spacing:.04em;
+}
+.version{
+  display:inline-flex;align-items:center;gap:6px;
+  margin-top:14px;padding:6px 16px;
+  font-size:.82rem;color:var(--accent);
+  background:linear-gradient(180deg,rgba(240,179,75,.16) 0%,rgba(240,179,75,.05) 100%);
+  border:1px solid rgba(240,179,75,.35);border-radius:999px;
+  box-shadow:0 2px 14px rgba(240,179,75,.18),inset 0 1px 0 rgba(255,255,255,.08);
+}
+.version::before{content:'';width:7px;height:7px;border-radius:50%;background:#7ee0a3;box-shadow:0 0 10px #7ee0a3;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* 平台卡片网格 */
+.grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:18px;
+  width:100%;
+}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+/* 玻璃卡片 */
+.card{
+  position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:30px 20px 24px;border-radius:var(--radius);
+  background:var(--card);
+  backdrop-filter:blur(24px) saturate(1.4);
+  -webkit-backdrop-filter:blur(24px) saturate(1.4);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 8px 40px rgba(0,0,0,.45),inset 0 1.5px 0 rgba(255,255,255,.07);
+  text-decoration:none;color:inherit;
+  transition:transform .25s var(--ease),box-shadow .25s ease,border-color .25s ease;
+  overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(135deg,rgba(180,140,255,.10) 0%,rgba(240,179,75,.06) 50%,rgba(95,195,195,.10) 100%);
+}
+.card>*{position:relative}
+.card:hover{
+  transform:translateY(-4px);
+  box-shadow:0 16px 52px rgba(0,0,0,.55),inset 0 1.5px 0 rgba(255,255,255,.12);
+  border-color:rgba(255,255,255,.20);
+}
+.card:active{transform:translateY(-1px) scale(.98)}
+.card .icon{
+  width:64px;height:64px;border-radius:18px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:2rem;margin-bottom:16px;
+  background:linear-gradient(180deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,.04) 100%);
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 16px rgba(0,0,0,.3);
+}
+.card h2{font-size:1.15rem;font-weight:700;letter-spacing:.02em}
+.card .desc{margin-top:6px;font-size:.82rem;color:var(--dim)}
+.card .meta{
+  margin-top:12px;font-size:.75rem;color:var(--dim);
+  padding:4px 12px;border-radius:999px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+}
+.card .btn{
+  margin-top:18px;padding:9px 26px;border-radius:12px;
+  font-size:.88rem;font-weight:600;color:#0f0f15;
+  background:linear-gradient(180deg,#ffd97a 0%,#f0b34b 60%,#d99a2e 100%);
+  box-shadow:0 4px 18px rgba(240,179,75,.35),inset 0 1px 0 rgba(255,255,255,.45);
+  transition:transform .2s var(--ease),box-shadow .2s ease;
+}
+.card:hover .btn{transform:translateY(-2px);box-shadow:0 8px 24px rgba(240,179,75,.45),inset 0 1px 0 rgba(255,255,255,.5)}
+.card .btn::after{content:' →';opacity:.7}
+/* 平台专属色调 */
+.card.android .icon{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 22px rgba(61,220,132,.22)}
+.card.windows .icon{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 22px rgba(0,168,232,.22)}
+.card.pwa .icon{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 22px rgba(95,195,195,.22)}
+/* PWA 子卡片（两个入口） */
+.card.pwa{padding-bottom:22px}
+.pwa-sub{display:flex;flex-direction:column;gap:10px;width:100%;margin-top:16px}
+.pwa-sub a{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px 14px;border-radius:12px;
+  font-size:.88rem;font-weight:600;color:var(--text);
+  background:var(--btn-glass,linear-gradient(180deg,rgba(255,255,255,.12) 0%,rgba(255,255,255,.04) 100%));
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 2px 10px rgba(0,0,0,.3);
+  text-decoration:none;
+  transition:transform .2s var(--ease),border-color .2s ease,background .2s ease;
+}
+.pwa-sub a:hover{
+  transform:translateY(-2px);
+  border-color:rgba(95,195,195,.55);
+  background:linear-gradient(180deg,rgba(140,222,222,.20) 0%,rgba(95,195,195,.08) 100%);
+  box-shadow:0 6px 20px rgba(95,195,195,.18),inset 0 1px 0 rgba(255,255,255,.14);
+}
+.pwa-sub .online{
+  background:linear-gradient(180deg,rgba(140,222,222,.18) 0%,rgba(95,195,195,.07) 100%);
+  border-color:rgba(95,195,195,.35);
+  color:#c9f2f2;
+}
+/* 页脚 */
+footer{
+  margin-top:36px;text-align:center;color:var(--dim);font-size:.78rem;
+  display:flex;gap:14px;flex-wrap:wrap;justify-content:center;
+}
+footer a{color:var(--accent2);text-decoration:none;border-bottom:1px dotted rgba(95,195,195,.4)}
+footer a:hover{color:#8fe0e0}
+</style>
+</head>
+<body>
+<div class="orbs" aria-hidden="true">
+  <span class="o1"></span><span class="o2"></span><span class="o3"></span>
+  <span class="o4"></span><span class="o5"></span><span class="o6"></span>
+</div>
+
+<main>
+  <header>
+    <h1>♟ 连锁棋</h1>
+    <p class="subtitle">CHAIN CHESS · 下载中心</p>
+    <span class="version">v3.3.4 · 最新版</span>
+  </header>
+
+  <section class="grid">
+    <!-- Android -->
+    <a class="card android" data-platform="android"
+       href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.4/chainchess-3.3.4.apk">
+      <div class="icon">🤖</div>
+      <h2>Android</h2>
+      <p class="desc">APK 安装包 · 安卓手机 / 平板</p>
+      <div class="meta">v3.3.4 · 11.6 MB</div>
+      <span class="btn">前往下载</span>
+    </a>
+
+    <!-- Windows -->
+    <a class="card windows" data-platform="windows"
+       href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.4/chainchess-3.3.4.exe">
+      <div class="icon">🖥️</div>
+      <h2>Windows</h2>
+      <p class="desc">桌面版 · exe 安装包</p>
+      <div class="meta">v3.3.4 · 10.8 MB</div>
+      <span class="btn">前往下载</span>
+    </a>
+
+    <!-- PWA -->
+    <div class="card pwa">
+      <div class="icon">🌐</div>
+      <h2>浏览器 PWA</h2>
+      <p class="desc">免安装 · 打开即玩，可离线使用</p>
+      <div class="pwa-sub">
+        <a data-platform="pwa"
+           href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.4/chain-chess-pwa-v3.3.4.zip">📦 下载离线包（Gitee）</a>
+        <a class="online" data-platform="web"
+           href="https://ywnh1.github.io/chain-chess/" target="_blank" rel="noopener">▶ 在线游玩</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>v3.3.4 · 第 39 版</span>
+    <a href="https://gitee.com/ywnh1/chain-chess-release/releases" target="_blank" rel="noopener">Gitee Releases</a>
+    <span>© 2026 连锁棋</span>
+  </footer>
+</main>
+
+<!-- 51.la 网站统计：页面访问量 + 下载点击事件 -->
+<script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
+<script>
+LA.init({id:"3QmgmuNqsbhkfv7Y",ck:"3QmgmuNqsbhkfv7Y",autoTrack:true})
+</script>
+<script>
+(function(){
+  var VERSION = '3.3.4';
+  var links = document.querySelectorAll('a[data-platform]');
+  Array.prototype.forEach.call(links, function(a){
+    a.addEventListener('click', function(e){
+      var platform = a.getAttribute('data-platform');
+      // 上报 51.la 事件（download_android / download_windows / download_pwa / play_pwa）
+      try {
+        if (window.LA && typeof LA.track === 'function') {
+          LA.track('download_' + platform, {version: VERSION});
+        }
+      } catch (err) {}
+      // 在线游玩：新标签打开，无需拦截；下载类：延迟 250ms 确保事件上报后再跳转
+      if (platform === 'web') return;
+      e.preventDefault();
+      var btn = a.querySelector('.btn');
+      if (btn) btn.textContent = '正在跳转…';
+      setTimeout(function(){ window.location.href = a.href; }, 250);
+    });
+  });
+})();
+</script>
+</body>
+</html>

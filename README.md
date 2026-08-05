@@ -1,14 +1,15 @@
 <div align="center">
   <h1>♟ 连锁棋 · Chain Chess</h1>
   <p>
-    <strong>棋盘策略游戏 · 桌面 / Android</strong>
+    <strong>棋盘策略游戏 · 桌面 / Android / 浏览器 PWA</strong>
   </p>
   <p>
     <img src="https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=fff" alt="Tauri">
     <img src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=fff" alt="Android">
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
+    <img src="https://img.shields.io/badge/PWA-WASM-5A67D8?logo=pwa&logoColor=fff" alt="PWA">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/badge/version-3.3.3-orange" alt="v3.1.4">
+    <img src="https://img.shields.io/badge/version-3.3.4-orange" alt="v3.3.4">
   </p>
 </div>
 
@@ -18,7 +19,7 @@
 
 **连锁棋** 是基于 Chain Reaction / 爆裂棋玩法改进的多人策略游戏。2~10 人对战，棋子攒满格子就炸——炸出的棋子触发下一轮连锁，直到只剩一人存活。
 
-纯客户端应用（Tauri + Rust），无需服务器，本地启动即玩。
+一套代码，三种形态：**Tauri 桌面 / Android 应用**（Rust 引擎 + Rayon 多核并行）与**浏览器 PWA**（同一引擎编译为 WASM，可安装离线游玩）。均无需服务器，本地即可开局。
 
 ---
 
@@ -65,11 +66,21 @@
 - **中断恢复** — 异常退出或手动暂停时自动保存未完成对局，历史页面一键继续
 - **内存+磁盘两层存储** — 超过 500 步自动溢出到磁盘，防止内存暴涨
 
+### 设备性能检测
+
+- **🌐 WebView 性能** — WebGL 体积着色器压力测试，实时 FPS / 帧时间；报告平均、最低、1% Low FPS、丢帧统计与 WebView / GPU 信息
+- **🧠 AI 计算性能** — 50 局 AI 对局基准（可选棋盘 / 人数 / 算法 / 深度），逐局刷新进度；报告各算法胜率与每局耗时
+
 ### 音效与反馈
 
 - **合成音效** — 落子、爆炸、淘汰、获胜每种事件都有独立音频反馈（Web Audio API）
 - **震动反馈** — Android 原生支持，桌面静默降级
 - **连锁动画跳过** — 长连爆可一键跳过，提升体验
+
+### 平台形态
+
+- **桌面 / Android** — Tauri 应用，自动更新、触感反馈、文件系统存储
+- **浏览器 PWA** — `docs/` 目录独立构建（WASM 引擎），浏览器打开即可玩，可安装离线使用
 
 ---
 
@@ -87,19 +98,29 @@ npx tauri build        # 构建可执行文件
 ### Android APK / Windows exe
 
 ```bash
-./build.sh --apk chainchess        # 仅构建 APK（签名）
-./build.sh --exe                   # 仅构建 Windows exe（cargo-xwin 交叉编译）
-./build.sh --apk --exe chainchess  # 同时构建两者（默认）
+./build.sh --apk chainchess        # 构建签名 APK
+./build.sh --exe                   # 构建 Windows exe（cargo-xwin 交叉编译）
+./build.sh --zip                   # 打包 PWA zip（用 docs/ 预编译产物，无需编译）
+./build.sh --all chainchess        # 一次构建 apk + exe + zip
 ./build.sh --native chainchess     # APK 加 target-cpu=native 极致优化
-./build.sh --pwa                   # 仅打包 PWA zip（不编译）
-./build.sh --all                   # 打包全部：pwa zip + 登记 release/ 已编译 apk/exe
+./build.sh --release chainchess    # 构建全部并发布到设备与发布仓库
 ```
 
 - **APK**：脚本自动编译 arm64 APK，用 `release.keystore` 签名并输出到 `release/` 目录（需 keystore 密码）。
 - **exe**：`cargo-xwin` 交叉编译 `x86_64-pc-windows-msvc`，无需密码，输出 `release/chainchess-<version>.exe`。
-- **pwa**：`--pwa` 只打包 `release/chain-chess-pwa-v<version>.zip`（排除 wasm 源码与 pkg-node，仅含编译好的 pkg/*.wasm）。
-- **all**：`--all` 打包 pwa zip 并把 `release/` 下已编译的 apk/exe 大小登记进 `update.json`（不编译，产物需先由 `--apk`/`--exe` 生成）。
+- **zip**：`--zip` 打包 `release/chain-chess-pwa-v<version>.zip`——取 `docs/` 目录的静态资源与预编译 `pkg/*.wasm`（排除 wasm 源码与 pkg-node）。
+- **all / release**：`--all` 一次编译 apk + exe + zip；`--release` 额外发布到 Android 设备与 `../chain-chess-release` 仓库。
 - 构建都会自动更新 `update.json` 中对应平台的 URL 与 size。
+
+### 浏览器 PWA（本地预览）
+
+```bash
+cd docs
+python3 -m http.server 8899
+# 浏览器打开 http://localhost:8899
+```
+
+PWA 需通过 HTTP(S) 访问（WASM 动态加载在 `file://` 下不可用）；首次打开后可安装，之后可离线游玩。
 
 首次构建 APK 需先初始化 Android 项目：
 
@@ -110,7 +131,7 @@ cd ..
 ./build.sh chainchess
 ```
 
-预编译应用可在 [Releases](https://gitee.com/ywnh1/chain-chess-release/releases) 下载。
+预编译应用可在 [下载中心](https://ywnh1.free.leoi.org) 下载（或直达 [Gitee Releases](https://gitee.com/ywnh1/chain-chess-release/releases)）。
 
 ---
 
@@ -149,7 +170,7 @@ Principal Variation Search（主变例搜索）是 Alpha-Beta 的精炼版本。
 - **动态分支控制** — 浅层多搜（depth=1→14 条），深层少搜（depth=3→8 条）
 - **根级 Rayon 并行** — 多核并行加速根层搜索
 
-560 局基准测试中，PVS d=2 ML 以 70.0% 胜率持平 Alpha-Beta d=2 ML（70.7%），手写评估下 PVS（49.3%）反超 AB 手写（35.0%）。
+432 局两两对战评测（7×7 · ML 评估 · 深度 2）中，树搜索统治赛场：**A-B 73.6%**、**PVS 71.3%** 胜率断档领先，策略算法 46.8% 居中，MCTS 8.3% 垫底（深度 1 迭代量不足）。完整报告见应用内「关于 → AI 性能评测」。
 
 ### 🎲 MCTS 蒙特卡洛树搜索
 
@@ -162,7 +183,7 @@ SELECT → EXPAND → PLAYOUT → BACKPROPAGATE
 - **UCB1** 平衡探索与利用
 - **随机 Playout** — 均匀随机选择走法模拟
 - **渐进展开** — 子节点访问 ≥3 次后才展新分支
-- **迭代数** — depth=1~10 对应 800~8000 次迭代，树节点上限 2000
+- **迭代数** — depth=1~10 对应 400~4000 次迭代，树节点上限 2000
 
 擅长发现 Alpha-Beta 不易察觉的非直觉走法。
 
@@ -207,12 +228,13 @@ Alpha-Beta 和 PVS 搜索可使用两种评估函数：
 └──────────────────┘     └──────────────────┘
 ```
 
-- **前端**：原生 JavaScript + CSS，零框架依赖
-- **后端**：Rust（lib.rs + 搜索算法）+ Tauri v2 桥接
+- **前端**：原生 JavaScript + CSS，零框架依赖（`tauri/public/`，桌面/移动共用）
+- **桌面 / Android**：Rust 引擎（`tauri/src-tauri/`）+ Tauri v2 桥接，Rayon 多核并行
+- **浏览器 PWA**：`docs/` 目录独立构建——同一引擎编译为 WASM（`docs/wasm/` crate + wasm-bindgen），`engine.js` 在浏览器侧模拟 Tauri invoke 语义；`tauriInvoke` 自动降级到 `ChainEngine.webInvoke`
 - **AI 引擎**：Alpha-Beta 使用 `alpha_beta_pruning` crate，PVS 和 MCTS 自实现
-- **并行计算**：Rayon `par_iter()` 多核并行搜索
-- **评估函数**：增强版手写评估（位置权重 + 威胁评分）或 XGBoost 模型（可扩展）
-- **存储**：JSON 文件（`history.json`、`round_data.json`、`saved_game.json`）
+- **并行计算**：Rayon `par_iter()` 多核并行搜索（桌面端；WASM 版单线程顺序执行）
+- **评估函数**：增强版手写评估（位置权重 + 威胁评分）或 XGBoost 模型（内嵌模型，可扩展）
+- **存储**：桌面/移动 JSON 文件（`history.json`、`round_data.json`、`saved_game.json`）；PWA 用 `localStorage`（`chainchess:` 前缀）
 
 ---
 

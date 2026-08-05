@@ -301,6 +301,31 @@ loop {
 }
 }
 
+/// 合法首子布局：内圈均匀散布，彼此切比雪夫距离 ≥3（符合「首子 12 格限制」）
+pub fn spread_starts(sz: usize, n: usize) -> Vec<(usize, usize)> {
+    let mut pos: Vec<(usize, usize)> = Vec::new();
+    let cx = sz as f64 / 2.0 - 0.5;
+    let cy = sz as f64 / 2.0 - 0.5;
+    let r = (cx.min(cy) * 0.72).max(0.5);
+    for i in 0..n {
+        let ang = 2.0 * std::f64::consts::PI * i as f64 / n as f64 - std::f64::consts::FRAC_PI_2;
+        let mut x = (cx + r * ang.cos()).round() as usize;
+        let mut y = (cy + r * ang.sin()).round() as usize;
+        x = x.min(sz - 1);
+        y = y.min(sz - 1);
+        let mut guard = 0usize;
+        while pos.iter().any(|&(px, py)| {
+            px.abs_diff(x).max(py.abs_diff(y)) < 3
+        }) && guard < 100 {
+            x = (x + 3) % sz;
+            y = (y + 2) % sz;
+            guard += 1;
+        }
+        pos.push((x, y));
+    }
+    pos
+}
+
 const FEAT_DIM: usize = 18;
 
 #[derive(Clone, Deserialize)]
@@ -2316,6 +2341,83 @@ mod wasm_exports {
         ok(&result)
     }
 
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct BenchPlayer {
+        algorithm: String,
+        #[serde(default)]
+        depth: Option<usize>,
+        #[serde(default)]
+        random_scale: Option<u32>,
+        #[serde(default)]
+        use_ml_eval: Option<bool>,
+    }
+
+    fn default_bench_border() -> BorderMode { BorderMode::Default }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct BenchReq {
+        size: usize,
+        players: Vec<BenchPlayer>,
+        #[serde(default)]
+        game_count: u32,
+        #[serde(default = "default_bench_border")]
+        border_mode: BorderMode,
+        #[serde(default)]
+        cap_mode: CapMode,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct BenchResult {
+        elapsed_ms: f64,
+        steps: usize,
+        winner: Option<usize>,
+    }
+
+    /// 单局 AI 基准命令（与 Tauri 端 bench_ai_game 语义一致，供设备性能检测页使用）
+    #[wasm_bindgen]
+    pub fn bench_ai_game_cmd(json: &str) -> String {
+        let r: BenchReq = match serde_json::from_str(json) {
+            Ok(v) => v,
+            Err(e) => return err(&format!("参数解析失败: {}", e)),
+        };
+        let sz = r.size;
+        let max_players = r.players.len();
+        if sz < 5 || max_players < 2 {
+            return ok(&BenchResult { elapsed_ms: 0.0, steps: 0, winner: None });
+        }
+        let mut board: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz];
+        let starts = spread_starts(sz, max_players);
+        // 首子等级 = 阈值 n-1（cap3→2、cap4→3、cap5→4；随机模式取中间等级 3）
+        let th: u32 = match r.cap_mode {
+            CapMode::Cap3 => 3,
+            CapMode::Cap4 => 4,
+            CapMode::Cap5 => 5,
+            CapMode::Random => 3,
+        };
+        for (p, &(x, y)) in starts.iter().enumerate() {
+            board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: None };
+        }
+        let mut ai_configs: HashMap<String, serde_json::Value> = HashMap::new();
+        for (p, pl) in r.players.iter().enumerate() {
+            let is_mcts = pl.algorithm == "mcts";
+            ai_configs.insert(
+                p.to_string(),
+                serde_json::json!({
+                    "algorithm": pl.algorithm,
+                    "depth": pl.depth.unwrap_or(if is_mcts { 1 } else { 2 }),
+                    "useMlEval": pl.use_ml_eval.unwrap_or(true),
+                    "randomScale": pl.random_scale.unwrap_or(0),
+                }),
+            );
+        }
+        // 计时由 engine.js 用 performance.now() 完成（wasm32-unknown-unknown 无标准时钟）
+        let res = simulate_to_end(board, sz, max_players, 0, Vec::new(), r.border_mode, r.cap_mode, None, r.game_count, ai_configs);
+        ok(&BenchResult { elapsed_ms: 0.0, steps: res.history.len(), winner: res.winner })
+    }
+
     #[wasm_bindgen]
     pub fn engine_version() -> String {
         "chain-chess-engine-wasm-3.2.3".to_string()
@@ -2803,5 +2905,23 @@ mod tests {
         set(&mut b, 2, 3, 1, 4);
         let mv = find_best_move(&b, sz, 0, 2, &[], 2, 0, None, true, BorderMode::Default, CapMode::Cap5, 0);
         assert_eq!(mv, Some((2, 2)), "cap5 alphabeta should pick explosive move, got {:?}", mv);
+    }
+
+    // ── 设备性能检测：首子布局合法性 ──
+    #[test]
+    fn bench_spread_starts_valid() {
+        for &(sz, n) in &[(7usize, 4usize), (9, 6), (11, 6), (5, 2)] {
+            let pos = spread_starts(sz, n);
+            assert_eq!(pos.len(), n, "{sz}×{sz} {n} 人首子数量");
+            for &(x, y) in &pos {
+                assert!(x < sz && y < sz, "首子在界内");
+            }
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    let d = pos[i].0.abs_diff(pos[j].0).max(pos[i].1.abs_diff(pos[j].1));
+                    assert!(d >= 3, "{sz}×{sz}: 首子 ({:?}) 与 ({:?}) 距离 {d} < 3", pos[i], pos[j]);
+                }
+            }
+        }
     }
 }
