@@ -292,7 +292,7 @@ const SOUND_THEMES={
     // 使用 public/audio/ 下的真实音频，其余音效静音
     click:'audio/大狗.mp3',
     explosion:'dog-bark', // 特殊标记：按 dogBarkMode 在 3 种叫声间选择
-    elim:null,
+    elim:'audio/复现结果.mp3', // 淘汰音效
     gameover:null,
   },
   mute:{
@@ -3586,7 +3586,8 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-            {v:'v3.3.4 · 第 39 版',desc:'设备性能检测升级：新增 Tauri 技术栈与性能优化介绍、每项检测前弹窗说明测试原理并提示耗时与 CPU 占用、优化检测流程体验'},
+            {v:'v3.3.5 · 第 40 版',desc:'设备性能检测优化：AI 测试默认混合四算法、毒蘑菇测试新增放大缩小动画、卡片间距与返回按钮位置调整；下载页 PWA 卡片置顶并同步下载版本号；大狗叫主题新增淘汰音效'},
+    {v:'v3.3.4 · 第 39 版',desc:'设备性能检测升级：新增 Tauri 技术栈与性能优化介绍、每项检测前弹窗说明测试原理并提示耗时与 CPU 占用、优化检测流程体验'},
     {v:'v3.3.3 · 第 38 版',desc:'AI 评测页重写：两两对战432局胜率排行与完整报告、新增战力测试脚本；修复速爆/重炮模式对战与引爆判断、策略AI阈值迁移（二二/四四相接）、回环边界判断；优化MCTS搜索速度与数据生成进度条'},
 {v:'v3.3.2 · 第 37 版',desc:'修复速爆/重炮规则（特殊格改为加0/加2、方向不再跳变）、修复无动画时爆炸回退闪烁、随机边界行为与引擎一致；移除混合模式；优化AI搜索速度、历史记录容错（单条损坏不影响列表）、回放进度条拖动体验；更新检查平台缺失时安全跳过'},
     {v:'v3.3.1 · 第 36 版',desc:'新增随机玩法：爆炸阈值每步随机、棋盘边界每步随机、混合保持开局确定；首子等级改为阈值减一；关于页 AI 评测更新、暗色按钮质感优化、修复系统主题下游戏内亮色切换失效'},
@@ -4617,7 +4618,7 @@ function dbShowConfirm(type){
       '<div class="db-confirm-warn">⚠️ 检测期间设备可能：<b>耗时较长</b>（15~60 秒）、<b>CPU 占用高</b>、<b>界面卡顿</b>或发热</div>' +
       '<div class="db-confirm-principle">' +
       '<strong>测试原理</strong><br>' +
-      '渲染一个全屏 WebGL 体积着色器（光线步进分形）并持续旋转视角，逐帧记录帧间隔；' +
+      '渲染一个全屏 WebGL 体积着色器（光线步进分形）并持续旋转视角、周期性放大缩小，逐帧记录帧间隔；' +
       '通过平均 FPS、1% Low FPS 与丢帧率评估 WebView 的 GPU 渲染能力。' +
       '</div>';
   } else {
@@ -4691,6 +4692,8 @@ function dbWvFrame(ts){
   }
   // 渲染一帧（cznull 体积着色器基准核心）
   dbWv.ang1 += 0.01;
+  // 毒蘑菇缩放：相机距离周期推近/拉远（放大/缩小），范围 1.1~2.1，周期约 12.6s
+  dbWv.len = 1.6 + 0.5 * Math.sin(ts * 0.0005);
   const gl = dbWv.gl, L = dbWv.L;
   gl.uniform1f(L.x, 1.0);
   gl.uniform1f(L.y, 1.0);

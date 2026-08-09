@@ -1,7 +1,7 @@
 {
-  "version": "3.3.4",
-  "notes": "Add device performance test page upgrade: introduce Tauri tech stack and performance optimizations; show warning dialog (long duration, high CPU, possible lag) and test principle before each benchmark; polish WebView FPS and AI benchmark UX",
-  "pub_date": "2026-08-04T00:00:00Z",
+  "version": "3.3.5",
+  "notes": "Device benchmark page optimization: AI test defaults to mixed four-algorithm battle, mushroom fractal stress test adds zoom in/out animation, card spacing and back button alignment; download page PWA card moved to top with version numbers synced; dog-bark sound theme adds elimination sound effect",
+  "pub_date": "2026-08-09T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",

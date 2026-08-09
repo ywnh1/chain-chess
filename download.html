@@ -184,6 +184,29 @@ header .subtitle{
   border-color:rgba(95,195,195,.35);
   color:#c9f2f2;
 }
+
+/* 更新日志（中英文） */
+.changelog{
+  margin-top:30px;width:100%;max-width:640px;
+}
+.changelog h2{
+  text-align:center;font-size:1.1rem;font-weight:700;color:var(--text);
+  margin-bottom:14px;letter-spacing:.03em;
+}
+.changelog h2 span{color:var(--dim);font-size:.8rem;font-weight:500;margin-left:6px}
+.cl-item{
+  background:var(--card);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:var(--radius);
+  padding:14px 18px;margin-bottom:12px;
+  backdrop-filter:blur(24px) saturate(1.4);
+  -webkit-backdrop-filter:blur(24px) saturate(1.4);
+  box-shadow:0 4px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);
+}
+.cl-item .cl-v{font-size:.88rem;font-weight:700;color:var(--accent);margin-bottom:6px}
+.cl-item .cl-zh{font-size:.82rem;line-height:1.75;color:var(--text)}
+.cl-item .cl-en{font-size:.75rem;line-height:1.7;color:var(--dim);margin-top:6px;border-top:1px dashed rgba(255,255,255,.10);padding-top:6px}
+
 /* 页脚 */
 footer{
   margin-top:36px;text-align:center;color:var(--dim);font-size:.78rem;
@@ -203,30 +226,10 @@ footer a:hover{color:#8fe0e0}
   <header>
     <h1>♟ 连锁棋</h1>
     <p class="subtitle">CHAIN CHESS · 下载中心</p>
-    <span class="version">v3.3.4 · 最新版</span>
+    <span class="version">v3.3.5 · 最新版</span>
   </header>
 
   <section class="grid">
-    <!-- Android -->
-    <a class="card android" data-platform="android"
-       href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.4/chainchess-3.3.4.apk">
-      <div class="icon">🤖</div>
-      <h2>Android</h2>
-      <p class="desc">APK 安装包 · 安卓手机 / 平板</p>
-      <div class="meta">v3.3.4 · 11.6 MB</div>
-      <span class="btn">前往下载</span>
-    </a>
-
-    <!-- Windows -->
-    <a class="card windows" data-platform="windows"
-       href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.4/chainchess-3.3.4.exe">
-      <div class="icon">🖥️</div>
-      <h2>Windows</h2>
-      <p class="desc">桌面版 · exe 安装包</p>
-      <div class="meta">v3.3.4 · 10.8 MB</div>
-      <span class="btn">前往下载</span>
-    </a>
-
     <!-- PWA -->
     <div class="card pwa">
       <div class="icon">🌐</div>
@@ -234,15 +237,41 @@ footer a:hover{color:#8fe0e0}
       <p class="desc">免安装 · 打开即玩，可离线使用</p>
       <div class="pwa-sub">
         <a data-platform="pwa"
-           href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.4/chain-chess-pwa-v3.3.4.zip">📦 下载离线包（Gitee）</a>
+           href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.5/chain-chess-pwa-v3.3.5.zip">📦 下载离线包（Gitee）</a>
         <a class="online" data-platform="web"
            href="https://ywnh1.github.io/chain-chess/" target="_blank" rel="noopener">▶ 在线游玩</a>
       </div>
     </div>
+    <!-- Android -->
+    <a class="card android" data-platform="android"
+       href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.5/chainchess-3.3.5.apk">
+      <div class="icon">🤖</div>
+      <h2>Android</h2>
+      <p class="desc">APK 安装包 · 安卓手机 / 平板</p>
+      <div class="meta">v3.3.5 · 11.6 MB</div>
+      <span class="btn">前往下载</span>
+    </a>
+
+    <!-- Windows -->
+    <a class="card windows" data-platform="windows"
+       href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.5/chainchess-3.3.5.exe">
+      <div class="icon">🖥️</div>
+      <h2>Windows</h2>
+      <p class="desc">桌面版 · exe 安装包</p>
+      <div class="meta">v3.3.5 · 10.8 MB</div>
+      <span class="btn">前往下载</span>
+    </a>
+
+
+  </section>
+  <!-- 更新日志（中英文） -->
+  <section class="changelog">
+    <h2>📋 更新日志 <span>Changelog</span></h2>
+    <div id="changelogList"></div>
   </section>
 
   <footer>
-    <span>v3.3.4 · 第 39 版</span>
+    <span>v3.3.5 · 第 40 版</span>
     <a href="https://gitee.com/ywnh1/chain-chess-release/releases" target="_blank" rel="noopener">Gitee Releases</a>
     <span>© 2026 连锁棋</span>
   </footer>
@@ -255,7 +284,7 @@ LA.init({id:"3QmgmuNqsbhkfv7Y",ck:"3QmgmuNqsbhkfv7Y",autoTrack:true})
 </script>
 <script>
 (function(){
-  var VERSION = '3.3.4';
+  var VERSION = '3.3.5';
   var links = document.querySelectorAll('a[data-platform]');
   Array.prototype.forEach.call(links, function(a){
     a.addEventListener('click', function(e){
@@ -276,5 +305,37 @@ LA.init({id:"3QmgmuNqsbhkfv7Y",ck:"3QmgmuNqsbhkfv7Y",autoTrack:true})
   });
 })();
 </script>
+<script>
+// 更新日志数据（中英文对照，与应用内 changelog 同步）
+(function(){
+  var CHANGELOG = [
+    {v:'v3.3.5 · 第 40 版',
+     zh:'设备性能检测优化：AI 测试默认混合四算法、毒蘑菇测试新增放大缩小动画、卡片间距与返回按钮位置调整；下载页 PWA 卡片置顶并同步下载版本号；大狗叫主题新增淘汰音效',
+     en:'Device benchmark page optimization: AI test defaults to mixed four-algorithm battle, mushroom fractal stress test adds zoom in/out animation, card spacing and back button alignment; download page PWA card moved to top with version numbers synced; dog-bark sound theme adds elimination sound effect'},
+    {v:'v3.3.4 · 第 39 版',
+     zh:'设备性能检测升级：新增 Tauri 技术栈与性能优化介绍、每项检测前弹窗说明测试原理并提示耗时与 CPU 占用、优化检测流程体验',
+     en:'Add device performance test page upgrade: introduce Tauri tech stack and performance optimizations; show warning dialog (long duration, high CPU, possible lag) and test principle before each benchmark; polish WebView FPS and AI benchmark UX'},
+    {v:'v3.3.3 · 第 38 版',
+     zh:'AI 评测页重写：两两对战432局胜率排行与完整报告、新增战力测试脚本；修复速爆/重炮模式对战与引爆判断、策略AI阈值迁移（二二/四四相接）、回环边界判断；优化MCTS搜索速度与数据生成进度条',
+     en:'AI benchmark page rewritten: 432-round pairwise win-rate ranking with full reports, new strength test script; fix quick-explode/heavy-cannon battle and detonation detection, strategy AI threshold migration (2-2/4-4 adjacency), wrap-boundary judgment; optimize MCTS search speed and data generation progress bar'},
+    {v:'v3.3.2 · 第 37 版',
+     zh:'修复速爆/重炮规则（特殊格改为加0/加2、方向不再跳变）、修复无动画时爆炸回退闪烁、随机边界行为与引擎一致；移除混合模式；优化AI搜索速度、历史记录容错（单条损坏不影响列表）、回放进度条拖动体验；更新检查平台缺失时安全跳过',
+     en:'Fix quick-explode/heavy-cannon rules (special cells now +0/+2, no direction jumps), fix explosion rollback flicker without animation, random boundary behavior aligned with engine; remove mixed mode; optimize AI search speed, history tolerance (single corrupt entry no longer breaks list), replay progress bar dragging; update check skips missing platform safely'}
+  ];
+  var list = document.getElementById('changelogList');
+  if(!list) return;
+  var html = '';
+  for(var i = 0; i < CHANGELOG.length; i++){
+    var it = CHANGELOG[i];
+    html += '<div class="cl-item">' +
+      '<div class="cl-v">' + it.v + '</div>' +
+      '<div class="cl-zh">' + it.zh + '</div>' +
+      '<div class="cl-en">' + it.en + '</div>' +
+      '</div>';
+  }
+  list.innerHTML = html;
+})();
+</script>
+
 </body>
 </html>
