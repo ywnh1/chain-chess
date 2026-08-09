@@ -4,7 +4,7 @@
 # 仅支持 release 构建（debug 模式已移除）
 #       ./build.sh -a chainchess      # 编译安卓 APK 到 release/，更新 update.json 的 android size
 #       ./build.sh -e                 # 编译 Windows exe 到 release/，更新 update.json 的 windows size
-#       ./build.sh -z                 # 打包 PWA zip 到 release/（update.json 无 pwa 条目，不更新 size）
+#       ./build.sh -z                 # 重新编译 WASM + 打包 PWA zip 到 release/（update.json 无 pwa 条目，不更新 size）
 #       ./build.sh -A chainchess      # 编译 apk + exe + zip 全部到 release/，只更新本次编译的 size
 #       ./build.sh -n chainchess      # 编译安卓 Native APK 到 release/，不碰 update.json
 #       ./build.sh -r chainchess      # 编译除 Native 外所有（apk+exe+zip），全部更新 size，
@@ -13,6 +13,8 @@
 #       ./build.sh -V                 # 打印当前项目版本号
 
 set -e
+
+mkdir -p release 
 
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
@@ -37,7 +39,7 @@ fi
 # ── 参数解析 ──────────────────────────────────────────────
 # --apk    : 编译 Android APK（需 keystore 密码）→ 更新 android size
 # --exe    : 编译 Windows exe（cargo-xwin）→ 更新 windows size
-# --zip    : 打包 PWA zip（不编译 wasm，用 pkg/ 已编译产物）→ 无 size 条目
+# --zip    : 重新编译 WASM + 打包 PWA zip → 无 size 条目
 # --all    : apk + exe + zip 全部编译到 release/，只更新本次新编译内容的 size
 # --native : 编译 Android Native APK，不碰 update.json
 # --release: 编译除 Native 外所有（apk+exe+zip），全部更新 size，并发布
@@ -45,6 +47,7 @@ fi
 APK=false
 EXE=false
 ZIP=false
+ZIP_ONLY=false
 ALL=false
 NATIVE=false
 PUBLISH=false
@@ -56,7 +59,7 @@ for arg in "$@"; do
   case "$arg" in
     --apk|-a)     APK=true ;;
     --exe|-e)     EXE=true ;;
-    --zip|-z)     ZIP=true ;;
+    --zip|-z)     ZIP=true; ZIP_ONLY=true ;;
     --all|-A)     ALL=true ;;
     --native|-n)  NATIVE=true ;;
     --release|-r) PUBLISH=true ;;
@@ -82,7 +85,7 @@ if [ "$HELP" = true ]; then
 选项:
   -a, --apk <密码>     编译安卓 APK，更新 update.json 的 android size
   -e, --exe            编译 Windows exe（cargo-xwin），更新 windows size
-  -z, --zip            打包 PWA zip（无平台条目，不更新 size）
+  -z, --zip            重新编译 WASM 并打包 PWA zip（无平台条目，不更新 size）
   -A, --all <密码>     编译 apk + exe + zip 全部，只更新本次编译的 size
   -n, --native <密码>  编译安卓 Native APK，不碰 update.json
   -r, --release <密码> 编译除 Native 外所有，全部更新 size，并发布：
@@ -189,7 +192,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 # ════════════════════════════════════════════════════════
 # 步骤 Z: 打包 PWA zip（--zip / --all / --release）
-# PWA 是静态资源 + 预编译 wasm（pkg/），"编译"即打包发布 zip；update.json 无 pwa 平台条目，不更新 size
+# -r / -z 时先重新编译 wasm（docs/wasm → docs/pkg），再打包；-A 用现有 pkg/ 产物；update.json 无 pwa 平台条目，不更新 size
 # ════════════════════════════════════════════════════════
 if [ "$ZIP" = true ]; then
   PWA_ZIP="release/chain-chess-pwa-v${VERSION}.zip"
@@ -199,6 +202,17 @@ if [ "$ZIP" = true ]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
   if [ -d "docs" ]; then
+    # 重新编译 WASM 引擎（--release / --zip 时）：docs/wasm crate → docs/pkg
+    if [ "$PUBLISH" = true ] || [ "$ZIP_ONLY" = true ]; then
+      echo "  🦀 重新编译 WASM 引擎（docs/wasm → docs/pkg）..."
+      if command -v wasm-pack >/dev/null 2>&1; then
+        ( cd docs/wasm && wasm-pack build --target web --out-dir ../pkg --release )
+        echo "  ✅ WASM 引擎编译完成"
+      else
+        echo "  ⚠️  未找到 wasm-pack，跳过 WASM 重编译（使用现有 pkg/ 产物）"
+      fi
+      echo ""
+    fi
     TMPPKG=$(mktemp -d)
     cp -r docs "$TMPPKG/chain-chess-pwa-v${VERSION}"
     # 排除 wasm 源码目录（含 target/vendor）与 pkg-node（仅发布编译好的 pkg/*.wasm）
