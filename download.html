@@ -8,6 +8,10 @@ LA.init({id:"3QmgmuNqsbhkfv7Y",ck:"3QmgmuNqsbhkfv7Y",autoTrack:true})
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f0f15">
+<meta property="og:title" content="♟ 连锁棋 · 下载中心">
+<meta property="og:description" content="Android / Windows / 浏览器 PWA 免安装即玩，点击卡片前往 Gitee 下载最新版本">
+<meta property="og:type" content="website">
 <meta name="description" content="♟ 连锁棋 · Chain Chess 下载中心 — Android / Windows / 浏览器 PWA，点击卡片前往 Gitee 下载最新版本">
 <title>♟ 连锁棋 · 下载中心</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
@@ -21,7 +25,7 @@ LA.init({id:"3QmgmuNqsbhkfv7Y",ck:"3QmgmuNqsbhkfv7Y",autoTrack:true})
   --accent2:#5fc3c3;       /* 青绿 */
   --iris:#b48cff;          /* 虹彩紫 */
   --text:#e8e6e3;
-  --dim:#7a7885;
+  --dim:#8a8794;
   --radius:16px;
   --card:rgba(26,26,34,.82);
   --font:'CustomFont','PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,-apple-system,sans-serif;
@@ -44,8 +48,8 @@ body{
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:center;
-  padding:28px 16px;
+  justify-content:flex-start;
+  padding:calc(28px + env(safe-area-inset-top,0px)) 16px;
   padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));
   overflow-x:hidden;
   -webkit-font-smoothing:antialiased;
@@ -87,7 +91,7 @@ body::before{
   33%{transform:translate(28px,-34px) scale(1.08)}
   66%{transform:translate(-22px,26px) scale(.94)}
 }
-main{position:relative;z-index:1;width:100%;max-width:920px;display:flex;flex-direction:column;align-items:center}
+main{position:relative;z-index:1;width:100%;max-width:920px;display:flex;flex-direction:column;align-items:center;margin:auto 0}
 /* 标题 */
 header{text-align:center;margin-bottom:34px}
 header h1{
@@ -212,6 +216,28 @@ header .subtitle{
 .cl-item .cl-zh{font-size:.82rem;line-height:1.75;color:var(--text)}
 .cl-item .cl-en{font-size:.75rem;line-height:1.7;color:var(--dim);margin-top:6px;border-top:1px dashed rgba(255,255,255,.10);padding-top:6px}
 
+
+/* 键盘焦点可见（无障碍） */
+.card:focus-visible,.pwa-sub a:focus-visible,footer a:focus-visible{
+  outline:2px solid var(--accent2);outline-offset:3px;border-radius:var(--radius);
+}
+.pwa-sub a:focus-visible,footer a:focus-visible{border-radius:12px}
+/* 平台专属 hover glow（Vibrant bold hover） */
+.card.android:hover{border-color:rgba(61,220,132,.45);box-shadow:0 16px 52px rgba(0,0,0,.55),0 0 34px rgba(61,220,132,.14),inset 0 1.5px 0 rgba(255,255,255,.12)}
+.card.windows:hover{border-color:rgba(0,168,232,.45);box-shadow:0 16px 52px rgba(0,0,0,.55),0 0 34px rgba(0,168,232,.14),inset 0 1.5px 0 rgba(255,255,255,.12)}
+.card.pwa:hover{border-color:rgba(95,195,195,.45);box-shadow:0 16px 52px rgba(0,0,0,.55),0 0 34px rgba(95,195,195,.14),inset 0 1.5px 0 rgba(255,255,255,.12)}
+/* 矢量图标（替换 emoji） */
+.card .icon{color:#e8e6e3}
+.card .icon svg{width:32px;height:32px;flex-shrink:0}
+.card.android .icon{color:#3ddc84}
+.card.windows .icon{color:#00a8e8}
+.card.pwa .icon{color:#5fc3c3}
+.pwa-sub a svg{width:16px;height:16px;flex-shrink:0;opacity:.85}
+.changelog h2 svg{width:22px;height:22px;vertical-align:-4px;margin-right:8px;color:var(--accent)}
+/* changelog 卡片 hover */
+.cl-item{transition:border-color .2s ease,transform .2s var(--ease),box-shadow .2s ease}
+.cl-item:hover{border-color:rgba(255,255,255,.18);transform:translateY(-1px);box-shadow:0 8px 28px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08)}
+
 /* 页脚 */
 footer{
   margin-top:36px;text-align:center;color:var(--dim);font-size:.78rem;
@@ -237,20 +263,20 @@ footer a:hover{color:#8fe0e0}
   <section class="grid">
     <!-- PWA -->
     <div class="card pwa">
-      <div class="icon">🌐</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"/></svg></div>
       <h2>浏览器 PWA</h2>
       <p class="desc">免安装 · 打开即玩，可离线使用</p>
       <div class="pwa-sub">
         <a data-platform="pwa"
-           href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.5/chain-chess-pwa-v3.3.5.zip">📦 下载离线包（Gitee）</a>
+           href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.5/chain-chess-pwa-v3.3.5.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>下载离线包（Gitee）</a>
         <a class="online" data-platform="web"
-           href="https://ywnh1.github.io/chain-chess/" target="_blank" rel="noopener">▶ 在线游玩</a>
+           href="https://ywnh1.github.io/chain-chess/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5z" fill="currentColor" stroke="none"/></svg>在线游玩</a>
       </div>
     </div>
     <!-- Android -->
     <a class="card android" data-platform="android"
        href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.5/chainchess-3.3.5.apk">
-      <div class="icon">🤖</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10h8M9.5 6.5c.8-1.4 4.2-1.4 5 0M6 10.5l-2-2.5M18 10.5l2-2.5"/><rect x="6" y="10" width="12" height="9" rx="2"/><circle cx="9.5" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="14" r="1" fill="currentColor" stroke="none"/><path d="M9.5 16.5v3M14.5 16.5v3"/></svg></div>
       <h2>Android</h2>
       <p class="desc">APK 安装包 · 安卓手机 / 平板</p>
       <div class="meta">v3.3.5 · 11.6 MB</div>
@@ -260,7 +286,7 @@ footer a:hover{color:#8fe0e0}
     <!-- Windows -->
     <a class="card windows" data-platform="windows"
        href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.5/chainchess-3.3.5.exe">
-      <div class="icon">🖥️</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
       <h2>Windows</h2>
       <p class="desc">桌面版 · exe 安装包</p>
       <div class="meta">v3.3.5 · 10.8 MB</div>
@@ -271,7 +297,7 @@ footer a:hover{color:#8fe0e0}
   </section>
   <!-- 更新日志（中英文） -->
   <section class="changelog">
-    <h2>📋 更新日志 <span>Changelog</span></h2>
+    <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>更新日志 <span>Changelog</span></h2>
     <div id="changelogList"></div>
   </section>
 
