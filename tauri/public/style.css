@@ -558,6 +558,7 @@ body{padding-top:env(safe-area-inset-top,20px)}
 #about .about-info-row+.about-info-row{border-top:1px solid var(--glass-w-06)}
 #about .info-key{color:var(--accent);width:64px;flex-shrink:0;font-weight:var(--weight-medium)}
 #about .info-val{color:var(--text)}
+#about .about-icon{display:block;width:76px;height:76px;border-radius:19px;margin:2px auto 6px;box-shadow:var(--glass-shadow)}
 
 /* 短内容卡片 */
 #about .about-card,#about-ai .about-card,#about-benchmark .about-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1)}
@@ -566,6 +567,17 @@ body{padding-top:env(safe-area-inset-top,20px)}
 #about .about-card ol,#about-benchmark .about-card ol{margin:4px 0 0;padding-left:16px}
 #about .about-card li,#about-benchmark .about-card li{font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text);margin-bottom:3px}
 #about .about-card li:last-child,#about-benchmark .about-card li:last-child{margin-bottom:0}
+
+/* 许可证页（MIT + 第三方开源库许可） */
+#about-license .about-card{background-image:var(--liquid-iris),var(--glass-w-04);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:border-color .35s cubic-bezier(.22,1,.36,1)}
+#about-license .about-card h3{font-size:var(--text-lg);font-weight:var(--weight-bold);margin:0 0 8px;color:var(--accent);letter-spacing:.5px}
+#about-license .about-card p{font-size:var(--text-base);line-height:var(--leading-loose);color:var(--text);margin:0}
+#about-license .tp-list{list-style:none;margin:10px 0 0;padding:0}
+#about-license .tp-list li{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;row-gap:2px;padding:8px 0;border-bottom:1px solid var(--glass-w-06);font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text)}
+#about-license .tp-list li:last-child{border-bottom:none;padding-bottom:2px}
+#about-license .tp-name{font-weight:var(--weight-semibold)}
+#about-license .tp-lic{font-size:.72em;color:var(--accent);border:1px solid var(--glass-border);border-radius:999px;padding:2px 8px;background:var(--glass-w-06);flex-shrink:0}
+#about-license .tp-desc{flex-basis:100%;font-size:.85em;color:var(--dim);line-height:var(--leading-relaxed)}
 
 /* 导航条目（指向二级页面，统一为 mode-card 风格） */
 #about .about-nav{background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:20px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:.35s cubic-bezier(.22,1,.36,1);touch-action:manipulation;min-height:56px}
@@ -1021,6 +1033,7 @@ body.light-mode{
 #welcome .welcome-content{display:flex;flex-direction:column;align-items:center;width:100%;max-width:300px;gap:0.8rem;margin-top:-2rem}
 #welcome .welcome-content .logo{font-size:3.2rem;letter-spacing:2px;font-family:var(--font-display);font-weight:700}
 #welcome .welcome-content .logo span{color:var(--accent)}
+#welcome .welcome-content .logo img{width:3.2rem;height:3.2rem;border-radius:14px;vertical-align:middle;margin-right:10px;box-shadow:var(--glass-shadow)}
 #welcome .welcome-content .tagline{color:var(--dim);font-size:var(--text-sm);margin-top:-.8rem}
 .start-btn{
   width:100%;max-width:260px;padding:12px 0;font-size:var(--text-xl);font-weight:var(--weight-bold);

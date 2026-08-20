@@ -1,11 +1,11 @@
 {
-  "version": "3.3.5",
-  "notes": "Device benchmark page optimization: AI test defaults to mixed four-algorithm battle, mushroom fractal stress test adds zoom in/out animation, card spacing and back button alignment; download page PWA card moved to top with version numbers synced; dog-bark sound theme adds elimination sound effect",
-  "pub_date": "2026-08-09T00:00:00Z",
+  "version": "3.3.6",
+  "notes": "App icon replaced: the previous icon was the Tauri official default icon (official logo) used without authorization, posing copyright and brand risks; now switched to a brand-new original icon across desktop/Android/PWA; about page license section adds third-party open-source library licenses; new icon embedded in welcome page, about page, download page and README",
+  "pub_date": "2026-08-20T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 11715727
+      "size": 12141770
     },
     "windows": {
       "url": "https://ywnh1.free.leoi.org",

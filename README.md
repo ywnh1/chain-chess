@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="icon.png" width="140" alt="连锁棋">
   <h1>♟ 连锁棋 · Chain Chess</h1>
   <p>
     <strong>棋盘策略游戏 · 桌面 / Android / 浏览器 PWA</strong>
@@ -9,7 +10,7 @@
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
     <img src="https://img.shields.io/badge/PWA-WASM-5A67D8?logo=pwa&logoColor=fff" alt="PWA">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/badge/version-3.3.5-orange" alt="v3.3.5">
+    <img src="https://img.shields.io/badge/version-3.3.6-orange" alt="v3.3.6">
   </p>
 </div>
 

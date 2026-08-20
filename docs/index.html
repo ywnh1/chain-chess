@@ -31,8 +31,9 @@ try {
 <meta name="color-scheme" content="light dark">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
 <title>连锁棋</title>
-<link rel="stylesheet" href="style.css?v=3.3.5">
+<link rel="stylesheet" href="style.css?v=3.3.6">
 </head>
 <body>
 <!-- 背景彩色光球容器 -->
@@ -46,7 +47,7 @@ try {
 <!-- Welcome -->
 <div id="welcome" class="screen active">
   <div class="welcome-content">
-    <div class="logo">♟<span>连锁棋</span></div>
+    <div class="logo"><img src="icons/icon-192.png" alt="连锁棋"><span>连锁棋</span></div>
     <div class="tagline">多人联手，一触即发</div>
     <button class="glass-btn primary start-btn" onclick="Router.navigate('gameSetup')">开始游戏</button>
     <div class="welcome-footer">
@@ -411,10 +412,11 @@ try {
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll">
     <h2>关于连锁棋</h2>
+    <img src="icons/icon-192.png" alt="连锁棋" class="about-icon">
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.5</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.6</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/ywnh1/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -1380,6 +1382,22 @@ try {
       <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
       <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
     </div>
+    <div class="about-card">
+      <h3>第三方开源库许可</h3>
+      <p>本应用基于以下开源项目构建。各项目版权归其作者所有，并遵循各自许可证分发；完整许可证文本请参见对应项目仓库。</p>
+      <ul class="tp-list">
+        <li><span class="tp-name">Tauri</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v2 · 跨平台桌面应用框架；含 tauri、tauri-build 及官方插件 tauri-plugin-dialog / tauri-plugin-fs / tauri-plugin-opener · github.com/tauri-apps/tauri</span></li>
+        <li><span class="tp-name">serde</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v1 · Rust 序列化框架 · github.com/serde-rs/serde</span></li>
+        <li><span class="tp-name">serde_json</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v1 · JSON 序列化与反序列化 · github.com/serde-rs/json</span></li>
+        <li><span class="tp-name">rayon</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v1 · 数据并行计算库 · github.com/rayon-rs/rayon</span></li>
+        <li><span class="tp-name">rand</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v0.8 · 随机数生成库 · github.com/rust-random/rand</span></li>
+        <li><span class="tp-name">reqwest</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v0.12 · HTTP 客户端（版本更新检查）· github.com/seanmonstar/reqwest</span></li>
+        <li><span class="tp-name">semver</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v1 · 语义化版本号解析 · github.com/dtolnay/semver</span></li>
+        <li><span class="tp-name">wasm-bindgen</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v0.2 · Rust ↔ JavaScript WebAssembly 绑定；docs/pkg 生成代码同源 · github.com/rustwasm/wasm-bindgen</span></li>
+        <li><span class="tp-name">getrandom</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v0.2 · 跨平台随机源（WebAssembly）· github.com/rust-random/getrandom</span></li>
+        <li><span class="tp-name">alpha_beta_pruning</span><span class="tp-lic">MIT</span><span class="tp-desc">v0.1.0 · Alpha-Beta 剪枝搜索 AI 算法库（随项目 vendor 分发）· docs/wasm/vendor/alpha_beta_pruning</span></li>
+      </ul>
+    </div>
   </div>
 </div>
 
@@ -1720,7 +1738,7 @@ window.closeUpdateModal = function() {
 window.confirmUpdate = function() { startDownload(); };
 })();
 </script>
-<script src="engine.js?v=3.3.5"></script>
-<script src="app.js?v=3.3.5"></script>
+<script src="engine.js?v=3.3.6"></script>
+<script src="app.js?v=3.3.6"></script>
 </body>
 </html>
