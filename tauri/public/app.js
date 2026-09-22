@@ -94,17 +94,17 @@ const COLORS_LIGHT=['rgba(231,76,60,.08)','rgba(241,196,15,.08)','rgba(52,152,21
 const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色','橙色','棕色','深灰色'];
 // 棋盘边界模式描述
 const BORDER_MODE_DESC = {
-  'default': '标准模式：达到 4 子即爆，边界处正常扩散',
-  'wrap': '回环模式：棋子达到 4 子即爆，爆炸会穿过边界到达对面，棋盘变成甜甜圈',
-  'bounce': '反弹模式：达到 4 子即爆，边界处能量反弹集中：边上出一颗二级棋子和两颗一级棋子，角上出两颗二级棋子',
-  'degrade': '降级模式：中央区域 4 子即爆，边界处降为 3 子即爆，角落处仅需 2 子即爆（与 3/5 级爆炸互斥）',
-  'random': '随机边界：开局时随机确定一种边界模式，整局不再改变（默认 / 回环 / 反弹 / 降级）',
+  'default': '默认边界：4 颗即爆，飞到棋盘外的棋子直接消失（最直观，新手推荐）',
+  'wrap': '回环边界：棋盘像甜甜圈，从右边飞出去的棋子会从左边回来，棋子不会丢',
+  'bounce': '反弹边界：飞出去的能量弹回相反方向，边上会出现一颗二级棋子、角上会出两颗二级棋子',
+  'degrade': '降级边界：中央 4 颗才爆，边上 3 颗就爆，角落 2 颗就爆，越靠边越危险（与 3/5 级阈值互斥）',
+  'random': '随机边界：开局随机抽一种（默认 / 回环 / 反弹 / 降级），整局都按它来',
 };
 const CAP_MODE_DESC = {
-  '3': '速爆：3 级即爆，爆炸时随机一个方向加 0（该格不变），其余方向加 1；首子为 2 级（与降级边界互斥）',
-  '4': '标准规则：达到 4 子即爆，向上下左右各扩散一个棋子；首子为 3 级',
-  '5': '重炮：5 级才爆，爆炸时随机一个方向加 2（空格变 2 级、有棋子升 2 级），其余方向加 1；首子为 4 级（与降级边界互斥）',
-  'random': '随机阈值：开局时随机确定 3 / 4 / 5 级之一，整局不再改变；首子为该阈值减 1',
+  '3': '速爆：3 颗就爆，爆炸时随机一个方向不弹棋子；首子直接放成 2 颗（与降级边界互斥）',
+  '4': '标准玩法：4 颗即爆，向上下左右各弹出 1 颗；首子直接放成 3 颗（差一颗就爆）',
+  '5': '重炮：5 颗才爆，但有一个方向会连弹 2 颗；首子直接放成 4 颗（与降级边界互斥）',
+  'random': '随机阈值：开局随机抽 3 / 4 / 5 颗之一，整局都按它来',
 };
 // 随机模式解析：开局瞬间用时间戳种子随机确定具体模式，整局不再改变。
 // 解析后与直接选中该模式完全一致（随机只发生在开始的一瞬间）。
@@ -644,6 +644,11 @@ Router.register('about-changelog', {
   leave() { var cc=document.getElementById('changelogContainer');if(cc)cc.querySelectorAll('.cl-card').forEach(function(e){e.remove()}); }
 });
 Router.register('about-license', {
+  back: 'about',
+  enter() { document.body.style.background=''; },
+  leave() {}
+});
+Router.register('about-thirdparty', {
   back: 'about',
   enter() { document.body.style.background=''; },
   leave() {}
@@ -2521,7 +2526,7 @@ async function localClick(x,y){
     let c=board[x][y];
     if(c.owner!==null){showMsg('该位置已有棋子','');return}
     if(isInRestrictedZone(x,y,size,board)){
-      showMsg('该位置在已有棋子限制区域内','');return
+      showMsg('这里离已有棋子太近，换个位置','');return
     }
     saveUndoState();
     playClick();
@@ -2575,7 +2580,7 @@ async function localClick(x,y){
   }else{
     if(c.owner!==null){showMsg('不能抢占别人的格子','');return}
     if(isInRestrictedZone(x,y,size,board)){
-      showMsg('该位置在已有棋子限制区域内','');return
+      showMsg('这里离已有棋子太近，换个位置','');return
     }
   }
   playClick();
@@ -2949,10 +2954,10 @@ function showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap
     var cId1='rmP_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     var cId2='rmPt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     var cb1=document.createElement('div');cb1.className='rank-modal-chart-box';
-    cb1.innerHTML='<h4 onclick="showFullscreenChart(\''+cId1+'\')">棋子数变化 🔍</h4><canvas id="'+cId1+'" onclick="showFullscreenChart(\''+cId1+'\')" style="cursor:pointer"></canvas>';
+    cb1.innerHTML='<h4 onclick="showFullscreenChart(\''+cId1+'\')">棋子数变化</h4><canvas id="'+cId1+'" onclick="showFullscreenChart(\''+cId1+'\')" style="cursor:pointer"></canvas>';
     body.appendChild(cb1);
     var cb2=document.createElement('div');cb2.className='rank-modal-chart-box';
-    cb2.innerHTML='<h4 onclick="showFullscreenChart(\''+cId2+'\')">点数变化 🔍</h4><canvas id="'+cId2+'" onclick="showFullscreenChart(\''+cId2+'\')" style="cursor:pointer"></canvas>';
+    cb2.innerHTML='<h4 onclick="showFullscreenChart(\''+cId2+'\')">点数变化</h4><canvas id="'+cId2+'" onclick="showFullscreenChart(\''+cId2+'\')" style="cursor:pointer"></canvas>';
     body.appendChild(cb2);
     setTimeout(function(){
       var el1=document.getElementById(cId1);if(el1){var r1=el1.getBoundingClientRect();if(r1.width>0&&r1.height>0)drawLineChart(el1,playerHistory,cNames,colors,'pieces');else{var p1=function(){var r=el1.getBoundingClientRect();if(r.width>0&&r.height>0){drawLineChart(el1,playerHistory,cNames,colors,'pieces')}else requestAnimationFrame(p1)};requestAnimationFrame(p1)}}
@@ -3104,10 +3109,10 @@ function renderGameCharts(container, history, opts){
     let id1='cP_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     let id2='cPt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     let b1=document.createElement('div');b1.className='chart-box';
-    b1.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id1}')">棋子数变化 🔍</h4><canvas id="${id1}" onclick="showFullscreenChart('${id1}')" style="cursor:pointer"></canvas>`;
+    b1.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id1}')">棋子数变化</h4><canvas id="${id1}" onclick="showFullscreenChart('${id1}')" style="cursor:pointer"></canvas>`;
     container.appendChild(b1);
     let b2=document.createElement('div');b2.className='chart-box';
-    b2.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id2}')">点数变化 🔍</h4><canvas id="${id2}" onclick="showFullscreenChart('${id2}')" style="cursor:pointer"></canvas>`;
+    b2.innerHTML=`<h4 style="cursor:pointer" onclick="showFullscreenChart('${id2}')">点数变化</h4><canvas id="${id2}" onclick="showFullscreenChart('${id2}')" style="cursor:pointer"></canvas>`;
     container.appendChild(b2);
     // 等待 Canvas 可见后再绘制（兼容 Router 页面过渡延迟）
     function drawWhenReady(cid,h,cn,co,k){
@@ -3586,6 +3591,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+            {v:'v3.3.7 · 第 42 版',desc:'关于页新增第三方 SDK 与服务说明；各设置项加「!」帮助提示（点开看每项作用）；游戏规则与界面文案精简重写；下载页改版（开源与联系方式、平台卡片）'},
             {v:'v3.3.6 · 第 41 版',desc:'更换应用图标：原图标为 Tauri 官方默认图标（官方 Logo，未获官方授权，存在版权与品牌风险），更换为全新原创图标并同步桌面/Android/PWA；完善关于页许可证：新增第三方开源库许可清单；欢迎页、关于页、下载页与 README 嵌入新图标'},
             {v:'v3.3.5 · 第 40 版',desc:'设备性能检测优化：AI 测试默认混合四算法、毒蘑菇测试新增放大缩小动画、卡片间距与返回按钮位置调整；下载页 PWA 卡片置顶并同步下载版本号；大狗叫主题新增淘汰音效'},
     {v:'v3.3.4 · 第 39 版',desc:'设备性能检测升级：新增 Tauri 技术栈与性能优化介绍、每项检测前弹窗说明测试原理并提示耗时与 CPU 占用、优化检测流程体验'},
@@ -3638,6 +3644,124 @@ function renderChangelogCards(){
 /* ==================== UTILS ==================== */
 function openModal(id){document.getElementById(id).classList.add('show')}
 function closeModal(id){document.getElementById(id).classList.remove('show')}
+
+/* ═══════ 界面帮助：界面各处「!」按钮共用同一个说明弹窗 ═══════ */
+const HINTS = {
+  'board-size': {
+    title: '棋盘大小怎么选',
+    body:
+      '<p>棋盘越大，格子越多，一局拖得越久，也越难算清谁会先炸。</p>'+
+      '<ul>'+
+      '<li><strong>5×5 ~ 7×7</strong>：节奏快，几步就进连爆，新手推荐（默认 7×7）</li>'+
+      '<li><strong>8×8 ~ 12×12</strong>：中盘拉锯，摸熟规则再玩</li>'+
+      '<li><strong>13×13 ~ 19×19</strong>：长局，适合有耐心的人，也够多人混战</li>'+
+      '</ul>'+
+      '<p class="hint-tip">第一次玩就用默认 7×7，先感受一下「攒满 4 颗就炸」是什么节奏。</p>'
+  },
+  'border-mode': {
+    title: '棋盘边界是什么',
+    body:
+      '<p>格子爆炸时朝上下左右各弹一颗棋子。它要是在棋盘边上，那几颗「飞出棋盘」的棋子怎么办，就看这里。</p>'+
+      '<ul>'+
+      '<li><strong>默认边界</strong>：飞出棋盘的棋子直接消失。最直观，新手推荐</li>'+
+      '<li><strong>回环边界</strong>：从右边飞出去，从左边飞回来，棋盘成了甜甜圈，棋子一颗不丢</li>'+
+      '<li><strong>反弹边界</strong>：飞出去的能量弹回对面，边上和角落更容易堆出二级棋子</li>'+
+      '<li><strong>降级边界</strong>：中央 4 颗才爆，边上 3 颗就爆，角落 2 颗就爆。越靠边越危险</li>'+
+      '<li><strong>随机边界</strong>：开局随机抽一种，整局都按它来</li>'+
+      '</ul>'+
+      '<p class="hint-tip">「降级边界」不能和「3 级 / 5 级」阈值一起用，选了会自动改回 4 级。</p>'
+  },
+  'cap-mode': {
+    title: '爆炸阈值是什么',
+    body:
+      '<p>格子里攒到几颗才炸，这里选的就是那个数字。默认 4 颗。</p>'+
+      '<ul>'+
+      '<li><strong>3 级（速爆）</strong>：3 颗就炸，而且每炸一次有一个方向不弹棋子。快，也乱</li>'+
+      '<li><strong>4 级（标准）</strong>：4 颗炸，朝上下左右各弹一颗。默认玩法</li>'+
+      '<li><strong>5 级（重炮）</strong>：5 颗才炸，但有一个方向会连弹两颗。憋得久，炸得狠</li>'+
+      '<li><strong>随机</strong>：开局随机抽 3 / 4 / 5 之一，整局都按它来</li>'+
+      '</ul>'+
+      '<p class="hint-tip">3 级和 5 级都不能配「降级边界」。另外，你落下的第一颗棋子，直接就是「差一颗就炸」的样子。</p>'
+  },
+  'players': {
+    title: '能几个人一起玩',
+    body:
+      '<p>2~10 人，一台设备上轮流点，不用联网。</p>'+
+      '<ul>'+
+      '<li>每个人都能单独设成<strong>真人</strong>或 <strong>AI</strong>。全真人就是本地轮流下，全 AI 就是 AI 斗蛐蛐看戏，混着来也行</li>'+
+      '<li>人数上限跟棋盘大小绑着：5×5 最多 5 人，6×6 最多 7 人，更大的棋盘能到 10 人</li>'+
+      '</ul>'+
+      '<p class="hint-tip">定好人数后，点下面的玩家卡片就能改名字和 AI 参数。</p>'
+  },
+  'player-config': {
+    title: '怎么设置每位玩家',
+    body:
+      '<p>点下面任意一张玩家卡片，改名字、换类型（真人 / 各类 AI），顺便调这位 AI 的搜索深度、随机刻度、评估函数。</p>'+
+      '<p>卡片上写的算法名就是它现在的 AI 类型。改完点「确认」，再点页面最下面的「开始游戏」。</p>'
+  },
+  'ai-type': {
+    title: 'AI 类型怎么选',
+    body:
+      '<ul>'+
+      '<li><strong>人类</strong>：自己点，不用 AI</li>'+
+      '<li><strong>AI 策略</strong>：照固定规则出招，不搜索，一秒就下完。最快也最弱，新手拿它练手</li>'+
+      '<li><strong>A-B（Alpha-Beta）</strong>：会往后推演好几步再决定，四种里最强（432 局测试胜率 73.6%）</li>'+
+      '<li><strong>PVS</strong>：A-B 的加速版，棋力几乎一样（71.3%），同样深度下更快</li>'+
+      '<li><strong>MCTS</strong>：靠大量随机模拟试出胜负，不按套路出牌，偶尔下出让人意外的棋</li>'+
+      '</ul>'+
+      '<p class="hint-tip">想轻松赢选「AI 策略」，想被打服选「A-B」。</p>'
+  },
+  'search-depth': {
+    title: '搜索深度是什么',
+    body:
+      '<p>AI 往后推的步数（层数）。数字越大，它越能看到后面的连锁爆炸，也越强。</p>'+
+      '<p>代价是时间：每加深一层，要算的走法成倍增加。手机上一般 1~3 层。</p>'+
+      '<p class="hint-tip">想有来有回就用 1~2 层。AI 会犯错，你才有机会翻盘。</p>'
+  },
+  'random-scale': {
+    title: '随机刻度是什么',
+    body:
+      '<p>AI 的「手滑程度」。数字越大，它越常不走最优解，给你的机会越多。</p>'+
+      '<ul>'+
+      '<li><strong>0%</strong>：每步都下它认为最好的，最强</li>'+
+      '<li><strong>10% ~ 30%</strong>：偶尔失误，对局更有戏</li>'+
+      '</ul>'+
+      '<p>开局时随机值固定在 40%，之后随对局推进慢慢降到你设的数字。前期乱打，后期认真。</p>'+
+      '<p class="hint-tip">「AI 策略」不吃这个设置。</p>'
+  },
+  'eval-func': {
+    title: '评估函数怎么选',
+    body:
+      '<p>AI 判断「现在局势好不好」的打分方式。</p>'+
+      '<ul>'+
+      '<li><strong>ML 模型</strong>：拿大量对局数据训练出来的打分模型，判断更准，默认选它</li>'+
+      '<li><strong>手写规则</strong>：作者手写的位置和威胁优先级，算得少，设备弱时更流畅</li>'+
+      '</ul>'+
+      '<p class="hint-tip">不确定就保持「ML 模型」。</p>'
+  },
+  'ai-advice': {
+    title: '走法建议怎么用',
+    body:
+      '<p>让 AI 帮你算这一步该下哪儿。算完会在棋盘上高亮推荐位置，听不听随你。</p>'+
+      '<ul>'+
+      '<li>只算<strong>这一步</strong>，不会自动帮你接着走</li>'+
+      '<li>算法越强、深度越高，建议越靠谱，但等得也越久。手机上 A-B / PVS 深度 1~3 够用</li>'+
+      '</ul>'
+  },
+};
+
+/** 打开说明弹窗（界面各处「!」按钮调用） */
+function openHint(key){
+  const hint=HINTS[key];
+  if(!hint)return;
+  const t=document.getElementById('hintModalTitle');
+  const b=document.getElementById('hintModalBody');
+  if(!t||!b)return;
+  t.textContent=hint.title;
+  b.innerHTML=hint.body;
+  b.scrollTop=0;
+  openModal('hintModal');
+}
 function showMsg(t,c){
   let el=document.getElementById('msg');el.textContent=t;el.className=c||'';
   if(t)setTimeout(()=>{el.textContent='';el.className=''},3000);
@@ -4017,6 +4141,7 @@ window.addEventListener('popstate',()=>{
       'about-changelog': () => Router.switchPage('about'),          // 11 => 6
       'about-benchmark': () => Router.switchPage('about'),            // 12 => 6
       'about-license': () => Router.switchPage('about'),            // 11 => 6
+      'about-thirdparty': () => Router.switchPage('about'),         // SDK 页 => 6
       'device-bench':  () => Router.switchPage('settings'),         // device-bench => settings
       'checkout':      () => {                                      // 7 => 5, 8 => 2/3/4
         const prev = Router._checkoutPrev;
@@ -4619,8 +4744,8 @@ function dbShowConfirm(type){
       '<div class="db-confirm-warn">⚠️ 检测期间设备可能：<b>耗时较长</b>（15~60 秒）、<b>CPU 占用高</b>、<b>界面卡顿</b>或发热</div>' +
       '<div class="db-confirm-principle">' +
       '<strong>测试原理</strong><br>' +
-      '渲染一个全屏 WebGL 体积着色器（光线步进分形）并持续旋转视角、周期性放大缩小，逐帧记录帧间隔；' +
-      '通过平均 FPS、1% Low FPS 与丢帧率评估 WebView 的 GPU 渲染能力。' +
+      '画面是一个全屏 WebGL 体积着色器（光线步进分形），持续旋转、周期放大缩小，逐帧记录帧间隔。' +
+      '最后用平均 FPS、1% Low FPS 和丢帧率来看 WebView 的 GPU 渲染能力。' +
       '</div>';
   } else {
     title.textContent = 'AI 计算性能检测';
@@ -4628,8 +4753,8 @@ function dbShowConfirm(type){
       '<div class="db-confirm-warn">⚠️ 检测期间设备可能：<b>CPU 占用高</b>、<b>耗时较长</b>（50 局全速模拟）、<b>发热</b>或掉电加快</div>' +
       '<div class="db-confirm-principle">' +
       '<strong>测试原理</strong><br>' +
-      '用 Rust 引擎以分散首子布局全速模拟 AI 对局（可选棋盘 / 人数 / 算法 / 深度），逐局计时并统计各算法胜率与每步耗时，' +
-      '评估设备的 AI 计算性能。' +
+      '用 Rust 引擎全速跑 AI 对局（首子分散布局，棋盘 / 人数 / 算法 / 深度都能换），逐局计时，同时统计各算法胜率和每步耗时。' +
+      '跑完大致能看出这台设备的 AI 算力。' +
       '</div>';
   }
   openModal('dbBenchConfirm');
@@ -4827,7 +4952,7 @@ function renderWvReport(){
   const row = function(k, v){ return '<div class="db-report-row"><span class="db-report-key">' + k + '</span><span class="db-report-val">' + v + '</span></div>'; };
 
   let html = '';
-  html += '<div class="about-card"><h3>📊 WebView 性能报告</h3>' +
+  html += '<div class="about-card"><h3>WebView 性能报告</h3>' +
     '<div class="db-report-grid">' +
     '<div class="db-big-metric"><div class="db-big-num">' + fmt(avgFps) + '</div><div class="db-big-label">平均 FPS</div></div>' +
     '<div class="db-big-metric"><div class="db-big-num">' + fmt(minSecFps) + '</div><div class="db-big-label">最低 FPS（1s 窗口）</div></div>' +
@@ -4843,7 +4968,7 @@ function renderWvReport(){
     row('丢帧数（帧时间 > 50ms）', dropped + ' 帧') +
     '</div>';
 
-  html += '<div class="about-card"><h3>🌐 WebView 与设备信息</h3>' +
+  html += '<div class="about-card"><h3>WebView 与设备信息</h3>' +
     row('WebView', info.webview) +
     row('User-Agent', '<span style="font-size:.68rem;word-break:break-all">' + info.ua + '</span>') +
     row('平台 / 语言', info.platform + ' / ' + info.language) +
@@ -4986,7 +5111,7 @@ function renderAiBenchReport(){
   const row = function(k, v){ return '<div class="db-report-row"><span class="db-report-key">' + k + '</span><span class="db-report-val">' + v + '</span></div>'; };
 
   let html = '';
-  html += '<div class="about-card"><h3>🧠 AI 计算性能报告</h3>' +
+  html += '<div class="about-card"><h3>AI 计算性能报告</h3>' +
     row('测试配置', dbAi.size + '×' + dbAi.size + ' 棋盘 · ' + players.length + ' 人 · 深度 ' + dbAi.depth + (dbAi.algType === 'mixed' ? ' · 混合四算法' : ' · ' + dbAlgName(dbAi.algType))) +
     row('完成局数', res.length + ' / ' + dbAi.games + ' 局' + (dbAi.cancelRequested ? '（提前停止）' : '')) +
     (dbAi.error ? row('错误', dbAi.error) : '') +
@@ -5010,7 +5135,7 @@ function renderAiBenchReport(){
   html += '</div>';
 
   // 每局明细（滚动列表）
-  html += '<div class="about-card"><h3>📋 每局明细（' + res.length + ' 局）</h3><div class="db-ai-detail">';
+  html += '<div class="about-card"><h3>每局明细（' + res.length + ' 局）</h3><div class="db-ai-detail">';
   res.forEach(function(r){
     const w = (r.winner !== null && r.winner !== undefined) ? dbAlgName(players[r.winner] && players[r.winner].algorithm) : '-';
     html += '<div class="db-ai-detail-row">#' + (r.id + 1) + ' · <b>' + (r.elapsedMs / 1000).toFixed(2) + ' s</b> · ' + r.steps + ' 步 · 胜者 ' + w + '</div>';

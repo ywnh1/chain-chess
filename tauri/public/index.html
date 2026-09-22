@@ -24,7 +24,7 @@ try {
 <meta name="color-scheme" content="light dark">
 <title>连锁棋</title>
 <link rel="icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="style.css?v=3.3.6">
+<link rel="stylesheet" href="style.css?v=3.3.7">
 </head>
 <body>
 <!-- 背景彩色光球容器 -->
@@ -54,7 +54,7 @@ try {
   <h2>开始游戏</h2>
 
   <!-- 棋盘大小 -->
-  <div class="form-row"><label>棋盘大小</label>
+  <div class="form-row"><label>棋盘大小<button type="button" class="hint-btn" onclick="openHint('board-size')" aria-label="棋盘大小说明">!</button></label>
     <div id="setupSizeGrid" class="size-grid">
       <button class="size-btn" data-value="5">5×5</button>
       <button class="size-btn" data-value="6">6×6</button>
@@ -75,7 +75,7 @@ try {
   </div>
 
   <!-- 棋盘边界模式 -->
-  <div class="form-row"><label>棋盘边界</label>
+  <div class="form-row"><label>棋盘边界<button type="button" class="hint-btn" onclick="openHint('border-mode')" aria-label="棋盘边界说明">!</button></label>
     <div id="borderModeGroup" class="btn-group border-mode-group">
       <button class="gb selected" data-value="default">默认边界</button>
       <button class="gb" data-value="wrap">回环边界</button>
@@ -84,12 +84,12 @@ try {
       <button class="gb" data-value="random">随机边界</button>
     </div>
     <p id="borderModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
-      标准模式：达到 4 子即爆，边界处正常扩散
+      默认边界：4 颗即爆，飞到棋盘外的棋子直接消失（最直观，新手推荐）
     </p>
   </div>
 
   <!-- 爆炸阈值模式（独立于边界模式） -->
-  <div class="form-row"><label>爆炸阈值</label>
+  <div class="form-row"><label>爆炸阈值<button type="button" class="hint-btn" onclick="openHint('cap-mode')" aria-label="爆炸阈值说明">!</button></label>
     <div id="capModeGroup" class="btn-group">
       <button class="gb" data-value="3">3级</button>
       <button class="gb selected" data-value="4">4级</button>
@@ -97,12 +97,12 @@ try {
       <button class="gb" data-value="random">随机</button>
     </div>
     <p id="capModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
-      标准规则：达到 4 子即爆，向上下左右扩散
+      标准玩法：一个格子攒够 4 颗棋子就爆炸，向上下左右各弹出 1 颗
     </p>
   </div>
 
   <!-- 玩家人数 -->
-  <div class="form-row"><label>玩家人数</label>
+  <div class="form-row"><label>玩家人数<button type="button" class="hint-btn" onclick="openHint('players')" aria-label="玩家人数说明">!</button></label>
     <div id="setupPlayersGroup" class="btn-group">
       <button class="gb selected" data-value="2">2</button>
       <button class="gb" data-value="3">3</button>
@@ -118,7 +118,7 @@ try {
 
   <!-- 玩家配置列表 -->
   <div id="playerConfigList" class="player-config-list">
-    <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">点击玩家设置名称、类型和 AI 参数</p>
+    <p style="font-size:.82rem;color:var(--dim);margin:6px 0 4px;font-weight:500">点玩家卡片可以改名字、换类型和 AI 参数<button type="button" class="hint-btn" onclick="openHint('player-config')" aria-label="玩家配置说明">!</button></p>
   </div>
 
   <button class="glass-btn primary" onclick="startUnifiedGame()" style="margin-top:12px;padding:14px 28px;font-size:1.1rem">开始游戏</button>
@@ -131,7 +131,7 @@ try {
     <div class="form-row"><label>名称</label>
       <input type="text" id="playerNameInput" maxlength="16" placeholder="输入玩家名称（可选）" autocomplete="off">
     </div>
-    <div class="form-row"><label>类型</label>
+    <div class="form-row"><label>类型<button type="button" class="hint-btn" onclick="openHint('ai-type')" aria-label="AI 类型说明">!</button></label>
       <div id="playerTypeBtns" class="alg-mini" style="flex-wrap:wrap;gap:4px">
         <button class="am-btn" data-value="human">人类</button>
         <button class="am-btn" data-value="strategy">AI 策略</button>
@@ -141,7 +141,7 @@ try {
       </div>
     </div>
     <div class="form-row" id="playerDepthRow">
-      <label>搜索深度</label>
+      <label>搜索深度<button type="button" class="hint-btn" onclick="openHint('search-depth')" aria-label="搜索深度说明">!</button></label>
       <div class="depth-adjust">
         <button class="dm-btn" id="depthDecBtn">−</button>
         <span class="dm-val" id="depthValue">2</span>
@@ -149,15 +149,15 @@ try {
       </div>
     </div>
     <div class="form-row" id="playerRandomRow">
-      <label>随机刻度 <span id="randomValueLabel">10%</span></label>
+      <label>随机刻度 <span id="randomValueLabel">10%</span><button type="button" class="hint-btn" onclick="openHint('random-scale')" aria-label="随机刻度说明">!</button></label>
       <input type="range" id="randomScaleSlider" min="0" max="30" value="10" class="random-slider">
       <div class="random-labels">
         <span>0%</span><span>15%</span><span>30%</span>
       </div>
-      <p style="font-size:.7rem;color:var(--dim);margin-top:2px">游戏开始时随机值固定 40%，逐渐降至设定值（策略 AI 不受影响）</p>
+      <p style="font-size:.7rem;color:var(--dim);margin-top:2px">开局随机值固定 40%，之后再慢慢降到设定值（策略 AI 不受影响）</p>
     </div>
     <div class="form-row" id="playerEvalRow" style="display:none">
-      <label style="flex:1">评估函数</label>
+      <label style="flex:1">评估函数<button type="button" class="hint-btn" onclick="openHint('eval-func')" aria-label="评估函数说明">!</button></label>
       <div id="playerEvalToggle" class="toggle-group">
         <button class="tg-btn selected" data-value="true" onclick="var p=this.parentNode;p.querySelectorAll('.tg-btn').forEach(function(b){b.classList.remove('selected')});this.classList.add('selected')">ML 模型</button>
         <button class="tg-btn" data-value="false" onclick="var p=this.parentNode;p.querySelectorAll('.tg-btn').forEach(function(b){b.classList.remove('selected')});this.classList.add('selected')">手写规则</button>
@@ -175,7 +175,7 @@ try {
   <div class="modal-inner player-modal">
     <h3>AI 走法建议</h3>
     <div class="form-row">
-      <label>建议算法</label>
+      <label>建议算法<button type="button" class="hint-btn" onclick="openHint('ai-advice')" aria-label="走法建议说明">!</button></label>
       <div id="aiHelpAlgBtns" class="alg-mini" style="flex-wrap:wrap;gap:4px">
         <button class="am-btn selected" data-value="alphabeta">A-B</button>
         <button class="am-btn" data-value="pvs">PVS</button>
@@ -184,7 +184,7 @@ try {
       </div>
     </div>
     <div class="form-row" id="aiHelpDepthRow">
-      <label>搜索深度</label>
+      <label>搜索深度<button type="button" class="hint-btn" onclick="openHint('search-depth')" aria-label="搜索深度说明">!</button></label>
       <div class="depth-adjust">
         <button class="dm-btn" id="aiHelpDepthDec">−</button>
         <span class="dm-val" id="aiHelpDepthValue">3</span>
@@ -192,16 +192,27 @@ try {
       </div>
     </div>
     <div class="form-row" id="aiHelpEvalRow" style="display:none">
-      <label style="flex:1">评估函数</label>
+      <label style="flex:1">评估函数<button type="button" class="hint-btn" onclick="openHint('eval-func')" aria-label="评估函数说明">!</button></label>
       <div id="aiHelpEvalToggle" class="toggle-group">
         <button class="tg-btn selected" data-value="true">ML 模型</button>
         <button class="tg-btn" data-value="false">手写规则</button>
       </div>
     </div>
-    <p style="font-size:.72rem;color:var(--dim);margin:0 0 4px">仅为当前这一步给出推荐落子位置，不会自动持续提示。</p>
+    <p style="font-size:.72rem;color:var(--dim);margin:0 0 4px">只给当前这一步的推荐位置，不会一直提示。</p>
     <div class="modal-actions">
       <button class="glass-btn" onclick="closeAiHelpModal()">取消</button>
       <button class="glass-btn primary" onclick="requestAiSuggestion()">给出建议</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用帮助弹窗：界面各处「!」按钮共用（内容由 app.js 的 HINTS 表提供） -->
+<div id="hintModal" class="modal">
+  <div class="modal-inner hint-modal-inner">
+    <h3 id="hintModalTitle">说明</h3>
+    <div id="hintModalBody" class="hint-body"></div>
+    <div class="modal-actions">
+      <button class="glass-btn primary" onclick="closeModal('hintModal')">知道了</button>
     </div>
   </div>
 </div>
@@ -273,24 +284,24 @@ try {
     <!-- 主视图：技术栈介绍 + 两个检测项目 -->
     <div id="dbMain">
       <div class="about-card">
-        <h3>🦀 Tauri 与技术栈</h3>
-        <p class="db-desc">连锁棋在性能上做了这些努力，下面的检测用来验证它们在你这台设备上的实际表现：</p>
+        <h3>Tauri 与技术栈</h3>
+        <p class="db-desc">这些是连锁棋在性能上做的事，下面两项检测会实测它们在你这台设备上的效果：</p>
         <ul class="db-stack-list">
-          <li><strong>Tauri 2</strong> — Rust 内核 + 系统 WebView，相比传统 Electron 内存占用更低、启动更快</li>
-          <li><strong>Rust 引擎</strong> — 游戏规则与 AI 全部用 Rust 实现，编译为原生码；PWA 版编译为 WASM</li>
-          <li><strong>Rayon 多核并行</strong> — A-B / PVS / MCTS 根节点并行搜索，充分利用多核 CPU</li>
-          <li><strong>搜索剪枝</strong> — Alpha-Beta 剪枝、PVS 主变例搜索（Killer / History / 静止搜索）、MCTS 蒙特卡洛树搜索</li>
-          <li><strong>ML 评估</strong> — 内置 XGBoost 模型（18 维特征），AI 决策更准、收敛更快</li>
-          <li><strong>WebGL 渲染</strong> — 棋盘 Canvas 绘制 + 动画批处理，GPU 分担渲染压力</li>
+          <li><strong>Tauri 2</strong>：Rust 内核 + 系统 WebView，比 Electron 省内存，启动也快</li>
+          <li><strong>Rust 引擎</strong>：游戏规则和 AI 全用 Rust 写，编译成原生码；PWA 版编译为 WASM</li>
+          <li><strong>Rayon 多核并行</strong>：A-B / PVS / MCTS 在根节点并行搜索，多核 CPU 都吃得上</li>
+          <li><strong>搜索剪枝</strong>：Alpha-Beta 剪枝、PVS 主变例搜索（Killer / History / 静止搜索）、MCTS</li>
+          <li><strong>ML 评估</strong>：内置 XGBoost 模型（18 维特征），AI 判断更准</li>
+          <li><strong>WebGL 渲染</strong>：棋盘用 Canvas 画，动画批量提交，渲染压力交给 GPU</li>
         </ul>
       </div>
 
       <div class="about-card">
-        <h3>🌐 WebView 性能</h3>
+        <h3>WebView 性能</h3>
         <p class="db-desc">
-          基于 WebGL 体积着色器（光线步进分形）的 GPU / WebView 压力测试。
-          实时显示 FPS 与帧时间；结束后生成评测报告：平均 / 最低 / 1% Low FPS、
-          丢帧统计，以及 WebView 与设备信息（UA、WebGL 渲染器、分辨率、硬件并发等）。
+          跑一个 WebGL 体积着色器（光线步进分形）压 GPU 和 WebView。
+          过程中实时显示 FPS 和帧时间，结束后给出报告：平均 / 最低 / 1% Low FPS、
+          丢帧数，以及 UA、WebGL 渲染器、分辨率、硬件并发等设备信息。
         </p>
         <div class="form-row">
           <label style="flex:1">测试时长</label>
@@ -304,11 +315,11 @@ try {
       </div>
 
       <div class="about-card">
-        <h3>🧠 AI 计算性能</h3>
+        <h3>AI 计算性能</h3>
         <p class="db-desc">
-          使用 Rust 引擎全速模拟 AI 对局（首子分散布局，与 ai_bench 基准一致），
-          覆盖不同 AI 类型 / 棋盘大小 / 人数 / 搜索深度；默认 50 局，
-          每完成一局刷新进度，最后生成性能报告。
+          用 Rust 引擎全速跑 AI 对局（首子分散布局，跟 ai_bench 基准一致），
+          换着 AI 类型 / 棋盘大小 / 人数 / 深度测。默认 50 局，每局完刷新进度，
+          跑完出报告。
         </p>
         <div class="form-row">
           <label style="flex:1">棋盘大小</label>
@@ -353,7 +364,7 @@ try {
             <option value="100">100 局</option>
           </select>
         </div>
-        <p class="db-note">提示：MCTS 固定 1 迭代档；深度 3 且大棋盘时单局耗时显著上升。</p>
+        <p class="db-note">MCTS 固定 1 迭代档。深度 3 配大棋盘会明显变慢。</p>
         <button class="glass-btn primary" onclick="dbShowConfirm('ai')" style="width:100%;padding:9px 14px">▶ 开始 AI 计算性能检测</button>
       </div>
     </div>
@@ -380,7 +391,7 @@ try {
     <!-- AI 运行视图 -->
     <div id="dbAiRun" style="display:none">
       <div class="about-card">
-        <h3>🧠 AI 计算性能检测中…</h3>
+        <h3>AI 计算性能检测中…</h3>
         <div class="db-progress-track" style="margin:10px 0"><div id="dbAiBar" class="db-progress-fill"></div></div>
         <div class="db-ai-progress-row">
           <span id="dbAiProgressLabel">0 / 50 局</span>
@@ -407,7 +418,7 @@ try {
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.6</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.7</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/ywnh1/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -416,33 +427,37 @@ try {
     <!-- 游戏介绍 -->
     <div class="about-card">
       <h3>为什么玩连锁棋</h3>
-      <p>你点下的每一颗棋子，都可能引爆整张棋盘。每一次落子，都是在引爆点、扩散范围和对手布局之间做取舍。本地热座、人机对战、AI 斗蛐蛐三种模式，2~10 人同台博弈。桌面 / Android / 浏览器 PWA 三端运行，无需服务器，本地即可开局。</p>
+      <p>你点下的每一颗棋子，都可能引爆整张棋盘。本地热座、人机对战、AI 斗蛐蛐，2~10 人同台。桌面 / Android / 浏览器 PWA 三端都能跑，不用服务器，打开就能开局。</p>
     </div>
 
-    <!-- 游戏规则（短卡片） -->
+    <!-- 游戏规则（短卡片，面向零基础玩家） -->
     <div class="about-card">
       <h3>游戏规则</h3>
+      <p>往格子里堆自己的棋子。堆满一格就会炸，炸出去的棋子推着旁边的格子接着炸，最后一个还有棋子的玩家赢。</p>
       <ol>
-        <li><strong>落子</strong> — 点击空位落子，每位玩家首步需避开所有已有棋子周围 12 格；点击自己的棋子可加子</li>
-        <li><strong>爆裂</strong> — 格子中的棋子数达到容量（4 个）时，向上下左右各扩散一个棋子</li>
-        <li><strong>连锁</strong> — 爆裂扩散会触发相邻格子的连锁爆裂，形成连爆效应</li>
-        <li><strong>淘汰</strong> — 当某玩家的所有棋子被吞噬时该玩家被淘汰</li>
-        <li><strong>胜利</strong> — 最后存活的一位玩家获胜</li>
+        <li><strong>下子</strong>：点空格放一颗自己的棋子；点自己已经有棋子的格子，再添一颗。别人的格子点不动。</li>
+        <li><strong>爆炸</strong>：攒够 <strong>4 颗</strong>就炸，朝上下左右各弹一颗。弹出去的棋子算你的。</li>
+        <li><strong>连锁</strong>：弹出去的棋子落进旁边的格子，那格要是也堆到 4 颗，跟着炸。一路炸到没格子再够 4 颗为止。</li>
+        <li><strong>出局</strong>：你在棋盘上的棋子被炸光，就出局了。</li>
+        <li><strong>获胜</strong>：最后还有棋子留在棋盘上的人赢。</li>
+        <li><strong>第一手</strong>：不能下在已有棋子周围那 12 格里（上下左右各 2 格，加四个斜角），省得一开局就贴着打。</li>
+        <li><strong>第一颗棋子</strong>：落下就是“差一颗要爆”的状态，4 级规则下算 3 颗。所以抢地盘那一步常常直接炸开。</li>
       </ol>
+      <p>第一次玩就选 2 人、7×7、默认边界、4 级，以后想换再换。每项设置后面的「!」会告诉你它影响什么。</p>
     </div>
 
     <!-- 功能亮点 -->
     <div class="about-card">
       <h3>功能亮点</h3>
       <p style="font-size:.82rem;line-height:1.7;margin:0">
-        🦀 <strong>Rust AI 引擎</strong> — 四款算法（策略 / A-B / PVS / MCTS），桌面端 Rayon 多核并行，PWA 端 WASM 运行<br>
-        🎯 <strong>增强版 AI 评估</strong> — 位置权重 + 邻居威胁评分 + 爆发势能，内置 XGBoost ML 模型<br>
-        📊 <strong>AI 性能评测</strong> — 432 局两两对战报告：A-B 73.6% / PVS 71.3% 胜率断档领先<br>
-        🖥️ <strong>设备性能检测</strong> — WebView FPS 压力测试 + AI 计算基准（50 局），一键生成本机报告<br>
-        💾 <strong>中断恢复</strong> — 异常退出自动保存，历史页面一键继续上次对局<br>
-        📈 <strong>结算图表</strong> — 棋子数和点数双折线图，支持全屏缩放与双指缩放<br>
-        🔊 <strong>合成音效</strong> — 落子、爆炸、淘汰、获胜各有独立音频反馈（Web Audio API）<br>
-        🌐 <strong>三端形态</strong> — 桌面 / Android / 浏览器 PWA，同一引擎，可离线游玩
+        <strong>Rust AI 引擎</strong>：四种算法（策略 / A-B / PVS / MCTS），桌面端 Rayon 多核并行，PWA 端跑 WASM<br>
+        <strong>增强版评估</strong>：位置权重 + 邻居威胁评分 + 爆发势能，内置 XGBoost 模型<br>
+        <strong>AI 性能评测</strong>：432 局两两对战，A-B 73.6% / PVS 71.3% 胜率<br>
+        <strong>设备性能检测</strong>：WebView FPS 压力测试 + AI 计算基准（50 局）<br>
+        <strong>中断恢复</strong>：异常退出自动保存，历史页一键继续<br>
+        <strong>结算图表</strong>：棋子数和点数双折线图，可全屏、可双指缩放<br>
+        <strong>合成音效</strong>：落子、爆炸、淘汰、获胜各有音效（Web Audio API）<br>
+        <strong>三端形态</strong>：桌面 / Android / 浏览器 PWA，同一引擎，离线可玩
       </p>
     </div>
 
@@ -463,6 +478,12 @@ try {
       <span class="nav-arrow">→</span>
     </div>
 
+    <!-- 第三方 SDK 与服务 → 二级页 -->
+    <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-thirdparty')">
+      <span class="nav-label">第三方 SDK 与服务</span>
+      <span class="nav-arrow">→</span>
+    </div>
+
   </div>
 </div>
 
@@ -473,10 +494,10 @@ try {
     <h2>AI 介绍</h2>
 
     <div class="about-card">
-      <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋内置 <strong>四款 AI 算法</strong>，覆盖启发式规则、树搜索剪枝和随机模拟三大搜索范式。本地对战、AI 对战、AI 斗蛐蛐模式均可自由切换。四款算法均由 <strong>Rust</strong> 引擎实现（桌面端 A-B/PVS/MCTS 使用 Rayon 多核并行加速，PWA 版单线程 WASM）。</p>
+      <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋有 <strong>四种 AI</strong>，思路分三类：按人工规则下、搜索推演、随机模拟。本地对战、AI 对战、AI 斗蛐蛐里都能随便换。四种都用 <strong>Rust</strong> 引擎实现，桌面端 A-B/PVS/MCTS 走 Rayon 多核并行，PWA 版是单线程 WASM。</p>
 
-      <h3 class="ai-alg-title" style="color:var(--accent)">⚡ 策略算法 · 启发式规则</h3>
-      <p class="ai-alg-desc">Rust 实现，基于人工优先级规则快速决策，无需树搜索，响应最快，适合新手入门和低算力设备。</p>
+      <h3 class="ai-alg-title" style="color:var(--accent)">策略算法 · 启发式规则</h3>
+      <p class="ai-alg-desc">不做搜索，按人工排好的优先级直接出招，所以最快，新手和低配设备都用得上。</p>
       <div class="ai-alg-detail" style="background:rgba(240,179,75,.06)">
         <strong style="color:var(--accent)">三级优先</strong> → 优先走即将爆裂的棋子（count=3）<br>
         <strong style="color:var(--accent)">安全升级</strong> → 避开对手三级附近的二级棋子<br>
@@ -484,29 +505,29 @@ try {
         <strong style="color:var(--accent)">首子中心</strong> → 第一手落子在棋盘中央附近
       </div>
 
-      <h3 class="ai-alg-title" style="color:var(--accent2)">🧠 Alpha-Beta 剪枝 · 经典搜索</h3>
-      <p class="ai-alg-desc">标准 Alpha-Beta 剪枝搜索，Rust + Rayon 根级并行。采用 <strong>克隆式搜索</strong>——每次走法复制棋盘而非撤销，天然适配多玩家连锁反应。</p>
+      <h3 class="ai-alg-title" style="color:var(--accent2)">Alpha-Beta 剪枝 · 经典搜索</h3>
+      <p class="ai-alg-desc">标准的 Alpha-Beta 剪枝，Rust + Rayon 在根节点并行。走法是<strong>复制棋盘</strong>而不是撤销，多玩家连锁反应下反而更省事。</p>
       <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
         <strong style="color:var(--accent2)">搜索深度</strong> 1~10 层 · <strong style="color:var(--accent2)">根级分支</strong> top 10 · <strong style="color:var(--accent2)">走法排序</strong> 三级优先<br>
         <strong style="color:var(--accent2)">随机化探索</strong> 早期对局加入随机扰动，增加走法多样性<br>
         <strong style="color:var(--accent2)">评估函数</strong> 支持增强版（位置+威胁评分）或手写规则评估
       </div>
 
-      <h3 class="ai-alg-title" style="color:var(--accent2)">🔬 PVS NegaMax · 精炼剪枝</h3>
-      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：假设最优走法已被首先搜索，后续走法用<strong>零窗口（Null Window）</strong>快速试探——要么迅速证明不比首走法好，要么触发重搜索。432 局两两对战评测（ML 评估 · 深度 2）中，PVS 以 71.3% 胜率紧追 A-B 的 73.6%（详见「AI 性能评测」）。</p>
+      <h3 class="ai-alg-title" style="color:var(--accent2)">PVS NegaMax · 精炼剪枝</h3>
+      <p class="ai-alg-desc">Principal Variation Search（主变例搜索）：先假定最优走法排在第一，后面的走法用<strong>零窗口（Null Window）</strong>快试一下，要么马上证明它不如第一位，要么重搜。432 局两两对战里（ML 评估 · 深度 2），PVS 拿到 71.3%，紧追 A-B 的 73.6%，详见「AI 性能评测」。</p>
       <div class="ai-alg-detail" style="background:rgba(95,195,195,.06)">
         <strong style="color:var(--accent2)">Killer 启发</strong> 每层记录两条杀招走法 · <strong style="color:var(--accent2)">History 启发</strong> 全局走法成功率表<br>
         <strong style="color:var(--accent2)">QSearch 静止搜索</strong> 到底层只搜索爆炸性走法（限3层），消除水平线效应<br>
         <strong style="color:var(--accent2)">动态分支</strong> 浅层多搜深层少搜 · <strong style="color:var(--accent2)">根级 Rayon 并行</strong> 多核加速
       </div>
 
-      <h3 class="ai-alg-title" style="color:#c88cff">🎲 MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
-      <p class="ai-alg-desc"><strong>不依赖评估函数</strong>——不猜哪个走法好，直接大量随机模拟对局（单次最多 40 步，提前终局即停），用胜负统计数据做决策。</p>
+      <h3 class="ai-alg-title" style="color:#c88cff">MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
+      <p class="ai-alg-desc"><strong>不用评估函数</strong>，也不猜哪步好，直接随机模拟大量对局（单次最多 40 步，分出胜负就停），靠胜率统计决定走哪步。</p>
       <div class="ai-alg-detail" style="background:rgba(200,140,255,.06)">
         <strong style="color:#c88cff">SELECT</strong> → <strong style="color:#c88cff">EXPAND</strong> → <strong style="color:#c88cff">PLAYOUT</strong> → <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
         UCB1 平衡探索与利用 · 随机 Playout（均匀随机模拟）· 渐进展开（≥3 次访问才展新分支）
       </div>
-      <p class="ai-alg-desc">Rust 实现，depth=1~10 对应 400~4000 次迭代，树节点上限 2000。无需人为设计评估函数，擅长发现 Alpha-Beta 不易察觉的非直觉走法。</p>
+      <p class="ai-alg-desc">depth=1~10 对应 400~4000 次迭代，树节点上限 2000。不靠评估函数的好处是，常能找出 Alpha-Beta 看不到的路子。</p>
     </div>
   </div>
 </div>
@@ -518,7 +539,7 @@ try {
     <h2>AI 性能评测</h2>
 
     <div class="about-card">
-      <h3 style="font-size:1.05rem;margin-bottom:8px">🧪 两两对战 AI 实力测试（432 局）</h3>
+      <h3 style="font-size:1.05rem;margin-bottom:8px">两两对战 AI 实力测试（432 局）</h3>
       <p style="font-size:.82rem;color:var(--dim);line-height:1.7;margin:0">
         6 配对（全两两）× 4 边界 × 3 爆炸阈值 = 12 模式 · 每模式 6 局（<strong>先手轮换</strong>，消除先后手偏差）<br>
         7×7 棋盘 · A-B / PVS 深度 2 · MCTS 深度 1 · ML 评估 · 首子合法分散布局 · 随机刻度 0<br>
@@ -527,19 +548,19 @@ try {
     </div>
 
     <div class="about-card">
-      <h3 style="font-size:1.05rem;margin-bottom:8px">📌 总结</h3>
+      <h3 style="font-size:1.05rem;margin-bottom:8px">总结</h3>
       <ul style="font-size:.82rem;line-height:1.8;margin:0;padding-left:1.1em">
-        <li><strong>树搜索统治赛场</strong> — A-B 73.6% 与 PVS 71.3% 胜率断档领先；策略与 MCTS 合计仅 119 胜（A-B 159 胜 / PVS 154 胜）</li>
-        <li><strong>策略算法中等偏上（46.8%）</strong> — 在速爆 3（低阈值）模式下最有竞争力：对 A-B 拿到 4:2、对 PVS 多场 3:3 / 5:1，启发式"临界引爆"直觉贴近搜索结论</li>
-        <li><strong>MCTS 全面垫底（8.3%）</strong> — 深度 1（根分支约 400 次迭代）在 7×7 上模拟宽度/深度不足；平均 103 步即结束，多为快速送死，尚需更高迭代量</li>
-        <li><strong>阈值模式决定强弱分界</strong> — cap4（标准）几乎成为搜索算法的"送分项"（大量 6:0 / 0:6）；cap3 下策略算法反能多次咬下搜索算法</li>
-        <li><strong>边界影响节奏</strong> — 回环（wrap）对局最快（部分模式均步 45~92），反弹/降级出现长链僵持（均步可达 361~448）</li>
-        <li><strong>无平局、先手无优势</strong> — 432 局全部分出胜负；各配对先手胜率稳定在约 50%，赛制设计有效</li>
+        <li><strong>搜索算法领先</strong>：A-B 73.6%，PVS 71.3%。策略和 MCTS 加起来只有 119 胜（A-B 159 胜 / PVS 154 胜）</li>
+        <li><strong>策略算法中间偏上（46.8%）</strong>：速爆 3 的低阈值下它最能打，对 A-B 拿到 4:2，对 PVS 打出过 3:3 和 5:1。“临界引爆”的直觉跟搜索结果很接近</li>
+        <li><strong>MCTS 垫底（8.3%）</strong>：深度 1 在 7×7 上模拟量不够（根分支约 400 次迭代），平均 103 步就结束，多数是快速送死。想提强度得加迭代量</li>
+        <li><strong>阈值决定强弱分界</strong>：cap4 标准模式下搜索算法几乎全取（大量 6:0 / 0:6），cap3 下策略算法反过来能咬下几局</li>
+        <li><strong>边界影响节奏</strong>：回环（wrap）最快，部分模式平均 45~92 步；反弹和降级容易打成长链僵持，平均能到 361~448 步</li>
+        <li><strong>432 局没有平局</strong>，先手也没占到便宜：各配对的先手胜率都在 50% 上下，先手轮换这个设计是有效的</li>
       </ul>
     </div>
 
     <div class="about-card">
-      <h3 style="font-size:1.05rem;margin-bottom:8px">📊 综合胜率</h3>
+      <h3 style="font-size:1.05rem;margin-bottom:8px">综合胜率</h3>
       <div style="display:flex;align-items:center;gap:8px;margin:5px 0">
   <span style="width:60px;font-size:.8rem;white-space:nowrap">alphabeta</span>
   <div style="flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;overflow:hidden">
@@ -565,7 +586,7 @@ try {
   </div>
   <span style="width:52px;text-align:right;font-size:.8rem;color:var(--accent);font-weight:600">8.3%</span>
 </div>
-      <h4 style="margin:14px 0 6px;font-size:.95rem">🏆 综合排行（所有模式汇总）</h4>
+      <h4 style="margin:14px 0 6px;font-size:.95rem">综合排行（所有模式汇总）</h4>
       <table style="width:100%;font-size:.82rem;border-collapse:collapse">
         <tr style="border-bottom:1px solid rgba(255,255,255,.1)">
           <th style="text-align:left;padding:5px 6px;width:30px">#</th>
@@ -613,10 +634,10 @@ try {
     </div>
 
     <div class="about-card">
-      <h3 style="font-size:1.05rem;margin-bottom:8px">🆚 配对明细（A:B，先手轮换）</h3>
+      <h3 style="font-size:1.05rem;margin-bottom:8px">配对明细（A:B，先手轮换）</h3>
       <details style="margin-bottom:8px" open>
       <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
-        🆚 <strong>strategy</strong> vs <strong>alphabeta</strong>
+        <strong>strategy</strong> vs <strong>alphabeta</strong>
         <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
       </summary>
       <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
@@ -716,7 +737,7 @@ try {
       </table>
     </details><details style="margin-bottom:8px" open>
       <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
-        🆚 <strong>strategy</strong> vs <strong>pvs</strong>
+        <strong>strategy</strong> vs <strong>pvs</strong>
         <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
       </summary>
       <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
@@ -816,7 +837,7 @@ try {
       </table>
     </details><details style="margin-bottom:8px" open>
       <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
-        🆚 <strong>strategy</strong> vs <strong>mcts</strong>
+        <strong>strategy</strong> vs <strong>mcts</strong>
         <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
       </summary>
       <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
@@ -916,7 +937,7 @@ try {
       </table>
     </details><details style="margin-bottom:8px" open>
       <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
-        🆚 <strong>alphabeta</strong> vs <strong>pvs</strong>
+        <strong>alphabeta</strong> vs <strong>pvs</strong>
         <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
       </summary>
       <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
@@ -1016,7 +1037,7 @@ try {
       </table>
     </details><details style="margin-bottom:8px" open>
       <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
-        🆚 <strong>alphabeta</strong> vs <strong>mcts</strong>
+        <strong>alphabeta</strong> vs <strong>mcts</strong>
         <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
       </summary>
       <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
@@ -1116,7 +1137,7 @@ try {
       </table>
     </details><details style="margin-bottom:8px" open>
       <summary style="cursor:pointer;font-size:.9rem;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)">
-        🆚 <strong>pvs</strong> vs <strong>mcts</strong>
+        <strong>pvs</strong> vs <strong>mcts</strong>
         <span style="float:right;color:var(--dim);font-size:.75rem">点击展开/收起</span>
       </summary>
       <table style="width:100%;font-size:.78rem;border-collapse:collapse;margin-top:6px">
@@ -1218,19 +1239,19 @@ try {
     </div>
 
     <div class="about-card">
-      <h3 style="font-size:1.05rem;margin-bottom:8px">🔍 关键洞察</h3>
+      <h3 style="font-size:1.05rem;margin-bottom:8px">关键洞察</h3>
       <ul style="font-size:.82rem;line-height:1.8;margin:0;padding-left:1.1em">
-        <li><strong>为什么 A-B / PVS 断档？</strong> 搜索算法能显式推演 2 层连锁爆炸与淘汰，启发式只做单步贪心；cap4/cap5 下多步连锁价值巨大，搜索收益最高</li>
-        <li><strong>cap3 下策略为何能抗衡？</strong> 低阈值下棋盘"临界棋子"密集、每步都是爆炸点，深搜与浅贪心往往给出相同结论——启发式规则恰好命中</li>
-        <li><strong>MCTS 的均步最短（103.4）</strong> 说明它经常在中期就崩溃而非打满长局；提升迭代量（depth 2~3）或改用 UCT 变体是后续方向</li>
-        <li><strong>回环边界更快</strong> 因为爆炸能量绕圈回流、快速清盘；反弹/降级则制造"打不死"的僵持局</li>
-        <li><strong>ML 评估已生效</strong> 本测试使用新训练的 18 维阈值感知模型（800 树），A-B/PVS 在高价值长局中准确识别爆发链</li>
+        <li><strong>为什么 A-B / PVS 领先？</strong> 搜索算法能推演 2 层连锁爆炸和淘汰，启发式只做单步贪心。cap4 / cap5 下多步连锁的价值很大，搜索赚得最多</li>
+        <li><strong>cap3 下策略为什么能抗衡？</strong> 阈值低的时候棋盘上“临界棋子”密集，每一步都是爆炸点，深搜和浅贪心得出的结论差不多，启发式规则正好戳中</li>
+        <li><strong>MCTS 均步最短（103.4）</strong>，说明它常在中期就崩掉，而不是打满长局。加迭代量（depth 2~3）或换 UCT 变体是后面可以试的方向</li>
+        <li><strong>回环边界更快</strong>，因为爆炸能量绕圈回流，清盘快；反弹和降级会造出“打不死”的僵持局</li>
+        <li><strong>ML 评估确实起作用</strong>：这次用的是新训练的 18 维阈值感知模型（800 树），A-B / PVS 在高价值长局里能认出爆发链</li>
       </ul>
       <p style="font-size:.75rem;color:var(--dim);margin-top:12px">测试时间: 2026-08-03 ｜ 432 局总耗时 963.9s（平均 2.23s/局）· 完整原始输出见本页末尾</p>
     </div>
 
     <div class="about-card">
-      <h3 style="font-size:1.05rem;margin-bottom:8px">📄 完整测试结果（原始输出）</h3>
+      <h3 style="font-size:1.05rem;margin-bottom:8px">完整测试结果（原始输出）</h3>
       <pre style="font-size:.7rem;line-height:1.45;background:rgba(0,0,0,.25);border-radius:8px;padding:10px;overflow-x:auto;white-space:pre;margin:0;color:var(--dim)">════════════════════════════════════════════════════════════
   连锁棋 AI 战力评估报告
   棋盘 7×7 · alphabeta/pvs 深度 2 · MCTS 深度 1 · ML评估
@@ -1375,7 +1396,7 @@ try {
     </div>
     <div class="about-card">
       <h3>第三方开源库许可</h3>
-      <p>本应用基于以下开源项目构建。各项目版权归其作者所有，并遵循各自许可证分发；完整许可证文本请参见对应项目仓库。</p>
+      <p>本应用基于以下开源项目构建。版权归各项目作者所有，按各自的许可证分发；完整许可证文本见对应项目仓库。</p>
       <ul class="tp-list">
         <li><span class="tp-name">Tauri</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v2 · 跨平台桌面应用框架；含 tauri、tauri-build 及官方插件 tauri-plugin-dialog / tauri-plugin-fs / tauri-plugin-opener · github.com/tauri-apps/tauri</span></li>
         <li><span class="tp-name">serde</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v1 · Rust 序列化框架 · github.com/serde-rs/serde</span></li>
@@ -1388,6 +1409,49 @@ try {
         <li><span class="tp-name">getrandom</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v0.2 · 跨平台随机源（WebAssembly）· github.com/rust-random/getrandom</span></li>
         <li><span class="tp-name">alpha_beta_pruning</span><span class="tp-lic">MIT</span><span class="tp-desc">v0.1.0 · Alpha-Beta 剪枝搜索 AI 算法库（随项目 vendor 分发）· docs/wasm/vendor/alpha_beta_pruning</span></li>
       </ul>
+    </div>
+  </div>
+</div>
+
+<!-- About Third-party SDK page (二级) -->
+<div id="about-thirdparty" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>第三方 SDK 与服务</h2>
+
+    <div class="about-card">
+      <h3>数据放在哪</h3>
+      <p>连锁棋没有账号系统，也不需要登录。<strong>棋盘、走法、对局记录全部保存在你自己的设备上</strong>，不会上传到任何服务器。应用只在两处会访问网络：访问量统计与版本更新检查。</p>
+    </div>
+
+    <div class="about-card">
+      <h3>会联网的第三方服务</h3>
+      <ul class="tp-list">
+        <li><span class="tp-name">51.la 站点统计 SDK</span><span class="tp-lic">第三方统计</span><span class="tp-desc">SDK 地址 sdk.51.la/js-sdk-pro.min.js · 页面加载时引入并自动初始化（autoTrack）。用来统计访问量（PV/UV）、访问来源和大致设备环境，看有多少人在玩。它<strong>不会读取或上传棋盘、走法、对局记录、玩家名称</strong>等任何游戏内容。脚本加载失败（断网、被插件拦截）时游戏功能不受影响。桌面 / Android 应用使用与网页版相同的页面，因此也会引入该脚本。</span></li>
+        <li><span class="tp-name">Gitee 仓库接口</span><span class="tp-lic">更新检查</span><span class="tp-desc">接口地址 gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json · 启动时静默请求一次，或在设置里点「检查更新」时请求。只读取公开仓库里的版本号文件，用来判断有没有新版本；不发送账号、设备标识或游戏数据（请求本身的 IP 与 User-Agent 由 HTTP 协议附带，代码未额外附加任何信息）。</span></li>
+      </ul>
+      <p>除了这两个域名，应用不会主动请求别的地方。</p>
+    </div>
+
+    <div class="about-card">
+      <h3>系统能力（Tauri 插件）</h3>
+      <ul class="tp-list">
+        <li><span class="tp-name">tauri-plugin-dialog</span><span class="tp-lic">本地</span><span class="tp-desc">导出历史记录时弹出系统的「保存文件」对话框。</span></li>
+        <li><span class="tp-name">tauri-plugin-fs</span><span class="tp-lic">本地</span><span class="tp-desc">把导出的历史记录 JSON 写入你选定的位置，启动时读取本机历史记录文件。</span></li>
+        <li><span class="tp-name">tauri-plugin-opener</span><span class="tp-lic">本地</span><span class="tp-desc">用系统默认方式打开下载页面或已下载的安装文件。</span></li>
+      </ul>
+      <p>三个插件都只在本地工作，不联网，也不会在你没操作的时候读写文件。</p>
+    </div>
+
+    <div class="about-card">
+      <h3>本应用不包含</h3>
+      <p>无广告 SDK、无账号 / 登录 / 支付 SDK、无崩溃上报 SDK、无社交分享 SDK、无用户画像或行为分析 SDK（访问量统计仅由上面的 51.la 提供）。</p>
+    </div>
+
+    <div class="about-card">
+      <h3>不想被统计怎么办</h3>
+      <p>网页版可以用浏览器的隐私扩展或广告拦截规则屏蔽 sdk.51.la 域名，屏蔽后所有游戏功能照常可用；彻底断开网络也能正常游玩（只有「检查更新」会失败）。</p>
+      <p>开源库的许可证清单见「关于 → 许可证」页，完整源码以 MIT 协议公开在 GitHub。</p>
     </div>
   </div>
 </div>
@@ -1512,7 +1576,7 @@ try {
 <div id="fastFinishConfirm" class="modal">
   <div class="modal-inner">
     <h3>一键获取最终结果</h3>
-    <p style="text-align:center;font-size:.85rem;color:var(--dim);margin-bottom:4px">将直接计算到终局，期间可能占用较高 CPU 导致卡顿，且无动画与音效反馈。图表与排行数据不受影响。确定继续吗？</p>
+    <p style="text-align:center;font-size:.85rem;color:var(--dim);margin-bottom:4px">会一直算到分出胜负，期间 CPU 占用高、可能卡顿，也没有动画和音效。图表与排行数据不受影响。</p>
     <div class="modal-actions">
       <button class="glass-btn" onclick="closeModal('fastFinishConfirm')">取消</button>
       <button class="glass-btn primary" onclick="closeModal('fastFinishConfirm');fastFinish()">确定计算</button>
@@ -1524,7 +1588,7 @@ try {
 <div id="fastFinishOverlay" class="ff-overlay" style="display:none">
   <div class="ff-spinner"></div>
   <p class="ff-title">正在计算终局结果…</p>
-  <p class="ff-sub">后端模拟 AI 对局至分出胜负，可能需要一些时间，请稍候</p>
+  <p class="ff-sub">后端模拟 AI 对局至分出胜负，可能要等一会儿</p>
 </div>
 
 <!-- 测试前确认弹窗：警告 + 测试原理（body 层，fixed 定位不受 screen transform 影响） -->
@@ -1727,6 +1791,6 @@ window.closeUpdateModal = function() {
 window.confirmUpdate = function() { startDownload(); };
 })();
 </script>
-<script src="app.js?v=3.3.6"></script>
+<script src="app.js?v=3.3.7"></script>
 </body>
 </html>

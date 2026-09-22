@@ -1,15 +1,15 @@
 {
-  "version": "3.3.6",
-  "notes": "App icon replaced: the previous icon was the Tauri official default icon (official logo) used without authorization, posing copyright and brand risks; now switched to a brand-new original icon across desktop/Android/PWA; about page license section adds third-party open-source library licenses; new icon embedded in welcome page, about page, download page and README",
-  "pub_date": "2026-08-20T00:00:00Z",
+  "version": "3.3.7",
+  "notes": "New third-party SDK and service disclosure on the About page; help buttons explain each setup option; game rules and UI text rewritten for clarity; download page redesigned",
+  "pub_date": "2026-09-22T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 13346216
+      "size": 13403560
     },
     "windows": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 11134464
+      "size": 11148800
     }
   }
 }

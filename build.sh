@@ -19,10 +19,11 @@ mkdir -p release
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="chainchess"
-VERSION="3.3.6"
+VERSION="3.3.7"
 
 CARGO_CONFIG="tauri/src-tauri/.cargo/config.toml"
 CARGO_TOML="tauri/src-tauri/Cargo.toml"
+GRADLE_PROPS="tauri/src-tauri/gen/android/gradle.properties"
 RUST_DIR="tauri/src-tauri"
 
 # Windows exe 交叉编译目标（cargo-xwin）
@@ -76,7 +77,7 @@ done
 
 # ── 帮助 / 版本：打印后立即退出（优先级最高，不触发默认构建）──
 if [ "$HELP" = true ]; then
-  cat <<'HELP_EOF'
+  cat <<HELP_EOF
 用法: $0 [选项] <keystore_password>
 
 编译并签名连锁棋（APK / Windows exe / PWA zip）到 release/，
@@ -343,6 +344,13 @@ cleanup_all() {
     echo ""
     echo "  🧹 已恢复: Cargo.toml"
   fi
+  # 恢复 gradle.properties（aarch64 主机的 aapt2 原生覆盖）
+  if [ -f "${GRADLE_PROPS}.bak" ]; then
+    cp "${GRADLE_PROPS}.bak" "$GRADLE_PROPS"
+    rm -f "${GRADLE_PROPS}.bak"
+    echo ""
+    echo "  🧹 已恢复: gradle.properties"
+  fi
   # 清理 update.json 修改产生的临时文件
   rm -f tmp.json
   # 清理 native 优化配置（--native 模式生成）
@@ -425,6 +433,38 @@ if [ -f "$TAURI_PROPERTIES" ]; then
   VC_PATCH=$(echo "$VERSION" | cut -d. -f3 | cut -d- -f1)
   VC=$(( VC_MAJOR * 1000000 + VC_MINOR * 1000 + VC_PATCH ))
   sed -i "s/^tauri.android.versionCode=.*/tauri.android.versionCode=${VC}/" "$TAURI_PROPERTIES"
+fi
+
+# ── aapt2 原生覆盖（aarch64 主机）────────────────────────
+# AGP 从 maven.google.com 取的 aapt2 只有 linux-x86_64 版：在 aarch64 主机
+# （PRoot-Distro / Termux 等）上执行会 SIGILL（Illegal instruction），
+# 表现为 "AAPT2 ... Daemon startup failed"（AarResourcesCompilerTransform 失败）。
+# 用 android.aapt2FromMavenOverride 指向 build-tools 里的本机原生 aapt2 即可绕过；
+# 构建结束由 cleanup_all 恢复 gradle.properties。
+HOST_ARCH=$(uname -m)
+if [ -f "$GRADLE_PROPS" ] && [ -n "$ANDROID_HOME" ] \
+   && { [ "$HOST_ARCH" = "aarch64" ] || [ "$HOST_ARCH" = "arm64" ]; }; then
+  AAPT2_NATIVE=""
+  for cand in $(ls -r "${ANDROID_HOME}"/build-tools/*/aapt2 2>/dev/null); do
+    if "$cand" version >/dev/null 2>&1; then
+      AAPT2_NATIVE="$cand"
+      break
+    fi
+  done
+  if [ -n "$AAPT2_NATIVE" ]; then
+    cp "$GRADLE_PROPS" "${GRADLE_PROPS}.bak"
+    sed -i '/^android\.aapt2FromMavenOverride=/d' "$GRADLE_PROPS"
+    # 用 sed $a 追加：gradle.properties 末尾没有换行符，>> 会拼坏最后一行
+    sed -i "\$a android.aapt2FromMavenOverride=${AAPT2_NATIVE}" "$GRADLE_PROPS"
+    echo "  🧩 ${HOST_ARCH} 主机：aapt2 改用本机原生二进制（构建后自动恢复 gradle.properties）"
+    echo "     ${AAPT2_NATIVE}"
+    echo ""
+  else
+    echo "  ⚠️  ${HOST_ARCH} 主机但未找到可执行的原生 aapt2"
+    echo "     AGP 自带的是 x86_64 aapt2，本机跑不起来，构建会失败。"
+    echo "     请在 ${ANDROID_HOME}/build-tools/<版本>/ 放置 aarch64 版 aapt2 后重试。"
+    echo ""
+  fi
 fi
 
 # ── 步骤 2: 复制前端资源到 assets ──────────────────────
