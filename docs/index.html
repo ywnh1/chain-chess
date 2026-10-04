@@ -33,7 +33,7 @@ try {
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="style.css?v=3.3.7">
+<link rel="stylesheet" href="style.css?v=3.3.8">
 </head>
 <body>
 <!-- 背景彩色光球容器 -->
@@ -222,6 +222,19 @@ try {
     <div id="hintModalBody" class="hint-body"></div>
     <div class="modal-actions">
       <button class="glass-btn primary" onclick="closeModal('hintModal')">知道了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 首次进入引导：怎么玩 + 本版更新（每个版本首次进入显示一次） -->
+<div id="introModal" class="modal">
+  <div class="modal-inner hint-modal-inner">
+    <h3 id="introModalTitle">欢迎使用连锁棋</h3>
+    <div id="introModalBody" class="hint-body"></div>
+    <p class="intro-foot">关闭后可在「关于」页查看游戏规则和更新日志</p>
+    <div class="modal-actions">
+      <button class="glass-btn" onclick="dismissIntroForever()">以后不再显示</button>
+      <button class="glass-btn primary" onclick="closeModal('introModal')">知道了</button>
     </div>
   </div>
 </div>
@@ -427,7 +440,7 @@ try {
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.7</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.8</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/ywnh1/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -1484,6 +1497,16 @@ try {
       <button class="glass-btn" onclick="exitMultiSelect()" id="selCancelBtn" style="display:none">取消</button>
     </div>
   </div>
+  <div id="historyStats" class="history-stats" style="display:none"></div>
+  <div class="history-tools">
+    <input type="search" id="historySearch" placeholder="搜索玩家名 / AI 算法…" aria-label="搜索历史记录" oninput="onHistorySearchInput()">
+    <div class="hf-chips" id="historyModeChips" role="group" aria-label="按模式筛选">
+      <button type="button" class="hf-chip selected" data-mode="all" onclick="setHistoryMode(this)">全部</button>
+      <button type="button" class="hf-chip" data-mode="local" onclick="setHistoryMode(this)">本地</button>
+      <button type="button" class="hf-chip" data-mode="ai" onclick="setHistoryMode(this)">AI 对战</button>
+      <button type="button" class="hf-chip" data-mode="eve" onclick="setHistoryMode(this)">斗蛐蛐</button>
+    </div>
+  </div>
   <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">所有对局记录</p>
   <div id="historyList" class="history-list">
     <div class="empty">加载中...</div>
@@ -1494,7 +1517,7 @@ try {
 
 <!-- Game Screen -->
 <div id="game" class="screen">
-  <div class="game-msg"><span id="msg"></span></div>
+  <div class="game-msg"><span id="msg" role="status" aria-live="polite" aria-atomic="true"></span></div>
   <div class="top">
     <div class="top-left">
       <button onclick="undoLastMove()" id="undoBtn" disabled>悔棋</button>
@@ -1506,7 +1529,7 @@ try {
   </div>
   <div id="playerBar" class="player-bar"></div>
   <div class="board-wrap"><div id="board"></div></div>
-  <div id="skipChainBtn" onclick="chainSkipAll=true">跳过动画</div>
+  <button type="button" id="skipChainBtn" onclick="chainSkipAll=true">跳过动画</button>
 </div>
 
 <!-- Pause Overlay -->
@@ -1729,6 +1752,8 @@ function showToast(msg) {
     if (old) old.remove();
     var d = document.createElement('div');
     d.id = 'autoToast';
+    d.setAttribute('role', 'status');
+    d.setAttribute('aria-live', 'polite');
     d.textContent = msg;
     d.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);max-width:85%;padding:10px 18px;background:rgba(231,76,60,.92);color:#fff;border-radius:10px;font-size:.82rem;text-align:center;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);animation:toastFadeIn .3s ease';
     document.body.appendChild(d);
@@ -1781,13 +1806,41 @@ function startDownload() {
       p.style.display = 'none';
     });
   } else {
-    // PWA / 浏览器环境：直接跳转下载中心
+    // PWA / 浏览器环境：原地更新，不再跳下载中心——
+    // 让等待中的新版 Service Worker 接管并刷新页面
     p.style.display = 'none';
-    window.open(_updUrl, '_blank', 'noopener');
-    document.getElementById('updateModalTitle').textContent = '\u94fe\u63a5\u5df2\u6253\u5f00';
-    document.getElementById('updateModalMsg').textContent = '\u8bf7\u5728\u6253\u5f00\u7684\u9875\u9762\u4e2d\u9009\u62e9\u5e73\u53f0\u4e0b\u8f7d';
+    document.getElementById('updateModalTitle').textContent = '\u6b63\u5728\u66f4\u65b0';
+    document.getElementById('updateModalMsg').textContent = '\u6b63\u5728\u83b7\u53d6\u65b0\u7248\u672c\uff0c\u5b8c\u6210\u540e\u4f1a\u81ea\u52a8\u5237\u65b0\u9875\u9762';
     c.textContent = '\u5173\u95ed';
+    requestInPlaceUpdate();
   }
+}
+
+/** PWA 原地更新：让等待中的新版 Service Worker 接管并刷新，不跳下载中心 */
+function requestInPlaceUpdate() {
+  var sw = navigator.serviceWorker;
+  if (!sw) { location.reload(); return; }
+
+  var reloaded = false;
+  function reloadOnce() { if (reloaded) return; reloaded = true; location.reload(); }
+  sw.addEventListener('controllerchange', reloadOnce);
+
+  function activate(worker) {
+    worker.postMessage({ type: 'SKIP_WAITING' });
+    setTimeout(reloadOnce, 5000);   // 兜底：迟迟等不到 controllerchange 也刷新一次
+  }
+
+  sw.getRegistration().then(function (reg) {
+    if (!reg) { reloadOnce(); return; }
+    if (reg.waiting) { activate(reg.waiting); return; }
+    // 还没有等待中的新版：主动检查一次，之后短暂轮询等待它出现
+    try { reg.update(); } catch (e) {}
+    var tries = 0;
+    var timer = setInterval(function () {
+      if (reg.waiting) { clearInterval(timer); activate(reg.waiting); }
+      else if (++tries >= 10) { clearInterval(timer); reloadOnce(); }
+    }, 500);
+  }).catch(function () { reloadOnce(); });
 }
 
 silentCheck(); // PWA 启用自动更新检查
@@ -1802,7 +1855,7 @@ window.closeUpdateModal = function() {
 window.confirmUpdate = function() { startDownload(); };
 })();
 </script>
-<script src="app.js?v=3.3.7"></script>
-<script src="engine.js?v=3.3.7"></script>
+<script src="app.js?v=3.3.8"></script>
+<script src="engine.js?v=3.3.8"></script>
 </body>
 </html>

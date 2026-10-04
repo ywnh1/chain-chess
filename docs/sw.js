@@ -1,5 +1,5 @@
 /* sw.js — 连锁棋 PWA Service Worker（离线缓存） */
-const CACHE_NAME = 'chain-chess-v3.3.7';
+const CACHE_NAME = 'chain-chess-v3.3.8';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -18,13 +18,21 @@ const CORE_ASSETS = [
   './pkg/chain_chess_engine_bg.wasm'
 ];
 
-// 安装：预缓存核心资源
+// 安装：预缓存核心资源。
+// 不再无条件 skipWaiting()：新版装完后停在 waiting 状态，由页面里的更新提示条
+// 在用户点击时发来 {type:'SKIP_WAITING'} 才接管，实现「原地更新、不跳下载中心」。
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(CORE_ASSETS))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS))
   );
+});
+
+// 页面点击「有新版本，点击刷新」后才会走到这里
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (data && data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // 激活：清理旧版本缓存

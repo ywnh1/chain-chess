@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/Rust-Rayon-F74C00?logo=rust&logoColor=fff" alt="Rust">
     <img src="https://img.shields.io/badge/PWA-WASM-5A67D8?logo=pwa&logoColor=fff" alt="PWA">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT">
-    <img src="https://img.shields.io/badge/version-3.3.7-orange" alt="v3.3.7">
+    <img src="https://img.shields.io/badge/version-3.3.8-orange" alt="v3.3.8">
   </p>
 </div>
 

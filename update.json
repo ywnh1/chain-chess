@@ -1,15 +1,15 @@
 {
-  "version": "3.3.7",
-  "notes": "New third-party SDK and service disclosure on the About page; help buttons explain each setup option; game rules and UI text rewritten for clarity; download page redesigned",
-  "pub_date": "2026-09-22T00:00:00Z",
+  "version": "3.3.8",
+  "notes": "New first-run intro (how to play + release notes, dismissible forever); history search and mode filters; cross-session stats; keyboard play (arrow keys + Enter); fixed settings not persisting across restarts and a game-page crash; AI thinking timer, remembers last setup, smaller exports",
+  "pub_date": "2026-10-04T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 13403560
+      "size": 13428136
     },
     "windows": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 11148800
+      "size": 11125248
     }
   }
 }
