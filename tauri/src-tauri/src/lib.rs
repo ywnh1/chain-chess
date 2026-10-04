@@ -917,6 +917,11 @@ pub struct AppSettings {
     pub theme: String,
     #[serde(default = "settings_default_sound")]
     pub sound_theme: String,
+    /// 其余设置项原样透传（vibrate / dogBarkMode / lastSetup / introSeenVersion / introNeverShow …）。
+    /// 少了这个字段，serde 会在反序列化时静默丢弃所有未声明的键，
+    /// 导致前端存什么设置都存不住（每次重启都被重置）。
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 fn settings_default_theme() -> String { "system".to_string() }
@@ -927,6 +932,7 @@ impl Default for AppSettings {
         Self {
             theme: settings_default_theme(),
             sound_theme: settings_default_sound(),
+            extra: Default::default(),
         }
     }
 }

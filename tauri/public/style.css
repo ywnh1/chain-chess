@@ -291,7 +291,7 @@ body::after{content:'';position:fixed;inset:0;
 #undoBtn:disabled{opacity:.3;cursor:not-allowed;transform:none;background:var(--glass-w-04);border-color:var(--glass-w-06);color:var(--dim);box-shadow:none}
 /* 跳过动画按钮 */
 #skipChainBtn{
-  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:500;
+  position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:500;
   background:rgba(240,179,75,.2);border:1px solid var(--accent);color:var(--accent);
   padding:8px 20px;border-radius:20px;font-size:.78rem;font-weight:600;
   cursor:pointer;transition:.15s;display:none;font-family:var(--font);
@@ -325,6 +325,13 @@ body::after{content:'';position:fixed;inset:0;
 }
 .cell.highlight{background:var(--glass-w-12);border-color:var(--glass-w-10);transform:scale(1.02)}
 .cell:active{transform:scale(.93)}
+/* 键盘焦点：格子有 overflow:hidden，outline 会被裁掉，所以用内阴影 + 外发光。
+   用 :focus-visible 让鼠标点击不显示焦点环，只有键盘导航才显示。 */
+.cell:focus-visible{
+  outline:none;z-index:2;
+  background:var(--glass-w-12);
+  box-shadow:inset 0 0 0 2px var(--accent),0 0 0 2px rgba(240,179,75,.3);
+}
 /* ═══ 落子波纹特效（独立特效层，不受棋盘重绘影响）═══ */
 #fxLayer{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
 #fxLayer .ripple{
@@ -700,6 +707,14 @@ body{padding-top:env(safe-area-inset-top,20px)}
   white-space:nowrap;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
 }
+.turn-tag{
+  opacity:.65;cursor:default;
+  color:var(--dim);
+  background:var(--glass-w-04);
+  border-color:var(--glass-w-08);
+  font-variant-numeric:tabular-nums;
+  font-weight:500;
+}
 .player-tag .cnt{
   display:inline-block;min-width:1.2em;
   text-align:center;margin-left:4px;
@@ -762,6 +777,35 @@ body{padding-top:env(safe-area-inset-top,20px)}
 /* history */
 #history.screen{height:100dvh;overflow:hidden;padding:calc(12px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px))}
 #history .back,#history>div,#history>p{flex-shrink:0}
+/* 历史页搜索/筛选 */
+.history-tools{display:flex;flex-direction:column;gap:8px;width:100%;margin:0 0 10px}
+.history-tools input[type="search"]{
+  width:100%;padding:8px 12px;border-radius:10px;
+  border:1px solid var(--glass-border);background:var(--glass-w-04);color:var(--text);
+  font:inherit;font-size:.82rem;
+}
+.history-tools input[type="search"]:focus{border-color:var(--accent);outline:none}
+.hf-chips{display:flex;gap:6px;flex-wrap:wrap}
+.hf-chip{
+  padding:5px 12px;border-radius:999px;
+  border:1px solid var(--glass-w-08);background:var(--glass-w-04);
+  color:var(--dim);font:inherit;font-size:.74rem;font-weight:600;
+  cursor:pointer;transition:.15s;
+}
+.hf-chip.selected{background:var(--glass-w-12);border-color:var(--accent);color:var(--accent)}
+/* 首次进入引导 */
+.intro-foot{font-size:.74rem;color:var(--dim);margin:8px 0 0;line-height:1.5;text-align:center}
+.intro-sec{font-size:.9rem;font-weight:700;color:var(--accent);margin:14px 0 6px}
+.intro-sec:first-child{margin-top:0}
+.intro-desc{font-size:.84rem;line-height:1.7;color:var(--text);margin:0}
+/* 历史页顶部战绩汇总 */
+.history-stats{display:flex;flex-wrap:wrap;gap:8px;width:100%;margin:2px 0 10px}
+.hs-item{
+  padding:6px 12px;border-radius:999px;
+  font-size:.76rem;font-weight:600;color:var(--dim);
+  background:var(--glass-w-05);border:1px solid var(--glass-w-08);
+  white-space:nowrap;
+}
 .history-list{width:100%;overflow-y:auto;flex:1;min-height:0}
 .history-item{
   background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;

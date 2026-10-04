@@ -166,6 +166,59 @@ async function loadSettings(){
   settingsLoaded=true;
   applyTheme(appSettings.theme);
   updateDogBarkRow();
+  maybeShowIntro();
+}
+
+// 版本化引导：每个版本首次进入时展示一次（怎么玩 + 本次更新）。
+// 用户可永久关闭；关闭后仍能在首页「怎么玩？」和「关于 → 更新日志」找到。
+function maybeShowIntro(){
+  if(appSettings.introNeverShow)return;
+  const ver=currentAppVersion();
+  if(!ver)return;                                // 读不到版本就不打扰
+  if(appSettings.introSeenVersion===ver)return;  // 本版本已经看过
+  appSettings.introSeenVersion=ver;
+  saveSettings();
+  showIntroModal(ver);
+}
+
+// 从关于页读版本号（index.html 里的这个值由 build.sh 同步）
+function currentAppVersion(){
+  const rows=document.querySelectorAll('.about-info-row');
+  for(let i=0;i<rows.length;i++){
+    const k=rows[i].querySelector('.info-key');
+    if(k&&k.textContent.trim()==='版本'){
+      const v=rows[i].querySelector('.info-val');
+      return v?v.textContent.replace(/^\s*v/,'').trim():'';
+    }
+  }
+  return '';
+}
+
+// 最新一条更新说明（引导里展示本版更新内容）
+function latestChangelogDesc(){
+  if(!CHANGELOG_VERSIONS){try{renderChangelogCards()}catch(e){}}
+  const first=CHANGELOG_VERSIONS&&CHANGELOG_VERSIONS[0];
+  return first&&first.desc?first.desc:'';
+}
+
+function showIntroModal(ver){
+  const body=document.getElementById('introModalBody');
+  const title=document.getElementById('introModalTitle');
+  if(!body)return;
+  if(title)title.textContent='欢迎使用连锁棋 v'+ver;
+  const howto=(typeof HINTS!=='undefined'&&HINTS['howto'])?HINTS['howto'].body:'';
+  const latest=latestChangelogDesc();
+  body.innerHTML='<h4 class="intro-sec">怎么玩</h4>'+howto+
+    (latest?'<h4 class="intro-sec">本版更新</h4><p class="intro-desc">'+latest+'</p>':'');
+  body.scrollTop=0;
+  openModal('introModal');
+}
+
+function dismissIntroForever(){
+  appSettings.introNeverShow=true;
+  saveSettings();
+  closeModal('introModal');
+  try{showToast('已关闭。游戏规则和更新日志都在「关于」页')}catch(e){}
 }
 
 async function saveSettings(){
@@ -603,7 +656,12 @@ Router.register('welcome', {
 
 Router.register('gameSetup', {
   back: 'welcome',
-  enter() { document.body.style.background=''; setTimeout(setupLobbySync, 20); setTimeout(updateModeConflictUI, 20); },
+  enter() {
+    document.body.style.background='';
+    restoreLastSetup();          // 先恢复上次选择，再由 setupLobbySync 校验兼容性
+    setTimeout(setupLobbySync, 20);
+    setTimeout(updateModeConflictUI, 20);
+  },
   leave() {}
 });
 
@@ -703,12 +761,82 @@ function tauriInvoke(cmd, args){
     ? window.__TAURI_INTERNALS__.invoke(cmd, args || {})
     : Promise.reject(new Error('Not in Tauri'));
 }
+// ── 跨对局战绩统计 ──
+// 只统计已结束的对局；字段缺失的老记录跳过该项而不影响整条统计（不做假设，不因此丢数据）。
+function computeStats(records){
+  const s={total:0,finished:0,longestChain:0,longestChainPlayer:null,modes:{}};
+  if(!Array.isArray(records))return s;
+  for(const r of records){
+    if(!r||typeof r!=='object')continue;
+    s.total++;
+    if(r.finished===false)continue;
+    s.finished++;
+    const md=r.mode||'local';
+    s.modes[md]=(s.modes[md]||0)+1;
+    // maxChain: {player, length}；老记录可能缺字段
+    const lc=r.maxChain&&typeof r.maxChain.length==='number'?r.maxChain.length:0;
+    if(lc>s.longestChain){s.longestChain=lc;s.longestChainPlayer=r.maxChain.player;}
+  }
+  return s;
+}
+
+const _MODE_LABEL={local:'本地',ai:'AI对战',eve:'斗蛐蛐'};
+
+function renderHistoryStats(list){
+  const box=document.getElementById('historyStats');
+  if(!box)return;
+  const s=computeStats(list);
+  if(!s.finished){box.style.display='none';box.innerHTML='';return;}
+  const items=['共 '+s.total+' 局，已完成 '+s.finished];
+  if(s.longestChain>1)items.push('最长连锁 '+s.longestChain+' 连');
+  const modes=Object.keys(s.modes)
+    .sort((a,b)=>s.modes[b]-s.modes[a])
+    .map(k=>(_MODE_LABEL[k]||k)+' '+s.modes[k])
+    .join(' · ');
+  if(modes)items.push(modes);
+  box.innerHTML=items.map(t=>'<span class="hs-item">'+t+'</span>').join('');
+  box.style.display='flex';
+}
+
+// ── 历史记录搜索/筛选 ──
+let _historyQuery='',_historyMode='all',_historySearchTimer=null;
+
+function filterHistory(list){
+  if(!Array.isArray(list))return [];
+  // 忽略空格差异，让「AI 对战」也能匹配「AI对战」
+  const q=_historyQuery.trim().toLowerCase().replace(/\s+/g,'');
+  return list.filter(r=>{
+    if(!r)return false;
+    if(_historyMode!=='all'&&(r.mode||'local')!==_historyMode)return false;
+    if(!q)return true;
+    const hay=[(_MODE_LABEL[r.mode||'local']||''),(r.colorNames||[]).join(' '),r.aiAlgorithm||''].join(' ').toLowerCase().replace(/\s+/g,'');
+    return hay.indexOf(q)>=0;
+  });
+}
+function onHistorySearchInput(){
+  clearTimeout(_historySearchTimer);
+  _historySearchTimer=setTimeout(()=>{
+    const inp=document.getElementById('historySearch');
+    _historyQuery=inp?inp.value:'';
+    loadHistoryList();
+  },150);
+}
+function setHistoryMode(btn){
+  _historyMode=(btn&&btn.dataset.mode)||'all';
+  const box=document.getElementById('historyModeChips');
+  if(box)box.querySelectorAll('.hf-chip').forEach(b=>b.classList.toggle('selected',b===btn));
+  loadHistoryList();
+}
+
 function loadHistoryList(){
   let el=document.getElementById('historyList');
   el.innerHTML='<div class="empty">加载中...</div>';
-  tauriInvoke('load_game_history').then(list=>{
-    if(!list||list.length===0){
-      el.innerHTML='<div class="empty">暂无历史记录</div>';
+  tauriInvoke('load_game_history').then(raw=>{
+    const all=Array.isArray(raw)?raw:[];
+    renderHistoryStats(all);
+    const list=filterHistory(all);
+    if(!list.length){
+      el.innerHTML='<div class="empty">'+(all.length?'没有匹配的记录':'暂无历史记录')+'</div>';
       return;
     }
     el.innerHTML='';
@@ -883,7 +1011,8 @@ function exportHistory(){
       alert('暂无历史记录可导出');
       return;
     }
-    const jsonData = JSON.stringify(list, null, 2);
+    // 紧凑格式（无缩进）：导出用于备份/迁移，体积比缩进版小约四分之一
+    const jsonData = JSON.stringify(list);
     return tauriInvoke('export_game_history_dialog', {jsonData}).then(res=>{
       if(res){
         const isFallback = res.startsWith('fallback:');
@@ -1169,6 +1298,8 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
     tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history after save failed:', e));
   } catch(e) {
     logWarn('Save history failed:', e);
+    // 存储失败必须让用户知道，否则他会以为这局存下了（配额满是最常见原因）
+    try{showToast('❌ 历史记录保存失败，存储空间可能已满')}catch(_e){}
   }
 }// ─── 保存未完成游戏历史记录（用于异常退出后继续游戏） ───
 async function saveUnfinishedGameHistory(){
@@ -1857,21 +1988,67 @@ function addParticles(el,color,count){
     setTimeout(()=>p.remove(),700);
   }
 }
+// ── 键盘棋盘导航（roving tabindex）──
+// 只有键盘焦点所在格 tabindex=0，其余 -1；方向键移动焦点，Enter/Space 落子。
+// 落子复用 handleClick 的守卫（AI 思考 / 暂停 / 动画中不响应）。
+let _kbPos={i:0,j:0};
+let _kbBound=false;
+
+function ensureBoardKeyboard(){
+  const bd=document.getElementById('board');
+  if(!bd||_kbBound)return;
+  _kbBound=true;
+  bd.addEventListener('keydown',e=>{
+    const dirs={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]};
+    const d=dirs[e.key];
+    if(d){
+      e.preventDefault();
+      kbMoveFocus(_kbPos.i+d[0],_kbPos.j+d[1]);
+      return;
+    }
+    if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){
+      e.preventDefault();
+      handleClick(_kbPos.i,_kbPos.j);
+    }
+  });
+  // 鼠标/触摸点选后同步键盘位置，避免下一次方向键从旧位置跳走
+  bd.addEventListener('focusin',e=>{
+    const t=e.target;
+    if(t&&t.dataset&&t.dataset.i!==undefined)_kbPos={i:+t.dataset.i,j:+t.dataset.j};
+  });
+}
+
+function kbMoveFocus(i,j){
+  i=Math.max(0,Math.min(size-1,i));
+  j=Math.max(0,Math.min(size-1,j));
+  if(i===_kbPos.i&&j===_kbPos.j)return;
+  const prev=cells[_kbPos.i]&&cells[_kbPos.i][_kbPos.j];
+  if(prev)prev.setAttribute('tabindex','-1');
+  _kbPos={i,j};
+  const el=cells[i]&&cells[i][j];
+  if(el){el.setAttribute('tabindex','0');el.focus();}
+}
+
 function renderBoard(force,popX,popY){
   let bd=document.getElementById('board');
   bd.setAttribute('role','grid');
   bd.setAttribute('aria-label','棋盘');
+  ensureBoardKeyboard();
   if(force||cells.length!==size){
     bd.replaceChildren();
     void bd.offsetHeight;
     bd.style.gridTemplateColumns=`repeat(${size},1fr)`;
+    // 棋盘尺寸可能变了，先把键盘焦点钳到新范围内
+    _kbPos.i=Math.min(_kbPos.i,size-1);
+    _kbPos.j=Math.min(_kbPos.j,size-1);
     cells=[];
     for(let i=0;i<size;i++){
       let row=[];
       for(let j=0;j<size;j++){
         let el=document.createElement('div');el.className='cell';
         el.setAttribute('role','gridcell');
-        el.setAttribute('tabindex','-1');
+        el.dataset.i=i;el.dataset.j=j;
+        el.setAttribute('tabindex',(_kbPos.i===i&&_kbPos.j===j)?'0':'-1');
         const posLabel = `第${i+1}行第${j+1}列`;
         el.setAttribute('aria-label', `${posLabel}，空位`);
         el.onclick=()=>handleClick(i,j);
@@ -1959,6 +2136,13 @@ function renderPlayerBar(){
     t.onclick=function(e){e.stopPropagation();openInGamePlayerConfig(p)};
     el.appendChild(t);
   }
+  // 回合计数。用 gameHistory.length（每次落子在 recordHistory 里 push 一条）。
+  // ponytail: 超长对局（>500 步）溢出刷盘后 gameHistory 会被裁剪，此时显示的是内存中保留的步数；
+  // 升级路径：若需要精确值，在 recordHistory 里另维护一个不受裁剪影响的全局计数器。
+  let tc=document.createElement('span');
+  tc.className='player-tag turn-tag';
+  tc.textContent='第 '+gameHistory.length+' 步';
+  el.appendChild(tc);
 }
 function cloneBoard(b){
   return b.map(row=>row.map(c=>({owner:c.owner,count:c.count})));
@@ -2135,6 +2319,25 @@ async function fastFinish(){
   }
 }
 
+// ── AI 思考计时：长考时让用户知道还要等多久 ──
+// 计时器自己检测 aiThinking 归零后停表，不必在每个 aiThinking=false 处插桩。
+let _aiTimer=null;
+function startAiWaitHint(){
+  stopAiWaitHint();
+  const el=document.getElementById('msg');
+  if(!el)return;
+  showMsg('AI 思考中…','');            // 只播报这一次
+  el.setAttribute('aria-live','off');   // 计时数字静默更新，否则读屏每秒重复播报
+  const t0=Date.now();
+  _aiTimer=setInterval(()=>{
+    if(!aiThinking){stopAiWaitHint();return;}
+    el.textContent='AI 思考中… '+((Date.now()-t0)/1000).toFixed(0)+'s';
+  },500);
+}
+function stopAiWaitHint(){
+  if(_aiTimer){clearInterval(_aiTimer);_aiTimer=null;}
+}
+
 async function triggerAI(){
   if(gameOver||aiThinking||isPaused||animating)return;
   if(!aiPlayers.has(curPlayer))return;
@@ -2145,6 +2348,7 @@ async function triggerAI(){
   }
   saveUndoState();
   aiThinking=true;
+  startAiWaitHint();
   await sleep(50);
   let move;
   // 获取当前 AI 的配置（eve 模式用 per-AI config，其他模式用全局配置）
@@ -3587,10 +3791,14 @@ function exitGame(){
 }
 
 /* ==================== ABOUT ==================== */
+// changelog 数据在 renderChangelogCards 内部构建，首次引导要读它，
+// 所以在渲染时暴露到模块级（该渲染幂等，重复调用无副作用）
+let CHANGELOG_VERSIONS=null;
 function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+            {v:'v3.3.8 · 第 43 版',desc:'新增首次进入引导（怎么玩 + 本版更新，可永久关闭）、历史记录搜索筛选、跨对局战绩汇总、键盘操作（方向键选格、回车落子）；修复设置无法保存（震动等重启后丢失）与对局页报错；优化 AI 思考计时、开局记住上次配置、导出体积'},
             {v:'v3.3.7 · 第 42 版',desc:'关于页新增第三方 SDK 与服务说明；各设置项加「!」帮助提示（点开看每项作用）；游戏规则与界面文案精简重写；下载页改版（开源与联系方式、平台卡片）'},
             {v:'v3.3.6 · 第 41 版',desc:'更换应用图标：原图标为 Tauri 官方默认图标（官方 Logo，未获官方授权，存在版权与品牌风险），更换为全新原创图标并同步桌面/Android/PWA；完善关于页许可证：新增第三方开源库许可清单；欢迎页、关于页、下载页与 README 嵌入新图标'},
             {v:'v3.3.5 · 第 40 版',desc:'设备性能检测优化：AI 测试默认混合四算法、毒蘑菇测试新增放大缩小动画、卡片间距与返回按钮位置调整；下载页 PWA 卡片置顶并同步下载版本号；大狗叫主题新增淘汰音效'},
@@ -3630,7 +3838,8 @@ function renderChangelogCards(){
     {v:'v2.3.0-beta · 第 3 版',desc:'前端优化：消除 7 处静默错误吞噬，优化棋盘缓存内存使用'},
     {v:'v2.3.0-beta · 第 2 版',desc:'安全性增强：密码移除硬编码、启用 CSP、修复 3 处 XSS 向量'},
     {v:'v2.3.0-beta · 第 1 版',desc:'Rust 后端：修复 unset 空实现、u8 溢出防护、文件写入原子化、版本号统一'}
-  ];
+  ]
+  CHANGELOG_VERSIONS=versions;
   for(var i=0;i<versions.length;i++){
     var card=document.createElement('div');card.className='cl-card';
     var vEl=document.createElement('div');vEl.className='cl-version';vEl.textContent=versions[i].v;
@@ -3642,11 +3851,74 @@ function renderChangelogCards(){
 
 
 /* ==================== UTILS ==================== */
-function openModal(id){document.getElementById(id).classList.add('show')}
-function closeModal(id){document.getElementById(id).classList.remove('show')}
+let _modalReturnFocus=null;
+function openModal(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  if(!el.classList.contains('show'))_modalReturnFocus=document.activeElement;
+  el.classList.add('show');
+  // 焦点移入弹窗，键盘用户不会还留在背后的页面上
+  if(!el.contains(document.activeElement)){
+    const f=el.querySelector('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled])');
+    if(f){try{f.focus()}catch(e){}}
+  }
+}
+function closeModal(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.remove('show');
+  // 归还焦点，避免关闭后焦点“走失”到 body
+  if(_modalReturnFocus&&document.contains(_modalReturnFocus)){
+    try{_modalReturnFocus.focus()}catch(e){}
+  }
+  _modalReturnFocus=null;
+}
+
+// ── 弹窗键盘可用性：Esc 关闭最上层，Tab 在弹窗内循环 ──
+// 注：.modal 用 visibility 而非 display 隐藏，所以不能用 offsetParent 判断可见性；
+//     浏览器本身会跳过 display:none 的元素，无需额外过滤。
+function ensureModalKeyboard(){
+  const SEL='button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled])';
+  document.addEventListener('keydown',e=>{
+    const shown=document.querySelectorAll('.modal.show');
+    if(!shown.length)return;
+    const top=shown[shown.length-1];
+    if(e.key==='Escape'){
+      e.preventDefault();
+      // playerConfigModal 有专属关闭函数（要复位 _inGameSettingsMode），不能直接 closeModal
+      if(top.id==='playerConfigModal'&&typeof closePlayerModal==='function')closePlayerModal();
+      else closeModal(top.id);
+      return;
+    }
+    if(e.key!=='Tab')return;
+    // 焦点圈闭：Tab 只在弹窗内的可聚焦元素之间循环
+    const list=top.querySelectorAll(SEL);
+    if(!list.length){e.preventDefault();return;}
+    const first=list[0],last=list[list.length-1];
+    const inside=top.contains(document.activeElement);
+    if(e.shiftKey&&(!inside||document.activeElement===first)){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&(!inside||document.activeElement===last)){e.preventDefault();first.focus();}
+  });
+}
+ensureModalKeyboard();
 
 /* ═══════ 界面帮助：界面各处「!」按钮共用同一个说明弹窗 ═══════ */
 const HINTS = {
+  'howto': {
+    title: '怎么玩连锁棋',
+    body:
+      '<p>往格子里堆自己的棋子。堆满一格就会炸，炸出去的棋子推着旁边的格子接着炸，最后一个还有棋子的玩家赢。</p>'+
+      '<ol>'+
+      '<li><strong>下子</strong>：点空格放一颗自己的棋子；点自己已经有棋子的格子，再添一颗。别人的格子点不动。</li>'+
+      '<li><strong>爆炸</strong>：攒够 <strong>4 颗</strong>就炸，朝上下左右各弹一颗。弹出去的棋子算你的。</li>'+
+      '<li><strong>连锁</strong>：弹出去的棋子落进旁边的格子，那格要是也堆到 4 颗，跟着炸。一路炸到没格子再够 4 颗为止。</li>'+
+      '<li><strong>出局</strong>：你在棋盘上的棋子被炸光，就出局了。</li>'+
+      '<li><strong>获胜</strong>：最后还有棋子留在棋盘上的人赢。</li>'+
+      '<li><strong>第一手</strong>：不能下在已有棋子周围那 12 格里（上下左右各 2 格，加四个斜角）。</li>'+
+      '<li><strong>第一颗棋子</strong>：落下就是“差一颗要爆”的状态，4 级规则下算 3 颗。所以抢地盘那一步常常直接炸开。</li>'+
+      '</ol>'+
+      '<p>第一次玩就选 2 人、7×7、默认边界、4 级，以后想换再换。</p>'
+  },
   'board-size': {
     title: '棋盘大小怎么选',
     body:
@@ -3764,7 +4036,13 @@ function openHint(key){
 }
 function showMsg(t,c){
   let el=document.getElementById('msg');el.textContent=t;el.className=c||'';
-  if(t)setTimeout(()=>{el.textContent='';el.className=''},3000);
+  // aria-live 只在有内容时开启：3 秒后清空若仍开着，读屏会把“空”也播报一次
+  clearTimeout(showMsg._t);
+  el.setAttribute('aria-live',t?'polite':'off');
+  if(t)showMsg._t=setTimeout(()=>{
+    el.setAttribute('aria-live','off');
+    el.textContent='';el.className='';
+  },3000);
 }
 
 let playerConfigs=[];
@@ -3925,6 +4203,23 @@ function generatePlayerConfigs(){
   if(er){er.style.display=playerConfigs.some(c=>c.type!=='human')?'flex':'none'}
 }
 
+// 恢复上次开局用的棋盘大小/人数。
+// 只负责还原选择，兼容性校验交给随后执行的 setupLobbySync。
+function restoreLastSetup(){
+  const last=appSettings.lastSetup;
+  if(!last)return;
+  const sg=document.getElementById('setupSizeGrid');
+  const pg=document.getElementById('setupPlayersGroup');
+  if(sg&&last.sz){
+    const b=sg.querySelector('.size-btn[data-value="'+last.sz+'"]');
+    if(b)setSelected(sg,b);
+  }
+  if(pg&&last.cnt){
+    const b=pg.querySelector('.gb[data-value="'+last.cnt+'"]');
+    if(b)setSelected(pg,b);
+  }
+}
+
 function setupLobbySync(){
   const sz=getSel('setupSizeGrid')||7;
   const cnt=getSel('setupPlayersGroup')||2;
@@ -3953,6 +4248,9 @@ function setupLobbySync(){
 function startUnifiedGame(){
   const sz=getSel('setupSizeGrid')||7;
   const cnt=getSel('setupPlayersGroup')||2;
+  // 记住本次开局配置，下次进 setup 页时恢复（appSettings 会持久化）
+  appSettings.lastSetup={sz:sz,cnt:cnt};
+  saveSettings();
   generatePlayerConfigs();
   let aiCount=0;
   for(let i=0;i<cnt;i++){

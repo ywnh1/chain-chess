@@ -10,7 +10,12 @@
 #       ./build.sh -r chainchess      # 编译除 Native 外所有（apk+exe+zip），全部更新 size，
 #                                     #   并发布：release/ → /storage/emulated/0/用户/，
 #                                     #   update.json + PWA 必要内容 → ../chain-chess-release
-#       ./build.sh -V                 # 打印当前项目版本号
+#       ./build.sh -r -c chainchess   # 同上，并自动 commit 两个仓库（push 仍手动）
+#       ./build.sh -V                 # 打印当前项目版本号（来源 tauri.conf.json）
+#
+# 版本号：tauri/src-tauri/tauri.conf.json 是唯一来源。每次构建自动同步到
+#         Cargo.toml / package.json / 两个 index.html / sw.js / download.html /
+#         README badge / update.json，发版只需改那一个文件。
 
 set -e
 
@@ -19,10 +24,24 @@ mkdir -p release
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="chainchess"
-VERSION="3.3.7"
+VERSION="3.3.7"          # 兜底值；实际取 tauri.conf.json，见下方「版本号单一来源」
 
 CARGO_CONFIG="tauri/src-tauri/.cargo/config.toml"
 CARGO_TOML="tauri/src-tauri/Cargo.toml"
+TAURI_CONF="tauri/src-tauri/tauri.conf.json"
+
+# ── 版本号单一来源 ────────────────────────────────────────
+# 发版只需要改 tauri.conf.json 的 version 一处：
+#   1. 这里把它读出来作为 $VERSION
+#   2. sync_version() 把其余落点对齐过去
+#   3. verify_version_sync() 逐一复核，没对齐就报错退出，不静默通过
+if [ -f "$TAURI_CONF" ] && command -v jq >/dev/null 2>&1; then
+  _CONF_VER=$(jq -r '.version // empty' "$TAURI_CONF" 2>/dev/null || true)
+  if [ -n "$_CONF_VER" ]; then
+    VERSION="$_CONF_VER"
+  fi
+fi
+
 GRADLE_PROPS="tauri/src-tauri/gen/android/gradle.properties"
 RUST_DIR="tauri/src-tauri"
 
@@ -30,6 +49,133 @@ RUST_DIR="tauri/src-tauri"
 EXE_TARGET="x86_64-pc-windows-msvc"
 EXE_SRC="${RUST_DIR}/target/${EXE_TARGET}/release/chain-chess.exe"
 EXE_OUTPUT="release/${PRODUCT}-${VERSION}.exe"
+
+# ── 版本同步工具 ──────────────────────────────────────────
+SYNCED_FILES=""
+
+# sync_one <文件> <sed 表达式...>
+# 只在内容确有变化时把文件计入 SYNCED_FILES，--commit 据此精确 git add
+sync_one() {
+  _f="$1"; shift
+  [ -f "$_f" ] || return 0
+  _before=$(cat "$_f")
+  sed -i "$@" "$_f" 2>/dev/null || { echo "  ⚠️  版本同步写入失败: $_f"; return 0; }
+  _after=$(cat "$_f")
+  if [ "$_before" != "$_after" ]; then
+    SYNCED_FILES="$SYNCED_FILES $_f"
+  fi
+  return 0
+}
+
+# 把所有版本号落点对齐到 $1（幂等：已经是目标值就不动文件）
+sync_version() {
+  _v="$1"
+  [ -n "$_v" ] || return 0
+
+  sync_one "tauri/src-tauri/Cargo.toml" \
+    "0,/^version = \"[0-9][^\"]*\"/s//version = \"$_v\"/"
+  sync_one "tauri/package.json" \
+    "0,/\"version\": \"[0-9][^\"]*\"/s//\"version\": \"$_v\"/"
+  sync_one "README.md" \
+    "s|badge/version-[0-9][0-9.]*-orange|badge/version-$_v-orange|;s|alt=\"v[0-9][0-9.]*\"|alt=\"v$_v\"|"
+
+  # 前端资源版本戳（style.css / app.js / engine.js）+ 关于页显示的版本
+  sync_one "tauri/public/index.html" \
+    "s|\(href=\"style\.css\)[^\"]*|\1?v=$_v|;s|\(src=\"app\.js\)[^\"]*|\1?v=$_v|;s|\(版本</span><span class=\"info-val\">\)v[0-9][^<]*|\1v$_v|"
+  sync_one "docs/index.html" \
+    "s|\(href=\"style\.css\)[^\"]*|\1?v=$_v|;s|\(src=\"app\.js\)[^\"]*|\1?v=$_v|;s|\(src=\"engine\.js\)[^\"]*|\1?v=$_v|;s|\(版本</span><span class=\"info-val\">\)v[0-9][^<]*|\1v$_v|"
+
+  # Service Worker 缓存名（变号即触发 SW 更新）
+  sync_one "docs/sw.js" \
+    "s|^const CACHE_NAME = 'chain-chess-v[0-9][^']*'|const CACHE_NAME = 'chain-chess-v$_v'|"
+
+  # 下载中心：顶部版本、三条下载直链、卡片副标题、VERSION 常量
+  # （更新日志数组是历史条目，刻意不动；新版本条目需手动新增）
+  sync_one "download.html" \
+    "s|\(<span class=\"version\">\)v[0-9][0-9.]*|\1v$_v|;s|\(var VERSION = '\)[0-9][0-9.]*'|\1$_v'|;s|releases/download/v[0-9][0-9.]*/|releases/download/v$_v/|g;s|chainchess-[0-9][0-9.]*\.apk|chainchess-$_v.apk|g;s|chainchess-[0-9][0-9.]*\.exe|chainchess-$_v.exe|g;s|chain-chess-pwa-v[0-9][0-9.]*\.zip|chain-chess-pwa-v$_v.zip|g;s|\(<div class=\"meta\">\)v[0-9][0-9.]*|\1v$_v|g;s|\(<span>\)v[0-9][0-9.]*|\1v$_v|"
+
+  # 发布版本
+  if [ -f "update.json" ] && command -v jq >/dev/null 2>&1; then
+    if [ "$(jq -r '.version // empty' update.json 2>/dev/null || true)" != "$_v" ]; then
+      jq --arg v "$_v" '.version = $v' update.json > tmp.json && mv tmp.json update.json
+      SYNCED_FILES="$SYNCED_FILES update.json"
+    fi
+  fi
+  return 0
+}
+
+# 复核每个落点确实等于 $1；有偏差就列出来并返回非零
+verify_version_sync() {
+  _v="$1"
+  _bad=""
+  vcheck() {
+    [ -f "$1" ] || return 0
+    grep -qE "$2" "$1" 2>/dev/null || _bad="$_bad
+     - $3  ($1)"
+    return 0
+  }
+  vcheck "tauri/src-tauri/Cargo.toml" "^version = \"$_v\"$"              "Cargo.toml version"
+  vcheck "tauri/package.json"          "\"version\": \"$_v\""            "package.json version"
+  vcheck "README.md"                   "badge/version-$_v-orange"        "README badge"
+  vcheck "tauri/public/index.html"     "style\.css\?v=$_v"               "public/index.html 资源戳"
+  vcheck "docs/index.html"             "style\.css\?v=$_v"               "docs/index.html 资源戳"
+  vcheck "docs/sw.js"                  "CACHE_NAME = 'chain-chess-v$_v'" "sw.js 缓存名"
+  vcheck "download.html"               "<span class=\"version\">v$_v"    "download.html 顶部版本"
+  vcheck "update.json"                 "\"version\": \"$_v\""            "update.json version"
+  if [ -n "$_bad" ]; then
+    echo ""
+    echo "  ❌ 版本号未对齐（目标 v$_v）：$_bad"
+    echo "     检查上面这些文件，或确认 tauri.conf.json 是唯一来源。"
+    return 1
+  fi
+  return 0
+}
+
+# 自动提交（只 commit 不 push）：主仓库只提版本号文件，发布仓库整仓提交
+do_commit() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  📝 自动提交（只 commit，不 push）"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+  # 1) 发布仓库：内容全是构建产物，整仓提交
+  if [ -d "../chain-chess-release/.git" ]; then
+    ( cd ../chain-chess-release && git add -A )
+    if ( cd ../chain-chess-release && ! git diff --cached --quiet ); then
+      if ( cd ../chain-chess-release && git commit -m "release: v${VERSION}" >/dev/null 2>&1 ); then
+        echo "  ✅ ../chain-chess-release 已提交"
+      else
+        echo "  ⚠️  ../chain-chess-release 提交失败"
+      fi
+    else
+      echo "  ℹ️  ../chain-chess-release 无改动"
+    fi
+  else
+    echo "  ⚠️  未找到 ../chain-chess-release/.git，跳过"
+  fi
+
+  # 2) 主仓库：只提交本次实际同步过的版本号文件，不裹挟其他改动
+  if [ -n "$SYNCED_FILES" ] && [ -d ".git" ]; then
+    # shellcheck disable=SC2086  # 这里就是要按空格分词传多个路径
+    git add -- $SYNCED_FILES
+    if ! git diff --cached --quiet; then
+      if git commit -m "chore: 版本号对齐 v${VERSION}" >/dev/null 2>&1; then
+        echo "  ✅ 主仓库已提交:$SYNCED_FILES"
+      else
+        echo "  ⚠️  主仓库提交失败"
+      fi
+    else
+      echo "  ℹ️  主仓库无版本号改动"
+    fi
+  fi
+
+  echo ""
+  echo "  📌 push 仍需手动（脚本不碰远端凭证）:"
+  echo "     git push"
+  echo "     (cd ../chain-chess-release && git push)"
+  echo ""
+  return 0
+}
 
 # ── 环境检测 ──────────────────────────────────────────
 if [ -z "${ANDROID_HOME}" ] && [ -d "$HOME/Android/Sdk" ]; then
@@ -54,6 +200,8 @@ NATIVE=false
 PUBLISH=false
 HELP=false
 SHOW_VERSION=false
+COMMIT=false
+SYNC_ONLY=false
 PASSWORD=""
 
 for arg in "$@"; do
@@ -64,6 +212,8 @@ for arg in "$@"; do
     --all|-A)     ALL=true ;;
     --native|-n)  NATIVE=true ;;
     --release|-r) PUBLISH=true ;;
+    --commit|-c)  COMMIT=true ;;
+    --sync-only|-s) SYNC_ONLY=true ;;
     --help|-h)    HELP=true ;;
     --version|-V) SHOW_VERSION=true ;;
     -*)
@@ -83,6 +233,10 @@ if [ "$HELP" = true ]; then
 编译并签名连锁棋（APK / Windows exe / PWA zip）到 release/，
 并按模式更新 update.json 的安装包大小条目。
 
+版本号以 tauri/src-tauri/tauri.conf.json 为唯一来源，构建时自动同步到
+Cargo.toml / package.json / 两个 index.html / sw.js / download.html /
+README badge / update.json —— 发版只需改 tauri.conf.json 一处。
+
 选项:
   -a, --apk <密码>     编译安卓 APK，更新 update.json 的 android size
   -e, --exe            编译 Windows exe（cargo-xwin），更新 windows size
@@ -92,8 +246,11 @@ if [ "$HELP" = true ]; then
   -r, --release <密码> 编译除 Native 外所有，全部更新 size，并发布：
                        release/ → /storage/emulated/0/用户/
                        update.json + PWA 必要内容 → ../chain-chess-release
+  -c, --commit         构建后自动 git commit（主仓库的版本号文件 + ../chain-chess-release
+                       的发布产物）。只 commit 不 push，push 仍需手动执行
+  -s, --sync-only      只把版本号同步到各落点并复核，不构建（改完 tauri.conf.json 后可用）
   -h, --help           显示本帮助
-  -V, --version        打印当前项目版本号（来自 Cargo.toml，回退 update.json）
+  -V, --version        打印当前项目版本号（唯一来源 tauri.conf.json）
 
 示例:
   $0 -a chainchess          # 仅编译 APK
@@ -102,23 +259,35 @@ if [ "$HELP" = true ]; then
   $0 -A chainchess          # 编译全部（apk+exe+zip），不发布
   $0 -n chainchess          # 编译 Native APK，不碰 update.json
   $0 -r chainchess          # 编译全部 + 更新全部 size + 发布
+  $0 -r -c chainchess       # 同上，并自动 commit 两个仓库（需手动 push）
+  $0 -s                     # 只同步版本号（改完 tauri.conf.json 后执行）
   $0 -V                     # 打印项目版本号
 HELP_EOF
   exit 0
 fi
 
 if [ "$SHOW_VERSION" = true ]; then
-  # 当前项目版本号：优先 Cargo.toml（代码版本），回退 update.json（发布版本），再回退脚本内 VERSION
-  if [ -f "tauri/src-tauri/Cargo.toml" ]; then
-    PROJECT_VER=$(sed -n 's/^version = "\([0-9][^"]*\)"/\1/p' "tauri/src-tauri/Cargo.toml" | head -1)
+  # 版本号唯一来源：tauri.conf.json（脚本顶部已读出），读不到时用脚本兜底值
+  echo "$VERSION"
+  exit 0
+fi
+
+# ── 版本号对齐（发版只改 tauri.conf.json 一处）──────────
+# 在任何构建动作之前执行；--sync-only 到此为止，不进构建流程
+sync_version "$VERSION"
+if ! verify_version_sync "$VERSION"; then
+  exit 1
+fi
+if [ -n "$SYNCED_FILES" ]; then
+  echo ""
+  echo "  🔖 版本号 v${VERSION} 已同步到:$SYNCED_FILES"
+fi
+if [ "$SYNC_ONLY" = true ]; then
+  echo ""
+  echo "  ✅ 版本号同步完成（--sync-only，未构建）"
+  if [ "$COMMIT" = true ]; then
+    do_commit
   fi
-  if [ -z "$PROJECT_VER" ] && [ -f "update.json" ] && command -v jq >/dev/null 2>&1; then
-    PROJECT_VER=$(jq -r '.version' update.json 2>/dev/null | sed 's/^null$//')
-  fi
-  if [ -z "$PROJECT_VER" ]; then
-    PROJECT_VER="$VERSION"
-  fi
-  echo "$PROJECT_VER"
   exit 0
 fi
 
@@ -550,8 +719,6 @@ if [ -f "update.json" ]; then
   # 用 APK 真实字节数更新 .android.size（--argjson 要求合法 JSON 数值）
   jq --argjson sz "$FILESIZE_BYTES" '.platforms.android.size = $sz' update.json > tmp.json && mv tmp.json update.json
 
-  VERSION=$(jq -r '.version' update.json)
-  
   echo "  已验证: update.json"
   echo "  版本: ${VERSION}"
   echo "  尺寸: ${FILESIZE}"
@@ -616,4 +783,9 @@ if [ "$PUBLISH" = true ]; then
   fi
   echo ""
 fi
+
+if [ "$COMMIT" = true ]; then
+  do_commit
+fi
+
 echo ""
