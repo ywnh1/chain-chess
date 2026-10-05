@@ -1,15 +1,20 @@
 {
-  "version": "3.3.8",
-  "notes": "New first-run intro (how to play + release notes, dismissible forever); history search and mode filters; cross-session stats; keyboard play (arrow keys + Enter); fixed settings not persisting across restarts and a game-page crash; AI thinking timer, remembers last setup, smaller exports",
-  "pub_date": "2026-10-04T00:00:00Z",
+  "version": "3.3.9",
+  "notes": "New game rules page with a starter strategy guide, plus Linux packages; fixed silent engine load failures, back button overlapping the system gesture area, and a wrong deb binary name; history search/filter/invert, collapsible rules, localized update dialog",
+  "notes_zh": "新增游戏规则页（含新手快速上手策略）与 Linux 版安装包；修复引擎加载失败无提示、返回键顶进系统手势区、deb 可执行文件名错误；优化历史记录搜索筛选反选、规则页可折叠、更新弹窗中文化",
+  "pub_date": "2026-10-05T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 13428136
+      "size": 13436328
     },
     "windows": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 11125248
+      "size": 11129344
+    },
+    "linux": {
+      "url": "https://ywnh1.free.leoi.org",
+      "size": 1240432
     }
   }
 }

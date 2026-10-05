@@ -33,7 +33,7 @@ try {
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="style.css?v=3.3.8">
+<link rel="stylesheet" href="style.css?v=3.3.9">
 </head>
 <body>
 <!-- 背景彩色光球容器 -->
@@ -47,7 +47,7 @@ try {
 <!-- Welcome -->
 <div id="welcome" class="screen active">
   <div class="welcome-content">
-    <div class="logo"><img src="icons/icon-192.png" alt="连锁棋"><span>连锁棋</span></div>
+    <div class="logo" onclick="Router.navigate('about')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();Router.navigate('about')}" role="button" tabindex="0" aria-label="关于连锁棋"><img src="icons/icon-192.png" alt="连锁棋"><span>连锁棋</span></div>
     <div class="tagline">多人联手，一触即发</div>
     <button class="glass-btn primary start-btn" onclick="Router.navigate('gameSetup')">开始游戏</button>
     <div class="welcome-footer">
@@ -226,6 +226,26 @@ try {
   </div>
 </div>
 
+<!-- 引擎不可用提示（PWA：WASM 加载失败时整个游戏都跑不起来） -->
+<div id="engineFailModal" class="modal">
+  <div class="modal-inner hint-modal-inner">
+    <h3>游戏引擎未能加载</h3>
+    <div class="hint-body">
+      <p>这个版本需要 WebAssembly 才能跑起来，当前浏览器没能加载成功，<strong>暂时无法开始游戏</strong>。</p>
+      <p>可以试试：</p>
+      <ul>
+        <li><strong>下载安装包</strong>：Android APK 或 Windows exe，功能完整、性能更好</li>
+        <li><strong>换个浏览器</strong>：Chrome / Edge 等对新特性支持更完整</li>
+      </ul>
+      <p class="intro-foot" id="engineFailReason"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="glass-btn" onclick="closeModal('engineFailModal')">知道了</button>
+      <button class="glass-btn primary" onclick="window.open('https://ywnh1.free.leoi.org','_blank','noopener')">前往下载</button>
+    </div>
+  </div>
+</div>
+
 <!-- 首次进入引导：怎么玩 + 本版更新（每个版本首次进入显示一次） -->
 <div id="introModal" class="modal">
   <div class="modal-inner hint-modal-inner">
@@ -284,6 +304,13 @@ try {
     <div class="about-card" style="cursor:pointer" onclick="Router.navigate('device-bench')">
       <div class="form-row">
         <label style="flex:1">设备性能检测</label>
+        <span style="color:var(--dim)">→</span>
+      </div>
+    </div>
+
+    <div class="about-card" style="cursor:pointer" onclick="Router.navigate('about-rules')">
+      <div class="form-row">
+        <label style="flex:1">游戏规则</label>
         <span style="color:var(--dim)">→</span>
       </div>
     </div>
@@ -440,7 +467,7 @@ try {
 
     <!-- 信息行：键值对齐 -->
     <div class="about-info">
-      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.8</span></div>
+      <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.3.9</span></div>
       <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
       <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/ywnh1/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')" style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License →</span></div>
@@ -1397,6 +1424,164 @@ try {
     </div>
   </div>
 </div>
+<!-- 游戏规则（详细版，从设置页进入） -->
+<div id="about-rules" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>游戏规则</h2>
+
+    <div class="about-card">
+      <h3>一句话</h3>
+      <p>往格子里堆自己的棋子。堆满一格就会炸，炸出去的棋子推着旁边的格子接着炸，最后一个还有棋子的玩家赢。</p>
+      <ol>
+        <li><strong>下子</strong>：点空格放一颗自己的棋子；点自己已经有棋子的格子，再添一颗。别人的格子点不动。</li>
+        <li><strong>爆炸</strong>：攒够 <strong>4 颗</strong>就炸，朝上下左右各弹一颗。弹出去的棋子算你的。</li>
+        <li><strong>连锁</strong>：弹出去的棋子落进旁边的格子，那格要是也堆到 4 颗，跟着炸。一路炸到没格子再够 4 颗为止。</li>
+        <li><strong>出局</strong>：你在棋盘上的棋子被炸光，就出局了。</li>
+        <li><strong>获胜</strong>：最后还有棋子留在棋盘上的人赢。</li>
+        <li><strong>第一手</strong>：不能下在已有棋子周围那 12 格里（上下左右各 2 格，加四个斜角），省得一开局就贴着打。</li>
+        <li><strong>第一颗棋子</strong>：落下就是“差一颗要爆”的状态，4 级规则下算 3 颗。所以抢地盘那一步常常直接炸开。</li>
+      </ol>
+    </div>
+
+    <div class="about-card">
+      <h3>新手快速上手</h3>
+      <p>这一节其实就是<strong>「策略」AI 的决策顺序</strong> —— 它按下面五条从高到低挑走法，照着做就是一套稳的新手打法。</p>
+
+      <p><strong>一、能炸就炸</strong></p>
+      <ul>
+        <li>自己某格攒到 3 颗（4 级规则下就是“再放一颗就爆”），而且<strong>周围有对手同样是 3 颗的格子</strong>时，直接引爆它</li>
+        <li>道理：炸出去的棋子会灌进对手的临界格，接着引发连环爆，这是最赚的一手</li>
+      </ul>
+
+      <p><strong>二、在没对手的地方堆到 3 颗</strong></p>
+      <ul>
+        <li>没有好炸的目标时，找一处<strong>周围没有对手临界棋子</strong>的格子，把它堆到 3 颗</li>
+        <li>落点偏好：<strong>越靠边、越靠角越好</strong> —— 边缘格子接触面小，能被对手够到的方向少</li>
+        <li>同时避开放着对手棋子的区域</li>
+      </ul>
+
+      <p><strong>三、继续在远处往上堆</strong></p>
+      <ul>
+        <li>还没到 3 颗的格子，优先选离对手远的，慢慢加</li>
+      </ul>
+
+      <p><strong>四、躲不开了，就在对手旁边立威</strong></p>
+      <ul>
+        <li>如果自家每处格子旁边都有对手，就反过来——<strong>主动在对手边上堆到 3 颗</strong></li>
+        <li>3 颗的棋子是威慑：对手不敢在你旁边堆到临界，否则先挨你炸</li>
+      </ul>
+
+      <p><strong>第一手：落中间</strong></p>
+      <ul>
+        <li>只有开局这一手是往棋盘中央落的（避开已有棋子周围那 12 格），之后都按上面四条走</li>
+      </ul>
+
+      <p><strong>总原则</strong></p>
+      <ul>
+        <li>别在对手的临界棋子旁边堆自己的子 —— 那等于把引信递过去</li>
+        <li>反过来，看到对手的 3 颗旁边有你自己的 2 颗，那正是你的机会</li>
+      </ul>
+    </div>
+
+    <div class="about-card">
+      <h3>开局界面</h3>
+      <p>点首页的「开始游戏」进入。每一行右侧都有「!」按钮，点开就是这一项的说明。</p>
+
+      <p><strong>棋盘大小</strong>：5×5 到 19×19。</p>
+      <ul>
+        <li>5×5 ~ 7×7：几步就进连爆，节奏快，<strong>新手选 7×7</strong></li>
+        <li>9×9 ~ 13×13：攻守都比较从容，适合用来练</li>
+        <li>15×15 以上：一局能打很久，考验耐心</li>
+      </ul>
+      <p>棋盘越大，同一局能容纳的玩家越多；选了小盘，人数上限会自动收缩。</p>
+
+      <p><strong>玩家数</strong>：2 ~ 10 人，上限看棋盘大小。</p>
+
+      <p><strong>边界模式</strong>：棋子炸到棋盘边上时怎么算。</p>
+      <ul>
+        <li><strong>默认</strong>：弹到棋盘之外就消失（最简单，建议先用这个）</li>
+        <li><strong>回环</strong>：从左边界出去、从右边界出来，上下同理，棋盘相当于一张卷起来的纸</li>
+        <li><strong>反弹</strong>：弹到边界后弹回场内</li>
+        <li><strong>降级</strong>：靠近边界的格子少弹一些，不容易被挤死</li>
+        <li><strong>随机</strong>：开局随机定下一种，整局不再变</li>
+      </ul>
+
+      <p><strong>爆炸阈值</strong>：攒够几颗才炸。</p>
+      <ul>
+        <li><strong>3 级</strong>：最易连锁，一局很短</li>
+        <li><strong>4 级</strong>：默认，平衡</li>
+        <li><strong>5 级</strong>：攒得慢，节奏慢，更难预测</li>
+        <li><strong>随机</strong>：每步在 3/4/5 之间随机</li>
+      </ul>
+
+      <p><strong>玩家配置</strong>：点玩家卡片逐个设置。</p>
+      <ul>
+        <li><strong>类型</strong>：人类 / AI。全人类 = 本地对战，混合 = 人机对打，全 AI = 斗蛐蛐（纯观战）</li>
+        <li><strong>名称</strong>：棋盘和统计里显示的名字</li>
+        <li><strong>算法</strong>（AI）：策略（快、适合新手） / Alpha-Beta / PVS / MCTS（慢但套路怪）</li>
+        <li><strong>搜索深度</strong>（AI）：1~10 层。越深思越强，但思考时间也越长；选太深会等很久</li>
+        <li><strong>随机刻度</strong>（AI）：0%~30%。越高走法越不可预测，越低越“照着最优解走”</li>
+        <li><strong>评估函数</strong>（AI）：增强版（含位置权重，棋力更强） / 手写规则（经典，稳定）</li>
+      </ul>
+      <p>不想逐项配就用默认值：7×7、2 人、默认边界、4 级，直接开始。</p>
+    </div>
+
+    <div class="about-card">
+      <h3>对局中</h3>
+      <p>页面顶部那一排按钮，从左到右：</p>
+      <ul>
+        <li><strong>悔棋</strong>：撤回上一步。AI 思考中或动画播放中不能悔</li>
+        <li><strong>暂停</strong>：中断并自动存档，随时可以继续</li>
+        <li><strong>跳过</strong>：自动跳过连锁爆炸的动画，直接看结果</li>
+        <li><strong>⚡ 一键终局</strong>：场上只剩 AI 时出现，直接算出最终结果，不用干等</li>
+        <li><strong>💡 建议</strong>：让 AI 给出当前这一步的推荐落点，不替你做决定</li>
+      </ul>
+      <p>玩家栏（棋盘上方）的彩色标签就是各位玩家：亮着的是当前回合，变暗的是已出局，标签上的数字是棋子数。末尾会显示当前进行到第几步。</p>
+      <p>长连爆中点「跳过动画」可以一键看完；开启「跳过」之后都自动跳过。</p>
+    </div>
+
+    <div class="about-card">
+      <h3>历史记录</h3>
+
+      <p><strong>回放与详情</strong>：点任意一条记录，可以看到对局详情与图表（棋子数 / 点数双折线）。回放支持 <strong>0.5x / 1x / 2x / 4x</strong> 倍速。</p>
+
+      <p><strong>多选</strong>：两种进入方式 ——</p>
+      <ul>
+        <li>点条目左侧的<strong>选择框</strong></li>
+        <li><strong>长按</strong>条目约半秒（手机、桌面都支持）</li>
+      </ul>
+      <p>进入多选后，底部会出现操作栏：<strong>反选</strong>、<strong>导出选中</strong>、<strong>删除选中</strong>、<strong>取消</strong>。逐项点选即可增减。</p>
+      <p><strong>反选</strong>会把当前列表里没选中的全选上、已选中的取消。它只作用于搜索/筛选后看得见的那几条，被筛掉的记录不受影响。</p>
+
+      <p><strong>搜索与筛选</strong>：列表上方的搜索框可以按玩家名、AI 算法名、模式名查找（不区分空格）；下面一排是模式筛选：全部 / 本地 / AI 对战 / 斗蛐蛐。</p>
+
+      <p><strong>战绩汇总</strong>：列表顶部的几行小字是跨对局的统计 —— 总对局数、已完成局数、历史最长连锁、各模式的局数分布。</p>
+
+      <p><strong>导出 / 导入</strong>：右上角两个按钮。导出得到一个 JSON 文件（含全部记录），导入时会自动按 ID 去重，只补新记录。</p>
+
+      <p><strong>进行中的对局</strong>：异常退出或主动暂停后，未完成的对局会排在列表最前面，点「▶ 继续游戏」接着打。</p>
+    </div>
+
+    <div class="about-card">
+      <h3>设置</h3>
+      <ul>
+        <li><strong>音效主题</strong>：经典 / 柔和 / 清脆 / 电子 / 大狗叫 / 静音</li>
+        <li><strong>大狗叫声模式</strong>：只在选中「大狗叫」主题时出现，可选叫声的音尾长度</li>
+        <li><strong>震动</strong>：Android 上有效，桌面自动忽略</li>
+        <li><strong>检查更新</strong>：手动检测新版本</li>
+        <li><strong>设备性能检测</strong>：测 WebView 帧率与 AI 计算速度</li>
+      </ul>
+    </div>
+
+    <div class="about-card">
+      <h3>关于本应用在哪？</h3>
+      <p>两个入口都能进：<strong>点首页最上面的图标</strong>（连锁棋那个圆形图标），或者<strong>设置页 → 关于连锁棋</strong>。那里有 AI 介绍、性能评测、更新日志、开源许可证和第三方组件清单。</p>
+      <p>每次升级后第一次打开，会自动弹一次本版的更新说明，可以直接关掉，也可以选「以后不再显示」。</p>
+    </div>
+  </div>
+</div>
+
 <div id="about-changelog" class="screen">
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll" id="changelogContainer">
@@ -1492,6 +1677,7 @@ try {
   <div id="selBar">
     <span class="sel-count" id="selCount">已选择 0 项</span>
     <div class="sel-actions">
+      <button class="glass-btn" onclick="invertSelection()" id="selInvertBtn" style="display:none">反选</button>
       <button class="glass-btn primary" onclick="exportSelectedRecords()" id="selExportBtn" style="display:none">导出选中</button>
       <button class="glass-btn danger" onclick="deleteSelectedRecords()" id="selDeleteBtn" style="display:none">删除选中</button>
       <button class="glass-btn" onclick="exitMultiSelect()" id="selCancelBtn" style="display:none">取消</button>
@@ -1697,7 +1883,7 @@ function manualCheckUpdate(){
       var cur = getCurVer();
       var available = cmpVer(d.version, cur) > 0;
       var dlUrl = encodeURI(pickUpdateUrl(d.platforms) || '');
-      if (available && dlUrl) { showUpdateModal(d.version, d.notes || '', dlUrl); }
+      if (available && dlUrl) { showUpdateModal(d.version, d.notes_zh || d.notes || '', dlUrl); }
       else { showUpdateResult('ok','当前已是最新版本 v'+cur); }
     } catch(e) { showUpdateResult('error','检查更新失败：'+e.message); }
   };
@@ -1736,7 +1922,7 @@ function silentCheck() {
       var available = cmpVer(d.version, cur) > 0;
       var url = encodeURI(pickUpdateUrl(d.platforms) || '');
       try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ver: d.version, available: available && !!url, notes: d.notes || '', url: url })); } catch(e) {}
-      if (available && url) { showUpdateModal(d.version, d.notes || '', url); }
+      if (available && url) { showUpdateModal(d.version, d.notes_zh || d.notes || '', url); }
       else { document.title = 'upd:cur ' + d.version + ' (cur:' + cur + ')'; }
       
     } catch(e) { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25: ' + e.message); }
@@ -1855,7 +2041,7 @@ window.closeUpdateModal = function() {
 window.confirmUpdate = function() { startDownload(); };
 })();
 </script>
-<script src="app.js?v=3.3.8"></script>
-<script src="engine.js?v=3.3.8"></script>
+<script src="app.js?v=3.3.9"></script>
+<script src="engine.js?v=3.3.9"></script>
 </body>
 </html>

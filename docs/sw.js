@@ -1,5 +1,5 @@
 /* sw.js — 连锁棋 PWA Service Worker（离线缓存） */
-const CACHE_NAME = 'chain-chess-v3.3.8';
+const CACHE_NAME = 'chain-chess-v3.3.9';
 const CORE_ASSETS = [
   './',
   './index.html',
