@@ -251,10 +251,10 @@ try {
   <div class="modal-inner hint-modal-inner">
     <h3 id="introModalTitle">欢迎使用连锁棋</h3>
     <div id="introModalBody" class="hint-body"></div>
-    <p class="intro-foot">关闭后可在「关于」页查看游戏规则和更新日志</p>
+    <p class="intro-foot">每个新版本第一次打开都会弹一次，也可以随时在「关于」页翻看</p>
     <div class="modal-actions">
-      <button class="glass-btn" onclick="dismissIntroForever()">以后不再显示</button>
-      <button class="glass-btn primary" onclick="closeModal('introModal')">知道了</button>
+      <button class="glass-btn" onclick="closeModal('introModal')">知道了</button>
+      <button class="glass-btn primary" onclick="closeModal('introModal');Router.navigate('about-rules')">看看规则</button>
     </div>
   </div>
 </div>

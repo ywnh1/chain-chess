@@ -166,19 +166,27 @@ async function loadSettings(){
   settingsLoaded=true;
   applyTheme(appSettings.theme);
   updateDogBarkRow();
-  maybeShowIntro();
+  // 引导等 DOM 完全就绪后再弹，避免过早读不到版本号而静默跳过
+  if(document.readyState==='complete')setTimeout(maybeShowIntro,0);
+  else window.addEventListener('load',()=>setTimeout(maybeShowIntro,0));
 }
 
 // 版本化引导：每个版本首次进入时展示一次（怎么玩 + 本次更新）。
 // 用户可永久关闭；关闭后仍能在首页「怎么玩？」和「关于 → 更新日志」找到。
+// 版本化引导：**只要版本变了就一定弹**（不做永久关闭）。
+// introSeenVersion === 当前版本时才跳过，所以升级后必然再弹一次。
 function maybeShowIntro(){
-  if(appSettings.introNeverShow)return;
-  const ver=currentAppVersion();
-  if(!ver)return;                                // 读不到版本就不打扰
-  if(appSettings.introSeenVersion===ver)return;  // 本版本已经看过
-  appSettings.introSeenVersion=ver;
-  saveSettings();
-  showIntroModal(ver);
+  try{
+    const ver=currentAppVersion();
+    if(!ver)return;                                // 读不到版本就不打扰
+    if(appSettings.introSeenVersion===ver)return;  // 本版本已经弹过
+    appSettings.introSeenVersion=ver;
+    delete appSettings.introNeverShow;             // 旧版的「永不显示」标记一并清掉
+    saveSettings();
+    showIntroModal(ver);
+  }catch(e){
+    logWarn('Intro failed:', e);
+  }
 }
 
 // 从关于页读版本号（index.html 里的这个值由 build.sh 同步）
@@ -214,12 +222,6 @@ function showIntroModal(ver){
   openModal('introModal');
 }
 
-function dismissIntroForever(){
-  appSettings.introNeverShow=true;
-  saveSettings();
-  closeModal('introModal');
-  try{showToast('已关闭。游戏规则和更新日志都在「关于」页')}catch(e){}
-}
 
 async function saveSettings(){
   try{await tauriInvoke('save_settings',{settings:appSettings})}catch(e){}
@@ -286,7 +288,24 @@ function renderSettingsPage(){
   }
 }
 
+// ── PWA：检测 Rust/WASM 后端是否可用 ──
+// 引擎负责游戏规则 + AI，WASM 加载失败时整个游戏都跑不起来（不只是 AI）。
+// Tauri 版用原生引擎，不涉及。
+function checkWebBackend(){
+  const ce=window.ChainEngine;
+  if(!ce||ce.isTauri)return;
+  if(!ce.ready||typeof ce.ready.then!=='function')return;
+  ce.ready.catch(err=>showEngineFail(err));
+}
+
+function showEngineFail(err){
+  const el=document.getElementById('engineFailReason');
+  if(el)el.textContent='错误详情：'+((err&&err.message)||'未知原因');
+  try{openModal('engineFailModal')}catch(e){}
+}
+
 loadSettings();
+checkWebBackend();
 
 // ========== 音效 ==========
 let audioCtx = null;
@@ -696,6 +715,36 @@ Router.register('about-ai', {
   enter() { document.body.style.background=''; },
   leave() {}
 });
+// ── 规则页：每一节可折叠，默认全部收起来 ──
+// 点标题展开/收起。折叠只隐藏 h3 之后的同级子元素，不动卡片本身。
+function initRulesCollapse(){
+  document.querySelectorAll('#about-rules .about-card > h3').forEach(h3=>{
+    if(h3.dataset.collapsible)return;   // 已初始化过：保持用户当前的展开状态
+    h3.dataset.collapsible='1';
+    h3.setAttribute('role','button');
+    h3.setAttribute('tabindex','0');
+    const card=h3.parentElement;
+    if(card)card.classList.add('collapsed');   // 默认折叠
+    h3.setAttribute('aria-expanded','false');
+    const toggle=()=>{
+      const c=h3.parentElement;
+      if(!c)return;
+      const collapsed=c.classList.toggle('collapsed');
+      h3.setAttribute('aria-expanded',collapsed?'false':'true');
+      vibrate(6);
+    };
+    h3.addEventListener('click',toggle);
+    h3.addEventListener('keydown',e=>{
+      if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}
+    });
+  });
+}
+
+Router.register('about-rules', {
+  back: 'settings',
+  enter() { document.body.style.background=''; initRulesCollapse(); },
+  leave() {}
+});
 Router.register('about-changelog', {
   back: 'about',
   enter() { document.body.style.background=''; renderChangelogCards(); },
@@ -1069,6 +1118,7 @@ let _longPressTimer=null;
 function enterMultiSelect(){
   _multiSelectActive=true;
   document.getElementById('selBar').style.display='flex';
+  document.getElementById('selInvertBtn').style.display='';
   document.getElementById('selExportBtn').style.display='';
   document.getElementById('selDeleteBtn').style.display='';
   document.getElementById('selCancelBtn').style.display='';
@@ -1090,6 +1140,7 @@ function exitMultiSelect(){
   _multiSelectActive=false;
   _selectedIds.clear();
   document.getElementById('selBar').style.display='none';
+  document.getElementById('selInvertBtn').style.display='none';
   document.getElementById('selExportBtn').style.display='none';
   document.getElementById('selDeleteBtn').style.display='none';
   document.getElementById('selCancelBtn').style.display='none';
@@ -1126,6 +1177,28 @@ function updateSelBar(){
   document.getElementById('selCount').textContent=`已选择 ${cnt} 项`;
   document.getElementById('selExportBtn').style.display=cnt>0?'':'none';
   document.getElementById('selDeleteBtn').style.display=cnt>0?'':'none';
+}
+
+// 反选：只对当前列表里看得见的条目取反（搜索/筛选后的结果）
+// 依据 DOM 而非记录表，这样筛掉的那些不会被误选。
+function invertSelection(){
+  if(!_multiSelectActive)return;
+  vibrate(8);
+  const items=document.querySelectorAll('#historyList .history-item');
+  const next=new Set();
+  items.forEach(el=>{
+    const id=parseInt(el.dataset.recordId);
+    if(!isNaN(id)&&!_selectedIds.has(id))next.add(id);
+  });
+  _selectedIds=next;
+  items.forEach(el=>{
+    const id=parseInt(el.dataset.recordId);
+    const on=_selectedIds.has(id);
+    el.classList.toggle('sel-selected',on);
+    const chk=el.querySelector('.sel-chk');
+    if(chk)chk.classList.toggle('checked',on);
+  });
+  updateSelBar();
 }
 function initLongPress(el,id){
   let pressed=false;
@@ -3797,6 +3870,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
+            {v:'v3.3.9 · 第 44 版',desc:'新增游戏规则页（含新手快速上手策略）与 Linux 版安装包；修复引擎加载失败无提示、返回键顶进系统手势区、deb 可执行文件名错误；优化历史记录搜索筛选反选、规则页可折叠、更新弹窗中文化'},
             {v:'v3.3.8 · 第 43 版',desc:'新增首次进入引导（怎么玩 + 本版更新，可永久关闭）、历史记录搜索筛选、跨对局战绩汇总、键盘操作（方向键选格、回车落子）；修复设置无法保存（震动等重启后丢失）与对局页报错；优化 AI 思考计时、开局记住上次配置、导出体积'},
             {v:'v3.3.7 · 第 42 版',desc:'关于页新增第三方 SDK 与服务说明；各设置项加「!」帮助提示（点开看每项作用）；游戏规则与界面文案精简重写；下载页改版（开源与联系方式、平台卡片）'},
             {v:'v3.3.6 · 第 41 版',desc:'更换应用图标：原图标为 Tauri 官方默认图标（官方 Logo，未获官方授权，存在版权与品牌风险），更换为全新原创图标并同步桌面/Android/PWA；完善关于页许可证：新增第三方开源库许可清单；欢迎页、关于页、下载页与 README 嵌入新图标'},

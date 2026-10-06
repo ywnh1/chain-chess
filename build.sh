@@ -4,6 +4,7 @@
 # 仅支持 release 构建（debug 模式已移除）
 #       ./build.sh -a chainchess      # 编译安卓 APK 到 release/，更新 update.json 的 android size
 #       ./build.sh -e                 # 编译 Windows exe 到 release/，更新 update.json 的 windows size
+#       ./build.sh -l                 # 编译 Linux 版（deb + AppImage）到 release/，更新 linux size
 #       ./build.sh -z                 # 重新编译 WASM + 打包 PWA zip 到 release/（update.json 无 pwa 条目，不更新 size）
 #       ./build.sh -A chainchess      # 编译 apk + exe + zip 全部到 release/，只更新本次编译的 size
 #       ./build.sh -n chainchess      # 编译安卓 Native APK 到 release/，不碰 update.json
@@ -92,13 +93,44 @@ sync_version() {
   # 下载中心：顶部版本、三条下载直链、卡片副标题、VERSION 常量
   # （更新日志数组是历史条目，刻意不动；新版本条目需手动新增）
   sync_one "download.html" \
-    "s|\(<span class=\"version\">\)v[0-9][0-9.]*|\1v$_v|;s|\(var VERSION = '\)[0-9][0-9.]*'|\1$_v'|;s|releases/download/v[0-9][0-9.]*/|releases/download/v$_v/|g;s|chainchess-[0-9][0-9.]*\.apk|chainchess-$_v.apk|g;s|chainchess-[0-9][0-9.]*\.exe|chainchess-$_v.exe|g;s|chain-chess-pwa-v[0-9][0-9.]*\.zip|chain-chess-pwa-v$_v.zip|g;s|\(<div class=\"meta\">\)v[0-9][0-9.]*|\1v$_v|g;s|\(<span>\)v[0-9][0-9.]*|\1v$_v|"
+    "s|\(<span class=\"version\">\)v[0-9][0-9.]*|\1v$_v|;s|\(var VERSION = '\)[0-9][0-9.]*'|\1$_v'|;s|releases/download/v[0-9][0-9.]*/|releases/download/v$_v/|g;s|chainchess-[0-9][0-9.]*\.apk|chainchess-$_v.apk|g;s|chainchess-[0-9][0-9.]*\.exe|chainchess-$_v.exe|g;s|chainchess-[0-9][0-9.]*\.deb|chainchess-$_v.deb|g;s|chainchess-[0-9][0-9.]*\.AppImage|chainchess-$_v.AppImage|g;s|chain-chess-pwa-v[0-9][0-9.]*\.zip|chain-chess-pwa-v$_v.zip|g;s|\(<div class=\"meta\">\)v[0-9][0-9.]*|\1v$_v|g;s|\(<span>\)v[0-9][0-9.]*|\1v$_v|"
 
-  # 发布版本
+  # 发布版本 + 更新说明（中英）
+  # notes / notes_zh 都从 download.html 的 CHANGELOG 首条提取：
+  # en 与 notes 本应逐字相同，zh 供客户端更新弹窗显示中文。发版时只写 download.html 一处。
   if [ -f "update.json" ] && command -v jq >/dev/null 2>&1; then
     if [ "$(jq -r '.version // empty' update.json 2>/dev/null || true)" != "$_v" ]; then
       jq --arg v "$_v" '.version = $v' update.json > tmp.json && mv tmp.json update.json
       SYNCED_FILES="$SYNCED_FILES update.json"
+    fi
+    if [ -f "download.html" ] && command -v python3 >/dev/null 2>&1; then
+      _UPDSYNC=$(python3 - <<'PYEOF'
+import re, json, sys
+h = open('download.html', encoding='utf-8').read()
+m = re.search(r"\{v:'v[^']*',\s*\n\s*zh:'([^']*)',\s*\n\s*en:'([^']*)'\}", h)
+if not m:
+    print('WARN'); sys.exit(0)
+zh, en = m.group(1).strip(), m.group(2).strip()
+d = json.load(open('update.json', encoding='utf-8'))
+if d.get('notes_zh') == zh and d.get('notes') == en:
+    print('SAME'); sys.exit(0)
+d['notes_zh'] = zh
+d['notes'] = en
+with open('update.json', 'w', encoding='utf-8') as f:
+    json.dump(d, f, ensure_ascii=False, indent=2)
+    f.write('\n')
+print('CHANGED')
+PYEOF
+)
+      case "$_UPDSYNC" in
+        CHANGED)
+          echo "  📝 update.json: notes / notes_zh 已从 download.html 同步"
+          SYNCED_FILES="$SYNCED_FILES update.json"
+          ;;
+        WARN)
+          echo "  ⚠️  没能从 download.html 提取中英说明，notes 保持原样"
+          ;;
+      esac
     fi
   fi
   return 0
@@ -193,6 +225,7 @@ fi
 #            （release/ → /storage/emulated/0/用户/，update.json + PWA → ../chain-chess-release）
 APK=false
 EXE=false
+LINUX=false
 ZIP=false
 ZIP_ONLY=false
 ALL=false
@@ -208,6 +241,7 @@ for arg in "$@"; do
   case "$arg" in
     --apk|-a)     APK=true ;;
     --exe|-e)     EXE=true ;;
+    --linux|-l)   LINUX=true ;;
     --zip|-z)     ZIP=true; ZIP_ONLY=true ;;
     --all|-A)     ALL=true ;;
     --native|-n)  NATIVE=true ;;
@@ -240,6 +274,7 @@ README badge / update.json —— 发版只需改 tauri.conf.json 一处。
 选项:
   -a, --apk <密码>     编译安卓 APK，更新 update.json 的 android size
   -e, --exe            编译 Windows exe（cargo-xwin），更新 windows size
+  -l, --linux          编译 Linux 版（deb + AppImage，本机原生编译），更新 linux size
   -z, --zip            重新编译 WASM 并打包 PWA zip（无平台条目，不更新 size）
   -A, --all <密码>     编译 apk + exe + zip 全部，只更新本次编译的 size
   -n, --native <密码>  编译安卓 Native APK，不碰 update.json
@@ -255,6 +290,7 @@ README badge / update.json —— 发版只需改 tauri.conf.json 一处。
 示例:
   $0 -a chainchess          # 仅编译 APK
   $0 -e                     # 仅编译 Windows exe
+  $0 -l                     # 仅编译 Linux 版（deb + AppImage）
   $0 -z                     # 仅打包 PWA zip
   $0 -A chainchess          # 编译全部（apk+exe+zip），不发布
   $0 -n chainchess          # 编译 Native APK，不碰 update.json
@@ -294,17 +330,17 @@ fi
 # 模式语义展开
 # --all: apk + exe + zip；--release: apk + exe + zip + 发布动作
 if [ "$ALL" = true ]; then
-  APK=true; EXE=true; ZIP=true
+  APK=true; EXE=true; ZIP=true; LINUX=true
 fi
 if [ "$PUBLISH" = true ]; then
-  APK=true; EXE=true; ZIP=true
+  APK=true; EXE=true; ZIP=true; LINUX=true
 fi
 # --native: 编译 native APK
 if [ "$NATIVE" = true ]; then
   APK=true
 fi
 # 未指定平台时默认 APK + exe 都构建
-if [ "$APK" = false ] && [ "$EXE" = false ] && [ "$ZIP" = false ]; then
+if [ "$APK" = false ] && [ "$EXE" = false ] && [ "$ZIP" = false ] && [ "$LINUX" = false ]; then
   APK=true
   EXE=true
 fi
@@ -338,11 +374,13 @@ START_EPOCH=$(date +%s)
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 if [ "$PUBLISH" = true ]; then
-  echo "  📦 构建目标: APK + Windows exe + PWA zip（发布模式）"
+  echo "  📦 构建目标: APK + Windows exe + Linux deb/AppImage + PWA zip（发布模式）"
 elif [ "$ALL" = true ]; then
-  echo "  📦 构建目标: APK + Windows exe + PWA zip（全部，不发布）"
+  echo "  📦 构建目标: APK + Windows exe + Linux deb/AppImage + PWA zip（全部，不发布）"
 elif [ "$APK" = true ] && [ "$EXE" = true ]; then
   echo "  📦 构建目标: APK + Windows exe"
+elif [ "$LINUX" = true ] && [ "$APK" = false ] && [ "$EXE" = false ] && [ "$ZIP" = false ]; then
+  echo "  📦 构建目标: Linux deb/AppImage"
 elif [ "$APK" = true ] && [ "$NATIVE" = true ]; then
   echo "  📦 构建目标: Native APK（不更新 update.json）"
 elif [ "$APK" = true ]; then
@@ -435,6 +473,101 @@ if [ "$EXE" = true ]; then
        '.platforms.windows = {url: $url, size: $sz}' \
        update.json > tmp.json && mv tmp.json update.json
     echo "  📄 update.json: windows 平台已更新（url + size=${EXE_BYTES}）"
+    echo ""
+  fi
+fi
+# ════════════════════════════════════════════════════════
+# 步骤 1.5: 构建 Linux 版（deb / AppImage，本机原生编译）
+# deb 用 Tauri 自带 bundler（依赖 dpkg-deb + fakeroot）；
+# AppImage 需要 appimagetool，失败不阻断（deb 已够用）。
+# ════════════════════════════════════════════════════════
+if [ "$LINUX" = true ]; then
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  🐧 编译 Linux 版（deb + AppImage）"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+
+  (cd tauri && npx tauri build --bundles deb)
+
+  # 只认当前版本的产物：同一目录会积累历史 deb（连锁棋_3.3.8_*.deb 等），
+  # 按名字排序取第一个会捞到旧版本。
+  DEB_SRC=$(ls -1t "$RUST_DIR"/target/release/bundle/deb/*_"${VERSION}"_*.deb 2>/dev/null | head -1)
+  if [ -z "$DEB_SRC" ]; then
+    echo "❌ 错误: 未找到 v${VERSION} 的 deb 产物（$RUST_DIR/target/release/bundle/deb/）"
+    echo "   目录现有："
+    ls -1 "$RUST_DIR"/target/release/bundle/deb/ 2>/dev/null | sed 's/^/     /' || true
+    exit 1
+  fi
+  mkdir -p release
+  DEB_OUTPUT="release/${PRODUCT}-${VERSION}.deb"
+
+  # Tauri 挑主二进制时会挑到 src/bin/ 下的 CLI 工具（battle 等），deb 里装的就是
+  # 那个 CLI 而不是 GUI；它还会顺手把产物改成 mainBinaryName，所以光看文件名看不
+  # 出来。按 GUI 独有的 webkit 特征串找出 cargo 编出的真主程序，换进 deb。
+  _gui_bin=$(ls -1t "$RUST_DIR"/target/release/deps/chain_chess-* 2>/dev/null | grep -v '\.d$' | head -1)
+  if [ -z "$_gui_bin" ] || ! strings -a "$_gui_bin" 2>/dev/null | grep -qi 'webkit'; then
+    echo "❌ 错误: 找不到 Tauri GUI 主程序产物（$RUST_DIR/target/release/deps/chain_chess-*）"
+    exit 1
+  fi
+
+  # Tauri 拿 productName（这里含中文）当 Package 字段，dpkg 要求包名以字母或数字
+  # 开头，原样打包会直接安装失败。解包重写 control 再压回去。
+  _deb_tmp=$(mktemp -d)
+  dpkg-deb -R "$DEB_SRC" "$_deb_tmp"
+  sed -i 's/^Package: .*/Package: chain-chess/' "$_deb_tmp/DEBIAN/control"
+  if ! strings -a "$_deb_tmp/usr/bin/chain-chess" 2>/dev/null | grep -qi 'webkit'; then
+    echo "  ⚠️  deb 里的主程序不是 GUI（Tauri 挑错了 bin），已替换为 GUI 产物"
+    cp "$_gui_bin" "$_deb_tmp/usr/bin/chain-chess"
+  fi
+  dpkg-deb -b "$_deb_tmp" "$DEB_OUTPUT" >/dev/null
+  rm -rf "$_deb_tmp"
+
+  DEB_BYTES=$(stat -c %s "$DEB_OUTPUT")
+  echo "  ✅ Linux deb 构建完成: ${DEB_OUTPUT} ($(ls -lh "$DEB_OUTPUT" | awk '{print $5}'))"
+  echo ""
+
+  # AppImage：Tauri 自带 bundler 需联网下载 linuxdeploy，这里改用手工打包。
+  # 从刚生成的 deb 解出文件树，补上 AppImage 要求的顶层 AppRun/.desktop/图标。
+  if command -v appimagetool >/dev/null 2>&1; then
+    APPDIR="$RUST_DIR/target/release/bundle/appimage/AppDir"
+    rm -rf "$APPDIR"; mkdir -p "$APPDIR"
+    dpkg-deb -x "$DEB_OUTPUT" "$APPDIR" 2>/dev/null
+
+    MAIN_BIN="$APPDIR/usr/bin/chain-chess"
+    if [ ! -f "$MAIN_BIN" ]; then
+      echo "  ⚠️  deb 里未找到 usr/bin/chain-chess，跳过 AppImage"
+      echo ""
+    else
+      # AppImage 顶层要求：.desktop、图标、AppRun
+      DESKTOP_SRC=$(ls -1 "$APPDIR"/usr/share/applications/*.desktop 2>/dev/null | head -1)
+      [ -n "$DESKTOP_SRC" ] && cp "$DESKTOP_SRC" "$APPDIR/"
+      ICON_SRC=$(find "$APPDIR/usr/share/icons" -name '*.png' 2>/dev/null | sort -r | head -1)
+      [ -n "$ICON_SRC" ] && cp "$ICON_SRC" "$APPDIR/"
+      ln -sf usr/bin/chain-chess "$APPDIR/AppRun"
+
+      APP_OUTPUT="release/${PRODUCT}-${VERSION}.AppImage"
+      # appimagetool 自身也是 AppImage，无 FUSE 环境需要 extract-and-run
+      if APPIMAGE_EXTRACT_AND_RUN=1 ARCH=$(uname -m) appimagetool "$APPDIR" "$APP_OUTPUT" >/dev/null 2>&1; then
+        echo "  ✅ Linux AppImage 构建完成: ${APP_OUTPUT} ($(ls -lh "$APP_OUTPUT" | awk '{print $5}'))"
+        echo ""
+      else
+        echo "  ⚠️  AppImage 打包失败（已跳过，deb 不受影响）"
+        echo ""
+      fi
+    fi
+  else
+    echo "  ⚠️  未找到 appimagetool，跳过 AppImage"
+    echo ""
+  fi
+
+  # 更新 update.json 的 linux 平台条目（跳转目标与 android/windows 一致）
+  if [ -f "update.json" ]; then
+    LINUX_URL="https://ywnh1.free.leoi.org"
+    jq --arg url "$LINUX_URL" --argjson sz "$DEB_BYTES" \
+       '.platforms.linux = {url: $url, size: $sz}' \
+       update.json > tmp.json && mv tmp.json update.json
+    echo "  📄 update.json: linux 平台已更新（url + size=${DEB_BYTES}）"
     echo ""
   fi
 fi
@@ -756,7 +889,7 @@ if [ "$PUBLISH" = true ]; then
 
   # 1) 复制 release/ 全部产物到 Android 设备目录（仅当路径存在时）
   if [ -d "/storage/emulated/0/用户" ]; then
-    cp -f release/chainchess-*.apk release/chainchess-*.exe release/chain-chess-pwa-*.zip /storage/emulated/0/用户/ 2>/dev/null || true
+    cp -f release/chainchess-*.apk release/chainchess-*.exe release/chain-chess-pwa-*.zip release/chainchess-*.deb release/chainchess-*.AppImage /storage/emulated/0/用户/ 2>/dev/null || true
     echo "  📱 release/ 产物已复制到 /storage/emulated/0/用户/"
   else
     echo "  ⚠️  未找到 /storage/emulated/0/用户/，跳过设备复制"

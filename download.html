@@ -10,9 +10,9 @@ LA.init({id:"3QmgmuNqsbhkfv7Y",ck:"3QmgmuNqsbhkfv7Y",autoTrack:true})
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0f0f15">
 <meta property="og:title" content="♟ 连锁棋 · 下载中心">
-<meta property="og:description" content="Android APK、Windows exe、浏览器 PWA 三种版本，点卡片前往 Gitee 下载最新版">
+<meta property="og:description" content="Android APK、Windows exe、Linux deb / AppImage、浏览器 PWA，点卡片前往 Gitee 下载最新版">
 <meta property="og:type" content="website">
-<meta name="description" content="♟ 连锁棋 · Chain Chess 下载中心：Android APK、Windows exe 安装包，浏览器 PWA 免安装即玩，点卡片前往 Gitee 下载最新版">
+<meta name="description" content="♟ 连锁棋 · Chain Chess 下载中心：Android APK、Windows exe、Linux deb / AppImage 安装包，浏览器 PWA 免安装即玩，点卡片前往 Gitee 下载最新版">
 <title>♟ 连锁棋 · 下载中心</title>
 <link rel="icon" href="favicon.png">
 <style>
@@ -170,6 +170,7 @@ header .subtitle{
 /* 平台专属色调 */
 .card.android .icon{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 22px rgba(61,220,132,.22)}
 .card.windows .icon{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 22px rgba(0,168,232,.22)}
+.card.linux .icon{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 22px rgba(233,84,32,.22)}
 .card.pwa .icon{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 22px rgba(95,195,195,.22)}
 /* PWA 子卡片（两个入口） */
 .card.pwa{padding-bottom:22px}
@@ -227,12 +228,14 @@ header .subtitle{
 /* 平台专属 hover glow（Vibrant bold hover） */
 .card.android:hover{border-color:rgba(61,220,132,.45);box-shadow:0 16px 52px rgba(0,0,0,.55),0 0 34px rgba(61,220,132,.14),inset 0 1.5px 0 rgba(255,255,255,.12)}
 .card.windows:hover{border-color:rgba(0,168,232,.45);box-shadow:0 16px 52px rgba(0,0,0,.55),0 0 34px rgba(0,168,232,.14),inset 0 1.5px 0 rgba(255,255,255,.12)}
+.card.linux:hover{border-color:rgba(233,84,32,.45);box-shadow:0 16px 52px rgba(0,0,0,.55),0 0 34px rgba(233,84,32,.14),inset 0 1.5px 0 rgba(255,255,255,.12)}
 .card.pwa:hover{border-color:rgba(95,195,195,.45);box-shadow:0 16px 52px rgba(0,0,0,.55),0 0 34px rgba(95,195,195,.14),inset 0 1.5px 0 rgba(255,255,255,.12)}
 /* 矢量图标（替换 emoji） */
 .card .icon{color:#e8e6e3}
 .card .icon svg{width:32px;height:32px;flex-shrink:0}
 .card.android .icon{color:#3ddc84}
 .card.windows .icon{color:#00a8e8}
+.card.linux .icon{color:#e95420}
 .card.pwa .icon{color:#5fc3c3}
 .pwa-sub a svg{width:16px;height:16px;flex-shrink:0;opacity:.85}
 .changelog h2 svg{width:22px;height:22px;vertical-align:-4px;margin-right:8px;color:var(--accent)}
@@ -534,13 +537,23 @@ footer a:hover{color:#8fe0e0}
         <div class="meta">v3.3.9 · 多线程：AI 更快</div>
         <span class="btn">前往下载</span>
       </a>
-      <!-- Linux -->
-      <a class="card suggest" href="#/play">
+      <!-- Linux (deb) -->
+      <a class="card linux" data-platform="linux"
+         href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.9/chainchess-3.3.9.deb">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
         <h2>Linux</h2>
-        <p class="desc">桌面版 · 暂无安装包</p>
-        <div class="meta">建议直接游玩网页版</div>
-        <span class="btn ghost">网页版游玩</span>
+        <p class="desc">桌面版 · deb 安装包</p>
+        <div class="meta">v3.3.9 · Debian / Ubuntu</div>
+        <span class="btn">下载 deb</span>
+      </a>
+      <!-- Linux (AppImage) -->
+      <a class="card linux" data-platform="appimage"
+         href="https://gitee.com/ywnh1/chain-chess-release/releases/download/v3.3.9/chainchess-3.3.9.AppImage">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h2>AppImage</h2>
+        <p class="desc">Linux 免安装版 · 单文件</p>
+        <div class="meta">v3.3.9 · chmod +x 后直接运行</div>
+        <span class="btn">下载 AppImage</span>
       </a>
       <!-- macOS -->
       <a class="card suggest" href="#/play">
@@ -841,15 +854,17 @@ footer a:hover{color:#8fe0e0}
     var CARDS = [
       {cls: 'android', size: true},
       {cls: 'windows', size: true},
+      {cls: 'linux',   size: true},
       {cls: 'pwa',     size: false}
     ];
     for (var i = 0; i < CARDS.length; i++) {
-      var card = document.querySelector('.card.' + CARDS[i].cls);
-      if (!card) continue;
-      var href = card.getAttribute('href');
-      var next = swapVersion(href, version);
-      if (next && next !== href) card.setAttribute('href', next);
-      if (CARDS[i].size) applySize(card, platforms[CARDS[i].cls], version);
+      var cards = document.querySelectorAll('.card.' + CARDS[i].cls);
+      for (var j = 0; j < cards.length; j++) {
+        var href = cards[j].getAttribute('href');
+        var next = swapVersion(href, version);
+        if (next && next !== href) cards[j].setAttribute('href', next);
+      }
+      if (CARDS[i].size && cards[0]) applySize(cards[0], platforms[CARDS[i].cls], version);
     }
   }
 
@@ -861,6 +876,8 @@ footer a:hover{color:#8fe0e0}
       markPriority(document.querySelector('.card.android'));
     } else if (/Windows/i.test(ua)) {
       markPriority(document.querySelector('.card.windows'));
+    } else if (/Linux/i.test(ua)) {
+      markPriority(document.querySelector('.card.linux'));
     }
 
     var BTN_TEXT = {android: '下载 APK', windows: '下载 exe'};

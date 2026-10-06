@@ -1,0 +1,117 @@
+name: Linux x86_64 packages
+
+# 为什么在 CI 出包而不在本地：
+# 本机是 aarch64（termux proot），Tauri 的 Linux 后端要链 amd64 的
+# webkit2gtk-4.1，而 libwebkit2gtk-4.1-dev 没有 Multi-Arch: same 标记，
+# apt 装 amd64 版会挤掉本机的 arm64 版 —— 那正是出 arm64 包要用的东西。
+# 所以 x86_64 的包扔到 GitHub 的 x86_64 runner 上出。
+#
+# 产物名与 Gitee Release 附件对应：
+#   chainchess-<ver>-amd64.deb
+#   chainchess-<ver>-amd64.AppImage
+# 跑完到 Actions 页面下 artifact，再传到 Gitee Release。
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 读取版本号（tauri.conf.json 是唯一来源）
+        id: ver
+        run: |
+          V=$(python3 -c "import json;print(json.load(open('tauri/src-tauri/tauri.conf.json'))['version'])")
+          test -n "$V"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "版本: $V"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf \
+            libayatana-appindicator3-dev build-essential file
+
+      - name: 缓存 cargo 依赖源码
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('tauri/src-tauri/Cargo.lock') }}
+
+      - name: Tauri 构建 deb
+        run: |
+          cd tauri
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npx tauri build --bundles deb
+
+      - name: 修正并打包
+        run: |
+          set -eu
+          V='${{ steps.ver.outputs.version }}'
+          RUST=tauri/src-tauri
+          mkdir -p out
+
+          # Tauri 在多个 bin 里挑主二进制时会挑到 src/bin/ 下的 CLI 工具
+          # （productName 是中文，匹配不上任何 bin），然后按 mainBinaryName
+          # 改名，光看文件名看不出来。与本机 build.sh 同一处理：按 GUI 独有的
+          # webkit 特征串找出 cargo 编出的真主程序。
+          GUI=$(ls -1t "$RUST"/target/release/deps/chain_chess-* | grep -v '\.d$' | head -1)
+          test -n "$GUI"
+          strings -a "$GUI" | grep -qi webkit || { echo "不是 GUI 产物: $GUI"; exit 1; }
+
+          # 同一目录会累积历史 deb，只认当前版本
+          SRC=$(ls -1t "$RUST"/target/release/bundle/deb/*_"$V"_*.deb | head -1)
+          test -n "$SRC"
+
+          TMP=$(mktemp -d)
+          dpkg-deb -R "$SRC" "$TMP"
+          # Tauri 拿中文 productName 当 Package 字段，dpkg 要求以字母数字开头
+          sed -i 's/^Package: .*/Package: chain-chess/' "$TMP/DEBIAN/control"
+          strings -a "$TMP/usr/bin/chain-chess" | grep -qi webkit \
+            || cp "$GUI" "$TMP/usr/bin/chain-chess"
+          dpkg-deb -b "$TMP" "out/chainchess-$V-amd64.deb" > /dev/null
+          rm -rf "$TMP"
+
+          # AppImage 从修好的 deb 组装：Tauri 自带的 appimage bundler 有同一个
+          # 二进制问题，而且要联网拉 linuxdeploy
+          curl -fsSL -o /tmp/appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+          APPDIR=/tmp/AppDir
+          rm -rf "$APPDIR"; mkdir -p "$APPDIR"
+          dpkg-deb -x "out/chainchess-$V-amd64.deb" "$APPDIR"
+          cp "$(ls -1 "$APPDIR"/usr/share/applications/*.desktop | head -1)" "$APPDIR/"
+          cp "$(find "$APPDIR/usr/share/icons" -name '*.png' | sort -r | head -1)" "$APPDIR/"
+          ln -sf usr/bin/chain-chess "$APPDIR/AppRun"
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 \
+            /tmp/appimagetool "$APPDIR" "out/chainchess-$V-amd64.AppImage" > /dev/null
+
+          echo "--- 产物 ---"
+          ls -la out/
+          echo "--- 架构自检 ---"
+          dpkg-deb -f "out/chainchess-$V-amd64.deb" Package Version Architecture
+          file "out/chainchess-$V-amd64.AppImage"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: chainchess-linux-amd64-${{ steps.ver.outputs.version }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
