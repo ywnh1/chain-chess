@@ -131,7 +131,7 @@ function getMaxPlayersBySize(boardSize){
 // 双向联动：棋盘大小 ↔ 人数/AI数量，互相扣掉不合法的按钮
 
 /* ═══════ 设置系统（主题 / 震动 / 音效主题） ═══════ */
-let appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long'};
+let appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',customSounds:[]};
 let settingsLoaded=false;
 
 // 主题切换：system 跟随系统；light/dark 手动覆盖
@@ -161,7 +161,7 @@ function applyTheme(theme){
 async function loadSettings(){
   try{
     const s=await tauriInvoke('load_settings');
-    if(s)appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',...s};
+    if(s)appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',customSounds:[],...s};
   }catch(e){}
   settingsLoaded=true;
   applyTheme(appSettings.theme);
@@ -247,22 +247,8 @@ function renderSettingsPage(){
       if(appSettings.vibrate)vibrate(15);
     };
   }
-  // 音效主题
-  const st=document.getElementById('soundThemeGroup');
-  if(st){
-    st.querySelectorAll('.tg-btn').forEach(function(b){
-      b.classList.toggle('selected',b.dataset.value===appSettings.soundTheme);
-    });
-    st.querySelectorAll('.tg-btn').forEach(function(b){
-      b.onclick=function(){
-        st.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
-        this.classList.add('selected');
-        appSettings.soundTheme=this.dataset.value;
-        saveSettings();
-        updateDogBarkRow();
-      };
-    });
-  }
+  // 音效主题（内置 + 自定义；自定义项由「自定义音效」页增删，所以每次进页重建按钮）
+  renderSoundThemeButtons();
   // 大狗叫声模式（仅大狗叫主题显示）
   const dbRow=document.getElementById('dogBarkRow');
   const dbg=document.getElementById('dogBarkGroup');
@@ -288,6 +274,27 @@ function renderSettingsPage(){
       setTimeout(()=>playElim(),700);setTimeout(()=>playGameOver(),1100);
     };
   }
+}
+
+// 音效主题按钮：内置主题固定在前，用户自定义的主题按保存顺序跟在后面
+function renderSoundThemeButtons(){
+  const st=document.getElementById('soundThemeGroup');
+  if(!st)return;
+  const items=[];
+  Object.keys(SOUND_THEMES).forEach(function(k){items.push({value:k,label:SOUND_THEMES[k].label})});
+  (appSettings.customSounds||[]).forEach(function(t){items.push({value:t.id,label:t.label||'自定义'})});
+  st.innerHTML=items.map(function(it){
+    return '<button class="tg-btn'+(it.value===appSettings.soundTheme?' selected':'')+'" data-value="'+htmlEsc(it.value)+'">'+htmlEsc(it.label)+'</button>';
+  }).join('');
+  st.querySelectorAll('.tg-btn').forEach(function(b){
+    b.onclick=function(){
+      st.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+      this.classList.add('selected');
+      appSettings.soundTheme=this.dataset.value;
+      saveSettings();
+      updateDogBarkRow();
+    };
+  });
 }
 
 // ── PWA：检测 Rust/WASM 后端是否可用 ──
@@ -395,9 +402,98 @@ function playSoundFile(src){
   }catch(e){}
 }
 
-// 按当前主题播放指定音效
-function playThemeSound(key){
-  const theme=SOUND_THEMES[appSettings.soundTheme]||SOUND_THEMES.classic;
+// ─── 自定义音效：数据模型 ───
+// appSettings.customSounds 是数组，每项 {id, label, slots:{click,explosion,elim,gameover}}。
+// 槽位只有两种取值：{kind:'builtin',theme:'classic'} 借用某个内置主题的同位音色，
+// {kind:'file',ref,name,size} 是用户自己传的音频（ref 是下面 IndexedDB 里的键）。
+// 音频二进制不进 settings.json（那是每次启动都要解析的配置文件），
+// 单独存进 WebView 自带的 IndexedDB：Tauri 和 PWA 同一套代码，不需要后端支持。
+const SOUND_DB='chainchess_sound', SOUND_STORE='files';
+const SOUND_MAX_SIZE=1024*1024;     // 单个音频文件 1MB
+const SOUND_MAX_SECONDS=10;         // 单个音频文件 10 秒
+const SOUND_MAX_TOTAL=4*1024*1024;  // 同一个主题内自定义音频合计 4MB
+const SOUND_EXTS=['mp3','wav','ogg'];
+// 可自定义的四个音效位，key 与内置主题的键一一对应
+const CS_SLOTS=[
+  {key:'click',label:'落子'},
+  {key:'explosion',label:'爆炸'},
+  {key:'elim',label:'淘汰'},
+  {key:'gameover',label:'胜利'},
+];
+
+// HTML 转义：自定义主题名由用户输入，会拼进 innerHTML
+function htmlEsc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+let _soundDb=null;
+function soundDb(){
+  if(_soundDb)return _soundDb;
+  _soundDb=new Promise(function(res,rej){
+    try{
+      const rq=indexedDB.open(SOUND_DB,1);
+      rq.onupgradeneeded=function(){ if(!rq.result.objectStoreNames.contains(SOUND_STORE))rq.result.createObjectStore(SOUND_STORE); };
+      rq.onsuccess=function(){res(rq.result)};
+      rq.onerror=function(){rej(rq.error)};
+    }catch(e){rej(e)}
+  });
+  return _soundDb;
+}
+function putSound(ref,blob){
+  return soundDb().then(function(db){
+    return new Promise(function(res,rej){
+      const tx=db.transaction(SOUND_STORE,'readwrite');
+      tx.objectStore(SOUND_STORE).put(blob,ref);
+      tx.oncomplete=function(){res(true)};
+      tx.onerror=function(){rej(tx.error)};
+    });
+  });
+}
+function getSound(ref){
+  return soundDb().then(function(db){
+    return new Promise(function(res,rej){
+      const rq=db.transaction(SOUND_STORE,'readonly').objectStore(SOUND_STORE).get(ref);
+      rq.onsuccess=function(){res(rq.result||null)};
+      rq.onerror=function(){rej(rq.error)};
+    });
+  });
+}
+function delSound(ref){
+  return soundDb().then(function(db){
+    return new Promise(function(res){
+      const tx=db.transaction(SOUND_STORE,'readwrite');
+      tx.objectStore(SOUND_STORE).delete(ref);
+      tx.oncomplete=function(){res(true)};
+      tx.onerror=function(){res(false)};
+    });
+  }).catch(function(){return false});
+}
+// 播放存在 IndexedDB 里的音频：读出来转 object URL，播完释放（抛异常也要放，否则泄漏）
+function playStoredSound(ref){
+  getSound(ref).then(function(blob){
+    if(!blob)return;
+    let url='';
+    try{
+      url=URL.createObjectURL(blob);
+      const a=new Audio(url);
+      a.volume=0.9;
+      a.play().catch(()=>{});
+      a.onended=function(){URL.revokeObjectURL(url)};
+      setTimeout(function(){URL.revokeObjectURL(url)},60000);  // 卡住不播的兜底
+    }catch(e){ if(url)URL.revokeObjectURL(url); }
+  }).catch(()=>{});
+}
+function getCustomSoundTheme(id){
+  const list=appSettings.customSounds||[];
+  for(let i=0;i<list.length;i++)if(list[i].id===id)return list[i];
+  return null;
+}
+
+// 播放某个内置主题里的指定音色（包含大狗的文件音与静音主题的 null 值）
+function playBuiltinSlot(themeKey,key){
+  const theme=SOUND_THEMES[themeKey]||SOUND_THEMES.classic;
   const s=theme[key];
   if(!s)return;
   if(s==='dog-bark'){
@@ -407,9 +503,24 @@ function playThemeSound(key){
   if(typeof s==='string'){playSoundFile(s);return;}
   if(Array.isArray(s)){
     s.forEach((x,i)=>setTimeout(()=>playTone(x.f,x.dur,x.type,x.vol),i*120));
-  }else{
-    playTone(s.f,s.dur,s.type,s.vol);
+    return;
   }
+  playTone(s.f,s.dur,s.type,s.vol);
+}
+
+// 按当前主题播放指定音效。同一音效 60ms 内只响一次：
+// 连锁爆炸会连续触发几十次，叠在一起听不出层次，文件音效还会卡
+const _soundAt={};
+function playThemeSound(key){
+  const now=Date.now();
+  if(_soundAt[key]&&now-_soundAt[key]<60)return;
+  _soundAt[key]=now;
+  if(SOUND_THEMES[appSettings.soundTheme]){playBuiltinSlot(appSettings.soundTheme,key);return;}
+  const cs=getCustomSoundTheme(appSettings.soundTheme);
+  const slot=cs&&cs.slots?cs.slots[key]:null;
+  if(!slot){playBuiltinSlot('classic',key);return;}   // 主题被删或数据缺失 → 退回经典
+  if(slot.kind==='file'){playStoredSound(slot.ref);return;}
+  playBuiltinSlot(slot.theme||'classic',key);
 }
 function playClick(){playThemeSound('click');vibrate(12)}
 function playExplosion(){playThemeSound('explosion');vibrate(25)}
@@ -421,6 +532,231 @@ function playGameOver(){
   playThemeSound('gameover');
   vibrate([80,40,80,40,100]);
 }
+
+// ─── 自定义音效编辑器（更多 → 游戏音效 → 自定义） ───
+let csDraft=null;      // 正在编辑的草稿，保存前的改动都留在这里
+let _csPickKey=null;   // 刚点的「选文件」是哪一位
+
+function newCsId(){
+  return 'cs_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+}
+function defaultCsSlots(){
+  const s={};
+  CS_SLOTS.forEach(function(x){s[x.key]={kind:'builtin',theme:'classic'}});
+  return s;
+}
+function cloneCs(t){ return JSON.parse(JSON.stringify(t)); }
+
+function initCustomSoundPage(){
+  csDraft=null;
+  const list=appSettings.customSounds||[];
+  if(list.length)csDraft=cloneCs(list[0]);
+  renderCsThemeList();
+  syncCsLabelInput();
+  renderCsEditor();
+}
+
+function syncCsLabelInput(){
+  const lb=document.getElementById('csLabel');
+  if(lb)lb.value=csDraft?(csDraft.label||''):'';
+}
+
+function renderCsThemeList(){
+  const box=document.getElementById('csThemeList');
+  if(!box)return;
+  const list=appSettings.customSounds||[];
+  let html=list.map(function(t){
+    const sel=(csDraft&&csDraft.id===t.id)?' selected':'';
+    return '<button class="tg-btn'+sel+'" data-id="'+htmlEsc(t.id)+'">'+htmlEsc(t.label||'自定义')+'</button>';
+  }).join('');
+  html+='<button class="tg-btn" id="csNewBtn">＋ 新建</button>';
+  box.innerHTML=html;
+  box.querySelectorAll('.tg-btn[data-id]').forEach(function(b){
+    b.onclick=function(){
+      const t=getCustomSoundTheme(this.dataset.id);
+      if(!t)return;
+      csDraft=cloneCs(t);
+      renderCsThemeList();
+      syncCsLabelInput();
+      renderCsEditor();
+    };
+  });
+  const nb=document.getElementById('csNewBtn');
+  if(nb)nb.onclick=function(){
+    csDraft={id:newCsId(),label:'自定义音效 '+((appSettings.customSounds||[]).length+1),slots:defaultCsSlots()};
+    renderCsThemeList();
+    syncCsLabelInput();
+    renderCsEditor();
+  };
+}
+
+function renderCsEditor(){
+  const card=document.getElementById('csEditor');
+  if(!card)return;
+  if(!csDraft){card.style.display='none';return;}
+  card.style.display='';
+  const box=document.getElementById('csSlots');
+  box.innerHTML=CS_SLOTS.map(function(s){
+    const v=csDraft.slots[s.key]||{kind:'builtin',theme:'classic'};
+    let opts=Object.keys(SOUND_THEMES).map(function(k){
+      return '<option value="builtin:'+k+'"'+((v.kind==='builtin'&&v.theme===k)?' selected':'')+'>内置 · '+SOUND_THEMES[k].label+'</option>';
+    }).join('');
+    if(v.kind==='file')opts='<option value="file" selected>文件：'+htmlEsc(v.name||'音频')+'</option>'+opts;
+    return '<div class="form-row cs-slot">'
+      +'<label>'+s.label+'</label>'
+      +'<select class="cs-select" data-key="'+s.key+'">'+opts+'</select>'
+      +'<button class="glass-btn cs-pick" data-key="'+s.key+'">选文件</button>'
+      +'<button class="glass-btn cs-try" data-key="'+s.key+'">▶</button>'
+      +'</div>';
+  }).join('');
+  box.querySelectorAll('.cs-select').forEach(function(sel){
+    sel.onchange=function(){
+      if(this.value==='file')return;   // 回选已用的文件，不需要动作
+      csDraft.slots[this.dataset.key]={kind:'builtin',theme:this.value.slice(8)};
+      renderCsEditor();
+    };
+  });
+  box.querySelectorAll('.cs-pick').forEach(function(b){
+    b.onclick=function(){ pickCsFile(this.dataset.key) };
+  });
+  box.querySelectorAll('.cs-try').forEach(function(b){
+    b.onclick=function(){ previewCsSlot(this.dataset.key) };
+  });
+  const sb=document.getElementById('csSaveBtn');
+  if(sb)sb.onclick=csSaveDraft;
+  const db=document.getElementById('csDeleteBtn');
+  if(db){
+    db.onclick=csDeleteDraft;
+    db.style.display=getCustomSoundTheme(csDraft.id)?'':'none';   // 没保存过的草稿没什么可删
+  }
+}
+
+function previewCsSlot(key){
+  const v=csDraft&&csDraft.slots?csDraft.slots[key]:null;
+  if(!v)return;
+  if(v.kind==='file'){playStoredSound(v.ref);return;}
+  playBuiltinSlot(v.theme||'classic',key);
+}
+
+function pickCsFile(key){
+  const inp=document.getElementById('csFileInput');
+  if(!inp)return;
+  _csPickKey=key;
+  inp.value='';           // 清空，允许连续两次选同一个文件
+  inp.click();
+}
+
+function onCsFileChosen(ev){
+  const key=_csPickKey;
+  _csPickKey=null;
+  const f=ev.target.files&&ev.target.files[0];
+  ev.target.value='';
+  if(!key||!f||!csDraft)return;
+  validateSoundFile(f,key).then(function(err){
+    if(err){alert(err);return;}
+    const ref='s_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    putSound(ref,f).then(function(){
+      csDraft.slots[key]={kind:'file',ref:ref,name:f.name,size:f.size};
+      renderCsEditor();
+    }).catch(function(){
+      alert('音频没能存进本地存储：这台设备的浏览器存储不可用（无痕模式？）');
+    });
+  });
+}
+
+function soundExt(name){
+  const m=/\.([A-Za-z0-9]+)$/.exec(name||'');
+  return m?m[1].toLowerCase():'';
+}
+// 读时长：要等元数据加载完才有值；部分 mp3 先报 Infinity，拖一下播放位置才能逼出真实时长
+function probeSoundDuration(file){
+  return new Promise(function(res){
+    let url='', done=false;
+    const finish=function(v){
+      if(done)return;
+      done=true;
+      if(url)URL.revokeObjectURL(url);
+      res(v);
+    };
+    try{
+      url=URL.createObjectURL(file);
+      const a=new Audio();
+      a.preload='metadata';
+      a.onerror=function(){finish(-1)};
+      a.onloadedmetadata=function(){
+        if(a.duration===Infinity||isNaN(a.duration)){
+          a.ontimeupdate=function(){a.ontimeupdate=null;finish(a.duration)};
+          a.currentTime=1e101;
+          return;
+        }
+        finish(a.duration);
+      };
+      a.src=url;
+      setTimeout(function(){finish(-1)},5000);   // 卡住就当读不出来
+    }catch(e){finish(-1)}
+  });
+}
+// 校验用户选的音频：通过返回空串，不通过返回给用户看的理由（格式 + 真能加载双重把关）
+function validateSoundFile(file,key){
+  const ext=soundExt(file.name);
+  if(SOUND_EXTS.indexOf(ext)<0)return Promise.resolve('不支持的格式：只收 mp3 / wav / ogg（现在选的是 .'+(ext||'无扩展名')+'）');
+  if(file.size>SOUND_MAX_SIZE)return Promise.resolve('文件太大：单个音效最多 1MB，现在是 '+(file.size/1048576).toFixed(2)+'MB');
+  let total=file.size;
+  const slots=(csDraft&&csDraft.slots)||{};
+  CS_SLOTS.forEach(function(s){
+    const v=slots[s.key];
+    if(s.key!==key&&v&&v.kind==='file')total+=(v.size||0);
+  });
+  if(total>SOUND_MAX_TOTAL)return Promise.resolve('这个主题的自定义音效太多了：合计最多 4MB，加进去会到 '+(total/1048576).toFixed(2)+'MB');
+  return probeSoundDuration(file).then(function(dur){
+    if(dur<0)return '读不出音频信息：文件可能已损坏，或者扩展名和真实格式对不上';
+    if(dur>SOUND_MAX_SECONDS)return '时长太长：单个音效最多 10 秒，现在是 '+dur.toFixed(1)+' 秒';
+    return '';
+  });
+}
+
+function csSaveDraft(){
+  if(!csDraft)return;
+  const lb=document.getElementById('csLabel');
+  const label=((lb&&lb.value)||'').trim()||'自定义音效';
+  csDraft.label=label;
+  if(!appSettings.customSounds)appSettings.customSounds=[];
+  const list=appSettings.customSounds;
+  const i=list.findIndex(function(t){return t.id===csDraft.id});
+  const saved=cloneCs(csDraft);
+  if(i>=0)list[i]=saved; else list.push(saved);
+  appSettings.soundTheme=csDraft.id;   // 保存即启用，省得再回设置页点一次
+  saveSettings();
+  renderSoundThemeButtons();
+  updateDogBarkRow();
+  renderCsThemeList();
+  renderCsEditor();
+  alert('已保存「'+label+'」并切换到这个主题');
+}
+
+function csDeleteDraft(){
+  if(!csDraft)return;
+  const saved=getCustomSoundTheme(csDraft.id);
+  if(!saved){alert('这个主题还没保存');return;}
+  if(!confirm('删除「'+(saved.label||'自定义音效')+'」？'))return;
+  const list=appSettings.customSounds||[];
+  const i=list.findIndex(function(t){return t.id===csDraft.id});
+  if(i>=0)list.splice(i,1);
+  // 顺带清掉它引用的音频，别在本地存储里留垃圾
+  CS_SLOTS.forEach(function(s){
+    const v=saved.slots&&saved.slots[s.key];
+    if(v&&v.kind==='file'&&v.ref)delSound(v.ref);
+  });
+  if(appSettings.soundTheme===saved.id)appSettings.soundTheme='classic';
+  saveSettings();
+  csDraft=list.length?cloneCs(list[0]):null;
+  renderSoundThemeButtons();
+  updateDogBarkRow();
+  renderCsThemeList();
+  syncCsLabelInput();
+  renderCsEditor();
+}
+
 // ─── 震动反馈 ───
 // Android WebView 的 navigator.vibrate 不可用（WebView 禁用 Vibration API），
 // 因此优先走 Tauri haptics 插件（原生 Vibrator，需 VIBRATE 权限），
@@ -772,6 +1108,12 @@ Router.register('device-bench', {
   back: 'settings',
   enter() { document.body.style.background=''; initDeviceBenchPage(); },
   leave() { teardownDeviceBenchPage(); }
+});
+
+Router.register('custom-sound', {
+  back: 'settings',
+  enter() { document.body.style.background=''; initCustomSoundPage(); },
+  leave() { csDraft=null; }   // 没保存的草稿不留到下次进来
 });
 
 Router.register('checkout', {

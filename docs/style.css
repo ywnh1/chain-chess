@@ -1440,6 +1440,15 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
   background:var(--glass-w-04);color:var(--dim);font-size:.74rem;font-weight:500;cursor:pointer;transition:.12s;font-family:var(--font)}
 .theme-group .tg-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
 
+/* ═══════ 自定义音效编辑器 ═══════ */
+.cs-note{font-size:.76rem;color:var(--dim);line-height:1.65;margin:8px 0 0}
+.form-row.cs-slot{flex-direction:row;align-items:center;gap:6px;margin:8px 0}
+.form-row.cs-slot label{flex:0 0 38px}
+.form-row.cs-slot select{flex:1;min-width:0;padding:8px 26px 8px 10px;font-size:var(--text-sm)}
+.cs-slot .glass-btn{padding:0 10px;font-size:.72rem;min-height:34px;flex:0 0 auto}
+.cs-actions{display:flex;gap:8px;margin-top:12px}
+.cs-actions .glass-btn{flex:1}
+
 
 /* ═══════ AI 帮忙推荐高亮（棋盘格子） ═══════ */
 .ai-hint{outline:3px solid var(--accent);outline-offset:-3px;border-radius:6px;

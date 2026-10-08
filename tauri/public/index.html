@@ -261,14 +261,8 @@ try {
       <h3>游戏音效</h3>
       <div class="form-row">
         <label style="flex:1">音效主题</label>
-        <div class="theme-group" id="soundThemeGroup" style="display:flex;gap:6px">
-          <button class="tg-btn" data-value="classic">经典</button>
-          <button class="tg-btn" data-value="soft">柔和</button>
-          <button class="tg-btn" data-value="crisp">清脆</button>
-          <button class="tg-btn" data-value="electronic">电子</button>
-          <button class="tg-btn" data-value="dog">大狗叫</button>
-          <button class="tg-btn" data-value="mute">静音</button>
-        </div>
+        <!-- 按钮由 renderSoundThemeButtons() 生成：6 个内置主题 + 用户自定义主题 -->
+        <div class="theme-group" id="soundThemeGroup" style="display:flex;gap:6px"></div>
       </div>
       <div class="form-row" id="dogBarkRow" style="display:none">
         <label style="flex:1">大狗叫声模式</label>
@@ -281,6 +275,10 @@ try {
       <div class="form-row">
         <label style="flex:1">试听当前主题音效</label>
         <button class="glass-btn primary" id="soundPreviewBtn" style="padding:6px 14px;font-size:.78rem">▶ 试听</button>
+      </div>
+      <div class="form-row" style="cursor:pointer;flex-direction:row;align-items:center;justify-content:space-between" onclick="Router.navigate('custom-sound')">
+        <label style="flex:1">自定义音效</label>
+        <span style="color:var(--dim)">→</span>
       </div>
     </div>
 
@@ -1573,6 +1571,37 @@ try {
   </div>
 </div>
 
+<!-- 自定义音效编辑器（更多 → 游戏音效 → 自定义） -->
+<div id="custom-sound" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>自定义音效</h2>
+
+    <div class="about-card">
+      <h3>我的音效主题</h3>
+      <div class="theme-group" id="csThemeList"></div>
+      <p class="cs-note">每个主题可以给落子 / 爆炸 / 淘汰 / 胜利各挑一个音色：借内置主题的同位音色，或者传自己的音频文件。</p>
+    </div>
+
+    <div class="about-card" id="csEditor" style="display:none">
+      <div class="form-row">
+        <label>主题名称</label>
+        <input type="text" id="csLabel" maxlength="12" placeholder="我的音效" autocomplete="off">
+      </div>
+      <h3>音效选择</h3>
+      <div id="csSlots"></div>
+      <div class="cs-actions">
+        <button class="glass-btn primary" id="csSaveBtn">保存并启用</button>
+        <button class="glass-btn danger" id="csDeleteBtn">删除主题</button>
+      </div>
+    </div>
+
+    <p class="cs-note">单个音频：mp3 / wav / ogg，不超过 1MB、10 秒；同一个主题里自己传的音频合计不超过 4MB。不满足会直接拒绝并告诉你原因。</p>
+  </div>
+  <input type="file" id="csFileInput" accept=".mp3,.wav,.ogg,audio/*" style="display:none" onchange="onCsFileChosen(event)">
+</div>
+
+<!-- 更新详情页（二级） -->
 <div id="about-changelog" class="screen">
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll" id="changelogContainer">
