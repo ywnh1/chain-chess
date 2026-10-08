@@ -2,7 +2,7 @@
   <img src="icon.png" width="140" alt="连锁棋">
   <h1>♟ 连锁棋 · Chain Chess</h1>
   <p>
-    <strong>棋盘策略游戏 · 桌面 / Android / 浏览器 PWA</strong>
+    <strong>棋盘策略游戏 · Windows / Linux / Android / 浏览器 PWA</strong>
   </p>
   <p>
     <img src="https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=fff" alt="Tauri">
@@ -20,7 +20,7 @@
 
 **连锁棋** 是基于 Chain Reaction / 爆裂棋玩法改进的多人策略游戏。2~10 人对战，棋子攒满格子就炸，炸出来的棋子接着引爆下一轮，直到只剩一人。
 
-前端和 AI 引擎是同一份代码，出三种形态：**Tauri 桌面 / Android 应用**（Rust 引擎 + Rayon 多核并行），以及**浏览器 PWA**（引擎编译成 WASM，可安装离线游玩）。都不用服务器，本地就能开局。
+前端和 AI 引擎是同一份代码，出三种形态：**Tauri 桌面（Windows / Linux）/ Android 应用**（Rust 引擎 + Rayon 多核并行），以及**浏览器 PWA**（引擎编译成 WASM，可安装离线游玩）。都不用服务器，本地就能开局。
 
 ---
 
@@ -80,7 +80,8 @@
 
 ### 平台形态
 
-- **桌面 / Android**：Tauri 应用，自动更新、触感反馈、文件系统存储
+- **桌面（Windows / Linux）/ Android**：Tauri 应用，自动更新、触感反馈、文件系统存储
+- **Linux 包**：`chainchess-<version>.deb`（Debian / Ubuntu）与 `chainchess-<version>.AppImage`（通用发行版）；x86_64 由 CI 另外构建，文件名带 `-amd64` 后缀
 - **浏览器 PWA**：`docs/` 目录独立构建（WASM 引擎），浏览器打开就能玩，可安装离线使用
 
 ---
@@ -96,21 +97,23 @@ npx tauri dev          # 开发模式
 npx tauri build        # 构建可执行文件
 ```
 
-### Android APK / Windows exe
+### Android APK / Windows exe / Linux deb·AppImage
 
 ```bash
 ./build.sh --apk chainchess        # 构建签名 APK
 ./build.sh --exe                   # 构建 Windows exe（cargo-xwin 交叉编译）
-./build.sh --zip                   # 打包 PWA zip（用 docs/ 预编译产物，无需编译）
-./build.sh --all chainchess        # 一次构建 apk + exe + zip
+./build.sh --linux                 # 构建 Linux deb + AppImage（本机原生编译）
+./build.sh --zip                   # 重新编译 WASM 并打包 PWA zip
+./build.sh --all chainchess        # 一次构建 apk + exe + linux + zip
 ./build.sh --native chainchess     # APK 加 target-cpu=native 极致优化
 ./build.sh --release chainchess    # 构建全部并发布到设备与发布仓库
 ```
 
 - **APK**：脚本自动编译 arm64 APK，用 `release.keystore` 签名后输出到 `release/`（需要 keystore 密码）。
 - **exe**：`cargo-xwin` 交叉编译 `x86_64-pc-windows-msvc`，不需要密码，输出 `release/chainchess-<version>.exe`。
-- **zip**：取 `docs/` 的静态资源和预编译 `pkg/*.wasm` 打包成 `release/chain-chess-pwa-v<version>.zip`（排除 wasm 源码和 pkg-node）。
-- **all / release**：`--all` 一次编译 apk + exe + zip；`--release` 额外发布到 Android 设备和 `../chain-chess-release` 仓库。
+- **linux**：`npx tauri build --bundles deb` 出 deb，再用 `appimagetool` 打包 AppImage（没装 appimagetool 时只出 deb），输出 `release/chainchess-<version>.deb` / `.AppImage`。
+- **zip**：重新编译 WASM 引擎（`docs/wasm` → `docs/pkg`），再把 `docs/` 的静态资源和 `pkg/*.wasm` 打包成 `release/chain-chess-pwa-v<version>.zip`（排除 wasm 源码和 pkg-node）；`--all` / `--release` 复用已有的 `pkg/`，不重编。
+- **all / release**：`--all` 一次编译 apk + exe + linux + zip；`--release` 额外发布到 Android 设备和 `../chain-chess-release` 仓库。
 - 每次构建都会更新 `update.json` 里对应平台的 URL 与 size。
 
 ### 浏览器 PWA（本地预览）
@@ -227,7 +230,7 @@ Alpha-Beta 和 PVS 可以换用两种评估函数：
 ```
 
 - **前端**：原生 JavaScript + CSS，零框架依赖（`tauri/public/`，桌面和移动端共用）
-- **桌面 / Android**：Rust 引擎（`tauri/src-tauri/`）+ Tauri v2 桥接，Rayon 多核并行
+- **桌面（Windows / Linux）/ Android**：Rust 引擎（`tauri/src-tauri/`）+ Tauri v2 桥接，Rayon 多核并行
 - **浏览器 PWA**：`docs/` 目录独立构建，同一引擎编译成 WASM（`docs/wasm/` crate + wasm-bindgen）；`engine.js` 在浏览器侧模拟 Tauri invoke 语义，`tauriInvoke` 自动降级到 `ChainEngine.webInvoke`
 - **AI 引擎**：Alpha-Beta 用 `alpha_beta_pruning` crate，PVS 和 MCTS 自己实现
 - **并行计算**：Rayon `par_iter()` 多核并行搜索（桌面端；WASM 版单线程顺序执行）

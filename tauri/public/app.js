@@ -171,7 +171,7 @@ async function loadSettings(){
   else window.addEventListener('load',()=>setTimeout(maybeShowIntro,0));
 }
 
-// 版本化引导：每个版本首次进入时展示一次（怎么玩 + 本次更新）。
+// 版本化引导：每个版本首次进入时展示一次（本次更新 + 怎么玩，两段可折叠、默认折叠）。
 // 用户可永久关闭；关闭后仍能在首页「怎么玩？」和「关于 → 更新日志」找到。
 // 版本化引导：**只要版本变了就一定弹**（不做永久关闭）。
 // introSeenVersion === 当前版本时才跳过，所以升级后必然再弹一次。
@@ -216,8 +216,10 @@ function showIntroModal(ver){
   if(title)title.textContent='欢迎使用连锁棋 v'+ver;
   const howto=(typeof HINTS!=='undefined'&&HINTS['howto'])?HINTS['howto'].body:'';
   const latest=latestChangelogDesc();
-  body.innerHTML='<h4 class="intro-sec">怎么玩</h4>'+howto+
-    (latest?'<h4 class="intro-sec">本版更新</h4><p class="intro-desc">'+latest+'</p>':'');
+  // 顺序：本版更新在前、怎么玩在后；两段都是原生 details，默认折叠
+  body.innerHTML=
+    (latest?'<details class="intro-fold"><summary class="intro-sec">本版更新</summary><p class="intro-desc">'+latest+'</p></details>':'')+
+    '<details class="intro-fold"><summary class="intro-sec">怎么玩</summary>'+howto+'</details>';
   body.scrollTop=0;
   openModal('introModal');
 }

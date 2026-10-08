@@ -51,7 +51,7 @@ try {
     <div class="tagline">多人联手，一触即发</div>
     <button class="glass-btn primary start-btn" onclick="Router.navigate('gameSetup')">开始游戏</button>
     <div class="welcome-footer">
-      <button onclick="Router.navigate('settings')" class="glass-btn about-foot-btn">设置</button>
+      <button onclick="Router.navigate('settings')" class="glass-btn about-foot-btn">更多</button>
       <button onclick="Router.navigate('history')" class="glass-btn history-foot-btn">历史记录</button>
     </div>
   </div>
@@ -246,7 +246,7 @@ try {
   </div>
 </div>
 
-<!-- 首次进入引导：怎么玩 + 本版更新（每个版本首次进入显示一次） -->
+<!-- 首次进入引导：本版更新 + 怎么玩（每段可折叠，默认折叠；每个版本首次进入显示一次） -->
 <div id="introModal" class="modal">
   <div class="modal-inner hint-modal-inner">
     <h3 id="introModalTitle">欢迎使用连锁棋</h3>
@@ -264,7 +264,7 @@ try {
 <div id="settings" class="screen">
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll">
-    <h2>设置</h2>
+    <h2>更多</h2>
 
     <div class="about-card">
       <h3>游戏音效</h3>
@@ -1424,7 +1424,7 @@ try {
     </div>
   </div>
 </div>
-<!-- 游戏规则（详细版，从设置页进入） -->
+<!-- 游戏规则（详细版，从更多页进入） -->
 <div id="about-rules" class="screen">
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <div class="about-scroll">
@@ -1564,7 +1564,7 @@ try {
     </div>
 
     <div class="about-card">
-      <h3>设置</h3>
+      <h3>更多</h3>
       <ul>
         <li><strong>音效主题</strong>：经典 / 柔和 / 清脆 / 电子 / 大狗叫 / 静音</li>
         <li><strong>大狗叫声模式</strong>：只在选中「大狗叫」主题时出现，可选叫声的音尾长度</li>
@@ -1576,7 +1576,7 @@ try {
 
     <div class="about-card">
       <h3>关于本应用在哪？</h3>
-      <p>两个入口都能进：<strong>点首页最上面的图标</strong>（连锁棋那个圆形图标），或者<strong>设置页 → 关于连锁棋</strong>。那里有 AI 介绍、性能评测、更新日志、开源许可证和第三方组件清单。</p>
+      <p>两个入口都能进：<strong>点首页最上面的图标</strong>（连锁棋那个圆形图标），或者<strong>更多页 → 关于连锁棋</strong>。那里有 AI 介绍、性能评测、更新日志、开源许可证和第三方组件清单。</p>
       <p>每次升级后第一次打开，会自动弹一次本版的更新说明，可以直接关掉，也可以选「以后不再显示」。</p>
     </div>
   </div>
@@ -1635,7 +1635,7 @@ try {
       <h3>会联网的第三方服务</h3>
       <ul class="tp-list">
         <li><span class="tp-name">51.la 站点统计 SDK</span><span class="tp-lic">第三方统计</span><span class="tp-desc">SDK 地址 sdk.51.la/js-sdk-pro.min.js · 页面加载时引入并自动初始化（autoTrack）。用来统计访问量（PV/UV）、访问来源和大致设备环境，看有多少人在玩。它<strong>不会读取或上传棋盘、走法、对局记录、玩家名称</strong>等任何游戏内容。脚本加载失败（断网、被插件拦截）时游戏功能不受影响。桌面 / Android 应用使用与网页版相同的页面，因此也会引入该脚本。</span></li>
-        <li><span class="tp-name">Gitee 仓库接口</span><span class="tp-lic">更新检查</span><span class="tp-desc">接口地址 gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json · 启动时静默请求一次，或在设置里点「检查更新」时请求。只读取公开仓库里的版本号文件，用来判断有没有新版本；不发送账号、设备标识或游戏数据（请求本身的 IP 与 User-Agent 由 HTTP 协议附带，代码未额外附加任何信息）。</span></li>
+        <li><span class="tp-name">Gitee 仓库接口</span><span class="tp-lic">更新检查</span><span class="tp-desc">接口地址 gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json · 启动时静默请求一次，或在更多里点「检查更新」时请求。只读取公开仓库里的版本号文件，用来判断有没有新版本；不发送账号、设备标识或游戏数据（请求本身的 IP 与 User-Agent 由 HTTP 协议附带，代码未额外附加任何信息）。</span></li>
       </ul>
       <p>除了这两个域名，应用不会主动请求别的地方。</p>
     </div>

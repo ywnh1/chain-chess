@@ -1,14 +1,14 @@
 #!/bin/sh
-# build.sh - 编译并签名连锁棋（APK / Windows exe / PWA zip）
+# build.sh - 编译并签名连锁棋（APK / Windows exe / Linux deb+AppImage / PWA zip）
 # 用法: ./build.sh [选项] <keystore_password>    （./build.sh -h 查看完整帮助）
 # 仅支持 release 构建（debug 模式已移除）
 #       ./build.sh -a chainchess      # 编译安卓 APK 到 release/，更新 update.json 的 android size
 #       ./build.sh -e                 # 编译 Windows exe 到 release/，更新 update.json 的 windows size
 #       ./build.sh -l                 # 编译 Linux 版（deb + AppImage）到 release/，更新 linux size
 #       ./build.sh -z                 # 重新编译 WASM + 打包 PWA zip 到 release/（update.json 无 pwa 条目，不更新 size）
-#       ./build.sh -A chainchess      # 编译 apk + exe + zip 全部到 release/，只更新本次编译的 size
+#       ./build.sh -A chainchess      # 编译 apk + exe + linux + zip 全部到 release/，只更新本次编译的 size
 #       ./build.sh -n chainchess      # 编译安卓 Native APK 到 release/，不碰 update.json
-#       ./build.sh -r chainchess      # 编译除 Native 外所有（apk+exe+zip），全部更新 size，
+#       ./build.sh -r chainchess      # 编译除 Native 外所有（apk+exe+linux+zip），全部更新 size，
 #                                     #   并发布：release/ → /storage/emulated/0/用户/，
 #                                     #   update.json + PWA 必要内容 → ../chain-chess-release
 #       ./build.sh -r -c chainchess   # 同上，并自动 commit 两个仓库（push 仍手动）
@@ -264,7 +264,7 @@ if [ "$HELP" = true ]; then
   cat <<HELP_EOF
 用法: $0 [选项] <keystore_password>
 
-编译并签名连锁棋（APK / Windows exe / PWA zip）到 release/，
+编译并签名连锁棋（APK / Windows exe / Linux deb+AppImage / PWA zip）到 release/，
 并按模式更新 update.json 的安装包大小条目。
 
 版本号以 tauri/src-tauri/tauri.conf.json 为唯一来源，构建时自动同步到
@@ -276,7 +276,7 @@ README badge / update.json —— 发版只需改 tauri.conf.json 一处。
   -e, --exe            编译 Windows exe（cargo-xwin），更新 windows size
   -l, --linux          编译 Linux 版（deb + AppImage，本机原生编译），更新 linux size
   -z, --zip            重新编译 WASM 并打包 PWA zip（无平台条目，不更新 size）
-  -A, --all <密码>     编译 apk + exe + zip 全部，只更新本次编译的 size
+  -A, --all <密码>     编译 apk + exe + linux + zip 全部，只更新本次编译的 size
   -n, --native <密码>  编译安卓 Native APK，不碰 update.json
   -r, --release <密码> 编译除 Native 外所有，全部更新 size，并发布：
                        release/ → /storage/emulated/0/用户/

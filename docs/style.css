@@ -819,6 +819,15 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 .intro-sec{font-size:.9rem;font-weight:700;color:var(--accent);margin:14px 0 6px}
 .intro-sec:first-child{margin-top:0}
 .intro-desc{font-size:.84rem;line-height:1.7;color:var(--text);margin:0}
+/* 引导弹窗的可折叠段落：默认折叠，点标题展开 */
+.intro-fold{margin:0 0 10px}
+.intro-fold:last-child{margin-bottom:0}
+.intro-fold>summary{display:flex;align-items:center;gap:6px;cursor:pointer;
+  -webkit-user-select:none;user-select:none}
+.intro-fold>summary::-webkit-details-marker{display:none}
+.intro-fold>summary::before{content:'▸';font-size:.75rem}
+.intro-fold[open]>summary::before{content:'▾'}
+.intro-fold>summary:hover{opacity:.85}
 /* 历史页顶部战绩汇总 */
 .history-stats{display:flex;flex-wrap:wrap;gap:8px;width:100%;margin:2px 0 10px}
 .hs-item{
