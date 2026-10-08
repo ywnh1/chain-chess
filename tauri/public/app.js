@@ -392,6 +392,8 @@ const DOG_BARK_FILES={
   none:'audio/叫(无淡出).mp3',
   long:'audio/叫(长淡出).mp3',
 };
+// 叫声模式的中文名，自定义音效的选项标签要用
+const DOG_BARK_LABELS={medium:'中淡出',none:'无淡出',long:'长淡出'};
 
 // 播放外部音频文件（相对 public 根目录）
 function playSoundFile(src){
@@ -491,13 +493,15 @@ function getCustomSoundTheme(id){
   return null;
 }
 
-// 播放某个内置主题里的指定音色（包含大狗的文件音与静音主题的 null 值）
-function playBuiltinSlot(themeKey,key){
+// 播放某个内置主题里的指定音色（包含大狗的文件音与静音主题的 null 值）。
+// bark 只有自定义主题会传：它让「借用大狗叫的爆炸音」自带叫声模式，
+// 不必跟着设置页那一个全局值走；内置大狗叫主题不传 bark，仍跟随设置。
+function playBuiltinSlot(themeKey,key,bark){
   const theme=SOUND_THEMES[themeKey]||SOUND_THEMES.classic;
   const s=theme[key];
   if(!s)return;
   if(s==='dog-bark'){
-    playSoundFile(DOG_BARK_FILES[appSettings.dogBarkMode]||DOG_BARK_FILES.long);
+    playSoundFile(DOG_BARK_FILES[bark||appSettings.dogBarkMode]||DOG_BARK_FILES.long);
     return;
   }
   if(typeof s==='string'){playSoundFile(s);return;}
@@ -520,7 +524,7 @@ function playThemeSound(key){
   const slot=cs&&cs.slots?cs.slots[key]:null;
   if(!slot){playBuiltinSlot('classic',key);return;}   // 主题被删或数据缺失 → 退回经典
   if(slot.kind==='file'){playStoredSound(slot.ref);return;}
-  playBuiltinSlot(slot.theme||'classic',key);
+  playBuiltinSlot(slot.theme||'classic',key,slot.bark);
 }
 function playClick(){playThemeSound('click');vibrate(12)}
 function playExplosion(){playThemeSound('explosion');vibrate(25)}
@@ -598,9 +602,19 @@ function renderCsEditor(){
   const box=document.getElementById('csSlots');
   box.innerHTML=CS_SLOTS.map(function(s){
     const v=csDraft.slots[s.key]||{kind:'builtin',theme:'classic'};
-    let opts=Object.keys(SOUND_THEMES).map(function(k){
-      return '<option value="builtin:'+k+'"'+((v.kind==='builtin'&&v.theme===k)?' selected':'')+'>内置 · '+SOUND_THEMES[k].label+'</option>';
-    }).join('');
+    let opts='';
+    Object.keys(SOUND_THEMES).forEach(function(k){
+      // 大狗叫的爆炸位是个「跟着设置里叫声模式走」的模糊项，借用过来就没法自己选长短，
+      // 所以在这里摊成三个具体选项；没存过 bark 的老数据按当前的全局叫声模式显示
+      if(SOUND_THEMES[k][s.key]==='dog-bark'){
+        const cur=v.bark||appSettings.dogBarkMode||'long';
+        Object.keys(DOG_BARK_FILES).forEach(function(bm){
+          opts+='<option value="builtin:'+k+'@'+bm+'"'+((v.kind==='builtin'&&v.theme===k&&cur===bm)?' selected':'')+'>内置 · '+SOUND_THEMES[k].label+'·'+DOG_BARK_LABELS[bm]+'</option>';
+        });
+        return;
+      }
+      opts+='<option value="builtin:'+k+'"'+((v.kind==='builtin'&&v.theme===k&&!v.bark)?' selected':'')+'>内置 · '+SOUND_THEMES[k].label+'</option>';
+    });
     if(v.kind==='file')opts='<option value="file" selected>文件：'+htmlEsc(v.name||'音频')+'</option>'+opts;
     return '<div class="form-row cs-slot">'
       +'<label>'+s.label+'</label>'
@@ -612,7 +626,9 @@ function renderCsEditor(){
   box.querySelectorAll('.cs-select').forEach(function(sel){
     sel.onchange=function(){
       if(this.value==='file')return;   // 回选已用的文件，不需要动作
-      csDraft.slots[this.dataset.key]={kind:'builtin',theme:this.value.slice(8)};
+      const m=/^builtin:([^@]+)(?:@(.+))?$/.exec(this.value);
+      if(!m)return;
+      csDraft.slots[this.dataset.key]=m[2]?{kind:'builtin',theme:m[1],bark:m[2]}:{kind:'builtin',theme:m[1]};
       renderCsEditor();
     };
   });
@@ -635,7 +651,7 @@ function previewCsSlot(key){
   const v=csDraft&&csDraft.slots?csDraft.slots[key]:null;
   if(!v)return;
   if(v.kind==='file'){playStoredSound(v.ref);return;}
-  playBuiltinSlot(v.theme||'classic',key);
+  playBuiltinSlot(v.theme||'classic',key,v.bark);
 }
 
 function pickCsFile(key){

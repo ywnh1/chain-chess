@@ -27,6 +27,19 @@ function extractFn(code, name) {
   return code.slice(i, k);
 }
 
+// 抠出 `const NAME={...}` 这种纯字面量常量并求值（SOUND_THEMES / DOG_BARK_FILES 都是）
+function extractConst(code, name) {
+  const i = code.indexOf("const " + name + "=");
+  if (i < 0) return null;
+  const open = code.indexOf("{", i);
+  let depth = 0, k = open;
+  for (; k < code.length; k++) {
+    if (code[k] === "{") depth++;
+    else if (code[k] === "}") { depth--; if (depth === 0) { k++; break; } }
+  }
+  return new Function("return " + code.slice(open, k))();
+}
+
 // ── 1) 数据契约 ──
 const SLOT_KEYS = ["click", "explosion", "elim", "gameover"];
 for (const k of SLOT_KEYS) {
@@ -74,6 +87,30 @@ else {
   check(esc("<img src=x onerror=alert(1)>").indexOf("<") < 0, "htmlEsc 没有挡住标签注入");
   check(esc('a\'b"c&d') === "a&#39;b&quot;c&amp;d", "htmlEsc 转义结果不对：" + esc('a\'b"c&d'));
   check(esc(null) === "" && esc(undefined) === "", "htmlEsc 对空值应返回空串");
+}
+
+// ── 大狗叫的「短中长」：自定义槽位自带的 bark 要真的盖过设置里的全局值 ──
+const pbSrc = extractFn(src.tauri, "playBuiltinSlot");
+const themes = extractConst(src.tauri, "SOUND_THEMES");
+const barks = extractConst(src.tauri, "DOG_BARK_FILES");
+if (!pbSrc || !themes || !barks) errs.push("抽不出 playBuiltinSlot / SOUND_THEMES / DOG_BARK_FILES");
+else {
+  const played = [];
+  const appSettings = { dogBarkMode: "long" };
+  const pb = new Function("SOUND_THEMES", "DOG_BARK_FILES", "appSettings", "playSoundFile", "playTone",
+    pbSrc + "\nreturn playBuiltinSlot;")(themes, barks, appSettings, s => played.push(s), () => {});
+  pb("dog", "explosion", "none");
+  check(played[0] === barks.none, "自定义槽位指定无淡出，实际播的是 " + played[0]);
+  pb("dog", "explosion", "medium");
+  check(played[1] === barks.medium, "自定义槽位指定中淡出，实际播的是 " + played[1]);
+  pb("dog", "explosion");   // 内置大狗叫主题不传 bark → 跟随设置
+  check(played[2] === barks.long, "不传 bark 时应跟随设置里的长淡出，实际 " + played[2]);
+  appSettings.dogBarkMode = "none";
+  pb("dog", "explosion");
+  check(played[3] === barks.none, "设置改成无淡出后没跟随，实际 " + played[3]);
+  pb("dog", "click");
+  check(played[4] === "audio/大狗.mp3", "大狗叫的落子音应仍是固定文件，实际 " + played[4]);
+  check(/DOG_BARK_LABELS\[bm\]/.test(src.tauri), "编辑器没把大狗叫的叫声模式摊开成选项");
 }
 
 // ── 3) 镜像一致 + 页面/JS 的元素 id 对得上 ──
