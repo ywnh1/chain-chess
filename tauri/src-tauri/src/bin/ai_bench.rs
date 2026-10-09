@@ -94,7 +94,7 @@ fn spread_starts(sz: usize, n: usize) -> Vec<(usize, usize)> {
 
 /// 构造开局空棋盘
 fn build_board(sz: usize, _cm: CapMode, _gc: u32) -> GameBoard {
-    vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz]
+    vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz]
 }
 
 fn alg_depth(alg: &str, cfg: &BenchConfig) -> usize {
@@ -121,7 +121,7 @@ fn run_game(
             CapMode::Cap5 => 5,
             CapMode::Random => 3, // 每步随机阈值模式：开局首子取中间等级
         };
-        board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: board[x][y].th };
+        board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: board[x][y].th, blocked: false };
     }
     let mut ai_configs = std::collections::HashMap::new();
     for (p, alg) in players.iter().enumerate() {

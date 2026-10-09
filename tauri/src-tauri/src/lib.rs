@@ -248,7 +248,7 @@ fn run_ai_bench_game(cfg: &AiBenchGameConfig, game_count: u32) -> AiBenchGameRes
     if sz < 5 || max_players < 2 {
         return AiBenchGameResult { elapsed_ms: 0.0, steps: 0, winner: None };
     }
-    let mut board: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz];
+    let mut board: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz];
     let starts = spread_starts(sz, max_players);
     // 首子等级 = 阈值 n-1（cap3→2、cap4→3、cap5→4；随机模式取中间等级 3）
     let th: u32 = match cfg.cap_mode {
@@ -258,7 +258,7 @@ fn run_ai_bench_game(cfg: &AiBenchGameConfig, game_count: u32) -> AiBenchGameRes
         CapMode::Random => 3,
     };
     for (p, &(x, y)) in starts.iter().enumerate() {
-        board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: None };
+        board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: None, blocked: false };
     }
     let mut ai_configs: HashMap<String, serde_json::Value> = HashMap::new();
     for (p, pl) in cfg.players.iter().enumerate() {
@@ -877,7 +877,7 @@ fn run_one_game(
     rng: &mut impl rand::Rng,
 ) -> Result<u64, String> {
     let mut board = vec![
-        vec![Cell { owner: None, count: 0, th: None }; board_size];
+        vec![Cell { owner: None, count: 0, th: None, blocked: false }; board_size];
         board_size
     ];
     let mut eliminated: Vec<usize> = Vec::new();
@@ -1189,10 +1189,10 @@ mod tests {
     const ALL_BM: [BorderMode; 4] = [BorderMode::Default, BorderMode::Wrap, BorderMode::Bounce, BorderMode::Degrade];
 
     fn mk_b(sz: usize) -> GameBoard {
-        vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz]
+        vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz]
     }
     fn set(b: &mut GameBoard, x: usize, y: usize, owner: usize, count: u8) {
-        b[x][y] = Cell { owner: Some(owner), count, th: None };
+        b[x][y] = Cell { owner: Some(owner), count, th: None, blocked: false };
     }
     fn do_click(b: &GameBoard, sz: usize, x: usize, y: usize, pl: usize, max: usize, bm: BorderMode, cm: CapMode, seed: Option<u64>) -> (GameBoard, Vec<usize>, Vec<(usize, usize)>) {
         let mut nb = b.clone();
@@ -1548,7 +1548,7 @@ mod tests {
                 let max_players = 3;
                 let mut b = mk_b(sz);
                 for (x, y, p) in [(0usize, 0usize, 0usize), (0, 6, 1), (6, 0, 2), (6, 6, 0), (3, 3, 1), (1, 1, 2)] {
-                    b[x][y] = Cell { owner: Some(p), count: 2, th: b[x][y].th };
+                    b[x][y] = Cell { owner: Some(p), count: 2, th: b[x][y].th, blocked: false };
                 }
                 let mut cfg = std::collections::HashMap::new();
                 for p in 0..max_players {

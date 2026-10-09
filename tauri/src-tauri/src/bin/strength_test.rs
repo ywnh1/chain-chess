@@ -115,7 +115,7 @@ fn spread_starts(sz: usize, n: usize) -> Vec<(usize, usize)> {
 }
 
 fn build_board(sz: usize) -> GameBoard {
-    vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz]
+    vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz]
 }
 
 /// 跑一局，返回 (胜者, 步数)
@@ -139,7 +139,7 @@ fn run_game(
         CapMode::Cap4 => 4,
     };
     for (p, &(x, y)) in starts.iter().enumerate() {
-        board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: board[x][y].th };
+        board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: board[x][y].th, blocked: false };
     }
     let mut ai_configs = HashMap::new();
     for (p, alg) in players.iter().enumerate() {

@@ -77,6 +77,17 @@ pub struct Cell {
     /// 旧版本混合模式(mixed)遗留的每格阈值字段；已停用，保留仅为兼容旧历史数据反序列化
     #[serde(default)]
     pub th: Option<u8>,
+    /// 空洞：不规则棋盘里被挖掉的格子。不可落子，棋子飞进来直接消失，
+    /// 评估时不计入总格数。默认 false —— 老数据反序列化后行为与从前一致。
+    #[serde(default)]
+    pub blocked: bool,
+}
+
+impl Cell {
+    /// 空格
+    pub const fn empty() -> Self { Cell { owner: None, count: 0, th: None, blocked: false } }
+    /// 空洞（不规则棋盘挖掉的格子）
+    pub const fn hole() -> Self { Cell { owner: None, count: 0, th: None, blocked: true } }
 }
 
 
@@ -476,7 +487,7 @@ pub fn xgb_engine() -> &'static XGBoostEngine {
 pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usize, border_mode: BorderMode, cap_mode: CapMode) -> [f32; FEAT_DIM] {
     let sz = board.len();                             // 行数
     let cols = board.first().map_or(sz, |r| r.len());  // 列数：长方形时与行数不同
-    let total_cells = (sz * cols) as f32;
+    let mut open_cells = 0i32;   // 可用格数：不规则棋盘挖掉的洞不计入
     let row_c = (sz as f32 - 1.0) * 0.5;               // 行中心
     let col_c = (cols as f32 - 1.0) * 0.5;             // 列中心
 
@@ -496,6 +507,7 @@ pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usi
     for (i, row) in board.iter().enumerate() {
         let dist_center = ((i as f32 - row_c).abs() * 0.5) as i32;
         for (j, c) in row.iter().enumerate() {
+            if !c.blocked { open_cells += 1; }
             if let Some(owner) = c.owner {
                 total_pieces += 1;
                 let d = dist_center + ((j as f32 - col_c).abs() * 0.5) as i32;
@@ -537,6 +549,7 @@ pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usi
             }
         }
     }
+    let total_cells = open_cells.max(1) as f32;   // 空洞不算地，别把特征稀释掉
     // 统计存活玩家
     for p in 0..max_players {
         if board.iter().flatten().any(|c| c.owner == Some(p)) {
@@ -860,6 +873,7 @@ pub fn process_click_with_killer_inner(
     // place / upgrade
     {
         let cell = &mut board[x][y];
+        if cell.blocked { return (vec![], 0, vec![], steps, exploded); }   // 空洞不可落子
         if cell.owner.is_none() {
             cell.owner = Some(player);
             // 首子等级 = 阈值 n-1（临界态：再落一子即炸）；其余落子 +1
@@ -986,6 +1000,7 @@ pub fn process_click_with_killer_inner(
                         }
                     }
                 }
+                if board[nx][ny].blocked { return; }   // 飞进空洞：棋子直接消失（等价默认边界的飞出棋盘）
                 if let Some(pv) = board[nx][ny].owner {
                     if pv != owner { last_killer.insert(pv, owner); }
                 }
@@ -1002,7 +1017,7 @@ pub fn process_click_with_killer_inner(
                 let is_special = special.is_some_and(|sp| {
                     targets.get(sp).map_or(false, |&(sx, sy)| sx == nx && sy == ny)
                 });
-                if !is_special {
+                if !is_special && !board[nx][ny].blocked {
                     board[nx][ny].count = board[nx][ny].count.saturating_add(1);
                 }
             }
@@ -1165,6 +1180,7 @@ pub fn get_moves(board: &GameBoard, sz: usize, player: usize, _first_move_pos: O
     for i in 0..sz {
         for j in 0..cols {
             let c = &board[i][j];
+            if c.blocked { continue; }   // 空洞不可落子
             if has_p {
                 // 阈值感知：只有 count < 本格阈值 的棋子可以落子（cap5 下 count==4 的引爆动作合法）
                 if c.owner == Some(player) && (c.count as u32) < cell_threshold(i, j, sz, cols, border_mode, cap_mode) {
@@ -2029,28 +2045,29 @@ pub fn first_move_center(board: &GameBoard, sz: usize) -> Option<(usize, usize)>
     let cols = board.first().map_or(sz, |r| r.len());
     let mut candidates: Vec<(usize, usize)> = (1..sz - 1)
         .flat_map(|i| (1..cols - 1).filter_map(move |j| {
-            if board[i][j].owner.is_none() && !is_in_any_restricted_zone(board, i, j) {
+            if board[i][j].owner.is_none() && !board[i][j].blocked && !is_in_any_restricted_zone(board, i, j) {
                 Some((i, j))
             } else { None }
         })).collect();
     if candidates.is_empty() {
         for i in 0..sz { for j in 0..cols {
-            if board[i][j].owner.is_none() && !is_in_any_restricted_zone(board, i, j) {
+            if board[i][j].owner.is_none() && !board[i][j].blocked && !is_in_any_restricted_zone(board, i, j) {
                 candidates.push((i, j));
             }
         }}
     }
     if candidates.is_empty() {
         for i in 0..sz { for j in 0..cols {
-            if board[i][j].owner.is_none() { candidates.push((i, j)); }
+            if board[i][j].owner.is_none() && !board[i][j].blocked { candidates.push((i, j)); }
         }}
     }
     if candidates.is_empty() { return None; }
-    let cx = sz as f64 / 2.0 - 0.5;
+    let row_c = sz as f64 / 2.0 - 0.5;
+    let col_c = cols as f64 / 2.0 - 0.5;
     candidates.into_iter()
         .min_by(|&(i1, j1), &(i2, j2)| {
-            let d1 = (i1 as f64 - cx).abs() + (j1 as f64 - cx).abs();
-            let d2 = (i2 as f64 - cx).abs() + (j2 as f64 - cx).abs();
+            let d1 = (i1 as f64 - row_c).abs() + (j1 as f64 - col_c).abs();
+            let d2 = (i2 as f64 - row_c).abs() + (j2 as f64 - col_c).abs();
             d1.partial_cmp(&d2).unwrap()
         })
 }

@@ -62,7 +62,7 @@ fn play_game(
     border_mode: BorderMode,
     cap_mode: CapMode,
 ) -> Option<usize> {
-    let mut board = vec![vec![Cell { owner: None, count: 0, th: None }; board_size]; board_size];
+    let mut board = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; board_size]; board_size];
     let mut eliminated: Vec<usize> = Vec::new();
     let mut cur_player: usize = first_player;
 

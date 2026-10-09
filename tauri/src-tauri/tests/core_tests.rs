@@ -3,8 +3,8 @@ use chain_chess_core::*;
 #[test]
 fn test_find_best_move_finds_valid_move() {
     // Empty board with one piece for player 0
-    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; 7]; 7];
-    b[3][3] = Cell { owner: Some(0), count: 1, th: None };
+    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 7]; 7];
+    b[3][3] = Cell { owner: Some(0), count: 1, th: None, blocked: false };
     let result = find_best_move(&b, 7, 0, 1, &[], 2, 10, None, false, BorderMode::Default, CapMode::Cap4, 0);
     assert!(result.is_some(), "AI should find a valid move at depth=1");
     let (x, y) = result.unwrap();
@@ -15,8 +15,8 @@ fn test_find_best_move_finds_valid_move() {
 
 #[test]
 fn test_find_best_move_strategy_returns_something() {
-    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; 5]; 5];
-    b[2][2] = Cell { owner: Some(0), count: 3, th: None };
+    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 5]; 5];
+    b[2][2] = Cell { owner: Some(0), count: 3, th: None, blocked: false };
     let result = find_best_move_strategy(&b, 5, 0, &[], 2, 10, None, BorderMode::Default, CapMode::Cap4);
     assert!(result.is_some(), "Strategy AI should find a move");
     let (x, y) = result.unwrap();
@@ -25,21 +25,21 @@ fn test_find_best_move_strategy_returns_something() {
 
 #[test]
 fn test_cell_default_state() {
-    let cell = Cell { owner: None, count: 0, th: None };
+    let cell = Cell { owner: None, count: 0, th: None, blocked: false };
     assert_eq!(cell.owner, None);
     assert_eq!(cell.count, 0);
 }
 
 #[test]
 fn test_cell_occupied() {
-    let cell = Cell { owner: Some(0), count: 3, th: None };
+    let cell = Cell { owner: Some(0), count: 3, th: None, blocked: false };
     assert_eq!(cell.owner, Some(0));
     assert_eq!(cell.count, 3);
 }
 
 #[test]
 fn test_process_move_result_defaults() {
-    let b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; 5]; 5];
+    let b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 5]; 5];
     let result = ProcessMoveResult {
         board: b.clone(),
         eliminated: vec![],
@@ -109,9 +109,9 @@ fn test_history_record_serde() {
 #[test]
 fn test_process_click_with_killer_identifies_eliminator() {
     // 3x3: 玩家1 在 (1,1) 只有 1 颗棋子；玩家0 在 (2,1) 有 3 颗，落子后爆裂吞掉玩家1
-    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; 3]; 3];
-    b[1][1] = Cell { owner: Some(1), count: 1, th: None };
-    b[2][1] = Cell { owner: Some(0), count: 3, th: None };
+    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 3]; 3];
+    b[1][1] = Cell { owner: Some(1), count: 1, th: None, blocked: false };
+    b[2][1] = Cell { owner: Some(0), count: 3, th: None, blocked: false };
     let (eliminated, _chain, killed_by) = process_click_with_killer(&mut b, 3, 2, 1, 0, 2, BorderMode::Default, CapMode::Cap4, None);
     assert_eq!(eliminated, vec![1], "player 1 should be eliminated");
     assert_eq!(killed_by, vec![(1, 0)], "player 0 should be the killer of player 1");
@@ -121,9 +121,9 @@ fn test_process_click_with_killer_identifies_eliminator() {
 #[test]
 fn test_process_click_wrapper_still_works() {
     // 简单版本应保持原行为（返回二元组）
-    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; 3]; 3];
-    b[1][1] = Cell { owner: Some(1), count: 1, th: None };
-    b[2][1] = Cell { owner: Some(0), count: 3, th: None };
+    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 3]; 3];
+    b[1][1] = Cell { owner: Some(1), count: 1, th: None, blocked: false };
+    b[2][1] = Cell { owner: Some(0), count: 3, th: None, blocked: false };
     let (eliminated, chain) = process_click(&mut b, 3, 2, 1, 0, 2, BorderMode::Default, CapMode::Cap4, None);
     assert_eq!(eliminated, vec![1]);
     assert!(chain >= 1);
@@ -141,9 +141,9 @@ fn test_chain_reaction_no_deadlock_degrade() {
         ((3, 0), 0, 2), ((3, 1), 0, 3), ((3, 2), 0, 2), ((3, 3), 0, 1), ((3, 4), 0, 2),
         ((4, 1), 0, 2), ((4, 2), 0, 2), ((4, 3), 0, 2), ((4, 4), 1, 1),
     ];
-    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz];
+    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz];
     for ((i, j), o, c) in setup {
-        b[i][j] = Cell { owner: Some(o), count: c, th: None };
+        b[i][j] = Cell { owner: Some(o), count: c, th: None, blocked: false };
     }
     // 修复前：此调用永不返回（死循环）
     let (elim, chain) = process_click(&mut b, sz, 4, 4, 1, 3, BorderMode::Degrade, CapMode::Cap4, None);
@@ -161,13 +161,13 @@ fn test_chain_reaction_no_deadlock_degrade() {
 fn test_chain_reaction_wrap_no_deadlock() {
     // wrap 模式：拥挤棋盘长对局可能进入互喂周期，防御上限必须生效
     let sz = 7usize;
-    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz];
+    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz];
     // 构造整圈 3 子环绕（wrap 下每格都有 4 邻居，能量守恒）
     for i in 0..sz {
-        b[i][0] = Cell { owner: Some(0), count: 3, th: None };
-        b[i][sz - 1] = Cell { owner: Some(0), count: 3, th: None };
-        b[0][i] = Cell { owner: Some(1), count: 3, th: None };
-        b[sz - 1][i] = Cell { owner: Some(1), count: 3, th: None };
+        b[i][0] = Cell { owner: Some(0), count: 3, th: None, blocked: false };
+        b[i][sz - 1] = Cell { owner: Some(0), count: 3, th: None, blocked: false };
+        b[0][i] = Cell { owner: Some(1), count: 3, th: None, blocked: false };
+        b[sz - 1][i] = Cell { owner: Some(1), count: 3, th: None, blocked: false };
     }
     let (elim, chain) = process_click(&mut b, sz, 3, 3, 0, 2, BorderMode::Wrap, CapMode::Cap4, None);
     assert!(chain < 1_000_000, "wrap 连锁步数异常: chain={}", chain);
@@ -186,9 +186,9 @@ fn test_killed_by_all_border_modes() {
     ];
     for (name, m) in modes {
         let sz = 3usize;
-        let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz];
-        b[1][1] = Cell { owner: Some(1), count: 1, th: None };
-        b[2][1] = Cell { owner: Some(0), count: 3, th: None };
+        let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz];
+        b[1][1] = Cell { owner: Some(1), count: 1, th: None, blocked: false };
+        b[2][1] = Cell { owner: Some(0), count: 3, th: None, blocked: false };
         let (eliminated, _chain, killed_by) = process_click_with_killer(&mut b, sz, 2, 1, 0, 2, m, CapMode::Cap4, None);
         assert_eq!(eliminated, vec![1], "[{}] player 1 应被淘汰", name);
         assert_eq!(killed_by, vec![(1, 0)], "[{}] 击败者应为玩家0", name);
@@ -200,9 +200,9 @@ fn test_killed_by_all_border_modes() {
 fn test_killed_by_degrade_corner() {
     // degrade 模式：角上 cap=2，玩家0 落角上引爆吞掉玩家1
     let sz = 3usize;
-    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None }; sz]; sz];
-    b[0][1] = Cell { owner: Some(1), count: 1, th: None };
-    b[0][0] = Cell { owner: Some(0), count: 1, th: None };
+    let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz];
+    b[0][1] = Cell { owner: Some(1), count: 1, th: None, blocked: false };
+    b[0][0] = Cell { owner: Some(0), count: 1, th: None, blocked: false };
     // 玩家0 落子 (0,0)：count 1->2 达角上阈值 2 引爆，向 (0,1) 扩散吞掉玩家1
     let (eliminated, _chain, killed_by) = process_click_with_killer(&mut b, sz, 0, 0, 0, 2, BorderMode::Degrade, CapMode::Cap4, None);
     assert_eq!(eliminated, vec![1], "degrade 角上玩家1 应被淘汰");
@@ -213,7 +213,7 @@ fn test_killed_by_degrade_corner() {
 
 /// 造一个 rows × cols 的空棋盘
 fn rect_board(rows: usize, cols: usize) -> GameBoard {
-    vec![vec![Cell { owner: None, count: 0, th: None }; cols]; rows]
+    vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; cols]; rows]
 }
 
 #[test]
@@ -252,8 +252,8 @@ fn test_rect_get_moves_stay_inside() {
 #[test]
 fn test_rect_full_game_runs_to_end() {
     let mut b = rect_board(7, 5);
-    b[1][1] = Cell { owner: Some(0), count: 3, th: None };
-    b[5][3] = Cell { owner: Some(1), count: 3, th: None };
+    b[1][1] = Cell { owner: Some(0), count: 3, th: None, blocked: false };
+    b[5][3] = Cell { owner: Some(1), count: 3, th: None, blocked: false };
     let res = simulate_to_end(
         b, 7, 2, 0, vec![], BorderMode::Default, CapMode::Cap4, None, 10,
         std::collections::HashMap::new(),
@@ -272,4 +272,70 @@ fn test_rect_wrap_uses_cols_for_columns() {
     assert!(ns.contains(&(6, 0)), "上行回绕到最后一行(6)");
     assert!(ns.contains(&(0, 4)), "左列回绕到最后一列(4)");
     assert!(ns.iter().all(|&(i, j)| i < 7 && j < 5), "回绕结果必须仍在棋盘内: {:?}", ns);
+}
+
+// ─── 异型棋盘：空洞（不规则形状的地基） ───
+
+#[test]
+fn test_hole_rejects_placement() {
+    let mut b: GameBoard = vec![vec![Cell::empty(); 5]; 5];
+    b[2][2] = Cell::hole();
+    let (elim, chain, _) = process_click_with_killer(&mut b, 5, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap4, None);
+    assert_eq!(chain, 0, "空洞不该接受落子");
+    assert!(elim.is_empty(), "不该淘汰任何人");
+    assert!(b[2][2].blocked, "空洞仍是空洞");
+    assert!(b[2][2].owner.is_none(), "空洞里不该出现棋子");
+}
+
+#[test]
+fn test_hole_excluded_from_moves() {
+    let mut b: GameBoard = vec![vec![Cell::empty(); 5]; 5];
+    b[2][2] = Cell::hole();
+    let moves = get_moves(&b, 5, 0, None, BorderMode::Default, CapMode::Cap4);
+    assert!(!moves.contains(&(2, 2)), "空洞不该出现在走法里");
+    assert!(!moves.is_empty(), "其它格子仍可落子");
+}
+
+/// 棋子飞进空洞要直接消失（等价于默认边界的「飞出棋盘」）
+#[test]
+fn test_piece_flying_into_hole_disappears() {
+    let mut b: GameBoard = vec![vec![Cell::empty(); 5]; 5];
+    b[2][2] = Cell { owner: Some(0), count: 3, blocked: false, th: None };  // cfg4 下 3 颗即爆
+    b[2][3] = Cell::hole();                                                // 右边挖个洞
+    let (_, chain, _) = process_click_with_killer(&mut b, 5, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap4, None);
+    assert_eq!(chain, 1, "中心应当爆一次");
+    assert!(b[2][3].blocked, "洞保持是洞");
+    assert!(b[2][3].owner.is_none(), "飞进洞的棋子应当消失");
+    assert_eq!(b[2][3].count, 0, "洞里不留棋子");
+}
+
+#[test]
+fn test_hole_board_neighbors_stay_in_bounds() {
+    // 洞不影响邻居越界判断：整盘遍历一次，邻居必须都在界内
+    let mut b: GameBoard = vec![vec![Cell::empty(); 8]; 4];   // 长方形 + 洞
+    for j in 0..8 { b[0][j] = Cell::hole(); }
+    for i in 0..4 {
+        for j in 0..8 {
+            let ns = nbrs(i, j, 4, 8);
+            assert!(ns.iter().all(|&(a, c)| a < 4 && c < 8), "越界: {:?}", ns);
+        }
+    }
+}
+
+#[test]
+fn test_features_survive_holes() {
+    let mut b: GameBoard = vec![vec![Cell::empty(); 7]; 7];
+    for i in 0..7 { b[i][0] = Cell::hole(); b[i][6] = Cell::hole(); }   // 左右两列挖空
+    b[3][3] = Cell { owner: Some(0), count: 2, blocked: false, th: None };
+    let f = extract_features_improved(&b, 0, 2, BorderMode::Default, CapMode::Cap4);
+    assert!(f.iter().all(|x| x.is_finite()), "特征必须有限（归一化分母按可用格数算）: {:?}", f);
+}
+
+#[test]
+fn test_holes_do_not_count_as_pieces() {
+    let mut b: GameBoard = vec![vec![Cell::empty(); 5]; 5];
+    b[0][0] = Cell::hole();
+    assert!(!has_pieces(&b, 1), "空洞不算任何人的棋子");
+    b[1][1] = Cell { owner: Some(1), count: 1, blocked: false, th: None };
+    assert!(has_pieces(&b, 1));
 }
