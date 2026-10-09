@@ -122,11 +122,15 @@ function resolveRandomCap(){
   let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
   return opts[s%opts.length];
 }
-// 根据棋盘大小返回最大允许玩家人数
-function getMaxPlayersBySize(boardSize){
-  if(boardSize===5)return 5;
-  if(boardSize===6)return 7;
+// 按可用格数限制人数：长方形与不规则棋盘都按实际格数算
+function getMaxPlayersByArea(area){
+  if(area<=25)return 5;
+  if(area<=36)return 7;
   return 10;
+}
+// 正方形棋盘按边长折算（5×5→5 人、6×6→7 人、更大→10 人）
+function getMaxPlayersBySize(boardSize){
+  return getMaxPlayersByArea(boardSize*boardSize);
 }
 // 双向联动：棋盘大小 ↔ 人数/AI数量，互相扣掉不合法的按钮
 
@@ -796,7 +800,7 @@ async function vibrate(pattern){
 }
 
 /* ==================== STATE ==================== */
-let board=[],curPlayer=0,size=7,maxPlayers=2;
+let board=[],curPlayer=0,size=7,cols=7,maxPlayers=2;   // size=行数，cols=列数（长方形时两者不同）
 let cells=[];
 let gameMode=null; // 'ai'|'local'|'eve'
 let _originPage=null; // 游戏从哪个 lobby 页面发起（用于「再来一局」返回）
@@ -1032,7 +1036,7 @@ Router.register('gameSetup', {
   enter() {
     document.body.style.background='';
     restoreLastSetup();          // 先恢复上次选择，再由 setupLobbySync 校验兼容性
-    setTimeout(setupLobbySync, 20);
+    setTimeout(initShapeMode, 20);
     setTimeout(updateModeConflictUI, 20);
   },
   leave() {}
@@ -1269,7 +1273,7 @@ function loadHistoryList(){
       let innerHtml=`
         <span class="sel-chk"></span>
         <div class="h-time" style="color:var(--accent2)">进行中</div>
-        <div class="h-info">${modeLabel} · ${r.boardSize}×${r.boardSize} · ${r.playerCount}人${r.aiCount>0?(' · AI×'+r.aiCount):''}</div>
+        <div class="h-info">${modeLabel} · ${r.boardSize}×${r.boardCols||r.boardSize} · ${r.playerCount}人${r.aiCount>0?(' · AI×'+r.aiCount):''}</div>
         <div class="h-winner" style="color:var(--accent2)">进行中 · ${r.playerCount} 人模式</div>
         <div style="margin-top:4px;display:flex;gap:6px">
           <button class="glass-btn primary" id="continueFromHistoryBtn" style="flex:1;padding:6px 8px;font-size:.78rem">▶ 继续游戏</button>
@@ -1306,7 +1310,7 @@ function loadHistoryList(){
       div.innerHTML=`
         <span class="sel-chk"></span>
         <div class="h-time">${r.time}</div>
-        <div class="h-info">${modeLabel} · ${r.boardSize}×${r.boardSize} · ${r.playerCount}人${r.aiCount>0?(' · AI×'+r.aiCount):''}</div>
+        <div class="h-info">${modeLabel} · ${r.boardSize}×${r.boardCols||r.boardSize} · ${r.playerCount}人${r.aiCount>0?(' · AI×'+r.aiCount):''}</div>
         <div class="h-winner" style="color:${winnerColor}">${winnerName}</div>
         <div class="h-details">${r.aiAlgorithm?('算法: '+r.aiAlgorithm):''}${r.aiDepth>0?(' · 深度: '+r.aiDepth):''}</div>
         <div style="margin-top:6px"><button class="glass-btn primary" id="replayFromListBtn" style="padding:5px 12px;font-size:.75rem">▶ 回放</button></div>
@@ -1323,6 +1327,7 @@ function loadHistoryList(){
           const historyData=expandHistory(rec.history, rec.playerCount||maxPlayers);
           openReplay({
             size: rec.boardSize || 7,
+            cols: rec.boardCols || rec.boardSize || 7,
             maxPlayers: rec.playerCount || 2,
             borderMode: rec.borderMode || 'default',
             capMode: rec.capMode || '4',
@@ -1365,7 +1370,7 @@ function loadHistoryList(){
       const liveCount = effectiveState.maxPlayers - (elimArr ? (Array.isArray(elimArr) ? elimArr.length : (elimArr.size || 0)) : 0);
       div.innerHTML = `
         <div class="h-time" style="color:var(--accent2)">进行中</div>
-        <div class="h-info">${modeLabel} · ${effectiveState.size}×${effectiveState.size} · ${effectiveState.maxPlayers}人${(effectiveState.aiCount||0)>0?(' · AI×'+effectiveState.aiCount):''}</div>
+        <div class="h-info">${modeLabel} · ${effectiveState.size}×${effectiveState.cols||effectiveState.size} · ${effectiveState.maxPlayers}人${(effectiveState.aiCount||0)>0?(' · AI×'+effectiveState.aiCount):''}</div>
         <div class="h-winner" style="color:var(--accent2)">存活 ${liveCount} 人 · 轮到 ${(effectiveState.colorNames&&effectiveState.colorNames[effectiveState.curPlayer])||'玩家 '+(effectiveState.curPlayer+1)}</div>
         <div style="margin-top:4px;display:flex;gap:6px">
           <button class="glass-btn primary" onclick="continueGame()" style="flex:1;padding:6px 8px;font-size:.78rem">▶ 继续游戏</button>
@@ -1388,7 +1393,7 @@ function loadHistoryList(){
       const liveCount = backupState.maxPlayers - (elimArr ? (Array.isArray(elimArr) ? elimArr.length : (elimArr.size || 0)) : 0);
       div.innerHTML = `
         <div class="h-time" style="color:var(--accent2)">进行中</div>
-        <div class="h-info">${modeLabel} · ${backupState.size}×${backupState.size} · ${backupState.maxPlayers}人${(backupState.aiCount||0)>0?(' · AI×'+backupState.aiCount):''}</div>
+        <div class="h-info">${modeLabel} · ${backupState.size}×${backupState.cols||backupState.size} · ${backupState.maxPlayers}人${(backupState.aiCount||0)>0?(' · AI×'+backupState.aiCount):''}</div>
         <div class="h-winner" style="color:var(--accent2)">存活 ${liveCount} 人 · 轮到 ${(backupState.colorNames&&backupState.colorNames[backupState.curPlayer])||'玩家 '+(backupState.curPlayer+1)}</div>
         <div style="margin-top:4px;display:flex;gap:6px">
           <button class="glass-btn primary" onclick="continueGame()" style="flex:1;padding:6px 8px;font-size:.78rem">▶ 继续游戏</button>
@@ -1715,6 +1720,7 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
         playerCount: maxPlayers,
         aiCount: aiPlayers.size,
         boardSize: size,
+        boardCols: cols,
         borderMode: borderMode || 'default',
         capMode: capMode || '4',
         winner: winner !== null && winner !== undefined ? winner : null,
@@ -1740,6 +1746,7 @@ async function saveUnfinishedGameHistory(){
   // ★ 在 await 之前捕获所有全局变量的快照（避免 exitGame 在 await 期间重置全局变量后读取到空值）
   const _board = board;
   const _size = size;
+  const _cols = cols;
   const _maxPlayers = maxPlayers;
   const _curPlayer = curPlayer;
   const _firstMovePos = firstMovePos;
@@ -1776,6 +1783,7 @@ async function saveUnfinishedGameHistory(){
   const state = {
     board: _board,
     size: _size,
+    cols: _cols,
     maxPlayers: _maxPlayers,
     curPlayer: _curPlayer,
     firstMovePos: _firstMovePos,
@@ -1819,6 +1827,7 @@ async function saveUnfinishedGameHistory(){
         playerCount: _maxPlayers,
         aiCount: _aiPlayers.length,
         boardSize: _size,
+        boardCols: _cols,
         winner: null,
         colorNames: toColorNamesArray(_colorNames),
         chainStats: _chainStats,
@@ -1866,6 +1875,7 @@ function loadGameFromState(saved){
   undoStack = [];
 
   size = saved.size;
+  cols = saved.cols || saved.size;   // 老存档没有 cols，按正方形算
   maxPlayers = saved.maxPlayers;
   curPlayer = saved.curPlayer;
   firstMovePos = saved.firstMovePos || null;
@@ -2003,18 +2013,20 @@ function nbrs(i,j,s){
   if(j>0)r.push([i,j-1]);if(j<s-1)r.push([i,j+1]);
   return r;
 }
-function nbrs8(i,j,s){
+function nbrs8(i,j,rows,cols){
   let r=[];
   for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++){
     if(di===0&&dj===0)continue;
     let ni=i+di,nj=j+dj;
-    if(ni>=0&&ni<s&&nj>=0&&nj<s)r.push([ni,nj]);
+    if(ni>=0&&ni<rows&&nj>=0&&nj<cols)r.push([ni,nj]);
   }
   return r;
 }
 // 创建空棋盘（每格 owner=null、count=0；保留 th 字段以兼容旧历史数据，但不再生成阈值）
-function mkBoard(s){
-  return Array.from({length:s},()=>Array.from({length:s},()=>{
+// 造棋盘：s 是行数，c 是列数（长方形时不同；不传就按正方形）
+function mkBoard(s,c){
+  const w=c||s;
+  return Array.from({length:s},()=>Array.from({length:w},()=>{
     return {owner:null,count:0,th:undefined};
   }));
 }
@@ -2022,8 +2034,8 @@ function hasPieces(p,b){
   for(let r of b)for(let c of r)if(c.owner===p)return true;
   return false;
 }
-function nearAny(i,j,s,b){
-  for(let[ni,nj]of nbrs8(i,j,s)){if(b[ni][nj].owner!==null)return true}
+function nearAny(i,j,b){
+  for(let[ni,nj]of nbrs8(i,j,b.length,b[0].length)){if(b[ni][nj].owner!==null)return true}
   return false;
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -2039,8 +2051,9 @@ function isInFirstMoveRestricted(x,y,fx,fy){
   return false;
 }
 // 检查 (x,y) 是否在棋盘上任何已有棋子周围的12格限制区内
-function isInRestrictedZone(x,y,sz,b){
-  for(let i=0;i<sz;i++)for(let j=0;j<sz;j++){
+// 尺寸直接从棋盘推导，长方形也不用改调用方
+function isInRestrictedZone(x,y,b){
+  for(let i=0;i<b.length;i++)for(let j=0;j<b[i].length;j++){
     if(b[i][j].owner!==null&&isInFirstMoveRestricted(x,y,i,j))return true;
   }
   return false;
@@ -2203,7 +2216,7 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
     for(let k=0;k<snapSteps.length;k++){
       // 应用引擎快照棋盘（每一步爆炸后的真实状态）
       const snap = snapSteps[k];
-      for(let i=0;i<size;i++)for(let j=0;j<size;j++)b[i][j]=snap[i][j];
+      for(let i=0;i<size;i++)for(let j=0;j<cols;j++)b[i][j]=snap[i][j];
       // 爆炸特效位置以引擎返回的坐标为准
       let ex=x,ey=y;
       if(snapExploded && snapExploded[k]){
@@ -2234,7 +2247,7 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
     }
     // 矫正到引擎最终棋盘（快照最后一步即最终态，再矫正一次保证一致）
     if(finalBoard){
-      for(let i=0;i<size;i++) for(let j=0;j<size;j++) b[i][j]=finalBoard[i][j];
+      for(let i=0;i<size;i++) for(let j=0;j<cols;j++) b[i][j]=finalBoard[i][j];
       renderBoard(true);
     }else if(anim&&chainCount>0&&wantSkip()){
       renderBoard(true);
@@ -2319,7 +2332,7 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
 
   // 用 Rust 结果矫正本地棋盘（弥补前端简化模拟 vs 真实边界逻辑的偏差）
   if(finalBoard){
-    for(let i=0;i<size;i++) for(let j=0;j<size;j++){
+    for(let i=0;i<size;i++) for(let j=0;j<cols;j++){
       b[i][j]=finalBoard[i][j];
     }
     // 矫正后始终渲染引擎真实结果：动画播放路径下此前依赖逐帧渲染 JS 模拟态，
@@ -2453,7 +2466,7 @@ function ensureBoardKeyboard(){
 
 function kbMoveFocus(i,j){
   i=Math.max(0,Math.min(size-1,i));
-  j=Math.max(0,Math.min(size-1,j));
+  j=Math.max(0,Math.min(cols-1,j));
   if(i===_kbPos.i&&j===_kbPos.j)return;
   const prev=cells[_kbPos.i]&&cells[_kbPos.i][_kbPos.j];
   if(prev)prev.setAttribute('tabindex','-1');
@@ -2467,17 +2480,17 @@ function renderBoard(force,popX,popY){
   bd.setAttribute('role','grid');
   bd.setAttribute('aria-label','棋盘');
   ensureBoardKeyboard();
-  if(force||cells.length!==size){
+  if(force||cells.length!==size||(cells.length&&cells[0].length!==cols)){
     bd.replaceChildren();
     void bd.offsetHeight;
-    bd.style.gridTemplateColumns=`repeat(${size},1fr)`;
+    bd.style.gridTemplateColumns=`repeat(${cols},1fr)`;
     // 棋盘尺寸可能变了，先把键盘焦点钳到新范围内
     _kbPos.i=Math.min(_kbPos.i,size-1);
-    _kbPos.j=Math.min(_kbPos.j,size-1);
+    _kbPos.j=Math.min(_kbPos.j,cols-1);
     cells=[];
     for(let i=0;i<size;i++){
       let row=[];
-      for(let j=0;j<size;j++){
+      for(let j=0;j<cols;j++){
         let el=document.createElement('div');el.className='cell';
         el.setAttribute('role','gridcell');
         el.dataset.i=i;el.dataset.j=j;
@@ -2493,7 +2506,7 @@ function renderBoard(force,popX,popY){
     void document.body.offsetHeight;
     _boardCache=null;
   }
-  for(let i=0;i<size;i++)for(let j=0;j<size;j++){
+  for(let i=0;i<size;i++)for(let j=0;j<cols;j++){
     let el=cells[i][j],d=board[i][j];
     let prev=_boardCache?.[i]?.[j];
     // 更新 aria-label（仅当格子状态变化时）
@@ -3162,7 +3175,7 @@ async function localClick(x,y){
     // AI 无棋子：人类点击为空 AI 放置首子
     let c=board[x][y];
     if(c.owner!==null){showMsg('该位置已有棋子','');return}
-    if(isInRestrictedZone(x,y,size,board)){
+    if(isInRestrictedZone(x,y,board)){
       showMsg('这里离已有棋子太近，换个位置','');return
     }
     saveUndoState();
@@ -3216,7 +3229,7 @@ async function localClick(x,y){
     if(c.owner!==curPlayer){showMsg('只能点击自己的棋子','');return}
   }else{
     if(c.owner!==null){showMsg('不能抢占别人的格子','');return}
-    if(isInRestrictedZone(x,y,size,board)){
+    if(isInRestrictedZone(x,y,board)){
       showMsg('这里离已有棋子太近，换个位置','');return
     }
   }
@@ -3789,7 +3802,7 @@ function replayGame(){
     maxPlayers=c.aiCount+1;
     aiAlgorithm=c.aiAlgorithm||'strategy';
     selectedPlayerColor=c.humanIdx;
-    board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+    board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
     document.getElementById('pauseBtn').textContent='暂停';
     gameMode='ai';
     aiPlayers=new Set();
@@ -3814,7 +3827,7 @@ function replayGame(){
     undoStack=[];
     size=c.size;
     maxPlayers=c.maxPlayers;
-    board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+    board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
     document.getElementById('pauseBtn').textContent='暂停';
     gameMode='local';
     aiPlayers=new Set();
@@ -3835,7 +3848,7 @@ function replayGame(){
     undoStack=[];
     size=c.size;
     maxPlayers=c.maxPlayers||c.aiCount;
-    board=mkBoard(size);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+    board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
     document.getElementById('pauseBtn').textContent='暂停';
     gameMode='eve';
     aiPlayers=new Set();
@@ -4654,10 +4667,67 @@ function restoreLastSetup(){
   }
 }
 
+// ─── 棋盘形状（开局页） ───
+// 正方形走原来的尺寸按钮；长方形在这里选行/列；自定义跳形状编辑器页面。
+function currentShapeMode(){
+  return getSel('shapeModeGroup')||'square';
+}
+function fillRectSizeSelects(){
+  [['rectRows',size||7],['rectCols',cols||7]].forEach(function(p){
+    const el=document.getElementById(p[0]);
+    if(!el)return;
+    if(!el.options.length){
+      for(let v=5;v<=19;v++){
+        const o=document.createElement('option');
+        o.value=String(v);o.textContent=String(v);
+        el.appendChild(o);
+      }
+    }
+    if(!el.value)el.value=String(p[1]);
+  });
+}
+// 读出当前选中的棋盘尺寸（长方形走行/列选择器，其余按正方形）
+function readSetupBoard(){
+  if(currentShapeMode()==='rect'){
+    fillRectSizeSelects();
+    const rr=document.getElementById('rectRows'), cc=document.getElementById('rectCols');
+    const r=parseInt(rr&&rr.value,10)||7;
+    const c=parseInt(cc&&cc.value,10)||7;
+    return {rows:r,cols:c};
+  }
+  const s=getSel('setupSizeGrid')||7;
+  return {rows:s,cols:s};
+}
+// 形状切换：显示对应的尺寸控件
+function applyShapeMode(){
+  const mode=currentShapeMode();
+  const sq=document.getElementById('squareSizeRow');
+  const rc=document.getElementById('rectSizeRow');
+  if(sq)sq.style.display=(mode==='rect')?'none':'';
+  if(rc)rc.style.display=(mode==='rect')?'':'none';
+  if(mode==='custom'){Router.navigate('board-editor');return;}
+  setupLobbySync();
+}
+// 进入开局页时初始化形状选择（默认正方形）
+function initShapeMode(){
+  fillRectSizeSelects();
+  const g=document.getElementById('shapeModeGroup');
+  if(g){
+    g.querySelectorAll('.tg-btn').forEach(function(b){
+      b.onclick=function(){
+        g.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+        applyShapeMode();
+      };
+    });
+  }
+  applyShapeMode();
+}
+
 function setupLobbySync(){
-  const sz=getSel('setupSizeGrid')||7;
   const cnt=getSel('setupPlayersGroup')||2;
-  const maxP=getMaxPlayersBySize(sz);
+  const bd=readSetupBoard();
+  const maxP=getMaxPlayersByArea(bd.rows*bd.cols);
   const pg=document.getElementById('setupPlayersGroup');
   if(pg){
     pg.querySelectorAll('.gb').forEach(b=>{b.style.display=parseInt(b.dataset.value)<=maxP?'':'none'});
@@ -4667,8 +4737,9 @@ function setupLobbySync(){
       if(f)setSelected(pg,f);
     }
   }
+  // 方形尺寸按钮的可用性只在正方形模式下维护（长方形时那一栏是隐藏的）
   const sg=document.getElementById('setupSizeGrid');
-  if(sg){
+  if(sg&&currentShapeMode()!=='rect'){
     sg.querySelectorAll('.size-btn').forEach(b=>{b.style.display=cnt<=getMaxPlayersBySize(parseInt(b.dataset.value))?'':'none'});
     const ss=sg.querySelector('.selected');
     if(ss&&cnt>getMaxPlayersBySize(parseInt(ss.dataset.value))){
@@ -4680,8 +4751,10 @@ function setupLobbySync(){
 }
 
 function startUnifiedGame(){
-  const sz=getSel('setupSizeGrid')||7;
+  const bd=readSetupBoard();
+  const sz=bd.rows;
   const cnt=getSel('setupPlayersGroup')||2;
+  size=bd.rows;cols=bd.cols;   // 长方形棋盘：行、列分开记
   // 记住本次开局配置，下次进 setup 页时恢复（appSettings 会持久化）
   appSettings.lastSetup={sz:sz,cnt:cnt};
   saveSettings();
@@ -4707,7 +4780,7 @@ function startLocalFromSetup(sz,cnt){
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
   if(borderMode==='random')borderMode=resolveRandomBorder();
   if(capMode==='random')capMode=resolveRandomCap();
-  board=mkBoard(size,capMode,gameCount);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='local';_originPage='gameSetup';
   aiPlayers=new Set();aiThinking=false;
@@ -4739,7 +4812,7 @@ function startAIFromSetup(sz,cnt){
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
   if(borderMode==='random')borderMode=resolveRandomBorder();
   if(capMode==='random')capMode=resolveRandomCap();
-  board=mkBoard(size,capMode,gameCount);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='ai';_originPage='gameSetup';
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
@@ -4781,7 +4854,7 @@ function startEveFromSetup(sz,cnt){
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
   if(borderMode==='random')borderMode=resolveRandomBorder();
   if(capMode==='random')capMode=resolveRandomCap();
-  board=mkBoard(size,capMode,gameCount);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='eve';_originPage='gameSetup';
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
@@ -4919,10 +4992,12 @@ function openReplay(cfg){
     return;
   }
   const size=cfg.size||7;
+  const cols=cfg.cols||size;   // 长方形回放：列数可能不等于行数
   const maxPlayers=cfg.maxPlayers||2;
   const ov=document.getElementById('replayOverlay');
   _rp={
     size,
+    cols,
     maxPlayers,
     borderMode:cfg.borderMode||'default',
     capMode:cfg.capMode||'4',
@@ -4931,7 +5006,7 @@ function openReplay(cfg){
     history,
     total:history.length-1,        // 落子步数（第 0 条为初始状态）
     step:0,
-    board:mkBoard(size,cfg.capMode||'4',cfg.gameCount||0),
+    board:mkBoard(size,cfg.cols||size),
     cells:null,
     curPlayer:0,
     playing:false,
@@ -4942,11 +5017,11 @@ function openReplay(cfg){
   // 构建回放棋盘 DOM
   const bd=document.getElementById('rpBoard');
   bd.replaceChildren();
-  bd.style.gridTemplateColumns=`repeat(${size},1fr)`;
+  bd.style.gridTemplateColumns=`repeat(${_rp.cols},1fr)`;
   _rp.cells=[];
-  for(let i=0;i<size;i++){
+  for(let i=0;i<_rp.size;i++){
     const row=[];
-    for(let j=0;j<size;j++){
+    for(let j=0;j<_rp.cols;j++){
       const el=document.createElement('div');el.className='cell';
       bd.appendChild(el);row.push(el);
     }
@@ -4991,7 +5066,7 @@ function closeReplay(){
 function rpRenderBoard(force,popX,popY){
   if(!_rp)return;
   const bd=_rp.board;
-  for(let i=0;i<_rp.size;i++)for(let j=0;j<_rp.size;j++){
+  for(let i=0;i<_rp.size;i++)for(let j=0;j<_rp.cols;j++){
     const el=_rp.cells[i][j],d=bd[i][j];
     el.innerHTML='';
     if(d.owner!==null){
@@ -5080,7 +5155,7 @@ async function rpGoTo(target, animate){
     let from=0;
     for(const[k]of _rp.ck){if(k<=target&&k>from)from=k;}
     if(from===0){
-      _rp.board=mkBoard(_rp.size,_rp.capMode,_rp.gameCount);
+      _rp.board=mkBoard(_rp.size,_rp.cols||_rp.size);
       _rp.curPlayer=0;
     }else{
       _rp.board=cloneBoard(_rp.ck.get(from));
@@ -5138,7 +5213,7 @@ async function rpResetTo(step, animate){
   if(!_rp)return;
   rpCancel();
   const token=_rp.token;
-  _rp.board=mkBoard(_rp.size,_rp.capMode,_rp.gameCount);
+  _rp.board=mkBoard(_rp.size,_rp.cols||_rp.size);
   _rp.curPlayer=0;
   _rp.step=0;
   _rp.ck.clear();

@@ -146,6 +146,9 @@ pub struct HistoryRecord {
     pub player_count: u32,
     pub ai_count: u32,
     pub board_size: u32,
+    /// 棋盘列数（长方形棋盘专用）。缺省视为与 board_size 相同，即正方形 —— 老记录照旧。
+    #[serde(default)]
+    pub board_cols: Option<u32>,
     /// 边界模式（默认/回环/反弹/降级/随机）
     #[serde(default)]
     pub border_mode: Option<String>,

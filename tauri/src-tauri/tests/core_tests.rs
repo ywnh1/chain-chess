@@ -89,6 +89,7 @@ fn test_history_record_serde() {
         player_count: 3,
         ai_count: 3,
         board_size: 9,
+        board_cols: Some(5),   // 长方形：9 行 × 5 列
         border_mode: Some("default".to_string()),
         cap_mode: Some("4".to_string()),
         winner: Some(1),

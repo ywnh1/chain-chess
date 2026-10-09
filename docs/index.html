@@ -62,8 +62,17 @@ try {
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>
   <h2>开始游戏</h2>
 
-  <!-- 棋盘大小 -->
-  <div class="form-row"><label>棋盘大小<button type="button" class="hint-btn" onclick="openHint('board-size')" aria-label="棋盘大小说明">!</button></label>
+  <!-- 棋盘形状 -->
+  <div class="form-row"><label>棋盘形状</label>
+    <div id="shapeModeGroup" class="toggle-group">
+      <button class="tg-btn selected" data-value="square">正方形</button>
+      <button class="tg-btn" data-value="rect">长方形</button>
+      <button class="tg-btn" data-value="custom">自定义</button>
+    </div>
+  </div>
+
+  <!-- 棋盘大小（正方形） -->
+  <div class="form-row" id="squareSizeRow"><label>棋盘大小<button type="button" class="hint-btn" onclick="openHint('board-size')" aria-label="棋盘大小说明">!</button></label>
     <div id="setupSizeGrid" class="size-grid">
       <button class="size-btn" data-value="5">5×5</button>
       <button class="size-btn" data-value="6">6×6</button>
@@ -80,6 +89,15 @@ try {
       <button class="size-btn" data-value="17">17×17</button>
       <button class="size-btn" data-value="18">18×18</button>
       <button class="size-btn" data-value="19">19×19</button>
+    </div>
+  </div>
+
+  <!-- 长宽（长方形棋盘） -->
+  <div class="form-row" id="rectSizeRow" style="display:none"><label>行 × 列</label>
+    <div style="display:flex;align-items:center;gap:8px">
+      <select id="rectRows" style="flex:1"></select>
+      <span style="color:var(--dim)">×</span>
+      <select id="rectCols" style="flex:1"></select>
     </div>
   </div>
 
