@@ -2790,7 +2790,8 @@ function renderPlayerBar(){
   el.appendChild(tc);
 }
 function cloneBoard(b){
-  return b.map(row=>row.map(c=>({owner:c.owner,count:c.count})));
+  // blocked 必须一起拷：不规则棋盘悔棋后要是丢了，洞就没了
+  return b.map(row=>row.map(c=>({owner:c.owner,count:c.count,blocked:c.blocked})));
 }
 
 /* ═══════ AI 走法建议（局内手动触发，仅给当前一步） ═══════ */
@@ -4139,6 +4140,8 @@ async function showSettlement(winner,colorNames,history){
     replayBtn.onclick = () => {
       openReplay({
         size: size,
+        cols: cols,
+        cells: boardCells,
         maxPlayers: maxPlayers,
         borderMode: borderMode || 'default',
         capMode: capMode || '4',
@@ -4221,6 +4224,8 @@ function showHistoryDetail(r){
     replayBtn.onclick = () => {
       openReplay({
         size: r.boardSize || size,
+        cols: r.boardCols || r.boardSize || size,
+        cells: r.boardCells || null,
         maxPlayers: histPlayerCnt,
         borderMode: r.borderMode || 'default',
         capMode: r.capMode || '4',
@@ -5220,7 +5225,7 @@ function openReplay(cfg){
     history,
     total:history.length-1,        // 落子步数（第 0 条为初始状态）
     step:0,
-    board:mkBoard(size,cfg.cols||size),
+    board:mkBoard(size,cols,cfg.cells||null),
     cells:null,
     curPlayer:0,
     playing:false,

@@ -70,6 +70,13 @@ for(const c of strContainers)
     if(run('custom',false).nav)e.push("初始化时不该跳编辑器（会退不出来）");
   }
 }
+// 棋盘副本必须带上 blocked，否则悔棋后洞就没了。只盯 cloneBoard 的返回，
+// _boardCache 那种只用于渲染对比的缓存不需要（它本来就只看 owner/count）。
+if(/return b\.map\(row=>row\.map\(c=>\(\{owner:c\.owner,count:c\.count\}\)\)\)/.test(appJs))
+  e.push("cloneBoard 丢了 blocked：悔棋后不规则棋盘会变回普通棋盘");
+// 回放入口必须传 cols：少了它，长方形回放会按正方形重建，坐标直接错乱
+for(const m of appJs.matchAll(/openReplay\(\{([\s\S]*?)\n      \}\)/g))
+  if(!/cols:/.test(m[1]))e.push("openReplay 调用没传 cols");
 console.log("\n"+h.split("\n").length+" lines, "+kb+"KB");
 if(e.length){console.log("ERRORS:");e.forEach(x=>console.log(" - "+x))}
 if(w.length){console.log("WARNINGS:");w.forEach(x=>console.log(" - "+x))}
