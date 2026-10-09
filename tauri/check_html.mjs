@@ -15,6 +15,11 @@ const hintsBlock=appJs.slice(appJs.indexOf("const HINTS = {"),appJs.indexOf("/**
 const hintKeys=new Set([...hintsBlock.matchAll(/'([a-z-]+)': \{\n    title:/g)].map(m=>m[1]));
 for(const m of h.matchAll(/openHint\('([a-z-]+)'\)/g))if(!hintKeys.has(m[1]))e.push("unknown hint key: "+m[1]);
 for(const m of h.matchAll(/<div id="([a-z-]+)" class="screen"/g))if(!appJs.includes(`Router.register('${m[1]}'`))e.push("screen not registered: "+m[1]);
+// 取值辅助别用错：getSel 是数字版（parseInt），字符串容器必须用 getSelStr。
+// 这个错犯过一次：currentShapeMode 用了 getSel，点「长方形/自定义」永远退回 square。
+const strContainers=["shapeModeGroup","borderModeGroup","capModeGroup","soundThemeGroup","dogBarkGroup"];
+for(const c of strContainers)
+  if(new RegExp("getSel\\('"+c+"'\\)").test(appJs))e.push("getSel('"+c+"') 用错了：字符串容器要用 getSelStr");
 console.log("\n"+h.split("\n").length+" lines, "+kb+"KB");
 if(e.length){console.log("ERRORS:");e.forEach(x=>console.log(" - "+x))}
 if(w.length){console.log("WARNINGS:");w.forEach(x=>console.log(" - "+x))}

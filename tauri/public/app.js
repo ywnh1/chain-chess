@@ -1105,7 +1105,7 @@ Router.register('about-rules', {
   leave() {}
 });
 Router.register('about-changelog', {
-  back: 'about',
+  back() { return Router.getPrev() || 'about'; },   // 从「更多 → 更新详情」或「关于」进来都能原路返回
   enter() { document.body.style.background=''; renderChangelogCards(); },
   leave() { var cc=document.getElementById('changelogContainer');if(cc)cc.querySelectorAll('.cl-card').forEach(function(e){e.remove()}); }
 });
@@ -4857,7 +4857,9 @@ function restoreLastSetup(){
 // ─── 棋盘形状（开局页） ───
 // 正方形走原来的尺寸按钮；长方形在这里选行/列；自定义跳形状编辑器页面。
 function currentShapeMode(){
-  return getSel('shapeModeGroup')||'square';
+  // 注意用 getSelStr：getSel 是数字版，对 'square' 这种值取 parseInt 会得到 NaN
+  const v=getSelStr('shapeModeGroup');
+  return (v==='rect'||v==='custom')?v:'square';
 }
 function fillRectSizeSelects(){
   [['rectRows',size||7],['rectCols',cols||7]].forEach(function(p){
