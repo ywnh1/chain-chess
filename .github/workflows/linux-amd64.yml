@@ -52,7 +52,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('tauri/src-tauri/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('tauri/src-tauri/Cargo.lock', 'engine/Cargo.lock') }}
 
       - name: Tauri 构建 deb
         run: |
