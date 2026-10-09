@@ -1,20 +1,20 @@
 {
   "version": "3.4.0",
-  "notes": "Irregular board shapes: rectangles up to 19 per side, plus a 20x20 shape editor with cross/ring/L/U presets and JSON import/export; custom sound themes, where each of the four cues can use a built-in tone or your own audio file; the intro dialog is now collapsible with the changelog first; settings renamed to More; docs updated for Linux",
-  "notes_zh": "新增异型棋盘：长方形（长宽各 5-19）与自定义不规则形状（20×20 编辑器，十字/口字/L/U 预设，可导入导出）；新增自定义音效主题，四个音效位可各自选内置音色或传入自己的音频；引导弹窗改为可折叠、本版更新在前；设置页更名「更多」；文档补齐 Linux 平台",
+  "notes": "Irregular board shapes (rectangles plus a 20x20 shape editor with cross/ring/L/U presets and JSON import/export); custom sound themes, where each cue can use a built-in tone or your own audio file; the intro dialog is now collapsible; settings renamed to More",
+  "notes_zh": "新增异型棋盘（长方形与自定义不规则形状：20×20 形状编辑器、十字/口字/L/U 预设、可导入导出）、新增自定义音效主题（四个音效位可各选内置音色或传入音频）、引导弹窗改为可折叠、设置页更名「更多」",
   "pub_date": "2026-10-09T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 13469096
+      "size": 13489576
     },
     "windows": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 11140096
+      "size": 11151872
     },
     "linux": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 3810796
+      "size": 3817488
     }
   }
 }
