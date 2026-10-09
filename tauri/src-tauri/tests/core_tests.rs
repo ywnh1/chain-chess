@@ -208,3 +208,68 @@ fn test_killed_by_degrade_corner() {
     assert_eq!(eliminated, vec![1], "degrade 角上玩家1 应被淘汰");
     assert_eq!(killed_by, vec![(1, 0)], "degrade 击败者应为玩家0");
 }
+
+// ─── 异型棋盘：长方形 ───
+
+/// 造一个 rows × cols 的空棋盘
+fn rect_board(rows: usize, cols: usize) -> GameBoard {
+    vec![vec![Cell { owner: None, count: 0, th: None }; cols]; rows]
+}
+
+#[test]
+fn test_rect_board_keeps_its_dimensions() {
+    let b = rect_board(7, 5);
+    assert_eq!(b.len(), 7, "行数");
+    assert_eq!(b[0].len(), 5, "列数");
+}
+
+/// 邻居要按 rows/cols 分别判断边界：以前只有一个 sz，长方棋盘会在短边越界
+#[test]
+fn test_rect_neighbors_respect_rows_and_cols() {
+    assert_eq!(nbrs(0, 0, 7, 5).len(), 2, "左上角只有两个邻居");
+    assert_eq!(nbrs(6, 4, 7, 5).len(), 2, "右下角只有两个邻居");
+    assert_eq!(nbrs(6, 2, 7, 5).len(), 3, "最后一行中间（行边界）");
+    assert_eq!(nbrs(2, 4, 7, 5).len(), 3, "最后一列中间（列边界）");
+    assert_eq!(nbrs(3, 2, 7, 5).len(), 4, "内部四邻居");
+    // 关键回归：若列边界错用行数(7)，第 5 列会越界
+    for i in 0..7 {
+        for j in 0..5 {
+            let ns = nbrs(i, j, 7, 5);
+            assert!(ns.iter().all(|&(a, b)| a < 7 && b < 5), "({},{}) 的邻居越界: {:?}", i, j, ns);
+        }
+    }
+}
+
+#[test]
+fn test_rect_get_moves_stay_inside() {
+    let b = rect_board(6, 4);
+    let m = get_moves(&b, 6, 0, None, BorderMode::Default, CapMode::Cap4);
+    assert!(!m.is_empty(), "空棋盘应当有走法");
+    assert!(m.iter().all(|&(i, j)| i < 6 && j < 4), "走法必须在棋盘内: {:?}", m);
+}
+
+/// 7×5 长方形跑完整局：不 panic、棋盘尺寸不变、胜者合法
+#[test]
+fn test_rect_full_game_runs_to_end() {
+    let mut b = rect_board(7, 5);
+    b[1][1] = Cell { owner: Some(0), count: 3, th: None };
+    b[5][3] = Cell { owner: Some(1), count: 3, th: None };
+    let res = simulate_to_end(
+        b, 7, 2, 0, vec![], BorderMode::Default, CapMode::Cap4, None, 10,
+        std::collections::HashMap::new(),
+    );
+    assert_eq!(res.board.len(), 7);
+    assert_eq!(res.board[0].len(), 5);
+    if let Some(w) = res.winner {
+        assert!(w < 2, "胜者必须是参战玩家，实际 {}", w);
+    }
+}
+
+/// 回环边界在长方形上要按各自的边长回绕
+#[test]
+fn test_rect_wrap_uses_cols_for_columns() {
+    let ns = nbrs_wrap(0, 0, 7, 5);
+    assert!(ns.contains(&(6, 0)), "上行回绕到最后一行(6)");
+    assert!(ns.contains(&(0, 4)), "左列回绕到最后一列(4)");
+    assert!(ns.iter().all(|&(i, j)| i < 7 && j < 5), "回绕结果必须仍在棋盘内: {:?}", ns);
+}
