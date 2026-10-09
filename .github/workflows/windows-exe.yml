@@ -50,40 +50,45 @@ jobs:
 
       - name: 构建 exe
         run: |
-          cd tauri
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
-          npx tauri build --no-bundle
+          # 不走 tauri CLI：这是多 bin 项目（src/bin/ 下有 AI 对局等 CLI 工具），
+          # 而 productName 是中文「连锁棋」，匹配不上任何 bin，Tauri 就退而取其
+          # 一个 —— 实测挑到的是 battle。它的产物是 console 程序，不是 GUI。
+          # 直接指定 bin，与本地 build.sh 的 cargo-xwin 产物一致。
+          cd tauri/src-tauri
+          cargo build --release --bin chain-chess
 
       - name: 整理产物并自检
         run: |
           set -eu
           V='${{ steps.ver.outputs.version }}'
           SRC=tauri/src-tauri/target/release/chain-chess.exe
-          test -f "$SRC" || { echo "没找到产物: $SRC"; ls -la tauri/src-tauri/target/release/ | head -20; exit 1; }
+          test -f "$SRC" || { echo "missing: $SRC"; ls -la tauri/src-tauri/target/release/ | head -20; exit 1; }
 
-          # Tauri 在多 bin 项目里可能挑到 src/bin/ 下的 CLI 工具（productName
-          # 是中文，匹配不上任何 bin）。GUI 产物体积明显更大，且链接了 WebView2；
-          # 这里按「可执行体里能找到 WebView2 字样」判一下，免得把 CLI 发出去。
+          # 判据是 PE 头的 Subsystem 字段：2 = GUI，3 = 控制台。
+          # 看体积或找 WebView2 字符串都不靠谱（本项目的 WebView2 是动态加载的，
+          # 字符串不一定在，而 strip 过的 GUI 也可能只有几 MB）。
           python - "$SRC" <<'PY'
-          import sys
-          # Windows 控制台默认 cp1252，print 中文会 UnicodeEncodeError，统一走 utf-8
+          import struct, sys
+          # Windows 控制台默认 cp1252，print 中文会 UnicodeEncodeError
           try:
               sys.stdout.reconfigure(encoding='utf-8')
           except Exception:
               pass
           data = open(sys.argv[1], 'rb').read()
-          size = len(data)
-          has_wv = b'WebView2' in data or b'webview2' in data.lower()
-          print(f"size: {size/1024/1024:.1f} MB")
-          print("has WebView2 marker:", has_wv)
-          if size < 3 * 1024 * 1024:
-              print("too small -- looks like the CLI tool got picked instead of the GUI")
+          pe = struct.unpack_from('<I', data, 0x3C)[0]
+          assert data[pe:pe+4] == b'PE\x00\x00', 'not a PE file'
+          subsystem = struct.unpack_from('<H', data, pe + 0x5C)[0]
+          kind = {2: 'GUI', 3: 'console'}.get(subsystem, f'other({subsystem})')
+          print(f"size: {len(data)/1024/1024:.1f} MB")
+          print(f"PE subsystem: {subsystem} ({kind})")
+          if subsystem != 2:
+              print("expected a GUI subsystem (2) - wrong binary got built")
               sys.exit(1)
           PY
 
           mkdir -p out
           cp "$SRC" "out/chainchess-$V.exe"
-          echo "--- 产物 ---"
+          echo "--- artifact ---"
           ls -la out/
 
       - name: 上传产物
