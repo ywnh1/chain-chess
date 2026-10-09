@@ -66,13 +66,18 @@ jobs:
           # 这里按「可执行体里能找到 WebView2 字样」判一下，免得把 CLI 发出去。
           python - "$SRC" <<'PY'
           import sys
+          # Windows 控制台默认 cp1252，print 中文会 UnicodeEncodeError，统一走 utf-8
+          try:
+              sys.stdout.reconfigure(encoding='utf-8')
+          except Exception:
+              pass
           data = open(sys.argv[1], 'rb').read()
           size = len(data)
           has_wv = b'WebView2' in data or b'webview2' in data.lower()
-          print(f"体积: {size/1024/1024:.1f} MB")
-          print("含 WebView2 特征:", has_wv)
+          print(f"size: {size/1024/1024:.1f} MB")
+          print("has WebView2 marker:", has_wv)
           if size < 3 * 1024 * 1024:
-              print("体积过小，疑似编成了 CLI 工具")
+              print("too small -- looks like the CLI tool got picked instead of the GUI")
               sys.exit(1)
           PY
 
