@@ -90,6 +90,7 @@ fn test_history_record_serde() {
         ai_count: 3,
         board_size: 9,
         board_cols: Some(5),   // 长方形：9 行 × 5 列
+        board_cells: None,     // 老记录没有形状位图，全盘可用
         border_mode: Some("default".to_string()),
         cap_mode: Some("4".to_string()),
         winner: Some(1),

@@ -1335,6 +1335,7 @@ function loadHistoryList(){
           openReplay({
             size: rec.boardSize || 7,
             cols: rec.boardCols || rec.boardSize || 7,
+            cells: rec.boardCells || null,
             maxPlayers: rec.playerCount || 2,
             borderMode: rec.borderMode || 'default',
             capMode: rec.capMode || '4',
@@ -1728,6 +1729,7 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
         aiCount: aiPlayers.size,
         boardSize: size,
         boardCols: cols,
+        boardCells: boardCells,
         borderMode: borderMode || 'default',
         capMode: capMode || '4',
         winner: winner !== null && winner !== undefined ? winner : null,
@@ -1754,6 +1756,7 @@ async function saveUnfinishedGameHistory(){
   const _board = board;
   const _size = size;
   const _cols = cols;
+  const _boardCells = boardCells;
   const _maxPlayers = maxPlayers;
   const _curPlayer = curPlayer;
   const _firstMovePos = firstMovePos;
@@ -1835,6 +1838,7 @@ async function saveUnfinishedGameHistory(){
         aiCount: _aiPlayers.length,
         boardSize: _size,
         boardCols: _cols,
+        boardCells: _boardCells,
         winner: null,
         colorNames: toColorNamesArray(_colorNames),
         chainStats: _chainStats,
@@ -4557,6 +4561,7 @@ const HINTS = {
       '<li><strong>8×8 ~ 12×12</strong>：中盘拉锯，摸熟规则再玩</li>'+
       '<li><strong>13×13 ~ 19×19</strong>：长局，适合有耐心的人，也够多人混战</li>'+
       '</ul>'+
+      '<p><strong>形状</strong>：除了正方形，还能选长方形（长宽各 5–19），或者用形状编辑器自己点出一个不规则棋盘——挖掉的格子就是「洞」，棋子飞进去会像飞出棋盘一样消失。不规则棋盘只支持默认边界。</p>'+
       '<p class="hint-tip">第一次玩就用默认 7×7，先感受一下「攒满 4 颗就炸」是什么节奏。</p>'
   },
   'border-mode': {
@@ -5187,6 +5192,7 @@ function openReplay(cfg){
   _rp={
     size,
     cols,
+    shapeCells: cfg.cells || null,   // 不规则形状的空洞位图，回放靠它还原
     maxPlayers,
     borderMode:cfg.borderMode||'default',
     capMode:cfg.capMode||'4',
@@ -5258,7 +5264,8 @@ function rpRenderBoard(force,popX,popY){
   for(let i=0;i<_rp.size;i++)for(let j=0;j<_rp.cols;j++){
     const el=_rp.cells[i][j],d=bd[i][j];
     el.innerHTML='';
-    if(d.owner!==null){
+    el.className='cell'+(d.blocked?' blocked':'');   // 空洞画成空白格
+    if(!d.blocked&&d.owner!==null){
       if(d.owner===_rp.curPlayer){
         const bg=document.createElement('div');bg.className='bg p'+d.owner;
         el.appendChild(bg);
@@ -5344,7 +5351,7 @@ async function rpGoTo(target, animate){
     let from=0;
     for(const[k]of _rp.ck){if(k<=target&&k>from)from=k;}
     if(from===0){
-      _rp.board=mkBoard(_rp.size,_rp.cols||_rp.size);
+      _rp.board=mkBoard(_rp.size,_rp.cols||_rp.size,_rp.shapeCells);
       _rp.curPlayer=0;
     }else{
       _rp.board=cloneBoard(_rp.ck.get(from));
@@ -5402,7 +5409,7 @@ async function rpResetTo(step, animate){
   if(!_rp)return;
   rpCancel();
   const token=_rp.token;
-  _rp.board=mkBoard(_rp.size,_rp.cols||_rp.size);
+  _rp.board=mkBoard(_rp.size,_rp.cols||_rp.size,_rp.shapeCells);
   _rp.curPlayer=0;
   _rp.step=0;
   _rp.ck.clear();

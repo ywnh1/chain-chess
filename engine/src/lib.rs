@@ -149,6 +149,9 @@ pub struct HistoryRecord {
     /// 棋盘列数（长方形棋盘专用）。缺省视为与 board_size 相同，即正方形 —— 老记录照旧。
     #[serde(default)]
     pub board_cols: Option<u32>,
+    /// 不规则棋盘的空洞位图（每行一个 0/1 串）。缺省表示整盘可用 —— 回放靠它还原形状。
+    #[serde(default)]
+    pub board_cells: Option<Vec<String>>,
     /// 边界模式（默认/回环/反弹/降级/随机）
     #[serde(default)]
     pub border_mode: Option<String>,
