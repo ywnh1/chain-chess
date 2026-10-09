@@ -2652,6 +2652,20 @@ function kbMoveFocus(i,j){
   if(el){el.setAttribute('tabindex','0');el.focus();}
 }
 
+// 棋盘容器（.board-wrap）在 CSS 里是正方形固定尺寸，长方形棋盘会把格子拉长。
+// 按行列比算出真实宽高，在可用区域内取最大；竖长方形也不会撑出屏幕。
+function applyBoardAspect(wrap,rows,cols,maxSide){
+  if(!wrap||!rows||!cols)return;
+  const maxW=Math.min(window.innerWidth*0.88,maxSide);
+  const maxH=Math.min(window.innerHeight*0.62,maxSide);
+  const ar=cols/rows;
+  let w=maxW,h=w/ar;
+  if(h>maxH){h=maxH;w=h*ar;}
+  wrap.style.width=w+'px';
+  wrap.style.height=h+'px';
+  wrap.style.aspectRatio=cols+' / '+rows;
+}
+
 function renderBoard(force,popX,popY){
   let bd=document.getElementById('board');
   bd.setAttribute('role','grid');
@@ -2661,6 +2675,7 @@ function renderBoard(force,popX,popY){
     bd.replaceChildren();
     void bd.offsetHeight;
     bd.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+    applyBoardAspect(bd.parentElement, size, cols, 440);
     // 棋盘尺寸可能变了，先把键盘焦点钳到新范围内
     _kbPos.i=Math.min(_kbPos.i,size-1);
     _kbPos.j=Math.min(_kbPos.j,cols-1);
@@ -4895,13 +4910,15 @@ function readSetupBoard(){
   return {rows:s,cols:s,cells:null};
 }
 // 形状切换：显示对应的尺寸控件
-function applyShapeMode(){
+// jumpToEditor：只有用户亲手点「自定义」才跳编辑器。
+// 初始化时不能跳 —— 否则从编辑器返回开局页又会被弹回去，永远退不出来。
+function applyShapeMode(jumpToEditor){
   const mode=currentShapeMode();
   const sq=document.getElementById('squareSizeRow');
   const rc=document.getElementById('rectSizeRow');
   if(sq)sq.style.display=(mode==='rect')?'none':'';
   if(rc)rc.style.display=(mode==='rect')?'':'none';
-  if(mode==='custom'){Router.navigate('board-editor');return;}
+  if(mode==='custom'&&jumpToEditor){Router.navigate('board-editor');return;}
   setupLobbySync();
 }
 // 进入开局页时初始化形状选择（默认正方形）
@@ -4913,11 +4930,11 @@ function initShapeMode(){
       b.onclick=function(){
         g.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
         this.classList.add('selected');
-        applyShapeMode();
+        applyShapeMode(true);
       };
     });
   }
-  applyShapeMode();
+  applyShapeMode(false);
 }
 
 function setupLobbySync(){
@@ -5215,6 +5232,7 @@ function openReplay(cfg){
   const bd=document.getElementById('rpBoard');
   bd.replaceChildren();
   bd.style.gridTemplateColumns=`repeat(${_rp.cols},1fr)`;
+  applyBoardAspect(bd.parentElement, _rp.size, _rp.cols, 400);
   _rp.cells=[];
   for(let i=0;i<_rp.size;i++){
     const row=[];
