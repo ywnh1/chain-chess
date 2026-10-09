@@ -44,8 +44,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # 会把 ANDROID_HOME / ANDROID_SDK_ROOT 设好
+      # 会把 ANDROID_HOME / ANDROID_SDK_ROOT 设好。
+      # 不能留默认的 packages（默认含 tools，而新版 SDK 已经没这个包，
+      # sdkmanager 会以退出码 1 挂掉），显式列出真正需要的。
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;34.0.0 platforms;android-34'
 
       - name: 准备 NDK
         run: |

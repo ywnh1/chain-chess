@@ -27,7 +27,9 @@ jobs:
       - name: 读取版本号（tauri.conf.json 是唯一来源）
         id: ver
         run: |
-          V=$(python -c "import json;print(json.load(open('tauri/src-tauri/tauri.conf.json'))['version'])")
+          # Windows 上 python 默认用 cp1252 读文件，而 tauri.conf.json 里有中文
+          # （productName 是「连锁棋」），不显式指定编码会 UnicodeDecodeError
+          V=$(python -c "import json,io;print(json.load(io.open('tauri/src-tauri/tauri.conf.json',encoding='utf-8'))['version'])")
           test -n "$V"
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "版本: $V"
