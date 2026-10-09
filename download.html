@@ -1736,8 +1736,11 @@
       var LINUX_ARCH = /aarch64|arm64/i.test(navigator.userAgent || '') ? 'arm64' : 'amd64';
 
       // 把 chainchess-<版本>.<后缀> 换成带架构的那份；已经带架构的原样返回。
+      // 注意：amd64 是默认架构，CI 与 build.sh 出的包都不带后缀，
+      // 所以认出 amd64 时直接返回原 URL —— 补上 -amd64 会 404。
       function withArch(url, arch) {
         if (!url || !arch || /-arm64\.|-amd64\./.test(url)) return url;
+        if (arch === 'amd64') return url;
         return url.replace(/(chainchess-[\d.]+)\.(deb|AppImage)$/, '$1-' + arch + '.$2');
       }
       // .meta 追加文件大小：v3.3.7 · 13.4 MB · 多线程：AI 更快
