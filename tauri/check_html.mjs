@@ -38,6 +38,38 @@ for(const c of strContainers)
   }
   if(!/applyBoardAspect\(bd\.parentElement/.test(appJs))e.push("renderBoard 没调用 applyBoardAspect（长方形会被拉变形）");
 }
+// 形状切换的显示逻辑：三种模式各该显示哪些控件。把函数抽出来真跑一遍，
+// 光看代码看不出漏分支（自定义曾误显示普通尺寸按钮，初始化也曾误跳编辑器）。
+{
+  const m=appJs.match(/function applyShapeMode\([\s\S]*?\n\}/);
+  if(!m)e.push("applyShapeMode 不见了");
+  else{
+    const run=(mode,jump)=>{
+      let navigated=null;
+      const mk=()=>({style:{}});
+      const els={squareSizeRow:mk(),rectSizeRow:mk()};
+      const fn=new Function("currentShapeMode","document","Router","setupLobbySync","return "+m[0])(
+        ()=>mode,
+        {getElementById:id=>els[id]||null},
+        {navigate:id=>{navigated=id;}},
+        ()=>{}
+      );
+      fn(jump);
+      return {sq:els.squareSizeRow.style.display,rc:els.rectSizeRow.style.display,nav:navigated};
+    };
+    const a=run('square',false);
+    if(a.sq==='none')e.push("正方形模式不该隐藏尺寸按钮");
+    if(a.rc!=='none')e.push("正方形模式不该显示长宽选择器");
+    const b=run('rect',false);
+    if(b.sq!=='none')e.push("长方形模式应隐藏正方形尺寸按钮");
+    if(b.rc==='none')e.push("长方形模式应显示长宽选择器");
+    const c=run('custom',false);
+    if(c.sq!=='none')e.push("自定义模式应隐藏正方形尺寸按钮（这里出过 bug）");
+    if(c.rc!=='none')e.push("自定义模式不该显示长宽选择器");
+    if(run('custom',true).nav!=='board-editor')e.push("用户点自定义时该跳形状编辑器");
+    if(run('custom',false).nav)e.push("初始化时不该跳编辑器（会退不出来）");
+  }
+}
 console.log("\n"+h.split("\n").length+" lines, "+kb+"KB");
 if(e.length){console.log("ERRORS:");e.forEach(x=>console.log(" - "+x))}
 if(w.length){console.log("WARNINGS:");w.forEach(x=>console.log(" - "+x))}

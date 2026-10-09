@@ -4915,7 +4915,8 @@ function applyShapeMode(jumpToEditor){
   const mode=currentShapeMode();
   const sq=document.getElementById('squareSizeRow');
   const rc=document.getElementById('rectSizeRow');
-  if(sq)sq.style.display=(mode==='rect')?'none':'';
+  // 只有正方形才显示那排尺寸按钮；长方形走行/列选择器；自定义两者都不显示
+  if(sq)sq.style.display=(mode==='square')?'':'none';
   if(rc)rc.style.display=(mode==='rect')?'':'none';
   if(mode==='custom'&&jumpToEditor){Router.navigate('board-editor');return;}
   setupLobbySync();
