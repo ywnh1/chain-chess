@@ -3999,7 +3999,7 @@ function replayGame(){
     location.hash='#game';
     resetRoundHistory();
     undoStack=[];
-    size=c.size;
+    size=c.size;cols=c.cols||c.size;
     maxPlayers=c.aiCount+1;
     aiAlgorithm=c.aiAlgorithm||'strategy';
     selectedPlayerColor=c.humanIdx;
@@ -4026,7 +4026,7 @@ function replayGame(){
     location.hash='#game';
     resetRoundHistory();
     undoStack=[];
-    size=c.size;
+    size=c.size;cols=c.cols||c.size;
     maxPlayers=c.maxPlayers;
     board=mkBoard(size,cols,boardCells);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
     document.getElementById('pauseBtn').textContent='暂停';
@@ -4047,7 +4047,7 @@ function replayGame(){
     location.hash='#game';
     resetRoundHistory();
     undoStack=[];
-    size=c.size;
+    size=c.size;cols=c.cols||c.size;
     maxPlayers=c.maxPlayers||c.aiCount;
     board=mkBoard(size,cols,boardCells);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
     document.getElementById('pauseBtn').textContent='暂停';
@@ -5015,7 +5015,7 @@ function startLocalFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
-  _lastGameConfig={mode:'local',size,maxPlayers,colorNames,borderMode:userBorderMode,capMode:userCapMode};
+  _lastGameConfig={mode:'local',size,cols,maxPlayers,colorNames,borderMode:userBorderMode,capMode:userCapMode};
 }
 function startAIFromSetup(sz,cnt){
   clearSavedGameState();
@@ -5057,7 +5057,7 @@ function startAIFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'ai',size,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode:userBorderMode,capMode:userCapMode};
+  _lastGameConfig={mode:'ai',size,cols,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode:userBorderMode,capMode:userCapMode};
 }
 function startEveFromSetup(sz,cnt){
   clearSavedGameState();
@@ -5093,7 +5093,7 @@ function startEveFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'eve',size,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode:userBorderMode,capMode:userCapMode};
+  _lastGameConfig={mode:'eve',size,cols,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode:userBorderMode,capMode:userCapMode};
 }
 window.addEventListener('popstate',()=>{
   const cur = Router._current;
@@ -5247,6 +5247,9 @@ function openReplay(cfg){
     }
     _rp.cells.push(row);
   }
+  // 标题带上尺寸：长方形回放时一眼能看出拿到的是几行几列
+  const rtitle=document.querySelector('#replayOverlay .replay-title');
+  if(rtitle)rtitle.textContent='对局回放 · '+size+'×'+cols;
   // 重置控件
   const slider=document.getElementById('rpSlider');
   slider.min=0;slider.max=_rp.total;slider.value=0;
