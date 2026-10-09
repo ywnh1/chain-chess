@@ -20,7 +20,7 @@
 // 用法: cargo run --release --bin ai_bench < config.json
 use std::io::{self, Read, Write};
 use serde::Deserialize;
-use chain_chess_lib::*;
+use chain_chess_core::*;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -19,10 +19,10 @@ use std::env;
 use std::fs;
 use std::time::Instant;
 use serde::Deserialize;
-use chain_chess_lib::*;
+use chain_chess_core::*;
 
-use chain_chess_lib::BorderMode;
-use chain_chess_lib::CapMode;
+use chain_chess_core::BorderMode;
+use chain_chess_core::CapMode;
 
 /// AI 选手配置（来自 JSON）
 #[derive(Deserialize, Clone)]

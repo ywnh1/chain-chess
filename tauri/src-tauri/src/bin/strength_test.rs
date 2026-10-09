@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::env;
 use std::time::Instant;
 
-use chain_chess_lib::{BorderMode, CapMode, Cell, GameBoard, simulate_to_end};
+use chain_chess_core::{BorderMode, CapMode, Cell, GameBoard, simulate_to_end};
 
 // ── 命令行参数 ──
 

@@ -35,8 +35,6 @@ dependencies = [
 [[package]]
 name = "alpha_beta_pruning"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5139143436c1dc4cd3f4e4760d995e668c6ab7e57471ee6acc8556ee016beb1"
 dependencies = [
  "rayon",
 ]
@@ -483,9 +481,8 @@ dependencies = [
 name = "chain-chess"
 version = "3.3.9"
 dependencies = [
- "alpha_beta_pruning",
+ "chain_chess_core",
  "rand 0.8.7",
- "rayon",
  "reqwest 0.12.28",
  "semver",
  "serde",
@@ -495,6 +492,17 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-opener",
+]
+
+[[package]]
+name = "chain_chess_core"
+version = "3.3.9"
+dependencies = [
+ "alpha_beta_pruning",
+ "rand 0.8.7",
+ "rayon",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

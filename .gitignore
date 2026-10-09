@@ -79,5 +79,6 @@ prompt.md
 #       若重跑 wasm-pack 生成到 docs/pkg/，请删除该文件再提交 docs/pkg/ 内容
 # Rust 编译中间产物（构建内容，不上传）
 docs/wasm/target/
+engine/target/
 # Node 版 pkg（不上传，仅浏览器版 docs/pkg/ 需要上传）
 docs/pkg-node/

@@ -13,7 +13,8 @@
 
 use std::env;
 
-use chain_chess_lib::{BorderMode, CapMode, PlayerAiConfig, generate_selfplay_data, generate_selfplay_data_mixed};
+use chain_chess_core::{BorderMode, CapMode, PlayerAiConfig};
+use chain_chess_lib::{generate_selfplay_data, generate_selfplay_data_mixed};
 
 fn print_usage(program: &str) {
     eprintln!("连锁棋 自对弈数据生成器 — 为 ML 模型训练收集对局数据");

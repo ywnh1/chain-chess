@@ -1,4 +1,4 @@
-use chain_chess_lib::*;
+use chain_chess_core::*;
 
 #[test]
 fn test_find_best_move_finds_valid_move() {

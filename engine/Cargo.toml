@@ -1,0 +1,22 @@
+[package]
+name = "chain_chess_core"
+version = "3.3.9"
+edition = "2021"
+description = "连锁棋共享引擎：棋盘规则 / 爆裂连锁 / AI 搜索 / 评估 / 模拟"
+
+[lib]
+name = "chain_chess_core"
+crate-type = ["lib"]
+
+[features]
+default = []
+# 桌面端启用：Rayon 多核并行，同时打开 alpha_beta_pruning 的并行搜索。
+# WASM 单线程，不开这个 feature。
+parallel = ["dep:rayon", "alpha_beta_pruning/parallel"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = "0.8"
+rayon = { version = "1", optional = true }
+alpha_beta_pruning = { path = "../docs/wasm/vendor/alpha_beta_pruning", default-features = false }
