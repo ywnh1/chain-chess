@@ -8,7 +8,7 @@
 #       ./build.sh -z                 # 重新编译 WASM + 打包 PWA zip 到 release/（update.json 无 pwa 条目，不更新 size）
 #       ./build.sh -A chainchess      # 编译 apk + exe + linux + zip 全部到 release/，只更新本次编译的 size
 #       ./build.sh -n chainchess      # 编译安卓 Native APK 到 release/，不碰 update.json
-#       ./build.sh -r chainchess      # 编译除 Native 外所有（apk+exe+linux+zip），全部更新 size，
+#       ./build.sh -r chainchess      # 只编 Android APK 并发布（exe / linux / zip 交给 CI），
 #                                     #   并发布：release/ → /storage/emulated/0/用户/，
 #                                     #   update.json + PWA 必要内容 → ../chain-chess-release
 #       ./build.sh -r -c chainchess   # 同上，并自动 commit 两个仓库（push 仍手动）
@@ -221,7 +221,7 @@ fi
 # --zip    : 重新编译 WASM + 打包 PWA zip → 无 size 条目
 # --all    : apk + exe + zip 全部编译到 release/，只更新本次新编译内容的 size
 # --native : 编译 Android Native APK，不碰 update.json
-# --release: 编译除 Native 外所有（apk+exe+zip），全部更新 size，并发布
+# --release: 只编 Android APK，更新 size，并发布（exe / linux / zip 走 CI）
 #            （release/ → /storage/emulated/0/用户/，update.json + PWA → ../chain-chess-release）
 APK=false
 EXE=false
@@ -278,7 +278,7 @@ README badge / update.json —— 发版只需改 tauri.conf.json 一处。
   -z, --zip            重新编译 WASM 并打包 PWA zip（无平台条目，不更新 size）
   -A, --all <密码>     编译 apk + exe + linux + zip 全部，只更新本次编译的 size
   -n, --native <密码>  编译安卓 Native APK，不碰 update.json
-  -r, --release <密码> 编译除 Native 外所有，全部更新 size，并发布：
+  -r, --release <密码> 只编 Android APK 并发布（exe / linux / zip 交给 CI）：
                        release/ → /storage/emulated/0/用户/
                        update.json + PWA 必要内容 → ../chain-chess-release
   -c, --commit         构建后自动 git commit（主仓库的版本号文件 + ../chain-chess-release
@@ -328,12 +328,14 @@ if [ "$SYNC_ONLY" = true ]; then
 fi
 
 # 模式语义展开
-# --all: apk + exe + zip；--release: apk + exe + zip + 发布动作
+# --all: apk + exe + zip；--release: 只编 APK 并发布（其余交给 CI）
 if [ "$ALL" = true ]; then
   APK=true; EXE=true; ZIP=true; LINUX=true
 fi
 if [ "$PUBLISH" = true ]; then
-  APK=true; EXE=true; ZIP=true; LINUX=true
+  # exe / linux / zip 已经搬到 GitHub Actions（.github/workflows/），
+  # 本地 -r 只编 Android，并同步版本号 / 拷发布文件
+  APK=true
 fi
 # --native: 编译 native APK
 if [ "$NATIVE" = true ]; then
@@ -347,7 +349,7 @@ fi
 # --native 与 --all / --release 互斥（--release 定义即为"除 Native 外所有"）
 if [ "$NATIVE" = true ] && { [ "$ALL" = true ] || [ "$PUBLISH" = true ]; }; then
   echo "❌ 参数冲突: --native 与 --all / --release 互斥"
-  echo "   --native 单独编译 Native APK；--all / --release 编译普通 apk + exe + zip"
+  echo "   --native 单独编译 Native APK；--all 编译普通 apk + exe + zip；--release 只编 APK"
   exit 1
 fi
 
@@ -374,7 +376,7 @@ START_EPOCH=$(date +%s)
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 if [ "$PUBLISH" = true ]; then
-  echo "  📦 构建目标: APK + Windows exe + Linux deb/AppImage + PWA zip（发布模式）"
+  echo "  📦 构建目标: Android APK（发布模式；exe / linux / zip 由 CI 出）"
 elif [ "$ALL" = true ]; then
   echo "  📦 构建目标: APK + Windows exe + Linux deb/AppImage + PWA zip（全部，不发布）"
 elif [ "$APK" = true ] && [ "$EXE" = true ]; then
