@@ -1628,6 +1628,45 @@ try {
   <input type="file" id="csFileInput" accept=".mp3,.wav,.ogg,audio/*" style="display:none" onchange="onCsFileChosen(event)">
 </div>
 
+<!-- 自定义棋盘形状编辑器（开始 → 棋盘形状 → 自定义） -->
+<div id="board-editor" class="screen">
+  <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+  <div class="about-scroll">
+    <h2>自定义棋盘形状</h2>
+
+    <div class="about-card">
+      <h3>预设形状</h3>
+      <div class="toggle-group" id="bePresets">
+        <button class="tg-btn" data-value="cross">十字形</button>
+        <button class="tg-btn" data-value="ring">口字形</button>
+        <button class="tg-btn" data-value="lshape">L 形</button>
+        <button class="tg-btn" data-value="ushape">U 形</button>
+        <button class="tg-btn" data-value="all">全开</button>
+        <button class="tg-btn" data-value="none">清空</button>
+      </div>
+    </div>
+
+    <div class="about-card">
+      <h3>点格子启用 / 取消</h3>
+      <div id="beGrid" class="be-grid" role="grid" aria-label="棋盘形状编辑区"></div>
+      <p class="cs-note" id="beInfo"></p>
+    </div>
+
+    <div class="about-card">
+      <div class="cs-actions">
+        <button class="glass-btn primary" id="beSaveBtn">保存并使用</button>
+        <button class="glass-btn" id="beExportBtn">导出</button>
+        <button class="glass-btn" id="beImportBtn">导入</button>
+      </div>
+      <div class="form-row" id="beExportRow" style="display:none">
+        <label>复制这段 JSON 存成文件</label>
+        <textarea id="beExportArea" rows="4" readonly></textarea>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="beFileInput" accept=".json,application/json" style="display:none" onchange="onBeFileChosen(event)">
+</div>
+
 <!-- 更新详情页（二级） -->
 <div id="about-changelog" class="screen">
   <button class="back glass-btn" onclick="Router.back()">← 返回</button>

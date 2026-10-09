@@ -334,6 +334,8 @@ body::after{content:'';position:fixed;inset:0;
   -webkit-tap-highlight-color:transparent;
 }
 .cell.highlight{background:var(--glass-w-12);border-color:var(--glass-w-10);transform:scale(1.02)}
+/* 空洞（不规则棋盘挖掉的格子）：不参与游戏，视觉上就让它空着 */
+.cell.blocked{background:transparent;border-color:transparent;box-shadow:none;pointer-events:none;cursor:default}
 .cell:active{transform:scale(.93)}
 /* 键盘焦点：格子有 overflow:hidden，outline 会被裁掉，所以用内阴影 + 外发光。
    用 :focus-visible 让鼠标点击不显示焦点环，只有键盘导航才显示。 */
@@ -1439,6 +1441,16 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 .theme-group .tg-btn{flex:0 0 calc(33.333% - 6px);box-sizing:border-box;padding:6px 10px;border-radius:8px;border:1px solid var(--glass-w-08);
   background:var(--glass-w-04);color:var(--dim);font-size:.74rem;font-weight:500;cursor:pointer;transition:.12s;font-family:var(--font)}
 .theme-group .tg-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
+
+/* ═══════ 自定义棋盘形状编辑器 ═══════ */
+.be-grid{display:grid;gap:2px;margin-top:8px;touch-action:manipulation}
+.be-grid .be-cell{aspect-ratio:1/1;border-radius:3px;background:var(--glass-w-04);
+  border:1px solid var(--glass-w-08);cursor:pointer;transition:.1s}
+.be-grid .be-cell.on{background:rgba(240,179,75,.32);border-color:rgba(240,179,75,.6)}
+.be-grid .be-cell:active{transform:scale(.9)}
+#beExportArea{width:100%;font-size:.72rem;font-family:monospace;line-height:1.4;
+  background:var(--glass-w-04);color:var(--text);border:1px solid var(--border);
+  border-radius:8px;padding:8px;box-sizing:border-box;resize:vertical}
 
 /* ═══════ 自定义音效编辑器 ═══════ */
 .cs-note{font-size:.76rem;color:var(--dim);line-height:1.65;margin:8px 0 0}

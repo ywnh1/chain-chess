@@ -801,6 +801,7 @@ async function vibrate(pattern){
 
 /* ==================== STATE ==================== */
 let board=[],curPlayer=0,size=7,cols=7,maxPlayers=2;   // size=行数，cols=列数（长方形时两者不同）
+let boardCells=null;   // 当前棋盘的可用格位图（null=全部可用）；不规则形状用它标记空洞
 let cells=[];
 let gameMode=null; // 'ai'|'local'|'eve'
 let _originPage=null; // 游戏从哪个 lobby 页面发起（用于「再来一局」返回）
@@ -1134,6 +1135,12 @@ Router.register('custom-sound', {
   back: 'settings',
   enter() { document.body.style.background=''; initCustomSoundPage(); },
   leave() { csDraft=null; }   // 没保存的草稿不留到下次进来
+});
+
+Router.register('board-editor', {
+  back: 'gameSetup',
+  enter() { document.body.style.background=''; initBoardEditor(); },
+  leave() {}
 });
 
 Router.register('checkout', {
@@ -2023,11 +2030,13 @@ function nbrs8(i,j,rows,cols){
   return r;
 }
 // 创建空棋盘（每格 owner=null、count=0；保留 th 字段以兼容旧历史数据，但不再生成阈值）
-// 造棋盘：s 是行数，c 是列数（长方形时不同；不传就按正方形）
-function mkBoard(s,c){
+// 造棋盘：s 是行数，c 是列数（长方形时不同；不传就按正方形），
+// cells 是行位图（'1' 可用 / '0' 空洞），不传就全可用
+function mkBoard(s,c,cells){
   const w=c||s;
-  return Array.from({length:s},()=>Array.from({length:w},()=>{
-    return {owner:null,count:0,th:undefined};
+  return Array.from({length:s},(_,i)=>Array.from({length:w},(_,j)=>{
+    const blocked=!!(cells&&cells[i]&&cells[i][j]==='0');
+    return {owner:null,count:0,th:undefined,blocked};
   }));
 }
 function hasPieces(p,b){
@@ -2057,6 +2066,170 @@ function isInRestrictedZone(x,y,b){
     if(b[i][j].owner!==null&&isInFirstMoveRestricted(x,y,i,j))return true;
   }
   return false;
+}
+
+// ─── 自定义棋盘形状编辑器（开始 → 棋盘形状 → 自定义） ───
+const BE_N=20;          // 工作区 20×20
+const BE_PRESET_N=9;    // 预设形状的边长（居中放在工作区里，不至于一上来就是 20×20 那么挤）
+let beGrid=[];          // 20×20 布尔矩阵：true = 可用格
+
+function beBlankGrid(fill){
+  const g=[];
+  for(let i=0;i<BE_N;i++)g.push(new Array(BE_N).fill(!!fill));
+  return g;
+}
+function applyBePreset(name){
+  const g=beBlankGrid(false);
+  const off=Math.floor((BE_N-BE_PRESET_N)/2);
+  const n=BE_PRESET_N, m=Math.floor(n/3);   // 边宽取 1/3
+  for(let li=0;li<n;li++)for(let lj=0;lj<n;lj++){
+    let on=false;
+    if(name==='all')on=true;
+    else if(name==='cross')on=(li>=m&&li<n-m)||(lj>=m&&lj<n-m);
+    else if(name==='ring')on=(li<m||li>=n-m||lj<m||lj>=n-m);
+    else if(name==='lshape')on=(lj<m||li>=n-m);
+    else if(name==='ushape')on=(lj<m||lj>=n-m||li>=n-m);
+    if(on)g[off+li][off+lj]=true;
+  }
+  return g;
+}
+function beUsableCount(){
+  let n=0;
+  for(let i=0;i<BE_N;i++)for(let j=0;j<BE_N;j++)if(beGrid[i][j])n++;
+  return n;
+}
+function updateBeInfo(){
+  const el=document.getElementById('beInfo');
+  if(!el)return;
+  const n=beUsableCount();
+  el.textContent='可用格子 '+n+' 个，最多 '+getMaxPlayersByArea(n)+' 人。点格子切换，保存时会自动裁到最小范围。';
+}
+function renderBeGrid(){
+  const box=document.getElementById('beGrid');
+  if(!box)return;
+  box.style.gridTemplateColumns='repeat('+BE_N+',1fr)';
+  box.replaceChildren();
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<BE_N;i++)for(let j=0;j<BE_N;j++){
+    const el=document.createElement('div');
+    el.className='be-cell'+(beGrid[i][j]?' on':'');
+    el.dataset.i=i;el.dataset.j=j;
+    el.setAttribute('role','gridcell');
+    el.setAttribute('aria-label',(beGrid[i][j]?'可用':'空洞')+' 第'+(i+1)+'行第'+(j+1)+'列');
+    el.onclick=function(){
+      const a=+this.dataset.i,b=+this.dataset.j;
+      beGrid[a][b]=!beGrid[a][b];
+      this.classList.toggle('on',beGrid[a][b]);
+      updateBeInfo();
+    };
+    frag.appendChild(el);
+  }
+  box.appendChild(frag);
+  updateBeInfo();
+}
+// 裁到最小外接矩形，产出 {rows, cols, cells}（cells 每行一个 0/1 串）
+function cropBeShape(){
+  let i0=BE_N,i1=-1,j0=BE_N,j1=-1;
+  for(let i=0;i<BE_N;i++)for(let j=0;j<BE_N;j++)if(beGrid[i][j]){
+    if(i<i0)i0=i; if(i>i1)i1=i; if(j<j0)j0=j; if(j>j1)j1=j;
+  }
+  if(i1<0)return null;
+  const cells=[];
+  for(let i=i0;i<=i1;i++){
+    let row='';
+    for(let j=j0;j<=j1;j++)row+=beGrid[i][j]?'1':'0';
+    cells.push(row);
+  }
+  return {rows:i1-i0+1,cols:j1-j0+1,cells};
+}
+// 校验外部导入的形状：行列范围、位图行数、每行长度、字符集都要对
+function validateBeShape(o){
+  if(!o||typeof o!=='object')return null;
+  const rows=parseInt(o.rows,10), cols=parseInt(o.cols,10);
+  if(!(rows>0&&cols>0)||rows>BE_N||cols>BE_N)return null;
+  if(!Array.isArray(o.cells)||o.cells.length!==rows)return null;
+  for(let i=0;i<rows;i++){
+    const r=o.cells[i];
+    if(typeof r!=='string'||r.length!==cols||!/^[01]+$/.test(r))return null;
+  }
+  return {rows,cols,cells:o.cells.slice()};
+}
+function loadBeShape(shape){
+  beGrid=beBlankGrid(false);
+  const offI=Math.floor((BE_N-shape.rows)/2), offJ=Math.floor((BE_N-shape.cols)/2);
+  for(let i=0;i<shape.rows;i++)for(let j=0;j<shape.cols;j++){
+    const gi=offI+i, gj=offJ+j;
+    if(gi>=0&&gi<BE_N&&gj>=0&&gj<BE_N)beGrid[gi][gj]=shape.cells[i][j]==='1';
+  }
+  renderBeGrid();
+}
+function initBoardEditor(){
+  if(!beGrid.length){
+    const saved=appSettings.customShape;
+    const v=saved?validateBeShape(saved):null;
+    if(v)loadBeShape(v);
+    else beGrid=applyBePreset('all');
+  }
+  renderBeGrid();
+  const box=document.getElementById('bePresets');
+  if(box){
+    box.querySelectorAll('.tg-btn').forEach(function(b){
+      b.onclick=function(){
+        box.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+        beGrid=applyBePreset(this.dataset.value);
+        renderBeGrid();
+      };
+    });
+  }
+  const sb=document.getElementById('beSaveBtn');
+  if(sb)sb.onclick=beSaveShape;
+  const eb=document.getElementById('beExportBtn');
+  if(eb)eb.onclick=beExportShape;
+  const ib=document.getElementById('beImportBtn');
+  if(ib)ib.onclick=beImportShape;
+}
+function beSaveShape(){
+  const shape=cropBeShape();
+  if(!shape){alert('至少要留一个可用格子');return;}
+  const n=shape.cells.join('').split('1').length-1;
+  if(n<9){alert('可用格子只有 '+n+' 个，太少了，填不下几个人');return;}
+  appSettings.customShape=shape;
+  saveSettings();
+  const g=document.getElementById('shapeModeGroup');
+  if(g)g.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value==='custom')});
+  alert('已保存：'+shape.rows+'×'+shape.cols+'，可用 '+n+' 格');
+  Router.navigate('gameSetup');
+}
+function beExportShape(){
+  const shape=cropBeShape();
+  if(!shape){alert('形状是空的，先点几个格子');return;}
+  const row=document.getElementById('beExportRow');
+  const ta=document.getElementById('beExportArea');
+  if(!ta)return;
+  ta.value=JSON.stringify({v:1,rows:shape.rows,cols:shape.cols,cells:shape.cells});
+  if(row)row.style.display='';
+  ta.select();
+}
+function beImportShape(){
+  const inp=document.getElementById('beFileInput');
+  if(!inp)return;
+  inp.value='';
+  inp.click();
+}
+function onBeFileChosen(ev){
+  const f=ev.target.files&&ev.target.files[0];
+  ev.target.value='';
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=function(e){
+    let shape=null;
+    try{ shape=validateBeShape(JSON.parse(e.target.result)); }catch(err){ shape=null; }
+    if(!shape){alert('这个文件不是有效的形状（需要 rows / cols / cells 三个字段）');return;}
+    loadBeShape(shape);
+    alert('已载入：'+shape.rows+'×'+shape.cols);
+  };
+  rd.readAsText(f);
 }
 
 // ─── 历史存储管理（内存+磁盘两层） ───
@@ -2491,7 +2664,9 @@ function renderBoard(force,popX,popY){
     for(let i=0;i<size;i++){
       let row=[];
       for(let j=0;j<cols;j++){
-        let el=document.createElement('div');el.className='cell';
+        let el=document.createElement('div');
+        const blocked=board[i]&&board[i][j]&&board[i][j].blocked;
+        el.className='cell'+(blocked?' blocked':'');
         el.setAttribute('role','gridcell');
         el.dataset.i=i;el.dataset.j=j;
         el.setAttribute('tabindex',(_kbPos.i===i&&_kbPos.j===j)?'0':'-1');
@@ -2508,6 +2683,12 @@ function renderBoard(force,popX,popY){
   }
   for(let i=0;i<size;i++)for(let j=0;j<cols;j++){
     let el=cells[i][j],d=board[i][j];
+    if(d.blocked){   // 空洞：不画棋子，也不参与状态对比
+      el.className='cell blocked';
+      el.innerHTML='';
+      el.setAttribute('aria-label','不可用');
+      continue;
+    }
     let prev=_boardCache?.[i]?.[j];
     // 更新 aria-label（仅当格子状态变化时）
     const posLabel = `第${i+1}行第${j+1}列`;
@@ -3278,6 +3459,7 @@ async function localClick(x,y){
 }
 
 function handleClick(x,y){
+  if(board[x]&&board[x][y]&&board[x][y].blocked)return;   // 空洞点不动
   if(!aiThinking&&!isPaused&&!animating)localClick(x,y);
 }
 
@@ -3802,7 +3984,7 @@ function replayGame(){
     maxPlayers=c.aiCount+1;
     aiAlgorithm=c.aiAlgorithm||'strategy';
     selectedPlayerColor=c.humanIdx;
-    board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+    board=mkBoard(size,cols,boardCells);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
     document.getElementById('pauseBtn').textContent='暂停';
     gameMode='ai';
     aiPlayers=new Set();
@@ -3827,7 +4009,7 @@ function replayGame(){
     undoStack=[];
     size=c.size;
     maxPlayers=c.maxPlayers;
-    board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+    board=mkBoard(size,cols,boardCells);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
     document.getElementById('pauseBtn').textContent='暂停';
     gameMode='local';
     aiPlayers=new Set();
@@ -3848,7 +4030,7 @@ function replayGame(){
     undoStack=[];
     size=c.size;
     maxPlayers=c.maxPlayers||c.aiCount;
-    board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+    board=mkBoard(size,cols,boardCells);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
     document.getElementById('pauseBtn').textContent='暂停';
     gameMode='eve';
     aiPlayers=new Set();
@@ -4688,15 +4870,22 @@ function fillRectSizeSelects(){
 }
 // 读出当前选中的棋盘尺寸（长方形走行/列选择器，其余按正方形）
 function readSetupBoard(){
-  if(currentShapeMode()==='rect'){
+  const mode=currentShapeMode();
+  if(mode==='custom'){
+    const v=appSettings.customShape?validateBeShape(appSettings.customShape):null;
+    if(v)return {rows:v.rows,cols:v.cols,cells:v.cells};
+    const s=getSel('setupSizeGrid')||7;   // 还没存过自定义形状，退回正方形，别让开局卡住
+    return {rows:s,cols:s,cells:null};
+  }
+  if(mode==='rect'){
     fillRectSizeSelects();
     const rr=document.getElementById('rectRows'), cc=document.getElementById('rectCols');
     const r=parseInt(rr&&rr.value,10)||7;
     const c=parseInt(cc&&cc.value,10)||7;
-    return {rows:r,cols:c};
+    return {rows:r,cols:c,cells:null};
   }
   const s=getSel('setupSizeGrid')||7;
-  return {rows:s,cols:s};
+  return {rows:s,cols:s,cells:null};
 }
 // 形状切换：显示对应的尺寸控件
 function applyShapeMode(){
@@ -4754,7 +4943,7 @@ function startUnifiedGame(){
   const bd=readSetupBoard();
   const sz=bd.rows;
   const cnt=getSel('setupPlayersGroup')||2;
-  size=bd.rows;cols=bd.cols;   // 长方形棋盘：行、列分开记
+  size=bd.rows;cols=bd.cols;boardCells=bd.cells||null;   // 行、列、空洞位图
   // 记住本次开局配置，下次进 setup 页时恢复（appSettings 会持久化）
   appSettings.lastSetup={sz:sz,cnt:cnt};
   saveSettings();
@@ -4780,7 +4969,7 @@ function startLocalFromSetup(sz,cnt){
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
   if(borderMode==='random')borderMode=resolveRandomBorder();
   if(capMode==='random')capMode=resolveRandomCap();
-  board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  board=mkBoard(size,cols,boardCells);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='local';_originPage='gameSetup';
   aiPlayers=new Set();aiThinking=false;
@@ -4812,7 +5001,7 @@ function startAIFromSetup(sz,cnt){
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
   if(borderMode==='random')borderMode=resolveRandomBorder();
   if(capMode==='random')capMode=resolveRandomCap();
-  board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  board=mkBoard(size,cols,boardCells);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='ai';_originPage='gameSetup';
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
@@ -4854,7 +5043,7 @@ function startEveFromSetup(sz,cnt){
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
   if(borderMode==='random')borderMode=resolveRandomBorder();
   if(capMode==='random')capMode=resolveRandomCap();
-  board=mkBoard(size,cols);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
+  board=mkBoard(size,cols,boardCells);curPlayer=0;gameOver=false;isPaused=false;firstMovePos=null;
   document.getElementById('pauseBtn').textContent='暂停';
   gameMode='eve';_originPage='gameSetup';
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
