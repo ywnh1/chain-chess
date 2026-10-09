@@ -1,0 +1,88 @@
+name: Windows exe
+
+# 为什么搬到这里：本机是 aarch64 + termux proot，出 Windows exe 要靠
+# cargo-xwin 交叉编译，慢且依赖 xwin 缓存。Windows runner 上原生编最简单。
+#
+# 产物名与 Gitee Release 附件对应：
+#   chainchess-<ver>.exe
+# 项目发的是裸 exe（不带 NSIS 安装包），这里保持一致。
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 读取版本号（tauri.conf.json 是唯一来源）
+        id: ver
+        run: |
+          V=$(python -c "import json;print(json.load(open('tauri/src-tauri/tauri.conf.json'))['version'])")
+          test -n "$V"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "版本: $V"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 缓存 cargo 依赖源码
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-exe-cargo-${{ hashFiles('tauri/src-tauri/Cargo.lock', 'engine/Cargo.lock') }}
+
+      - name: 构建 exe
+        run: |
+          cd tauri
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npx tauri build --no-bundle
+
+      - name: 整理产物并自检
+        run: |
+          set -eu
+          V='${{ steps.ver.outputs.version }}'
+          SRC=tauri/src-tauri/target/release/chain-chess.exe
+          test -f "$SRC" || { echo "没找到产物: $SRC"; ls -la tauri/src-tauri/target/release/ | head -20; exit 1; }
+
+          # Tauri 在多 bin 项目里可能挑到 src/bin/ 下的 CLI 工具（productName
+          # 是中文，匹配不上任何 bin）。GUI 产物体积明显更大，且链接了 WebView2；
+          # 这里按「可执行体里能找到 WebView2 字样」判一下，免得把 CLI 发出去。
+          python - "$SRC" <<'PY'
+          import sys
+          data = open(sys.argv[1], 'rb').read()
+          size = len(data)
+          has_wv = b'WebView2' in data or b'webview2' in data.lower()
+          print(f"体积: {size/1024/1024:.1f} MB")
+          print("含 WebView2 特征:", has_wv)
+          if size < 3 * 1024 * 1024:
+              print("体积过小，疑似编成了 CLI 工具")
+              sys.exit(1)
+          PY
+
+          mkdir -p out
+          cp "$SRC" "out/chainchess-$V.exe"
+          echo "--- 产物 ---"
+          ls -la out/
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: chainchess-windows-${{ steps.ver.outputs.version }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
