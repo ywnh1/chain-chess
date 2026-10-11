@@ -1,8 +1,8 @@
 {
-  "version": "3.4.0",
-  "notes": "Irregular board shapes (rectangles plus a 20x20 shape editor with cross/ring/L/U presets and JSON import/export); custom sound themes, where each cue can use a built-in tone or your own audio file; the intro dialog is now collapsible; settings renamed to More",
-  "notes_zh": "新增异型棋盘（长方形与自定义不规则形状：20×20 形状编辑器、十字/口字/L/U 预设、可导入导出）、新增自定义音效主题（四个音效位可各选内置音色或传入音频）、引导弹窗改为可折叠、设置页更名「更多」",
-  "pub_date": "2026-10-09T00:00:00Z",
+  "version": "3.4.1",
+  "notes": "Multiple irregular-board fixes: AI and taps no longer land in holes, only the default border stays selectable, undo and replay keep the shape, restart keeps the column count; fixed garbled Chinese in the update notes; retrained AI model, stronger on irregular and rectangular boards",
+  "notes_zh": "修复异型棋盘多处问题：AI 与点击不再落进空洞、仅保留默认边界、悔棋与回放不丢形状、重开不丢列数；修复更新说明中文乱码；AI 模型重训，不规则与长方形棋盘上更强",
+  "pub_date": "2026-10-11T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",

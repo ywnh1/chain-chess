@@ -1549,7 +1549,7 @@
     </section>
 
     <footer>
-      <span>v3.4.0 · 第 45 版</span>
+      <span>v3.4.1 · 第 46 版</span>
       <span>© 2026 连锁棋 · Chain Chess</span>
     </footer>
   </main>
@@ -1581,6 +1581,11 @@
     // 更新日志数据（中英文对照，与应用内 changelog 同步）
     (function () {
       var CHANGELOG = [
+        {
+          v: 'v3.4.1 · 第 46 版',
+          zh: '修复异型棋盘多处问题：AI 与点击不再落进空洞、仅保留默认边界、悔棋与回放不丢形状、重开不丢列数；修复更新说明中文乱码；AI 模型重训，不规则与长方形棋盘上更强',
+          en: 'Multiple irregular-board fixes: AI and taps no longer land in holes, only the default border stays selectable, undo and replay keep the shape, restart keeps the column count; fixed garbled Chinese in the update notes; retrained AI model, stronger on irregular and rectangular boards'
+        },
         {
           v: 'v3.4.0 · 第 45 版',
           zh: '新增异型棋盘（长方形与自定义不规则形状：20×20 形状编辑器、十字/口字/L/U 预设、可导入导出）、新增自定义音效主题（四个音效位可各选内置音色或传入音频）、引导弹窗改为可折叠、设置页更名「更多」',
