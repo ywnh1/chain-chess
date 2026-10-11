@@ -490,6 +490,15 @@ if [ "$LINUX" = true ]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
 
+  # 产物命名约定：arm64 带 -arm64 后缀，amd64 不带（amd64 是默认架构）。
+  # 本机是 aarch64，出的是 arm64；CI（linux-amd64.yml）出 amd64，同样遵守
+  # 这个约定，两边就不会撞名。download.html 的 withArch() 按 UA 给无后缀
+  # 的那条链接补上 -arm64。
+  case "$(uname -m)" in
+    aarch64|arm64) LINUX_ARCH_SUFFIX="-arm64" ;;
+    *)             LINUX_ARCH_SUFFIX="" ;;
+  esac
+
   (cd tauri && npx tauri build --bundles deb)
 
   # 只认当前版本的产物：同一目录会积累历史 deb（连锁棋_3.3.8_*.deb 等），
@@ -502,7 +511,7 @@ if [ "$LINUX" = true ]; then
     exit 1
   fi
   mkdir -p release
-  DEB_OUTPUT="release/${PRODUCT}-${VERSION}.deb"
+  DEB_OUTPUT="release/${PRODUCT}-${VERSION}${LINUX_ARCH_SUFFIX}.deb"
 
   # Tauri 挑主二进制时会挑到 src/bin/ 下的 CLI 工具（battle 等），deb 里装的就是
   # 那个 CLI 而不是 GUI；它还会顺手把产物改成 mainBinaryName，所以光看文件名看不
@@ -548,7 +557,7 @@ if [ "$LINUX" = true ]; then
       [ -n "$ICON_SRC" ] && cp "$ICON_SRC" "$APPDIR/"
       ln -sf usr/bin/chain-chess "$APPDIR/AppRun"
 
-      APP_OUTPUT="release/${PRODUCT}-${VERSION}.AppImage"
+      APP_OUTPUT="release/${PRODUCT}-${VERSION}${LINUX_ARCH_SUFFIX}.AppImage"
       # appimagetool 自身也是 AppImage，无 FUSE 环境需要 extract-and-run
       if APPIMAGE_EXTRACT_AND_RUN=1 ARCH=$(uname -m) appimagetool "$APPDIR" "$APP_OUTPUT" >/dev/null 2>&1; then
         echo "  ✅ Linux AppImage 构建完成: ${APP_OUTPUT} ($(ls -lh "$APP_OUTPUT" | awk '{print $5}'))"
