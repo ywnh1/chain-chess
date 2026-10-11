@@ -1955,6 +1955,29 @@ function pickUpdateUrl(platforms) {
 
 /** 启动后静默检查 */
 // 手动检查更新：与自动检查不同，已是最新也提示结果
+// Gitee API 的 content 字段是 base64。atob 解出来的是「字节串」（每个字符一字节），
+// 而中文在 UTF-8 里是多字节（“新” = E6 96 B0）—— 直接 JSON.parse 会得到乱码。
+// 所以要把字节串再按 UTF-8 解一次。
+function b64ToUtf8(b64){
+  var bin = atob(b64);
+  if (typeof TextDecoder === 'function') {
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    try { return new TextDecoder('utf-8').decode(bytes); } catch (e) {}
+  }
+  // 老环境回退：手撸一遍 UTF-8 解码
+  var out = '', i = 0;
+  while (i < bin.length) {
+    var c = bin.charCodeAt(i++);
+    if (c < 0x80) { out += String.fromCharCode(c); }
+    else if (c > 0xBF && c < 0xE0) {
+      out += String.fromCharCode(((c & 0x1F) << 6) | (bin.charCodeAt(i++) & 0x3F));
+    } else if (c > 0xDF && c < 0xF0) {
+      out += String.fromCharCode(((c & 0x0F) << 12) | ((bin.charCodeAt(i++) & 0x3F) << 6) | (bin.charCodeAt(i++) & 0x3F));
+    }
+  }
+  return out;
+}
 function manualCheckUpdate(){
   showUpdateModal('检查中…','正在检查新版本，请稍候','');
   var xhr = new XMLHttpRequest();
@@ -1968,7 +1991,7 @@ function manualCheckUpdate(){
       var a = JSON.parse(r);
       if (!a.content || a.encoding !== 'base64') { showUpdateResult('error','检查更新失败：数据格式异常'); return; }
       var b64 = a.content; while (b64.length % 4) b64 += '=';
-      var d = JSON.parse(atob(b64));
+      var d = JSON.parse(b64ToUtf8(b64));
       if (!d || !d.version) { showUpdateResult('error','检查更新失败：缺少版本号'); return; }
       var cur = getCurVer();
       var available = cmpVer(d.version, cur) > 0;
@@ -2006,7 +2029,7 @@ function silentCheck() {
       var a = JSON.parse(r);
       if (!a.content || a.encoding !== 'base64') { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u6570\u636e\u683c\u5f0f\u5f02\u5e38'); return; }
       var b64 = a.content; while (b64.length % 4) b64 += '=';
-      var d = JSON.parse(atob(b64));
+      var d = JSON.parse(b64ToUtf8(b64));
       if (!d || !d.version) { showToast('\u66f4\u65b0\u68c0\u67e5\u5931\u8d25\uff1a\u7f3a\u5c11\u7248\u672c\u53f7'); return; }
       var cur = getCurVer();
       var available = cmpVer(d.version, cur) > 0;
@@ -2048,7 +2071,7 @@ function showUpdateModal(ver, notes, url) {
   if (!m) return;
   m.classList.add('show');
   document.getElementById('updateModalTitle').textContent = '\u53d1\u73b0\u65b0\u7248\u672c v' + ver;
-  document.getElementById('updateModalMsg').innerHTML = notes.replace(/\\n/g, '<br>');
+  document.getElementById('updateModalMsg').innerHTML = notes.replace(/\n/g, '<br>');
   document.getElementById('updateModalConfirm').style.display = 'inline-block';
   document.getElementById('updateModalConfirm').onclick = startDownload;
   document.getElementById('updateModalCancel').style.display = 'inline-block';

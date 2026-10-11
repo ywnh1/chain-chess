@@ -9,6 +9,10 @@ const ids={};
 for(const m of h.matchAll(/id="([^"]+)"/g))ids[m[1]]=(ids[m[1]]||0)+1;
 for(const[id,c]of Object.entries(ids))if(c>1)e.push("dup id");
 const kb=(Buffer.byteLength(h,"utf-8")/1024).toFixed(1);
+// Gitee API 返回的 content 是 base64；atob 解出来是字节串，中文必须再按 UTF-8
+// 解一次，否则更新弹窗里的更新说明全是乱码（曾如此）。
+if(/JSON\.parse\(atob\(/.test(h)) e.push("index.html 还在用裸 atob 解 base64：更新弹窗会乱码");
+if(!/function b64ToUtf8/.test(h)) e.push("index.html 缺少 b64ToUtf8");
 // 引用一致性：index.html 里的 openHint('key') 与 screen id 必须在 app.js 中有定义
 const appJs=readFileSync(resolve(import.meta.dirname,"public/app.js"),"utf-8");
 const hintsBlock=appJs.slice(appJs.indexOf("const HINTS = {"),appJs.indexOf("/** 打开说明弹窗"));
