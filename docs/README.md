@@ -17,7 +17,6 @@ docs/                                 # 本目录（PWA 独立构建）
 │   └── chain_chess_engine_bg.wasm    #   3.5MB（含内嵌 XGBoost 模型）
 ├── wasm/                             # WASM 引擎源码（Rust crate）
 │   ├── src/lib.rs                    #   从 tauri/src-tauri/src/lib.rs 提取的纯逻辑
-│   ├── xgb_model_board.json          #   XGBoost 模型（内嵌编译）
 │   └── vendor/alpha_beta_pruning/    #   vendor 化（rayon 改为可选 feature）
 └── pkg-node/                         # nodejs target 产物（仅本地测试用，可删除）
 ```

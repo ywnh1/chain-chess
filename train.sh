@@ -20,9 +20,8 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 DATA_DIR="${ROOT}/data"
 SCRIPT="${ROOT}/train_xgb_model.py"
 SELFPLAY_BIN="${ROOT}/tauri/src-tauri"
-MODEL_TAURI="${ROOT}/tauri/src-tauri/xgb_model_board.json"
 # 引擎已抽成共享 crate，两份宿主（Tauri / WASM）都从 engine/ 取模型，
-# 原来的 pwa/wasm/ 路径已不存在
+# 原来的 pwa/wasm/ 路径不存在了，tauri/src-tauri/ 那份遗留副本也已删除
 MODEL_ENGINE="${ROOT}/engine/xgb_model_board.json"
 
 mkdir -p "${DATA_DIR}"
