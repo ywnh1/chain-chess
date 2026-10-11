@@ -82,7 +82,7 @@
 ### 平台形态
 
 - **桌面（Windows / Linux）/ Android**：Tauri 应用，自动更新、触感反馈、文件系统存储
-- **Linux 包**：`chainchess-<version>.deb`（Debian / Ubuntu）与 `chainchess-<version>.AppImage`（通用发行版）；x86_64 由 CI 另外构建，文件名带 `-amd64` 后缀
+- **Linux 包**：`chainchess-<version>.deb`（Debian / Ubuntu）与 `chainchess-<version>.AppImage`（通用发行版）；
 - **浏览器 PWA**：`docs/` 目录独立构建（WASM 引擎），浏览器打开就能玩，可安装离线使用
 
 ---
@@ -151,7 +151,6 @@ Rust 实现，按人工定的优先级出招，不做树搜索，响应最快，
 - **三级优先**：棋子攒到 3 颗就先动它，好触发连锁
 - **安全升级**：躲开对手三级棋子旁边的二级棋子，免得被吞
 - **渐进控制**：一进二、下三级，逐步扩大地盘
-- **首子中心**：第一手落在棋盘中央附近
 
 ### 🧠 Alpha-Beta 剪枝
 
