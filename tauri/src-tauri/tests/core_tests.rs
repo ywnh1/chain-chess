@@ -393,3 +393,28 @@ fn test_ai_first_move_on_rect_and_holes() {
         }
     }
 }
+
+/// 新训练的模型能不能被引擎解析，以及在异形棋盘上能不能算。
+/// 上面那些测试都用 use_ml_eval:false，不会碰模型 —— 加载失败（格式不兼容）
+/// 是懒加载 + expect()，只有真正调用 ML 评估才会暴露。
+#[test]
+fn test_ml_model_loads_on_all_shapes() {
+    // 正方形
+    let mut sq = rect_board(7, 7);
+    sq[3][3] = Cell { owner: Some(0), count: 2, blocked: false, th: None };
+    sq[4][4] = Cell { owner: Some(1), count: 1, blocked: false, th: None };
+    assert!(eval_board_ml(&sq, 0, 10, BorderMode::Default, CapMode::Cap4, 0).abs() < 1_000_000);
+
+    // 长方形
+    let mut rect = rect_board(8, 5);
+    rect[4][2] = Cell { owner: Some(0), count: 3, blocked: false, th: None };
+    rect[6][4] = Cell { owner: Some(1), count: 1, blocked: false, th: None };
+    assert!(eval_board_ml(&rect, 0, 10, BorderMode::Default, CapMode::Cap4, 0).abs() < 1_000_000);
+
+    // 不规则（带洞）
+    let mut holed = rect_board(9, 9);
+    for i in 0..9 { holed[i][0] = Cell::hole(); holed[i][8] = Cell::hole(); }
+    holed[4][4] = Cell { owner: Some(0), count: 2, blocked: false, th: None };
+    holed[5][5] = Cell { owner: Some(1), count: 2, blocked: false, th: None };
+    assert!(eval_board_ml(&holed, 0, 10, BorderMode::Default, CapMode::Cap4, 0).abs() < 1_000_000);
+}
