@@ -368,3 +368,28 @@ fn test_ai_never_moves_into_holes() {
     }
     assert!(checked > 0, "一个走法都没生成，测试没意义");
 }
+
+/// 长方形/不规则棋盘上 AI 的首步不能越界。
+/// GameState::run 的「首步居中偏好」曾用单个 sz 当行列 —— 8×6 这种长方形上
+/// 列号会撞到 sz-2，直接 index out of bounds。原测试用的是 9×9 正方形，
+/// 且给 AI 放了子，走不到这个分支。
+#[test]
+fn test_ai_first_move_on_rect_and_holes() {
+    for (rows, cols) in [(8, 6), (6, 8), (7, 5), (5, 9), (9, 9)] {
+        let mut b = rect_board(rows, cols);
+        // 只给对手放子：AI 手上没子 → 走 run 的首步居中偏好分支
+        b[rows - 2][cols - 2] = Cell { owner: Some(1), count: 1, blocked: false, th: None };
+        if rows > 4 && cols > 4 {
+            b[1][1] = Cell::hole();
+        }
+        for alg in ["alphabeta", "pvs"] {
+            let cfg = PlayerAiConfig { algorithm: alg.to_string(), depth: 2, use_ml_eval: false };
+            if let Some((x, y)) =
+                find_best_move_by_alg(&b, rows, 0, &cfg, &[], 2, 10, None, BorderMode::Default, CapMode::Cap4, 0)
+            {
+                assert!(x < rows && y < cols, "{} 在 {}x{} 上给出越界走法 ({},{})", alg, rows, cols, x, y);
+                assert!(!b[x][y].blocked, "{} 在 {}x{} 上把子下进洞里 ({},{})", alg, rows, cols, x, y);
+            }
+        }
+    }
+}

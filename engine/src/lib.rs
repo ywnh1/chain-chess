@@ -1306,30 +1306,35 @@ impl AlphaBeta<(usize, usize)> for GameState {
 
         // 首步：居中偏好
         if !has_pieces(&self.board, self.player) {
-            let mut candidates: Vec<(usize, usize)> = (1..self.sz - 1)
-                .flat_map(|i| (1..self.sz - 1).filter_map(move |j| {
-                    if self.board[i][j].owner.is_none() && !is_in_any_restricted_zone(&self.board, i, j) {
+            // 行列从棋盘推导：长方形与不规则棋盘都不能拿 sz 当两轴用
+            // （曾经用 self.sz 当行列，长方形上会 index out of bounds）
+            let rows = self.board.len();
+            let cols = self.board.first().map_or(rows, |r| r.len());
+            let mut candidates: Vec<(usize, usize)> = (1..rows.saturating_sub(1))
+                .flat_map(|i| (1..cols.saturating_sub(1)).filter_map(move |j| {
+                    if !self.board[i][j].blocked && self.board[i][j].owner.is_none() && !is_in_any_restricted_zone(&self.board, i, j) {
                         Some((i, j))
                     } else { None }
                 })).collect();
             if candidates.is_empty() {
-                for i in 0..self.sz { for j in 0..self.sz {
-                    if self.board[i][j].owner.is_none() && !is_in_any_restricted_zone(&self.board, i, j) {
+                for i in 0..rows { for j in 0..cols {
+                    if !self.board[i][j].blocked && self.board[i][j].owner.is_none() && !is_in_any_restricted_zone(&self.board, i, j) {
                         candidates.push((i, j));
                     }
                 }}
             }
             if candidates.is_empty() {
-                for i in 0..self.sz { for j in 0..self.sz {
-                    if self.board[i][j].owner.is_none() { candidates.push((i, j)); }
+                for i in 0..rows { for j in 0..cols {
+                    if !self.board[i][j].blocked && self.board[i][j].owner.is_none() { candidates.push((i, j)); }
                 }}
             }
             if candidates.is_empty() { return None; }
-            let cx = self.sz as f64 / 2.0 - 0.5;
+            let row_c = rows as f64 / 2.0 - 0.5;
+            let col_c = cols as f64 / 2.0 - 0.5;
             return candidates.into_iter()
                 .min_by(|&(i1, j1), &(i2, j2)| {
-                    let d1 = (i1 as f64 - cx).abs() + (j1 as f64 - cx).abs();
-                    let d2 = (i2 as f64 - cx).abs() + (j2 as f64 - cx).abs();
+                    let d1 = (i1 as f64 - row_c).abs() + (j1 as f64 - col_c).abs();
+                    let d2 = (i2 as f64 - row_c).abs() + (j2 as f64 - col_c).abs();
                     d1.partial_cmp(&d2).unwrap()
                 });
         }

@@ -868,30 +868,144 @@ fn render_progress(done: u32, total: u32, steps: u64, start: &std::time::Instant
 /// 返回本局步数。rng 用于随机兜底走法（AI 无棋可下时）。
 /// 随机挖掉一些外围格，模拟不规则棋盘。只挖外圈：中心区保留，
 /// 否则整局可能没地方落子。若挖完可用格不足一半，则整体回退为全可用。
-fn make_random_shape(rows: usize, cols: usize, rng: &mut impl rand::Rng) -> Vec<String> {
-    let mut cells: Vec<Vec<u8>> = vec![vec![b'1'; cols]; rows];
-    let budget = (rows * cols / 5).max(1);
-    let holes = rng.gen_range(1..=budget);
-    for _ in 0..holes {
-        let i = rng.gen_range(0..rows);
-        let j = rng.gen_range(0..cols);
-        if i > 0 && i + 1 < rows && j > 0 && j + 1 < cols {
-            continue;   // 中心区不挖
-        }
-        cells[i][j] = b'0';
-    }
-    let open = cells.iter().flatten().filter(|&&c| c == b'1').count();
-    if open < (rows * cols) / 2 {
-        for row in cells.iter_mut() {
-            for c in row.iter_mut() {
-                *c = b'1';
+/// 不规则形状至少要留这么多可用格，否则一局没法展开（人数上限本身是按
+/// 可用格分档的：≤25 格 5 人）。
+///
+/// 不能定太高：长条与蛇形这类形状本身就很窄，宽度 2 × 全长 7 只有 14 格 ——
+/// 定 16 会让它们几乎全部生成失败而被丢弃，这两类就永远采集不到数据。
+const MIN_SHAPE_CELLS: usize = 12;
+
+/// 不规则形状的生成方式。每一次都保证连通、且可用格不少于 MIN_SHAPE_CELLS；
+/// 生成不合格（可用格太少）就返回 None，让调用方换一种或回退。
+const SHAPE_KINDS: [&str; 5] = ["挖洞", "口字", "十字", "长条", "蛇形"];
+
+fn make_irregular_shape(
+    kind: &str,
+    rows: usize,
+    cols: usize,
+    rng: &mut impl rand::Rng,
+) -> Option<Vec<String>> {
+    let mut cells: Vec<Vec<u8>> = vec![vec![b'0'; cols]; rows];
+    let band = rng.gen_range(1..=2usize).min(rows.min(cols));   // 条的宽度 1~2
+
+    match kind {
+        // 基本整盘可用，只在最外圈随机挖几个洞
+        "挖洞" => {
+            for row in cells.iter_mut() {
+                for c in row.iter_mut() {
+                    *c = b'1';
+                }
+            }
+            let budget = (rows * cols / 5).max(1);
+            for _ in 0..rng.gen_range(1..=budget) {
+                let i = rng.gen_range(0..rows);
+                let j = rng.gen_range(0..cols);
+                if i > 0 && i + 1 < rows && j > 0 && j + 1 < cols {
+                    continue;   // 中心区不挖
+                }
+                cells[i][j] = b'0';
             }
         }
+        // 口字形：留一圈外框，内部掏空
+        "口字" => {
+            let t = (rows.min(cols) / 4).max(1);
+            for i in 0..rows {
+                for j in 0..cols {
+                    let on_border = i < t || i + t >= rows || j < t || j + t >= cols;
+                    if on_border {
+                        cells[i][j] = b'1';
+                    }
+                }
+            }
+        }
+        // 十字形：中间一横一竖，宽度取短边的 1/3
+        "十字" => {
+            let t = (rows.min(cols) / 3).max(1);
+            let (mi, mj) = (rows / 2, cols / 2);
+            for i in 0..rows {
+                for j in 0..cols {
+                    let in_h = i >= mi.saturating_sub(t / 2) && i < (mi + t / 2 + 1).min(rows);
+                    let in_v = j >= mj.saturating_sub(t / 2) && j < (mj + t / 2 + 1).min(cols);
+                    if in_h || in_v {
+                        cells[i][j] = b'1';
+                    }
+                }
+            }
+        }
+        // 长条形：横着或竖着的一条，宽 1~2
+        "长条" => {
+            if rng.gen_bool(0.5) {
+                let i0 = rng.gen_range(0..rows.saturating_sub(band - 1).max(1));
+                for i in i0..rows.min(i0 + band) {
+                    for j in 0..cols {
+                        cells[i][j] = b'1';
+                    }
+                }
+            } else {
+                let j0 = rng.gen_range(0..cols.saturating_sub(band - 1).max(1));
+                for j in j0..cols.min(j0 + band) {
+                    for i in 0..rows {
+                        cells[i][j] = b'1';
+                    }
+                }
+            }
+        }
+        // 蛇形：从随机位置随机游走，每段直行几步再转向，宽 1~2
+        "蛇形" => {
+            let mut i = rng.gen_range(0..rows);
+            let mut j = rng.gen_range(0..cols);
+            cells[i][j] = b'1';
+            let dirs = [(0isize, 1isize), (1, 0), (0, -1), (-1, 0)];
+            let mut d = rng.gen_range(0..4usize);
+            let target = (rows * cols / 2).max(MIN_SHAPE_CELLS);
+            let mut placed = 1usize;
+            let mut guard = 0usize;
+            while placed < target && guard < rows * cols * 8 {
+                guard += 1;
+                let steps = rng.gen_range(1..=rows.min(cols).max(2));
+                for _ in 0..steps {
+                    let (di, dj) = dirs[d];
+                    let ni = i as isize + di;
+                    let nj = j as isize + dj;
+                    if ni < 0 || nj < 0 || ni as usize >= rows || nj as usize >= cols {
+                        break;
+                    }
+                    i = ni as usize;
+                    j = nj as usize;
+                    if cells[i][j] == b'0' {
+                        cells[i][j] = b'1';
+                        placed += 1;
+                    }
+                    if band == 2 {
+                        // 贴着行进方向的侧面再补一格，把条加宽到 2
+                        let (pi, pj) = dirs[(d + 1) % 4];
+                        let wi = i as isize + pi;
+                        let wj = j as isize + pj;
+                        if wi >= 0 && wj >= 0 && (wi as usize) < rows && (wj as usize) < cols
+                            && cells[wi as usize][wj as usize] == b'0'
+                        {
+                            cells[wi as usize][wj as usize] = b'1';
+                            placed += 1;
+                        }
+                    }
+                }
+                // 转向，但不直接回头
+                d = (d + 1 + rng.gen_range(0..3)) % 4;
+            }
+        }
+        _ => return None,
     }
-    cells
-        .into_iter()
-        .map(|r| String::from_utf8(r).expect("bitmap is ascii"))
-        .collect()
+
+    let open = cells.iter().flatten().filter(|&&c| c == b'1').count();
+    if open < MIN_SHAPE_CELLS {
+        return None;
+    }
+    Some(
+        cells
+            .into_iter()
+            .map(|r| String::from_utf8(r).expect("bitmap is ascii"))
+            .collect(),
+    )
 }
 
 /// 自对弈单局。shape 为 None 表示全盘可用；Some 时每行一个 0/1 串，
@@ -1102,11 +1216,11 @@ pub fn generate_selfplay_data_mixed(
     for game_id in 0..num_games {
         // 每局随机局面：棋盘大小 5-8（7 最常见），玩家数 2-4（与当前产品局配置一致）
         let size_pool = [5usize, 5, 6, 6, 7, 7, 7, 7, 8, 8];
-        // 形状分布：七成正方形（与产品默认一致），两成长方形，一成不规则（带洞）。
-        // 三类都要有数据，同一个模型才能靠已归一化的特征吃下任意形状。
+        // 形状分布 2:1:1（正方形 : 长方形 : 不规则）。三类都要有数据，
+        // 同一个模型才能靠已归一化的特征吃下任意形状。
         let shape_roll = rng.gen_range(0..100u32);
         let first = size_pool[rng.gen_range(0..size_pool.len())];
-        let (board_rows, board_cols) = if shape_roll < 70 {
+        let (board_rows, board_cols) = if shape_roll < 50 {
             (first, first)
         } else {
             let mut second = size_pool[rng.gen_range(0..size_pool.len())];
@@ -1115,12 +1229,25 @@ pub fn generate_selfplay_data_mixed(
             }
             (first, second)
         };
-        let shape_owned = if shape_roll >= 90 {
-            Some(make_random_shape(board_rows, board_cols, &mut rng))
+        // 不规则那 25% 里每次随机挑一种形状；生成不合格（可用格太少）
+        // 就依次试其它种类，全都不行则不挖洞（退化成普通棋盘）。
+        let shape_owned = if shape_roll >= 75 {
+            let mut picked = None;
+            let mut kinds: Vec<&str> = SHAPE_KINDS.to_vec();
+            while !kinds.is_empty() {
+                let k = rng.gen_range(0..kinds.len());
+                let kind = kinds.remove(k);
+                if let Some(cells) = make_irregular_shape(kind, board_rows, board_cols, &mut rng) {
+                    picked = Some((kind, cells));
+                    break;
+                }
+            }
+            picked
         } else {
             None
         };
-        let shape = shape_owned.as_deref();
+        let shape_kind = shape_owned.as_ref().map(|(k, _)| *k);
+        let shape = shape_owned.as_ref().map(|(_, c)| c.as_slice());
         let player_pool = [2usize, 2, 2, 3, 3, 4, 4, 4];
         let max_players = player_pool[rng.gen_range(0..player_pool.len())];
         let border_mode = [
@@ -1132,7 +1259,11 @@ pub fn generate_selfplay_data_mixed(
         ][rng.gen_range(0..3)];
 
         let configs = random_ai_configs(board_rows, max_players, &mut rng);
-        let shape_tag = if shape_owned.is_some() { "不规则" } else if board_rows != board_cols { "长方形" } else { "正方形" };
+        let shape_tag = match shape_kind {
+            Some(k) => k,                                        // 挖洞 / 口字 / 十字 / 长条 / 蛇形
+            None if board_rows != board_cols => "长方形",
+            None => "正方形",
+        };
         let key = format!("{board_rows}×{board_cols}/{max_players}p/{border_mode:?}/{cap_mode:?}/{shape_tag}");
         *mode_stats.entry(key).or_insert(0) += 1;
 
