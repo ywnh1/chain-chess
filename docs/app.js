@@ -888,10 +888,22 @@ function updateModeConflictUI(caller){
     selB=borderGroup.querySelector('.selected'); selC=capGroup.querySelector('.selected');
     bv=selB?selB.dataset.value:null; cv=selC?selC.dataset.value:null;
   }
-  // 禁用联动：cap 为 3/5 → degrade 不可选；border 为 degrade → 3/5 不可选
+  // 不规则棋盘（自定义形状）只支持默认边界：强制回默认，并在下面把其余选项禁用掉
+  const customShape=(typeof currentShapeMode==='function')&&currentShapeMode()==='custom';
+  if(customShape&&selB&&selB.dataset.value!=='default'){
+    const bd=borderGroup.querySelector('.gb[data-value="default"]');
+    if(bd){
+      setSelected(borderGroup,bd);
+      const d=document.getElementById('borderModeDesc');
+      if(d&&BORDER_MODE_DESC['default'])d.textContent=BORDER_MODE_DESC['default'];
+      selB=bd; bv='default';
+    }
+  }
+  // 禁用联动：cap 为 3/5 → degrade 不可选；border 为 degrade → 3/5 不可选；
+  // 不规则棋盘 → 只留默认边界
   const cap35=cv==='3'||cv==='5';
   borderGroup.querySelectorAll('.gb').forEach(function(b){
-    b.disabled=(b.dataset.value==='degrade'&&cap35);
+    b.disabled=(b.dataset.value==='degrade'&&cap35)||(customShape&&b.dataset.value!=='default');
   });
   capGroup.querySelectorAll('.gb').forEach(function(b){
     b.disabled=((b.dataset.value==='3'||b.dataset.value==='5')&&bv==='degrade');
@@ -2359,6 +2371,10 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
   if(anim&&!wantSkip())showSkipBtn(true);
   let bm=borderMode||'default';   // 必须在使用前定义（首子分支会引用 bm，避免 TDZ 异常）
   let c=b[x][y];
+  // 空洞不是棋盘格子，AI 与人类都不该落在这儿。
+  // 这一道必须挡在前端：本函数在引擎结果返回之前就会直接改棋盘（见下面的 c.owner=pl），
+  // 漏掉的话棋子会先被画进洞里，等 result.board 覆盖回来时已经闪过一瞬。
+  if(!c||c.blocked)return [];
   let isFirstMove=false;
   if(c.owner===null){
     let anyPieces=false;
@@ -4923,6 +4939,8 @@ function applyShapeMode(jumpToEditor){
   // 只有正方形才显示那排尺寸按钮；长方形走行/列选择器；自定义两者都不显示
   if(sq)sq.style.display=(mode==='square')?'':'none';
   if(rc)rc.style.display=(mode==='rect')?'':'none';
+  // 不规则棋盘只支持默认边界 —— 让边界按钮的禁用/回退跟着形状走
+  if(typeof updateModeConflictUI==='function')updateModeConflictUI();
   if(mode==='custom'&&jumpToEditor){Router.navigate('board-editor');return;}
   setupLobbySync();
 }

@@ -70,6 +70,18 @@ for(const c of strContainers)
     if(run('custom',false).nav)e.push("初始化时不该跳编辑器（会退不出来）");
   }
 }
+// 空洞不是棋盘格子：processClick 在引擎结果返回前就会直接改棋盘，
+// 前端得自己挡一道 —— 这里出过「AI 把子下进洞里」（棋子先被画上去，
+// 等 result.board 覆盖回来时已经闪过一瞬）。
+{
+  const m=appJs.match(/async function processClick\([\s\S]*?\n\}/);
+  if(!m)e.push("processClick 不见了");
+  else if(!/if\(!c\|\|c\.blocked\)return \[\]/.test(m[0]))
+    e.push("processClick 没挡 blocked：棋子会被画进洞里");
+}
+// 不规则棋盘只支持默认边界 —— 其余选项要禁用
+if(!/customShape&&b\.dataset\.value!=='default'/.test(appJs))
+  e.push("updateModeConflictUI 没处理不规则棋盘的边界禁用");
 // 棋盘副本必须带上 blocked，否则悔棋后洞就没了。只盯 cloneBoard 的返回，
 // _boardCache 那种只用于渲染对比的缓存不需要（它本来就只看 owner/count）。
 if(/return b\.map\(row=>row\.map\(c=>\(\{owner:c\.owner,count:c\.count\}\)\)\)/.test(appJs))

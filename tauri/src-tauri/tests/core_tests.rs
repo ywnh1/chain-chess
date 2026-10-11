@@ -341,3 +341,30 @@ fn test_holes_do_not_count_as_pieces() {
     b[1][1] = Cell { owner: Some(1), count: 1, blocked: false, th: None };
     assert!(has_pieces(&b, 1));
 }
+
+/// 不规则棋盘：AI 绝不能把子下进洞里
+/// （引擎里 get_moves 有一道 blocked 过滤，这条测试就是盯它真的生效）
+#[test]
+fn test_ai_never_moves_into_holes() {
+    let mut b = rect_board(9, 9);
+    for i in 0..3 { for j in 0..3 { b[i][j] = Cell::hole(); } }   // 左上 3x3 挖空
+    b[3][3] = Cell::hole();                                       // 再挖一个孤立的洞
+    b[4][4] = Cell { owner: Some(0), count: 1, blocked: false, th: None };
+    b[6][6] = Cell { owner: Some(1), count: 3, blocked: false, th: None };
+
+    let mut checked = 0;
+    for alg in ["strategy", "alphabeta", "pvs", "mcts"] {
+        for depth in [1usize, 2] {
+            let cfg = PlayerAiConfig { algorithm: alg.to_string(), depth, use_ml_eval: false };
+            for _ in 0..6 {
+                if let Some((x, y)) =
+                    find_best_move_by_alg(&b, 9, 0, &cfg, &[], 2, 10, None, BorderMode::Default, CapMode::Cap4, 0)
+                {
+                    assert!(!b[x][y].blocked, "{} depth={} 把子下进了洞 ({},{})", alg, depth, x, y);
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(checked > 0, "一个走法都没生成，测试没意义");
+}
