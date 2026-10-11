@@ -12,7 +12,7 @@
 # 说明:
 #   - 所有数据统一放在 data/ 下，文件名 selfplay_*.jsonl 才会被 train 自动收集
 #   - collect 生成的文件带时间戳，不会覆盖旧数据
-#   - 训练输出模型同时写入 tauri 与 pwa 两份 xgb_model_board.json，桌面端与 PWA 保持一致
+#   - 训练输出模型写入 engine/xgb_model_board.json（Tauri 与 WASM 共用这一份）
 
 set -e
 
@@ -21,7 +21,9 @@ DATA_DIR="${ROOT}/data"
 SCRIPT="${ROOT}/train_xgb_model.py"
 SELFPLAY_BIN="${ROOT}/tauri/src-tauri"
 MODEL_TAURI="${ROOT}/tauri/src-tauri/xgb_model_board.json"
-MODEL_PWA="${ROOT}/pwa/wasm/xgb_model_board.json"
+# 引擎已抽成共享 crate，两份宿主（Tauri / WASM）都从 engine/ 取模型，
+# 原来的 pwa/wasm/ 路径已不存在
+MODEL_ENGINE="${ROOT}/engine/xgb_model_board.json"
 
 mkdir -p "${DATA_DIR}"
 
@@ -67,13 +69,12 @@ case "${1:-train}" in
       echo "📦 用 data/ 下全部数据训练（共 $(echo "${FILES}" | wc -l) 个文件）"
     fi
     echo ""
-    python3 "${SCRIPT}" ${FILES} --output "${MODEL_TAURI}"
+    python3 "${SCRIPT}" ${FILES} --output "${MODEL_ENGINE}"
     echo ""
-    # 同步模型到 PWA（两份引擎共用同一模型，保持行为一致）
-    cp -f "${MODEL_TAURI}" "${MODEL_PWA}"
-    echo "✅ 模型已保存并同步:"
-    echo "   ${MODEL_TAURI}"
-    echo "   ${MODEL_PWA}"
+    # 模型只需要一份：engine/ 是唯一被 include_str! 引用的位置。
+    # tauri/src-tauri/ 下那份是抽 crate 前的遗留，已无人引用，不再同步。
+    echo "✅ 模型已保存："
+    echo "   ${MODEL_ENGINE}"
     ;;
 
   stats)

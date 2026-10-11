@@ -866,9 +866,41 @@ fn render_progress(done: u32, total: u32, steps: u64, start: &std::time::Instant
 
 /// 单局自对弈：按给定局面与 AI 配置跑完一局，逐步输出 StepRecord（JSONL 行）。
 /// 返回本局步数。rng 用于随机兜底走法（AI 无棋可下时）。
+/// 随机挖掉一些外围格，模拟不规则棋盘。只挖外圈：中心区保留，
+/// 否则整局可能没地方落子。若挖完可用格不足一半，则整体回退为全可用。
+fn make_random_shape(rows: usize, cols: usize, rng: &mut impl rand::Rng) -> Vec<String> {
+    let mut cells: Vec<Vec<u8>> = vec![vec![b'1'; cols]; rows];
+    let budget = (rows * cols / 5).max(1);
+    let holes = rng.gen_range(1..=budget);
+    for _ in 0..holes {
+        let i = rng.gen_range(0..rows);
+        let j = rng.gen_range(0..cols);
+        if i > 0 && i + 1 < rows && j > 0 && j + 1 < cols {
+            continue;   // 中心区不挖
+        }
+        cells[i][j] = b'0';
+    }
+    let open = cells.iter().flatten().filter(|&&c| c == b'1').count();
+    if open < (rows * cols) / 2 {
+        for row in cells.iter_mut() {
+            for c in row.iter_mut() {
+                *c = b'1';
+            }
+        }
+    }
+    cells
+        .into_iter()
+        .map(|r| String::from_utf8(r).expect("bitmap is ascii"))
+        .collect()
+}
+
+/// 自对弈单局。shape 为 None 表示全盘可用；Some 时每行一个 0/1 串，
+/// '0' 的格子是洞（不规则棋盘），棋子飞进去会直接消失。
 fn run_one_game(
     writer: &mut impl std::io::Write,
-    board_size: usize,
+    rows: usize,
+    cols: usize,
+    shape: Option<&[String]>,
     max_players: usize,
     player_configs: &[PlayerAiConfig],
     border_mode: BorderMode,
@@ -876,10 +908,19 @@ fn run_one_game(
     game_id: u32,
     rng: &mut impl rand::Rng,
 ) -> Result<u64, String> {
-    let mut board = vec![
-        vec![Cell { owner: None, count: 0, th: None, blocked: false }; board_size];
-        board_size
-    ];
+    let mut board: GameBoard = (0..rows)
+        .map(|i| {
+            (0..cols)
+                .map(|j| {
+                    let hole = shape
+                        .and_then(|cells| cells.get(i))
+                        .and_then(|row| row.as_bytes().get(j))
+                        .map_or(false, |c| *c == b'0');
+                    if hole { Cell::hole() } else { Cell::empty() }
+                })
+                .collect()
+        })
+        .collect();
     let mut eliminated: Vec<usize> = Vec::new();
     let mut cur_player: usize = 0;
     let game_count: u32 = game_id;
@@ -888,13 +929,13 @@ fn run_one_game(
     let mut steps: u64 = 0;
     // 单局步数上限：防止满盘/死锁局面（所有存活玩家均无合法走子且存活>1）导致无限轮转卡死。
     // 超限直接结束本局（该局无 winner，训练时会被跳过，不影响数据质量）。
-    let max_steps: u64 = (board_size * board_size * 4 * max_players).max(1000) as u64;
+    let max_steps: u64 = (rows * cols * 4 * max_players).max(1000) as u64;
 
     loop {
         steps += 1;
         if steps > max_steps { break; }
 
-        let legal_moves = get_moves(&board, board_size, cur_player, None, border_mode, cap_mode);
+        let legal_moves = get_moves(&board, rows, cur_player, None, border_mode, cap_mode);
 
         if legal_moves.is_empty() {
             let alive: Vec<usize> = (0..max_players)
@@ -909,7 +950,7 @@ fn run_one_game(
         let config = &player_configs[cur_player];
         let first_move_arr = first_move_pos.map(|[x, y]| [x, y]);
         let chosen = find_best_move_by_alg(
-            &board, board_size, cur_player, config,
+            &board, rows, cur_player, config,
             &eliminated, max_players, game_count, first_move_arr,
             border_mode, cap_mode, 0,  // 随机刻度 0，保持确定性
         );
@@ -924,7 +965,7 @@ fn run_one_game(
             .filter(|p| !eliminated.contains(p) && has_pieces(&board, *p))
             .collect();
 
-        let (new_elim, _chain_count) = process_click(&mut board, board_size, mx, my, cur_player, max_players, border_mode, cap_mode, None);
+        let (new_elim, _chain_count) = process_click(&mut board, rows, mx, my, cur_player, max_players, border_mode, cap_mode, None);
         for &e in &new_elim {
             if !eliminated.contains(&e) { eliminated.push(e); }
         }
@@ -941,7 +982,7 @@ fn run_one_game(
         };
 
         let record = StepRecord {
-            game_id, turn, size: board_size, max_players,
+            game_id, turn, size: rows, max_players,
             border_mode, cap_mode,
             board: board.clone(),
             cur_player, move_x: mx, move_y: my,
@@ -995,7 +1036,7 @@ pub fn generate_selfplay_data(
             last_prog = std::time::Instant::now();
         }
 
-        total_steps += run_one_game(&mut writer, board_size, max_players, player_configs, border_mode, cap_mode, game_id, &mut rng)?;
+        total_steps += run_one_game(&mut writer, board_size, board_size, None, max_players, player_configs, border_mode, cap_mode, game_id, &mut rng)?;
     }
 
     writer.flush().map_err(|e| format!("flush failed: {}", e))?;
@@ -1061,7 +1102,25 @@ pub fn generate_selfplay_data_mixed(
     for game_id in 0..num_games {
         // 每局随机局面：棋盘大小 5-8（7 最常见），玩家数 2-4（与当前产品局配置一致）
         let size_pool = [5usize, 5, 6, 6, 7, 7, 7, 7, 8, 8];
-        let board_size = size_pool[rng.gen_range(0..size_pool.len())];
+        // 形状分布：七成正方形（与产品默认一致），两成长方形，一成不规则（带洞）。
+        // 三类都要有数据，同一个模型才能靠已归一化的特征吃下任意形状。
+        let shape_roll = rng.gen_range(0..100u32);
+        let first = size_pool[rng.gen_range(0..size_pool.len())];
+        let (board_rows, board_cols) = if shape_roll < 70 {
+            (first, first)
+        } else {
+            let mut second = size_pool[rng.gen_range(0..size_pool.len())];
+            if second == first {
+                second = if first < 8 { first + 1 } else { first - 1 };
+            }
+            (first, second)
+        };
+        let shape_owned = if shape_roll >= 90 {
+            Some(make_random_shape(board_rows, board_cols, &mut rng))
+        } else {
+            None
+        };
+        let shape = shape_owned.as_deref();
         let player_pool = [2usize, 2, 2, 3, 3, 4, 4, 4];
         let max_players = player_pool[rng.gen_range(0..player_pool.len())];
         let border_mode = [
@@ -1072,18 +1131,19 @@ pub fn generate_selfplay_data_mixed(
             CapMode::Cap3, CapMode::Cap4, CapMode::Cap5,
         ][rng.gen_range(0..3)];
 
-        let configs = random_ai_configs(board_size, max_players, &mut rng);
-        let key = format!("{board_size}×{board_size}/{max_players}p/{border_mode:?}/{cap_mode:?}");
+        let configs = random_ai_configs(board_rows, max_players, &mut rng);
+        let shape_tag = if shape_owned.is_some() { "不规则" } else if board_rows != board_cols { "长方形" } else { "正方形" };
+        let key = format!("{board_rows}×{board_cols}/{max_players}p/{border_mode:?}/{cap_mode:?}/{shape_tag}");
         *mode_stats.entry(key).or_insert(0) += 1;
 
         if last_prog.elapsed().as_secs_f64() >= prog_interval || game_id + 1 == num_games {
             // 显示当前局局面（每局随机，帮助确认覆盖面）
             render_progress(game_id + 1, num_games, total_steps, &start,
-                &format!("当前 {}×{}/{}p {:?}/{:?}", board_size, board_size, max_players, border_mode, cap_mode));
+                &format!("当前 {}×{}({})/{}p {:?}/{:?}", board_rows, board_cols, shape_tag, max_players, border_mode, cap_mode));
             last_prog = std::time::Instant::now();
         }
 
-        total_steps += run_one_game(&mut writer, board_size, max_players, &configs, border_mode, cap_mode, game_id, &mut rng)?;
+        total_steps += run_one_game(&mut writer, board_rows, board_cols, shape, max_players, &configs, border_mode, cap_mode, game_id, &mut rng)?;
     }
 
     writer.flush().map_err(|e| format!("flush failed: {}", e))?;

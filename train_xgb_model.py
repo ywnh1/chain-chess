@@ -57,8 +57,8 @@ def parse_border(s):
 def parse_cap(s):
     return str(s or "4")
 
-def cell_threshold(x, y, sz, border_mode, cap_mode):
-    """格子的爆炸阈值（与 Rust cell_threshold 一致）"""
+def cell_threshold(x, y, rows, cols, border_mode, cap_mode):
+    """格子的爆炸阈值（与 Rust cell_threshold 一致）。x 是行、y 是列。"""
     if cap_mode == "3":
         return 3
     if cap_mode == "5":
@@ -67,40 +67,44 @@ def cell_threshold(x, y, sz, border_mode, cap_mode):
         return 4
     # cap_mode == "4"
     if border_mode == "degrade":
-        on_corner = (x == 0 or x == sz - 1) and (y == 0 or y == sz - 1)
-        on_edge = x == 0 or x == sz - 1 or y == 0 or y == sz - 1
+        on_corner = (x == 0 or x == rows - 1) and (y == 0 or y == cols - 1)
+        on_edge = x == 0 or x == rows - 1 or y == 0 or y == cols - 1
         if on_corner:
             return 2
         if on_edge:
             return 3
     return 4
 
-def crit_level(x, y, sz, border_mode, cap_mode):
-    return cell_threshold(x, y, sz, border_mode, cap_mode) - 1
+def crit_level(x, y, rows, cols, border_mode, cap_mode):
+    return cell_threshold(x, y, rows, cols, border_mode, cap_mode) - 1
 
-def nbrs_with_mode(i, j, sz, border_mode):
+def nbrs_with_mode(i, j, rows, cols, border_mode):
     """邻居（回环模式与 Rust nbrs_with_mode 一致）"""
     if border_mode == "wrap":
-        up = sz - 1 if i == 0 else i - 1
-        down = 0 if i + 1 >= sz else i + 1
-        left = sz - 1 if j == 0 else j - 1
-        right = 0 if j + 1 >= sz else j + 1
+        up = rows - 1 if i == 0 else i - 1
+        down = 0 if i + 1 >= rows else i + 1
+        left = cols - 1 if j == 0 else j - 1
+        right = 0 if j + 1 >= cols else j + 1
         return [(up, j), (down, j), (i, left), (i, right)]
     r = []
     if i > 0:
         r.append((i - 1, j))
-    if i + 1 < sz:
+    if i + 1 < rows:
         r.append((i + 1, j))
     if j > 0:
         r.append((i, j - 1))
-    if j + 1 < sz:
+    if j + 1 < cols:
         r.append((i, j + 1))
     return r
 
 # ─── 特征提取（与 Rust extract_features_improved 严格同步） ───
 
 def extract_features(board, cur_player, max_players, size, border_mode, cap_mode):
-    total_cells = size * size
+    # 尺寸从棋盘推导：不规则棋盘有洞，行/列也可能不等（size 参数保留仅为兼容旧调用）
+    rows = len(board)
+    cols = len(board[0]) if rows else size
+    # 可用格数：挖掉的洞不计入（与 Rust 一致，否则归一化分母会被稀释）
+    total_cells = sum(1 for row in board for c in row if not c.get('blocked', False))
     total_pieces = sum(1 for row in board for c in row if c['owner'] is not None)
 
     my_score = 0; opp_score = 0
@@ -115,25 +119,28 @@ def extract_features(board, cur_player, max_players, size, border_mode, cap_mode
     my_cdist = 0.0; opp_cdist = 0.0
     alive_count = 0
 
-    cx = (size - 1) * 0.5
+    row_c = (rows - 1) * 0.5
+    col_c = (cols - 1) * 0.5
 
     for p in range(max_players):
         has_pieces = False
-        for i in range(size):
-            for j in range(size):
+        for i in range(rows):
+            for j in range(cols):
                 c = board[i][j]
+                if c.get('blocked', False):
+                    continue   # 空洞不是棋盘格子
                 if c['owner'] == p:
                     has_pieces = True
                     cnt = c['count']
-                    d_val = 4 - int(abs(i - cx) * 0.5 + abs(j - cx) * 0.5)
+                    d_val = 4 - int(abs(i - row_c) * 0.5 + abs(j - col_c) * 0.5)
                     pos_val = max(d_val, 0)
-                    crit = crit_level(i, j, size, border_mode, cap_mode)
+                    crit = crit_level(i, j, rows, cols, border_mode, cap_mode)
 
                     if p == cur_player:
                         my_score += cnt
                         my_territory += 1
                         my_pos_bonus += pos_val
-                        my_cdist += abs(i - cx) + abs(j - cx)
+                        my_cdist += abs(i - row_c) + abs(j - col_c)
                         my_pieces += 1
                         if cnt == 2:
                             my_c2 += 1
@@ -144,7 +151,7 @@ def extract_features(board, cur_player, max_players, size, border_mode, cap_mode
                             my_crit += 1
                         elif cnt >= crit - 1:
                             my_chain_threat += 2
-                        for ni, nj in nbrs_with_mode(i, j, size, border_mode):
+                        for ni, nj in nbrs_with_mode(i, j, rows, cols, border_mode):
                             nc = board[ni][nj]
                             if nc['owner'] is not None and nc['owner'] != p:
                                 my_threat_prox += cnt
@@ -152,7 +159,7 @@ def extract_features(board, cur_player, max_players, size, border_mode, cap_mode
                         opp_score += cnt
                         opp_territory += 1
                         opp_pos_bonus += pos_val
-                        opp_cdist += abs(i - cx) + abs(j - cx)
+                        opp_cdist += abs(i - row_c) + abs(j - col_c)
                         opp_pieces += 1
                         if cnt == 2:
                             opp_c2 += 1
@@ -163,7 +170,7 @@ def extract_features(board, cur_player, max_players, size, border_mode, cap_mode
                             opp_crit += 1
                         elif cnt >= crit - 1:
                             opp_chain_threat += 2
-                        for ni, nj in nbrs_with_mode(i, j, size, border_mode):
+                        for ni, nj in nbrs_with_mode(i, j, rows, cols, border_mode):
                             nc = board[ni][nj]
                             if nc['owner'] == cur_player:
                                 opp_threat_prox += cnt
@@ -324,22 +331,34 @@ def smoke_test():
     import random
     rng = random.Random(42)
     rows = []
+    # (行, 列, 边界, 阈值, 是否挖洞) —— 后两类是长方形与不规则棋盘，
+    # 它们走的代码路径与正方形不同（列数、空洞跳过），必须覆盖到
     combos = [
-        (7, "default", "3"), (7, "default", "4"), (7, "default", "5"),
-        (7, "wrap", "3"), (7, "wrap", "4"), (7, "wrap", "5"),
-        (9, "degrade", "4"), (5, "bounce", "3"), (5, "bounce", "5"),
+        (7, 7, "default", "3", False), (7, 7, "default", "4", False), (7, 7, "default", "5", False),
+        (7, 7, "wrap", "3", False), (7, 7, "wrap", "4", False), (7, 7, "wrap", "5", False),
+        (9, 9, "degrade", "4", False), (5, 5, "bounce", "3", False), (5, 5, "bounce", "5", False),
+        (7, 11, "default", "4", False),   # 长方形：行 7 列 11
+        (5, 9, "default", "4", False),
+        (9, 9, "default", "4", True),     # 不规则：带空洞
+        (8, 6, "default", "4", True),     # 长方形 + 空洞
     ]
     game_id = 0
-    for size, bm, cm in combos:
+    for n_rows, n_cols, bm, cm, holes in combos:
         for _ in range(4):  # 每组合 4 局
             for turn in range(8):
-                board = [[{'owner': None, 'count': 0} for _ in range(size)] for _ in range(size)]
-                for _ in range(rng.randint(3, size * size // 2)):
-                    x, y = rng.randrange(size), rng.randrange(size)
+                board = [[{'owner': None, 'count': 0} for _ in range(n_cols)] for _ in range(n_rows)]
+                if holes:
+                    # 第一列与最后一列挖空，模拟不规则棋盘
+                    for i in range(n_rows):
+                        board[i][0] = {'owner': None, 'count': 0, 'blocked': True}
+                        board[i][n_cols - 1] = {'owner': None, 'count': 0, 'blocked': True}
+                spots = [(x, y) for x in range(n_rows) for y in range(n_cols) if not board[x][y].get('blocked')]
+                for _ in range(rng.randint(3, len(spots) // 2)):
+                    x, y = rng.choice(spots)
                     board[x][y] = {'owner': rng.randrange(2), 'count': rng.randint(1, 4)}
                 cur = rng.randrange(2)
                 rows.append({
-                    'game_id': game_id, 'turn': turn, 'size': size,
+                    'game_id': game_id, 'turn': turn, 'size': n_rows, 'cols': n_cols,
                     'max_players': 2, 'border_mode': bm, 'cap_mode': cm,
                     'board': board, 'cur_player': cur,
                     'winner': rng.randrange(2), 'game_over': turn == 7,
