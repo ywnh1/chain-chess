@@ -57,8 +57,29 @@ def parse_border(s):
 def parse_cap(s):
     return str(s or "4")
 
-def cell_threshold(x, y, rows, cols, border_mode, cap_mode):
-    """格子的爆炸阈值（与 Rust cell_threshold 一致）。x 是行、y 是列。"""
+def _blocked(board, x, y):
+    return board[x][y].get("blocked", False)
+
+def exposure_count(board, x, y):
+    """形状外沿数：该格朝四个方向有几个是界外或空洞（与 Rust exposure_count 一致）。"""
+    rows = len(board)
+    cols = len(board[0]) if rows else 0
+    n = 0
+    if x == 0 or _blocked(board, x - 1, y):
+        n += 1
+    if x + 1 >= rows or _blocked(board, x + 1, y):
+        n += 1
+    if y == 0 or _blocked(board, x, y - 1):
+        n += 1
+    if y + 1 >= cols or _blocked(board, x, y + 1):
+        n += 1
+    return n
+
+def cell_threshold(board, x, y, border_mode, cap_mode):
+    """格子的爆炸阈值（与 Rust cell_threshold 一致）。x 是行、y 是列。
+
+    degrade 按形状外沿数降级：0→4、1→3、≥2→2；矩形棋盘等价于角 2 / 边 3 / 内部 4。
+    """
     if cap_mode == "3":
         return 3
     if cap_mode == "5":
@@ -67,33 +88,53 @@ def cell_threshold(x, y, rows, cols, border_mode, cap_mode):
         return 4
     # cap_mode == "4"
     if border_mode == "degrade":
-        on_corner = (x == 0 or x == rows - 1) and (y == 0 or y == cols - 1)
-        on_edge = x == 0 or x == rows - 1 or y == 0 or y == cols - 1
-        if on_corner:
-            return 2
-        if on_edge:
+        exp = exposure_count(board, x, y)
+        if exp == 0:
+            return 4
+        if exp == 1:
             return 3
+        return 2
     return 4
 
-def crit_level(x, y, rows, cols, border_mode, cap_mode):
-    return cell_threshold(x, y, rows, cols, border_mode, cap_mode) - 1
+def crit_level(board, x, y, border_mode, cap_mode):
+    return cell_threshold(board, x, y, border_mode, cap_mode) - 1
 
-def nbrs_with_mode(i, j, rows, cols, border_mode):
-    """邻居（回环模式与 Rust nbrs_with_mode 一致）"""
+def wrap_target(board, x, y, dx, dy):
+    """回环落点：绕过边界、跳过空洞，返回第一个可用格（与 Rust wrap_target 一致）。"""
+    rows = len(board)
+    cols = len(board[0]) if rows else 0
+    if not rows or not cols:
+        return None
+    cx, cy = x, y
+    for _ in range(max(rows, cols)):
+        nx = (cx + dx) % rows
+        ny = (cy + dy) % cols
+        if (nx, ny) == (x, y):
+            break
+        if not _blocked(board, nx, ny):
+            return (nx, ny)
+        cx, cy = nx, ny
+    return None
+
+def nbrs_with_mode(board, i, j, border_mode):
+    """邻居（与 Rust nbrs_with_mode 一致）：回环跳过空洞，其余模式洞不算邻居。"""
+    rows = len(board)
+    cols = len(board[0]) if rows else 0
     if border_mode == "wrap":
-        up = rows - 1 if i == 0 else i - 1
-        down = 0 if i + 1 >= rows else i + 1
-        left = cols - 1 if j == 0 else j - 1
-        right = 0 if j + 1 >= cols else j + 1
-        return [(up, j), (down, j), (i, left), (i, right)]
+        r = []
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            p = wrap_target(board, i, j, dx, dy)
+            if p:
+                r.append(p)
+        return r
     r = []
-    if i > 0:
+    if i > 0 and not _blocked(board, i - 1, j):
         r.append((i - 1, j))
-    if i + 1 < rows:
+    if i + 1 < rows and not _blocked(board, i + 1, j):
         r.append((i + 1, j))
-    if j > 0:
+    if j > 0 and not _blocked(board, i, j - 1):
         r.append((i, j - 1))
-    if j + 1 < cols:
+    if j + 1 < cols and not _blocked(board, i, j + 1):
         r.append((i, j + 1))
     return r
 
@@ -134,7 +175,7 @@ def extract_features(board, cur_player, max_players, size, border_mode, cap_mode
                     cnt = c['count']
                     d_val = 4 - int(abs(i - row_c) * 0.5 + abs(j - col_c) * 0.5)
                     pos_val = max(d_val, 0)
-                    crit = crit_level(i, j, rows, cols, border_mode, cap_mode)
+                    crit = crit_level(board, i, j, border_mode, cap_mode)
 
                     if p == cur_player:
                         my_score += cnt
@@ -151,7 +192,7 @@ def extract_features(board, cur_player, max_players, size, border_mode, cap_mode
                             my_crit += 1
                         elif cnt >= crit - 1:
                             my_chain_threat += 2
-                        for ni, nj in nbrs_with_mode(i, j, rows, cols, border_mode):
+                        for ni, nj in nbrs_with_mode(board, i, j, border_mode):
                             nc = board[ni][nj]
                             if nc['owner'] is not None and nc['owner'] != p:
                                 my_threat_prox += cnt
@@ -170,7 +211,7 @@ def extract_features(board, cur_player, max_players, size, border_mode, cap_mode
                             opp_crit += 1
                         elif cnt >= crit - 1:
                             opp_chain_threat += 2
-                        for ni, nj in nbrs_with_mode(i, j, rows, cols, border_mode):
+                        for ni, nj in nbrs_with_mode(board, i, j, border_mode):
                             nc = board[ni][nj]
                             if nc['owner'] == cur_player:
                                 opp_threat_prox += cnt

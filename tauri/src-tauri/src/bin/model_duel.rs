@@ -93,7 +93,7 @@ fn negamax(engine: &XGBoostEngine, board: &GameBoard, rows: usize, player: usize
     let moves = get_moves(board, rows, player, None, BORDER, CAP);
     if moves.is_empty() { return -WIN + depth as f32; }   // 无棋可走视同判负
 
-    let ordered = order_moves(moves, board, rows, player, BORDER, CAP);
+    let ordered = order_moves(moves, board, player, BORDER, CAP);
     let mut best = f32::NEG_INFINITY;
     for (i, &(x, y)) in ordered.iter().take(MAX_CAND).enumerate() {
         let mut nb = board.clone();
@@ -115,7 +115,7 @@ fn choose_move(
 ) -> Option<(usize, usize)> {
     let moves = get_moves(board, rows, player, None, BORDER, CAP);
     if moves.is_empty() { return None; }
-    let ordered = order_moves(moves, board, rows, player, BORDER, CAP);
+    let ordered = order_moves(moves, board, player, BORDER, CAP);
     let opp = 1 - player;
 
     let mut best: Option<(f32, (usize, usize))> = None;

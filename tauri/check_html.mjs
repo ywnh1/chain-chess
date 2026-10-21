@@ -83,9 +83,10 @@ for(const c of strContainers)
   else if(!/if\(!c\|\|c\.blocked\)return \[\]/.test(m[0]))
     e.push("processClick 没挡 blocked：棋子会被画进洞里");
 }
-// 不规则棋盘只支持默认边界 —— 其余选项要禁用
-if(!/customShape&&b\.dataset\.value!=='default'/.test(appJs))
-  e.push("updateModeConflictUI 没处理不规则棋盘的边界禁用");
+// 异形棋盘曾只允许默认边界；现在引擎把洞当形状边界处理，前端不应再禁用其他边界。
+// 这条反过来盯：谁要是把旧限制加回来，这里会先报。
+if(/customShape&&b\.dataset\.value!=='default'/.test(appJs))
+  e.push("updateModeConflictUI 又在禁用异形棋盘的边界选项");
 // 棋盘副本必须带上 blocked，否则悔棋后洞就没了。只盯 cloneBoard 的返回，
 // _boardCache 那种只用于渲染对比的缓存不需要（它本来就只看 owner/count）。
 if(/return b\.map\(row=>row\.map\(c=>\(\{owner:c\.owner,count:c\.count\}\)\)\)/.test(appJs))
