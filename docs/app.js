@@ -99,17 +99,17 @@ const COLORS_LIGHT=['rgba(231,76,60,.08)','rgba(241,196,15,.08)','rgba(52,152,21
 const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色','橙色','棕色','深灰色'];
 // 棋盘边界模式描述
 const BORDER_MODE_DESC = {
-  'default': '默认边界：4 颗即爆，飞到棋盘外的棋子直接消失（最直观，新手推荐）',
-  'wrap': '回环边界：棋盘像甜甜圈，从右边飞出去的棋子会从左边回来，棋子不会丢',
-  'bounce': '反弹边界：飞出去的能量弹回相反方向，边上会出现一颗二级棋子、角上会出两颗二级棋子',
-  'degrade': '降级边界：中央 4 颗才爆，边上 3 颗就爆，角落 2 颗就爆，越靠边越危险（与 3/5 级阈值互斥）',
+  'default': '默认边界：4 点即爆，飞出棋盘或掉进空洞的棋子直接消失（最直观，新手推荐）',
+  'wrap': '回环边界：棋盘像甜甜圈，从右边飞出去的点会从左边回来；遇到空洞会穿过去落到下一格，不丢点',
+  'bounce': '反弹边界：飞出去的点弹回相反方向；撞到空洞也算撞墙，同样弹回对面',
+  'degrade': '降级边界：中央 4 点才爆，形状边缘 3 点就爆，拐角 2 点就爆，越靠边越危险（与 3/5 级阈值互斥）',
   'random': '随机边界：开局随机抽一种（默认 / 回环 / 反弹 / 降级），整局都按它来',
 };
 const CAP_MODE_DESC = {
-  '3': '速爆：3 颗就爆，爆炸时随机一个方向不弹棋子；首子直接放成 2 颗（与降级边界互斥）',
-  '4': '标准玩法：4 颗即爆，向上下左右各弹出 1 颗；首子直接放成 3 颗（差一颗就爆）',
-  '5': '重炮：5 颗才爆，但有一个方向会连弹 2 颗；首子直接放成 4 颗（与降级边界互斥）',
-  'random': '随机阈值：开局随机抽 3 / 4 / 5 颗之一，整局都按它来',
+  '3': '速爆：3 点就爆，爆炸时随机一个方向不送点；首子直接放成 2 点（与降级边界互斥）',
+  '4': '标准玩法：4 点即爆，向上下左右各送 1 点；首子直接放成 3 点（差一点就爆）',
+  '5': '重炮：5 点才爆，但有一个方向会连送 2 点；首子直接放成 4 点（与降级边界互斥）',
+  'random': '随机阈值：开局随机抽 3 / 4 / 5 点之一，整局都按它来',
 };
 // 随机模式解析：开局瞬间用时间戳种子随机确定具体模式，整局不再改变。
 // 解析后与直接选中该模式完全一致（随机只发生在开始的一瞬间）。
@@ -910,22 +910,11 @@ function updateModeConflictUI(caller){
     selB=borderGroup.querySelector('.selected'); selC=capGroup.querySelector('.selected');
     bv=selB?selB.dataset.value:null; cv=selC?selC.dataset.value:null;
   }
-  // 不规则棋盘（自定义形状）只支持默认边界：强制回默认，并在下面把其余选项禁用掉
-  const customShape=(typeof currentShapeMode==='function')&&currentShapeMode()==='custom';
-  if(customShape&&selB&&selB.dataset.value!=='default'){
-    const bd=borderGroup.querySelector('.gb[data-value="default"]');
-    if(bd){
-      setSelected(borderGroup,bd);
-      const d=document.getElementById('borderModeDesc');
-      if(d&&BORDER_MODE_DESC['default'])d.textContent=BORDER_MODE_DESC['default'];
-      selB=bd; bv='default';
-    }
-  }
-  // 禁用联动：cap 为 3/5 → degrade 不可选；border 为 degrade → 3/5 不可选；
-  // 不规则棋盘 → 只留默认边界
+  // 禁用联动：cap 为 3/5 → degrade 不可选；border 为 degrade → 3/5 不可选。
+  // 异形棋盘（带空洞）与普通棋盘一样支持全部边界：洞按形状边界处理，见引擎的 wrap_target / exposure_count。
   const cap35=cv==='3'||cv==='5';
   borderGroup.querySelectorAll('.gb').forEach(function(b){
-    b.disabled=(b.dataset.value==='degrade'&&cap35)||(customShape&&b.dataset.value!=='default');
+    b.disabled=(b.dataset.value==='degrade'&&cap35);
   });
   capGroup.querySelectorAll('.gb').forEach(function(b){
     b.disabled=((b.dataset.value==='3'||b.dataset.value==='5')&&bv==='degrade');
@@ -4600,15 +4589,15 @@ const HINTS = {
   'howto': {
     title: '怎么玩连锁棋',
     body:
-      '<p>往格子里堆自己的棋子。堆满一格就会炸，炸出去的棋子推着旁边的格子接着炸，最后一个还有棋子的玩家赢。</p>'+
+      '<p>往格子里堆自己的棋子。堆满一格就炸，炸出去的点把邻居染成自己的、各加一个点，连锁到停为止，最后还有棋子的人赢。</p>'+
       '<ol>'+
-      '<li><strong>下子</strong>：点空格放一颗自己的棋子；点自己已经有棋子的格子，再添一颗。别人的格子点不动。</li>'+
-      '<li><strong>爆炸</strong>：攒够 <strong>4 颗</strong>就炸，朝上下左右各弹一颗。弹出去的棋子算你的。</li>'+
-      '<li><strong>连锁</strong>：弹出去的棋子落进旁边的格子，那格要是也堆到 4 颗，跟着炸。一路炸到没格子再够 4 颗为止。</li>'+
-      '<li><strong>出局</strong>：你在棋盘上的棋子被炸光，就出局了。</li>'+
-      '<li><strong>获胜</strong>：最后还有棋子留在棋盘上的人赢。</li>'+
+      '<li><strong>点一下，多一个点</strong>：点空格长出一颗自己的棋子（1 点）；点自己已经有棋子的格子加 1 点。别人的格子点不动。</li>'+
+      '<li><strong>3 个点是临界</strong>：默认 4 个点爆炸，所以一颗 3 点的棋子，再点一下就炸。</li>'+
+      '<li><strong>爆炸</strong>：上下左右各送一个点，自己这一格清空。送到空格，就长出一颗你的棋子，带 1 点。</li>'+
+      '<li><strong>同化</strong>：送到对方棋子，它变成你的，点数加 1。原来是 3 点的，加 1 点正好到 4 点 —— 跟着炸，连锁开始。</li>'+
+      '<li><strong>出局与获胜</strong>：棋子被全部同化光就出局；最后还有棋子的人赢。</li>'+
       '<li><strong>第一手</strong>：不能下在已有棋子周围那 12 格里（上下左右各 2 格，加四个斜角）。</li>'+
-      '<li><strong>第一颗棋子</strong>：落下就是“差一颗要爆”的状态，4 级规则下算 3 颗。所以抢地盘那一步常常直接炸开。</li>'+
+      '<li><strong>第一颗棋子</strong>：落下就是临界状态（默认算 3 点），所以抢地盘那一步常常直接炸开。</li>'+
       '</ol>'+
       '<p>第一次玩就选 2 人、7×7、默认边界、4 级，以后想换再换。</p>'
   },
@@ -4621,33 +4610,34 @@ const HINTS = {
       '<li><strong>8×8 ~ 12×12</strong>：中盘拉锯，摸熟规则再玩</li>'+
       '<li><strong>13×13 ~ 19×19</strong>：长局，适合有耐心的人，也够多人混战</li>'+
       '</ul>'+
-      '<p><strong>形状</strong>：除了正方形，还能选长方形（长宽各 5–19），或者用形状编辑器自己点出一个不规则棋盘——挖掉的格子就是「洞」，棋子飞进去会像飞出棋盘一样消失。不规则棋盘只支持默认边界。</p>'+
-      '<p class="hint-tip">第一次玩就用默认 7×7，先感受一下「攒满 4 颗就炸」是什么节奏。</p>'
+      '<p><strong>形状</strong>：除了正方形，还能选长方形（长宽各 5–19），或者用形状编辑器自己点出一个不规则棋盘——挖掉的格子就是「洞」。异形棋盘也支持全部边界：回环会绕过洞落到下一格，反弹会把撞到洞的能量弹回对面，降级则按形状轮廓算边缘和拐角；默认边界下棋子飞进洞才会消失。</p>'+
+      '<p class="hint-tip">第一次玩就用默认 7×7，先感受一下「3 点再点一下就炸」是什么节奏。</p>'
   },
   'border-mode': {
     title: '棋盘边界是什么',
     body:
-      '<p>格子爆炸时朝上下左右各弹一颗棋子。它要是在棋盘边上，那几颗「飞出棋盘」的棋子怎么办，就看这里。</p>'+
+      '<p>格子爆炸时朝上下左右各送一个点。它要是在棋盘边上，那几个「飞出棋盘」的点怎么办，就看这里。</p>'+
       '<ul>'+
       '<li><strong>默认边界</strong>：飞出棋盘的棋子直接消失。最直观，新手推荐</li>'+
-      '<li><strong>回环边界</strong>：从右边飞出去，从左边飞回来，棋盘成了甜甜圈，棋子一颗不丢</li>'+
+      '<li><strong>回环边界</strong>：从右边飞出去，从左边飞回来，棋盘成了甜甜圈，一个点都不丢</li>'+
       '<li><strong>反弹边界</strong>：飞出去的能量弹回对面，边上和角落更容易堆出二级棋子</li>'+
-      '<li><strong>降级边界</strong>：中央 4 颗才爆，边上 3 颗就爆，角落 2 颗就爆。越靠边越危险</li>'+
+      '<li><strong>降级边界</strong>：中央 4 点才爆，形状边缘 3 点就爆，拐角 2 点就爆。越靠边越危险</li>'+
       '<li><strong>随机边界</strong>：开局随机抽一种，整局都按它来</li>'+
       '</ul>'+
-      '<p class="hint-tip">「降级边界」不能和「3 级 / 5 级」阈值一起用，选了会自动改回 4 级。</p>'
+      '<p class="hint-tip">「降级边界」不能和「3 级 / 5 级」阈值一起用，选了会自动改回 4 级。</p>'+
+      '<p class="hint-tip">不规则棋盘上的「洞」算形状边界：回环绕过去、反弹弹回来、降级按轮廓判定。</p>'
   },
   'cap-mode': {
     title: '爆炸阈值是什么',
     body:
-      '<p>格子里攒到几颗才炸，这里选的就是那个数字。默认 4 颗。</p>'+
+      '<p>格子里攒到几个点才炸，这里选的就是那个数字。默认 4 点。</p>'+
       '<ul>'+
-      '<li><strong>3 级（速爆）</strong>：3 颗就炸，而且每炸一次有一个方向不弹棋子。快，也乱</li>'+
-      '<li><strong>4 级（标准）</strong>：4 颗炸，朝上下左右各弹一颗。默认玩法</li>'+
-      '<li><strong>5 级（重炮）</strong>：5 颗才炸，但有一个方向会连弹两颗。憋得久，炸得狠</li>'+
+      '<li><strong>3 级（速爆）</strong>：3 点就炸，而且每炸一次有一个方向不送点。快，也乱</li>'+
+      '<li><strong>4 级（标准）</strong>：4 点炸，朝上下左右各送一点。默认玩法</li>'+
+      '<li><strong>5 级（重炮）</strong>：5 点才炸，但有一个方向会连送两点。憋得久，炸得狠</li>'+
       '<li><strong>随机</strong>：开局随机抽 3 / 4 / 5 之一，整局都按它来</li>'+
       '</ul>'+
-      '<p class="hint-tip">3 级和 5 级都不能配「降级边界」。另外，你落下的第一颗棋子，直接就是「差一颗就炸」的样子。</p>'
+      '<p class="hint-tip">3 级和 5 级都不能配「降级边界」。另外，你落下的第一颗棋子，直接就是「差一点就炸」的样子。</p>'
   },
   'players': {
     title: '能几个人一起玩',
@@ -4964,7 +4954,7 @@ function applyShapeMode(jumpToEditor){
   // 只有正方形才显示那排尺寸按钮；长方形走行/列选择器；自定义两者都不显示
   if(sq)sq.style.display=(mode==='square')?'':'none';
   if(rc)rc.style.display=(mode==='rect')?'':'none';
-  // 不规则棋盘只支持默认边界 —— 让边界按钮的禁用/回退跟着形状走
+  // 形状变化可能影响边界/阈值的兼容性（如降级 + 3/5 级互斥），刷新一次按钮状态
   if(typeof updateModeConflictUI==='function')updateModeConflictUI();
   if(mode==='custom'&&jumpToEditor){Router.navigate('board-editor');return;}
   setupLobbySync();
