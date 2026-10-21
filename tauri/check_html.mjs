@@ -93,6 +93,21 @@ if(/return b\.map\(row=>row\.map\(c=>\(\{owner:c\.owner,count:c\.count\}\)\)\)/.
 // 回放入口必须传 cols：少了它，长方形回放会按正方形重建，坐标直接错乱
 for(const m of appJs.matchAll(/openReplay\(\{([\s\S]*?)\n      \}\)/g))
   if(!/cols:/.test(m[1]))e.push("openReplay 调用没传 cols");
+// 外观设置：设置页要有两个开关，app.js 要真正消费它们，CSS 要能藏住光球。
+// 这几条都是「加过又忘了接上」的高危点：按钮渲染出来但点击没反应，最难发现。
+for(const id of ["orbsGroup","bgFollowGroup"])
+  if(!h.includes(`id="${id}"`))e.push("设置页缺少外观开关: "+id);
+for(const fn of ["applyOrbs","bindAppearanceGroup","applyBgFollow"])
+  if(!appJs.includes("function "+fn+"("))e.push("app.js 缺少 function "+fn+"：外观开关会失效");
+if(!/appSettings\.bgFollow===false/.test(appJs))
+  e.push("setBg 没挡 bgFollow：关掉背景跟随后仍会随玩家变色");
+if(!appJs.includes("orbs-on"))
+  e.push("app.js 没切换 orbs-on：光球开关无效");
+{
+  const css=readFileSync(resolve(import.meta.dirname,"public/style.css"),"utf-8");
+  if(!/body\.orbs-on \.orb-container\{display:block\}/.test(css))
+    e.push("style.css 缺少 .orbs-on 规则：光球不会显示");
+}
 console.log("\n"+h.split("\n").length+" lines, "+kb+"KB");
 if(e.length){console.log("ERRORS:");e.forEach(x=>console.log(" - "+x))}
 if(w.length){console.log("WARNINGS:");w.forEach(x=>console.log(" - "+x))}

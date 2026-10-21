@@ -14,19 +14,21 @@ docs/                                 # 本目录（PWA 独立构建）
 ├── audio/                            # 音效资源
 ├── pkg/                              # WASM 引擎产物（wasm-pack 构建）
 │   ├── chain_chess_engine.js         #   web target glue
-│   └── chain_chess_engine_bg.wasm    #   3.5MB（含内嵌 XGBoost 模型）
-├── wasm/                             # WASM 引擎源码（Rust crate）
-│   ├── src/lib.rs                    #   从 tauri/src-tauri/src/lib.rs 提取的纯逻辑
+│   └── chain_chess_engine_bg.wasm    #   约 3.7 MB（含内嵌 XGBoost 模型）
+├── wasm/                             # WASM 宿主层（Rust crate，只做 wasm-bindgen 导出）
+│   ├── src/lib.rs                    #   JSON 进出的导出命令 + PWA 侧测试
 │   └── vendor/alpha_beta_pruning/    #   vendor 化（rayon 改为可选 feature）
 └── pkg-node/                         # nodejs target 产物（仅本地测试用，可删除）
 ```
 
+引擎本体在仓库根的 `engine/`（crate `chain_chess_core`）：规则、AI、评估与内嵌模型，
+Tauri 宿 `tauri/src-tauri/` 和 PWA 宿主 `docs/wasm/` 都依赖它。
+
 ## 迁移方案
 
 核心决策：**游戏引擎（规则 + AI）编译成 WASM**，不用 JS 重写一遍。
-`tauri/src-tauri/src/lib.rs` 里的纯逻辑部分（游戏规则、Alpha-Beta / PVS / MCTS
-/ 策略搜索、XGBoost 机器学习评估）被提取成本目录的 `wasm/` crate，用
-`wasm-bindgen` 导出：
+引擎逻辑已在共享 crate `engine/`（`chain_chess_core`）里，Tauri 与 PWA 共用同一份；
+本目录的 `wasm/` 只保留 wasm-bindgen 导出层，用 JSON 进出：
 
 | WASM 导出 | 对应 Tauri 命令 |
 |---|---|
@@ -97,21 +99,17 @@ python3 -m http.server 8899
 
 ## 与 Tauri 版同步维护
 
-引擎源码 `wasm/src/lib.rs` 是从 `tauri/src-tauri/src/lib.rs` 提取的快照。
-Tauri 版改了游戏规则或 AI 逻辑，就得重新提取：
+不需要再「提取快照」：`wasm/` 与 `tauri/src-tauri/` 都依赖 `engine/`（`chain_chess_core`），
+规则与 AI 只维护一份。改完引擎后重新编译一次 WASM 即可：
 
 ```bash
-python3 - <<'EOF'   # 见下方说明：行区间随上游变动需调整
-EOF
+cd wasm
+wasm-pack build --target web --out-dir ../pkg --release
 ```
 
-提取按**函数/类型名**定位，行号随上游变动，别依赖具体行号：
+WASM 侧只有两处限制，都在 `wasm/Cargo.toml` 与 vendor 里处理掉了：
 
-- 核心类型：`BorderMode` / `CapMode` / `Cell` / `GameBoard` / `ProcessMoveResult` 等
-- 结构体：`SimulateResult` 及其历史类型
-- 纯函数：`simulate_to_end`（去掉 `spawn_blocking` 包装）
-- 纯逻辑主体：XGBoost 引擎 → `find_best_move_by_alg`（含各算法搜索函数）
-
-提取完还要人工处理两处：rayon `par_iter()` 改成 `iter()`，`std::fs` 函数加
-`#[cfg(not(target_arch = "wasm32"))]`。建议改 Tauri 引擎时顺手跑一遍
-`wasm-pack build` 验证。
+- rayon 在 wasm 上不可用 —— `chain_chess_core` 的 `parallel` feature 默认关闭，
+  桌面端由 `tauri/src-tauri/Cargo.toml` 显式打开
+- 模型文件 `engine/xgb_model_board.json` 由 `include_str!` 内嵌，两个宿主共用，
+  重训模型后两边都需要重新编译

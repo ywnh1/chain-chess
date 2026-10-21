@@ -1095,7 +1095,9 @@ body.light-mode{
   body.light-mode::after{background:rgba(0,0,0,.04)}
   body.light-mode .form-row select option{background:#fff;color:var(--text)}
 /* ═══════ 背景彩色光球动画 ═══════ */
-.orb-container{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden}
+.orb-container{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden;display:none}
+/* 外观设置：默认不渲染，设置加载后由 app.js 加 orbs-on 打开；关闭时整层隐藏，动画与模糊合成一起停掉 */
+body.orbs-on .orb-container{display:block}
 .orb{
   position:absolute;border-radius:50%;filter:blur(46px);opacity:.85;
   mix-blend-mode:screen;will-change:transform;

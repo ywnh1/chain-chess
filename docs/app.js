@@ -87,6 +87,11 @@ function initOrbs(){
   });
 }
 initOrbs();
+// 外观设置：背景光球开关。默认不渲染（CSS 隐藏），设置读取后按需加 orbs-on，
+// 关闭时整层不显示，10 个模糊层的动画与合成开销一并停掉。
+function applyOrbs(){
+  document.body.classList.toggle('orbs-on',appSettings.orbs!==false);
+}
 
 /* ==================== CONSTANTS ==================== */
 const COLORS=['#E74C3C','#F1C40F','#3498DB','#2ECC71','#9B59B6','#E91E63','#1ABC9C','#F39C12','#8B5E3C','#5D6D7E'];
@@ -135,7 +140,7 @@ function getMaxPlayersBySize(boardSize){
 // 双向联动：棋盘大小 ↔ 人数/AI数量，互相扣掉不合法的按钮
 
 /* ═══════ 设置系统（主题 / 震动 / 音效主题） ═══════ */
-let appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',customSounds:[]};
+let appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',orbs:true,bgFollow:true,customSounds:[]};
 let settingsLoaded=false;
 
 // 主题切换：system 跟随系统；light/dark 手动覆盖
@@ -165,10 +170,11 @@ function applyTheme(theme){
 async function loadSettings(){
   try{
     const s=await tauriInvoke('load_settings');
-    if(s)appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',customSounds:[],...s};
+    if(s)appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',orbs:true,bgFollow:true,customSounds:[],...s};
   }catch(e){}
   settingsLoaded=true;
   applyTheme(appSettings.theme);
+  applyOrbs();
   updateDogBarkRow();
   // 引导等 DOM 完全就绪后再弹，避免过早读不到版本号而静默跳过
   if(document.readyState==='complete')setTimeout(maybeShowIntro,0);
@@ -239,18 +245,34 @@ function updateDogBarkRow(){
   if(row)row.style.display=(appSettings.soundTheme==='dog')?'flex':'none';
 }
 
+// 外观开关组：按钮 data-value 为 true/false，选中后回调布尔值
+function bindAppearanceGroup(id,on,onChange){
+  const g=document.getElementById(id);
+  if(!g)return;
+  g.querySelectorAll('.tg-btn').forEach(function(b){
+    b.classList.toggle('selected',(b.dataset.value==='true')===on);
+    b.onclick=function(){
+      g.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+      this.classList.add('selected');
+      onChange(this.dataset.value==='true');
+    };
+  });
+}
+// 背景跟随开关立即生效：游戏中按当前玩家色刷新，否则清回主题背景
+function applyBgFollow(){
+  if(gameMode&&!gameOver&&typeof curPlayer==='number'&&curPlayer>=0)setBg(curPlayer);
+  else document.body.style.background='';
+}
+
 // 渲染设置页（每次进入时同步 UI 状态并绑定事件）
 function renderSettingsPage(){
-  // 震动开关
-  const vt=document.getElementById('vibrateToggle');
-  if(vt){
-    vt.checked=!!appSettings.vibrate;
-    vt.onchange=function(){
-      appSettings.vibrate=this.checked;
-      saveSettings();
-      if(appSettings.vibrate)vibrate(15);
-    };
-  }
+  // 外观
+  bindAppearanceGroup('orbsGroup',appSettings.orbs!==false,function(on){
+    appSettings.orbs=on;saveSettings();applyOrbs();
+  });
+  bindAppearanceGroup('bgFollowGroup',appSettings.bgFollow!==false,function(on){
+    appSettings.bgFollow=on;saveSettings();applyBgFollow();
+  });
   // 音效主题（内置 + 自定义；自定义项由「自定义音效」页增删，所以每次进页重建按钮）
   renderSoundThemeButtons();
   // 大狗叫声模式（仅大狗叫主题显示）
@@ -2766,6 +2788,8 @@ function isLightTheme(){
   return t==='light'||(t==='system'&&window.matchMedia('(prefers-color-scheme: light)').matches);
 }
 function setBg(pl){
+  // 外观设置：关闭「游戏内背景跟随玩家色」时清掉内联背景，回到主题背景
+  if(appSettings&&appSettings.bgFollow===false){document.body.style.background='';return;}
   let h=COLORS[pl];
   if(!h||typeof h!=='string'||h.length!==7)return;  // 防御无效玩家索引：不设置背景，避免残留旧色
   let r=parseInt(h.substr(1,2),16),g=parseInt(h.substr(3,2),16),b=parseInt(h.substr(5,2),16);

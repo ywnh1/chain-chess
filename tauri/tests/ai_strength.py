@@ -8,12 +8,18 @@
     cargo build --release --bin ai_bench        # 在 tauri/src-tauri 下
 
     python3 tests/ai_strength.py                                   # 默认 7×7、每组合 6 局、4 算法混战
+    python3 tests/ai_strength.py --mode duel                       # 应用内评测页口径：432 局两两对阵
+    python3 tests/ai_strength.py --no-ml                           # 手写评估函数对照
     python3 tests/ai_strength.py --games 10 --size 9
     python3 tests/ai_strength.py --mode duel --algs strategy,alphabeta
     python3 tests/ai_strength.py --caps 3,4 --borders default,wrap
     python3 tests/ai_strength.py --out report.md --out-json data.json
+
+注意：引擎的 CapMode 只接受 3/4/5/random；旧的「混合（每格固定阈值）」
+已从产品与引擎中移除，传 mixed 会让 ai_bench 配置解析失败。
 """
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -30,6 +36,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_BIN = os.path.normpath(os.path.join(HERE, '..', 'src-tauri', 'target', 'release', 'ai_bench'))
+MODEL_PATH = os.path.normpath(os.path.join(HERE, '..', '..', 'engine', 'xgb_model_board.json'))
 
 try:
     from tqdm import tqdm
@@ -38,9 +45,9 @@ except ImportError:
 
 ALG_LABEL = {'strategy': '策略', 'alphabeta': 'A-B', 'pvs': 'PVS', 'mcts': 'MCTS'}
 BM_LABEL = {'default': '默认', 'wrap': '回环', 'bounce': '反弹', 'degrade': '降级'}
-CAP_LABEL = {'3': '速爆3', '4': '标准4', '5': '重炮5', 'mixed': '混合'}
+CAP_LABEL = {'3': '速爆3', '4': '标准4', '5': '重炮5'}
 ALL_BORDERS = ['default', 'wrap', 'bounce', 'degrade']
-ALL_CAPS = ['3', '4', '5', 'mixed']
+ALL_CAPS = ['3', '4', '5']
 ALL_ALGS = ['strategy', 'alphabeta', 'pvs', 'mcts']
 
 
@@ -51,15 +58,32 @@ def parse_args():
     ap.add_argument('--games', type=int, default=6, help='每组合对局数（默认 6）')
     ap.add_argument('--mode', choices=['ffa', 'duel'], default='ffa', help='ffa=多算法混战(默认)，duel=两两对阵')
     ap.add_argument('--borders', default=','.join(ALL_BORDERS), help='边界模式列表，逗号分隔')
-    ap.add_argument('--caps', default=','.join(ALL_CAPS), help='爆炸阈值列表，逗号分隔（3/4/5/mixed）')
+    ap.add_argument('--caps', default=','.join(ALL_CAPS), help='爆炸阈值列表，逗号分隔（3/4/5）')
     ap.add_argument('--algs', default=','.join(ALL_ALGS), help='算法列表，逗号分隔（strategy/alphabeta/pvs/mcts）')
     ap.add_argument('--depth', type=int, default=2, help='A-B/PVS 搜索深度（默认 2）')
     ap.add_argument('--mcts-depth', type=int, default=1, help='MCTS 深度（默认 1，迭代=depth*800）')
     ap.add_argument('--random', type=int, default=5, help='搜索随机刻度 %%（默认 5）')
+    ap.add_argument('--ml', dest='use_ml', action='store_true', default=True,
+                    help='A-B / PVS 用 ML 模型评估（默认）')
+    ap.add_argument('--no-ml', dest='use_ml', action='store_false',
+                    help='A-B / PVS 改用手写评估，做对照')
+    ap.add_argument('--tag', default='', help='报告标题后缀，例如 “ML 模型” / “手写评估”')
     ap.add_argument('--seed', type=int, default=0, help='对局种子偏移（默认 0）')
     ap.add_argument('--out', default=os.path.join(HERE, 'ai_report.md'), help='Markdown 报告输出路径')
     ap.add_argument('--out-json', default=os.path.join(HERE, 'ai_report.json'), help='对局数据 JSON 输出路径')
     return ap.parse_args()
+
+
+def model_fingerprint():
+    """模型文件指纹：换个模型跑出来的胜率才可比。"""
+    try:
+        st = os.stat(MODEL_PATH)
+        with open(MODEL_PATH, 'rb') as f:
+            digest = hashlib.sha256(f.read()).hexdigest()[:12]
+        mtime = datetime.fromtimestamp(st.st_mtime).strftime('%Y-%m-%d')
+        return f'{digest} · {st.st_size / 1048576:.1f} MB · 文件时间 {mtime}'
+    except OSError:
+        return '未找到 engine/xgb_model_board.json'
 
 
 def build_config(a):
@@ -73,7 +97,7 @@ def build_config(a):
         'depth': a.depth,
         'mctsDepth': a.mcts_depth,
         'randomScale': a.random,
-        'useMlEval': True,
+        'useMlEval': a.use_ml,
         'seed': a.seed,
     }
 
@@ -183,9 +207,16 @@ def main():
 
     # ---- 生成 Markdown 报告 ----
     L = []
-    L.append('# 🤖 AI 实力测试报告（tauri 端引擎）')
+    title = '# 🤖 AI 实力测试报告（tauri 端引擎）'
+    if a.tag:
+        title += f' · {a.tag}'
+    L.append(title)
     L.append('')
     L.append(f'- **测试时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+    if a.use_ml:
+        L.append(f'- **评估函数**: ML 模型（{model_fingerprint()}）；策略 / MCTS 不使用评估函数，不受此影响')
+    else:
+        L.append('- **评估函数**: 手写规则（--no-ml）；策略 / MCTS 不使用评估函数，不受此影响')
     L.append(f'- **棋盘**: {config["size"]}×{config["size"]} · 模式: '
              f'{"混战（每算法一名）" if config["mode"] == "ffa" else "两两对阵"}')
     L.append(f'- **组合**: {len(config["borders"])} 边界 × {len(config["caps"])} 阈值 = '

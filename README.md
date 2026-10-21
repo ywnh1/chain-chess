@@ -27,8 +27,9 @@
 ## 🎮 游戏规则
 
 - **落子**：点空位落子，点自己的棋子加子。首步要避开已有棋子周围 12 格
-- **爆裂**：格子里的棋子攒到 4 颗就爆，向上下左右各扩散一颗
+- **爆裂**：格子里的棋子攒到阈值就爆，向上下左右各扩散一颗。阈值可选 3 / 4 / 5 颗（默认 4）
 - **连锁**：扩散出去的棋子会引爆相邻格子，接着往下传
+- **边界**：炸到盘边的棋子可以消失、从对面回环、反弹，或按位置降级（越靠边越容易爆）
 - **淘汰**：某位玩家的棋子被全部吞噬，出局
 - **胜利**：最后存活的一位玩家获胜
 
@@ -56,7 +57,8 @@
 
 ### 用户界面
 
-- **液态玻璃主题**：深色虹彩渐变玻璃 UI，10 个彩色光球缓慢浮动
+- **液态玻璃主题**：深色虹彩渐变玻璃 UI，10 个彩色光球缓慢浮动（可在设置里关闭）
+- **背景跟随**：对局中背景随当前玩家色变化，可在设置里关闭
 - **响应式布局**：平板横屏、手机竖屏各自适配
 - **挖孔屏适配**：用 `safe-area-inset-top` 处理刘海和挖孔
 - **路由管理**：统一 Router 管理页面，带生命周期钩子和智能回退导航
@@ -193,8 +195,8 @@ SELECT → EXPAND → PLAYOUT → BACKPROPAGATE
 
 Alpha-Beta 和 PVS 可以换用两种评估函数：
 
-- **增强版评估**（默认）：在手写规则上加了位置权重、邻居威胁评分和爆发势能，棋力更强
-- **手写规则**：经典启发式评估，稳定
+- **ML 模型**（默认）：XGBoost 树模型打分（18 维特征），再与手写启发式混合；模型内嵌在引擎里，离线可用
+- **手写规则**：纯启发式评估，计算量小，设备弱时更流畅
 
 在玩家配置弹窗里随时切换，不用重启游戏。
 
@@ -203,7 +205,7 @@ Alpha-Beta 和 PVS 可以换用两种评估函数：
 ## 🎨 UI 设计
 
 - **深色液态玻璃主题**：虹彩渐变玻璃卡片，`backdrop-filter: 32px` 毛玻璃，内斜面采光高光
-- **背景光球动效**：10 个彩色光球，`filter: blur(70px)` 虚化浮动，与玻璃元素自然折射反射
+- **背景光球动效**：10 个彩色光球，`filter: blur(46px)` 虚化浮动，与玻璃元素自然折射反射
 - **棱镜色散**：玻璃元素内嵌 `::before` 高光
 - **流体动画**：所有过渡使用 `cubic-bezier(0.34, 1.56, 0.64, 1)` 弹性曲线
 - **自定义控件**：统一下拉选择器、按钮按压反馈、挖孔屏安全区适配
@@ -230,11 +232,12 @@ Alpha-Beta 和 PVS 可以换用两种评估函数：
 ```
 
 - **前端**：原生 JavaScript + CSS，零框架依赖（`tauri/public/`，桌面和移动端共用）
-- **桌面（Windows / Linux）/ Android**：Rust 引擎（`tauri/src-tauri/`）+ Tauri v2 桥接，Rayon 多核并行
-- **浏览器 PWA**：`docs/` 目录独立构建，同一引擎编译成 WASM（`docs/wasm/` crate + wasm-bindgen）；`engine.js` 在浏览器侧模拟 Tauri invoke 语义，`tauriInvoke` 自动降级到 `ChainEngine.webInvoke`
+- **共享引擎**：`engine/`（crate `chain_chess_core`）放规则、AI 搜索、评估与内嵌模型，两个宿主共用同一份代码
+- **桌面（Windows / Linux）/ Android**：Tauri v2 宿主（`tauri/src-tauri/`）承接命令与存储，Rayon 多核并行
+- **浏览器 PWA**：`docs/wasm/` 只留 wasm-bindgen 导出层，依赖 `engine/` 编成 WASM；`engine.js` 在浏览器侧模拟 Tauri invoke 语义，`tauriInvoke` 自动降级到 `ChainEngine.webInvoke`
 - **AI 引擎**：Alpha-Beta 用 `alpha_beta_pruning` crate，PVS 和 MCTS 自己实现
 - **并行计算**：Rayon `par_iter()` 多核并行搜索（桌面端；WASM 版单线程顺序执行）
-- **评估函数**：增强版手写评估（位置权重 + 威胁评分）或 XGBoost 模型（内嵌，可扩展）
+- **评估函数**：XGBoost 模型（内嵌，可扩展）或纯手写启发式，可按 AI 单独切换
 - **存储**：桌面和移动端用 JSON 文件（`history.json`、`round_data.json`、`saved_game.json`），PWA 用 `localStorage`（`chainchess:` 前缀）
 
 ---

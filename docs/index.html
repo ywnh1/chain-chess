@@ -313,6 +313,24 @@
       <h2>更多</h2>
 
       <div class="about-card">
+        <h3>外观</h3>
+        <div class="form-row">
+          <label style="flex:1">背景光球</label>
+          <div class="toggle-group" id="orbsGroup">
+            <button class="tg-btn" data-value="true">开</button>
+            <button class="tg-btn" data-value="false">关</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label style="flex:1">游戏内背景跟随玩家色</label>
+          <div class="toggle-group" id="bgFollowGroup">
+            <button class="tg-btn" data-value="true">开</button>
+            <button class="tg-btn" data-value="false">关</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-card">
         <h3>游戏音效</h3>
         <div class="form-row">
           <label style="flex:1">音效主题</label>
@@ -561,7 +579,7 @@
         <h3>功能亮点</h3>
         <p style="font-size:.82rem;line-height:1.7;margin:0">
           <strong>Rust AI 引擎</strong>：四种算法（策略 / A-B / PVS / MCTS），桌面端 Rayon 多核并行，PWA 端跑 WASM<br>
-          <strong>增强版评估</strong>：位置权重 + 邻居威胁评分 + 爆发势能，内置 XGBoost 模型<br>
+          <strong>ML 评估模型</strong>：位置权重 + 邻居威胁评分 + 爆发势能，内置 XGBoost 模型<br>
           <strong>AI 性能评测</strong>：432 局两两对战，A-B 73.6% / PVS 71.3% 胜率<br>
           <strong>设备性能检测</strong>：WebView FPS 压力测试 + AI 计算基准（50 局）<br>
           <strong>中断恢复</strong>：异常退出自动保存，历史页一键继续<br>
@@ -1661,16 +1679,16 @@
           <li><strong>默认</strong>：弹到棋盘之外就消失（最简单，建议先用这个）</li>
           <li><strong>回环</strong>：从左边界出去、从右边界出来，上下同理，棋盘相当于一张卷起来的纸</li>
           <li><strong>反弹</strong>：弹到边界后弹回场内</li>
-          <li><strong>降级</strong>：靠近边界的格子少弹一些，不容易被挤死</li>
+          <li><strong>降级</strong>：中央 4 颗才爆，边上 3 颗、角落 2 颗就爆 —— 越靠边越危险（只与 4 级阈值搭配）</li>
           <li><strong>随机</strong>：开局随机定下一种，整局不再变</li>
         </ul>
 
         <p><strong>爆炸阈值</strong>：攒够几颗才炸。</p>
         <ul>
-          <li><strong>3 级</strong>：最易连锁，一局很短</li>
+          <li><strong>3 级</strong>：最易连锁，引爆频繁</li>
           <li><strong>4 级</strong>：默认，平衡</li>
           <li><strong>5 级</strong>：攒得慢，节奏慢，更难预测</li>
-          <li><strong>随机</strong>：每步在 3/4/5 之间随机</li>
+          <li><strong>随机</strong>：开局随机定下 3 / 4 / 5 之一，整局不变（只会抽到与当前边界兼容的阈值）</li>
         </ul>
 
         <p><strong>玩家配置</strong>：点玩家卡片逐个设置。</p>
@@ -1680,7 +1698,7 @@
           <li><strong>算法</strong>（AI）：策略（快、适合新手） / Alpha-Beta / PVS / MCTS（慢但套路怪）</li>
           <li><strong>搜索深度</strong>（AI）：1~10 层。越深思越强，但思考时间也越长；选太深会等很久</li>
           <li><strong>随机刻度</strong>（AI）：0%~30%。越高走法越不可预测，越低越“照着最优解走”</li>
-          <li><strong>评估函数</strong>（AI）：增强版（含位置权重，棋力更强） / 手写规则（经典，稳定）</li>
+          <li><strong>评估函数</strong>（AI）：ML 模型（默认，训练出来的打分） / 手写规则（轻量，设备弱时更流畅）</li>
         </ul>
         <p>不想逐项配就用默认值：7×7、2 人、默认边界、4 级，直接开始。</p>
       </div>
@@ -1725,9 +1743,10 @@
       <div class="about-card">
         <h3>更多</h3>
         <ul>
+          <li><strong>背景光球</strong>：开 / 关 —— 关掉暗色背景上漂浮的彩色光球，省一点 GPU</li>
+          <li><strong>游戏内背景跟随玩家色</strong>：开 / 关 —— 关掉后背景始终保持主题底色，不随当前玩家变色</li>
           <li><strong>音效主题</strong>：经典 / 柔和 / 清脆 / 电子 / 大狗叫 / 静音</li>
           <li><strong>大狗叫声模式</strong>：只在选中「大狗叫」主题时出现，可选叫声的音尾长度</li>
-          <li><strong>震动</strong>：Android 上有效，桌面自动忽略</li>
           <li><strong>检查更新</strong>：手动检测新版本</li>
           <li><strong>设备性能检测</strong>：测 WebView 帧率与 AI 计算速度</li>
         </ul>
