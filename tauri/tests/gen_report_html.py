@@ -27,7 +27,9 @@ TARGETS = [
 ]
 
 ALG_LABEL = {'strategy': '策略', 'alphabeta': 'A-B', 'pvs': 'PVS', 'mcts': 'MCTS'}
-ALG_ORDER = ['alphabeta', 'pvs', 'strategy', 'mcts']
+# 参战算法按此顺序展示；实际用到哪些由数据决定（MCTS 已从游戏内移除，
+# 但显式 --algs 复测时仍可能出现，所以不能写死）
+ALG_PREFERENCE = ['alphabeta', 'pvs', 'strategy', 'mcts']
 BM_LABEL = {'default': '默认', 'wrap': '回环', 'bounce': '反弹', 'degrade': '降级'}
 BM_ORDER = ['default', 'wrap', 'bounce', 'degrade']
 CAP_LABEL = {'3': '速爆 3', '4': '标准 4', '5': '重炮 5'}
@@ -42,6 +44,14 @@ BAR_COLORS = {
     'mcts': 'linear-gradient(90deg,#ff8a8a,#ff6b6b)',
 }
 MEDALS = ['🥇', '🥈', '🥉', '4']
+
+
+def alg_order(rows):
+    """数据里实际出现过的算法，按偏好顺序排。"""
+    seen = set()
+    for x in rows:
+        seen.update(x['players'])
+    return [a for a in ALG_PREFERENCE if a in seen] + sorted(seen - set(ALG_PREFERENCE))
 
 
 def pct(n, d):
@@ -88,7 +98,7 @@ def cell_color(win, total, a):
     return ''
 
 
-def build_config_card(cfg, total, capped_n, use_ml, model_note):
+def build_config_card(cfg, total, capped_n, use_ml, model_note, order):
     shapes = cfg.get('shapes') or ['square']
     shape_txt = ' / '.join(SHAPE_LABEL.get(s, s) for s in shapes)
     edge = cfg['size']
@@ -97,11 +107,17 @@ def build_config_card(cfg, total, capped_n, use_ml, model_note):
     else:
         edge_txt = f'{edge}×{edge}'
     eval_txt = f'ML 模型（{model_note}）' if use_ml else '手写规则'
+    # 配对数 = 参战算法的两两组合数，不能写死
+    pairs_n = len(order) * (len(order) - 1) // 2
+    # MCTS 深度只在 MCTS 真的参战时才写
+    depth_txt = f'A-B / PVS 深度 {cfg["depth"]}'
+    if 'mcts' in order:
+        depth_txt += f' · MCTS 深度 {cfg["mctsDepth"]}'
     return f'''      <div class="about-card">
         <h3 style="font-size:1.05rem;margin-bottom:8px">AI 实力测试（{total} 局）</h3>
         <p style="font-size:.82rem;color:var(--dim);line-height:1.7;margin:0">
-          {len(shapes)} 形状 × {len(cfg["borders"])} 边界 × {len(cfg["caps"])} 爆炸阈值 × 6 配对 × 每组合 {cfg["games"]} 局 = <strong>{total} 局</strong><br>
-          棋盘 {edge_txt} · 形状 {shape_txt} · A-B / PVS 深度 {cfg["depth"]} · MCTS 深度 {cfg["mctsDepth"]} · 随机刻度 {cfg["randomScale"]}%<br>
+          {len(shapes)} 形状 × {len(cfg["borders"])} 边界 × {len(cfg["caps"])} 爆炸阈值 × {pairs_n} 配对 × 每组合 {cfg["games"]} 局 = <strong>{total} 局</strong><br>
+          棋盘 {edge_txt} · 形状 {shape_txt} · {depth_txt} · 随机刻度 {cfg["randomScale"]}%<br>
           评估函数 {eval_txt} · 两两对阵（每对固定先后手）· 种子 {cfg["seed"]}<br>
           测试脚本: <code>tauri/tests/ai_strength.py</code> + <code>ai_bench</code>（与正式对局同源引擎）
         </p>
@@ -109,10 +125,10 @@ def build_config_card(cfg, total, capped_n, use_ml, model_note):
 '''
 
 
-def build_summary_card(rows, overall):
+def build_summary_card(rows, overall, order):
     """总结要点：全部由数据推出，不写死结论。"""
     wins, games = overall
-    ranked = sorted(ALG_ORDER, key=lambda a: -pct(wins[a], games[a]))
+    ranked = sorted(order, key=lambda a: -pct(wins[a], games[a]))
     top, bottom = ranked[0], ranked[-1]
 
     # 各阈值下的第一名
@@ -121,7 +137,7 @@ def build_summary_card(rows, overall):
     for cm in CAP_ORDER:
         if not g_cap.get(cm):
             continue
-        best = max(ALG_ORDER, key=lambda a: pct(w_cap[cm][a], g_cap[cm]))
+        best = max(order, key=lambda a: pct(w_cap[cm][a], g_cap[cm]))
         cap_best.append(f'{CAP_LABEL[cm]} 下是 {ALG_LABEL[best]}（{pct(w_cap[cm][best], g_cap[cm]):.1f}%）')
 
     # 各形状下的第一名
@@ -130,7 +146,7 @@ def build_summary_card(rows, overall):
     for sh in SHAPE_ORDER:
         if not g_sh.get(sh):
             continue
-        best = max(ALG_ORDER, key=lambda a: pct(w_sh[sh][a], g_sh[sh]))
+        best = max(order, key=lambda a: pct(w_sh[sh][a], g_sh[sh]))
         shape_best.append(f'{SHAPE_LABEL[sh]} {ALG_LABEL[best]} {pct(w_sh[sh][best], g_sh[sh]):.0f}%')
 
     # 步数
@@ -167,9 +183,9 @@ def build_summary_card(rows, overall):
 '''
 
 
-def build_ranking_card(overall):
+def build_ranking_card(overall, order):
     wins, games = overall
-    ranked = sorted(ALG_ORDER, key=lambda a: -pct(wins[a], games[a]))
+    ranked = sorted(order, key=lambda a: -pct(wins[a], games[a]))
     bars = []
     for a in ranked:
         p = pct(wins[a], games[a])
@@ -212,7 +228,7 @@ def build_ranking_card(overall):
 '''
 
 
-def build_matrix_card(rows, cfg, title, hint):
+def build_matrix_card(rows, cfg, title, hint, order):
     """形状 × 边界 的胜率矩阵：每格写第一名算法与胜率。"""
     w, g = tally(rows, lambda x: (x['shape'], x['bm']))
     shapes = cfg.get('shapes') or ['square']
@@ -228,7 +244,7 @@ def build_matrix_card(rows, cfg, title, hint):
             if not total:
                 cells.append('<td style="padding:3px 6px;text-align:center">-</td>')
                 continue
-            best = max(ALG_ORDER, key=lambda a: w[(sh, bm)][a])
+            best = max(order, key=lambda a: w[(sh, bm)][a])
             cells.append(
                 f'<td style="padding:3px 6px;text-align:center">'
                 f'{ALG_LABEL[best]} {pct(w[(sh, bm)][best], total):.0f}%</td>')
@@ -247,16 +263,16 @@ def build_matrix_card(rows, cfg, title, hint):
 '''
 
 
-def build_pair_cards(rows, cfg):
+def build_pair_cards(rows, cfg, order):
     """每个配对一张可折叠明细：形状 × 边界 × 阈值 的 A:B。"""
     pairs = []
     seen = set()
     for x in rows:
-        ps = tuple(sorted(x['players'], key=lambda a: ALG_ORDER.index(a)))
+        ps = tuple(sorted(x['players'], key=lambda a: order.index(a)))
         if len(ps) == 2 and ps not in seen:
             seen.add(ps)
             pairs.append(ps)
-    pairs.sort(key=lambda p: (ALG_ORDER.index(p[0]), ALG_ORDER.index(p[1])))
+    pairs.sort(key=lambda p: (order.index(p[0]), order.index(p[1])))
 
     shapes = cfg.get('shapes') or ['square']
     cards = []
@@ -373,6 +389,7 @@ def build_capped_card(rows):
 
 
 def build_block(rows, cfg, model_note):
+    order = alg_order(rows)
     use_ml = cfg.get('useMlEval', True)
     overall = overall_stats(rows)
     total = len(rows)
@@ -383,19 +400,19 @@ def build_block(rows, cfg, model_note):
         '    <button class="back glass-btn" onclick="Router.back()">← 返回</button>\n',
         '    <div class="about-scroll">\n',
         '      <h2>AI 性能评测</h2>\n\n',
-        build_config_card(cfg, total, capped_n, use_ml, model_note),
+        build_config_card(cfg, total, capped_n, use_ml, model_note, order),
         '\n',
-        build_summary_card(rows, overall),
+        build_summary_card(rows, overall, order),
         '\n',
-        build_ranking_card(overall),
+        build_ranking_card(overall, order),
         '\n',
         build_matrix_card(rows, cfg, '形状 × 边界（每格：胜场最多的算法与胜率）',
-                          '同一形状下不同边界的强弱会变，回环与降级最容易改变格局'),
+                          '同一形状下不同边界的强弱会变，回环与降级最容易改变格局', order),
         '\n',
         build_row_card(rows, cfg),
         '\n',
         build_capped_card(rows),
-        build_pair_cards(rows, cfg),
+        build_pair_cards(rows, cfg, order),
         '    </div>\n',
         '  </div>\n',
     ]
