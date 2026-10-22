@@ -68,6 +68,7 @@
       <div id="shapeModeGroup" class="toggle-group">
         <button class="tg-btn selected" data-value="square">正方形</button>
         <button class="tg-btn" data-value="rect">长方形</button>
+        <button class="tg-btn" data-value="random">随机棋盘</button>
         <button class="tg-btn" data-value="custom">自定义</button>
       </div>
     </div>
@@ -101,6 +102,13 @@
         <span style="color:var(--dim)">×</span>
         <select id="rectCols" style="flex:1"></select>
       </div>
+    </div>
+
+    <!-- 随机棋盘说明（按人数自动生成） -->
+    <div class="form-row" id="randomShapeRow" style="display:none;flex-direction:column;align-items:flex-start;gap:2px">
+      <label style="font-size:.8rem">随机棋盘<button type="button" class="hint-btn" onclick="openHint('random-board')"
+          aria-label="随机棋盘说明">!</button></label>
+      <p id="randomShapeHint" style="font-size:.72rem;color:var(--dim);margin:0">按当前人数自动生成一块大小合适的异形棋盘，每次开始游戏都不一样。</p>
     </div>
 
     <!-- 棋盘边界模式 -->
@@ -172,7 +180,6 @@
           <button class="am-btn" data-value="strategy">AI 策略</button>
           <button class="am-btn" data-value="alphabeta">A-B</button>
           <button class="am-btn" data-value="pvs">PVS</button>
-          <button class="am-btn" data-value="mcts">MCTS</button>
         </div>
       </div>
       <div class="form-row" id="playerDepthRow">
@@ -221,7 +228,6 @@
         <div id="aiHelpAlgBtns" class="alg-mini" style="flex-wrap:wrap;gap:4px">
           <button class="am-btn selected" data-value="alphabeta">A-B</button>
           <button class="am-btn" data-value="pvs">PVS</button>
-          <button class="am-btn" data-value="mcts">MCTS</button>
           <button class="am-btn" data-value="strategy">策略</button>
         </div>
       </div>
@@ -359,6 +365,11 @@
           <label style="flex:1">更新详情</label>
           <span style="color:var(--dim)">→</span>
         </div>
+        <div class="form-row" style="cursor:pointer;flex-direction:row;align-items:center;justify-content:space-between"
+          onclick="window.open('https://ywnh1.free.leoi.org/','_blank','noopener')">
+          <label style="flex:1">下载中心</label>
+          <span style="color:var(--dim)">→</span>
+        </div>
       </div>
 
       <div class="about-card" style="cursor:pointer" onclick="Router.navigate('device-bench')">
@@ -398,8 +409,8 @@
           <ul class="db-stack-list">
             <li><strong>Tauri 2</strong>：Rust 内核 + 系统 WebView，比 Electron 省内存，启动也快</li>
             <li><strong>Rust 引擎</strong>：游戏规则和 AI 全用 Rust 写，编译成原生码；PWA 版编译为 WASM</li>
-            <li><strong>Rayon 多核并行</strong>：A-B / PVS / MCTS 在根节点并行搜索，多核 CPU 都吃得上</li>
-            <li><strong>搜索剪枝</strong>：Alpha-Beta 剪枝、PVS 主变例搜索（Killer / History / 静止搜索）、MCTS</li>
+            <li><strong>Rayon 多核并行</strong>：A-B / PVS 在根节点并行搜索，多核 CPU 都吃得上</li>
+            <li><strong>搜索剪枝</strong>：Alpha-Beta 剪枝、PVS 主变例搜索（Killer / History / 静止搜索）</li>
             <li><strong>ML 评估</strong>：内置 XGBoost 模型（18 维特征），AI 判断更准</li>
             <li><strong>WebGL 渲染</strong>：棋盘用 Canvas 画，动画批量提交，渲染压力交给 GPU</li>
           </ul>
@@ -453,8 +464,7 @@
               <option value="strategy">全部策略算法</option>
               <option value="alphabeta">全部 A-B 剪枝</option>
               <option value="pvs">全部 PVS</option>
-              <option value="mcts">全部 MCTS</option>
-              <option value="mixed" selected>混合四算法混战</option>
+              <option value="mixed" selected>混合三算法混战</option>
             </select>
           </div>
           <div class="form-row">
@@ -474,7 +484,7 @@
               <option value="100">100 局</option>
             </select>
           </div>
-          <p class="db-note">MCTS 固定 1 迭代档。深度 3 配大棋盘会明显变慢。</p>
+          <p class="db-note">深度 3 配大棋盘会明显变慢。</p>
           <button class="glass-btn primary" onclick="dbShowConfirm('ai')" style="width:100%;padding:9px 14px">▶ 开始 AI
             计算性能检测</button>
         </div>
@@ -569,7 +579,7 @@
       <div class="about-card">
         <h3>功能亮点</h3>
         <p style="font-size:.82rem;line-height:1.7;margin:0">
-          <strong>Rust AI 引擎</strong>：四种算法（策略 / A-B / PVS / MCTS），桌面端 Rayon 多核并行，PWA 端跑 WASM<br>
+          <strong>Rust AI 引擎</strong>：三种算法（策略 / A-B / PVS），桌面端 Rayon 多核并行，PWA 端跑 WASM<br>
           <strong>ML 评估模型</strong>：位置权重 + 邻居威胁评分 + 爆发势能，内置 XGBoost 模型<br>
           <strong>AI 性能评测</strong>：360 局两两对战（含异形棋盘），A-B 75.6% / PVS 60.0% 胜率<br>
           <strong>设备性能检测</strong>：WebView FPS 压力测试 + AI 计算基准（50 局）<br>
@@ -597,6 +607,13 @@
         <span class="nav-arrow">→</span>
       </div>
 
+      <!-- 联系作者 → 下载中心联系页 -->
+      <a class="about-nav mode-clickable-block" href="https://ywnh1.free.leoi.org/#/contact" target="_blank" rel="noopener"
+        style="text-decoration:none;color:inherit">
+        <span class="nav-label">联系作者</span>
+        <span class="nav-arrow">→</span>
+      </a>
+
       <!-- 第三方 SDK 与服务 → 二级页 -->
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-thirdparty')">
         <span class="nav-label">第三方 SDK 与服务</span>
@@ -613,8 +630,8 @@
       <h2>AI 介绍</h2>
 
       <div class="about-card">
-        <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋有 <strong>四种
-            AI</strong>，思路分三类：按人工规则下、搜索推演、随机模拟。本地对战、AI 对战、AI 斗蛐蛐里都能随便换。四种都用 <strong>Rust</strong> 引擎实现，桌面端 A-B/PVS/MCTS
+        <p style="margin-bottom:12px;font-size:.85rem;line-height:1.7">连锁棋有 <strong>三种
+            AI</strong>，思路分两类：按人工规则下、搜索推演。本地对战、AI 对战、AI 斗蛐蛐里都能随便换。三种都用 <strong>Rust</strong> 引擎实现，桌面端 A-B/PVS
           走 Rayon 多核并行，PWA 版是单线程 WASM。</p>
 
         <h3 class="ai-alg-title" style="color:var(--accent)">策略算法 · 启发式规则</h3>
@@ -645,14 +662,9 @@
             并行</strong> 多核加速
         </div>
 
-        <h3 class="ai-alg-title" style="color:#c88cff">MCTS 蒙特卡洛树搜索 · 随机模拟</h3>
-        <p class="ai-alg-desc"><strong>不用评估函数</strong>，也不猜哪步好，直接随机模拟大量对局（单次最多 40 步，分出胜负就停），靠胜率统计决定走哪步。</p>
-        <div class="ai-alg-detail" style="background:rgba(200,140,255,.06)">
-          <strong style="color:#c88cff">SELECT</strong> → <strong style="color:#c88cff">EXPAND</strong> → <strong
-            style="color:#c88cff">PLAYOUT</strong> → <strong style="color:#c88cff">BACKPROPAGATE</strong><br>
-          UCB1 平衡探索与利用 · 随机 Playout（均匀随机模拟）· 渐进展开（≥3 次访问才展新分支）
-        </div>
-        <p class="ai-alg-desc">depth=1~10 对应 400~4000 次迭代，树节点上限 2000。不靠评估函数的好处是，常能找出 Alpha-Beta 看不到的路子。</p>
+        <p class="ai-alg-desc" style="font-size:.8rem;color:var(--dim);margin-top:12px">
+          早期版本还有一档 MCTS（蒙特卡洛树搜索），在 360 局评测里只有 13.3% 胜率，明显低于其他三种，已在游戏内移除。评测页保留了它的数据供对照。
+        </p>
       </div>
     </div>
   </div>
@@ -668,6 +680,7 @@
         <p style="font-size:.82rem;color:var(--dim);line-height:1.7;margin:0">
           5 形状 × 4 边界 × 3 爆炸阈值 × 6 配对 × 每组合 1 局 = <strong>360 局</strong><br>
           棋盘 7×7（长方形 7×9） · 形状 正方形 / 长方形 / 挖洞 / 口字 / 十字 · A-B / PVS 深度 2 · MCTS 深度 1 · 随机刻度 5%<br>
+          <span style="color:var(--accent)">MCTS 已在游戏内移除（胜率 13.3% 明显偏低），本页数据保留作历史对照</span><br>
           评估函数 ML 模型（48add791 · 2026-10-11 训练） · 两两对阵（每对固定先后手）· 种子 0<br>
           测试脚本: <code>tauri/tests/ai_strength.py</code> + <code>ai_bench</code>（与正式对局同源引擎）
         </p>
@@ -3892,7 +3905,7 @@
         <ul>
           <li><strong>类型</strong>：人类 / AI。全人类 = 本地对战，混合 = 人机对打，全 AI = 斗蛐蛐（纯观战）</li>
           <li><strong>名称</strong>：棋盘和统计里显示的名字</li>
-          <li><strong>算法</strong>（AI）：策略（快、适合新手） / Alpha-Beta / PVS / MCTS（慢但套路怪）</li>
+          <li><strong>算法</strong>（AI）：策略（快、适合新手） / Alpha-Beta（最强） / PVS（A-B 的加速版）</li>
           <li><strong>搜索深度</strong>（AI）：1~10 层。越深思越强，但思考时间也越长；选太深会等很久</li>
           <li><strong>随机刻度</strong>（AI）：0%~30%。越高走法越不可预测，越低越“照着最优解走”</li>
           <li><strong>评估函数</strong>（AI）：ML 模型（默认，训练出来的打分） / 手写规则（轻量，设备弱时更流畅）</li>

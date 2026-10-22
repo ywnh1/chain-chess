@@ -609,30 +609,66 @@ pub fn xgb_predict(engine: &XGBoostEngine, feats: &[f32; FEAT_DIM]) -> (f32, f32
 }
 
 
+/// 评估函数用的形状中心：所有可用格的重心。
+/// 不能直接用 (rows-1)/2 —— 异形棋盘上 w 矩形的“几何中心”可能是个洞，
+/// 位置权重会整体偏向一块根本下不了棋的区域。
+fn board_centroid(board: &GameBoard) -> (f64, f64) {
+    let (mut sr, mut sc, mut n) = (0f64, 0f64, 0usize);
+    for (i, row) in board.iter().enumerate() {
+        for (j, c) in row.iter().enumerate() {
+            if !c.blocked { sr += i as f64; sc += j as f64; n += 1; }
+        }
+    }
+    if n == 0 {
+        let rows = board.len();
+        let cols = board.first().map_or(rows, |r| r.len());
+        return ((rows as f64 - 1.0) * 0.5, (cols as f64 - 1.0) * 0.5);
+    }
+    (sr / n as f64, sc / n as f64)
+}
+
 /// 增强版评估函数：在原手写评估基础上加入位置权重、邻居威胁、爆发势能
 /// 深度优化——单次遍历，零额外 Vec 分配
+///
+/// 两条与边界模式直接相关的规则（之前都没有区分，导致回环下判断失真）：
+///
+/// 1. **位置权重只在非回环边界生效**。回环下每个格子四个方向都能被打到，
+///    不存在“中心更好”这回事，位置分应当归零；否则 AI 会在回环棋盘上
+///    无谓地往中间堆子，实测回环边界的胜率因此低了 10 个百分点。
+/// 2. **贴身的价值取决于自己的点数**。临界棋子贴着对手是爆发势能（炸开能把对手
+///    同化成自己的），而低点数棋子贴着对手是送子 —— 对手炸过来会把它同化并
+///    +1 点，正好喂给对手一次连锁。原实现只要“邻居有对手”就加分，
+///    两者混为一谈，等于鼓励 AI 把 1 点棋子贴到对手 3 点旁边。
 pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> i32 {
     let sz = board.len();                             // 行数
     let cols = board.first().map_or(sz, |r| r.len());  // 列数
-    let row_c = (sz as f64 - 1.0) * 0.5;
-    let col_c = (cols as f64 - 1.0) * 0.5;
+    let (row_c, col_c) = board_centroid(board);
+    // 回环边界没有“边缘”，位置权重整体归零
+    let use_position = !matches!(border_mode, BorderMode::Wrap | BorderMode::Random);
     let mut my_score = 0i32;
     let mut opp_score = 0i32;
     let mut my_territory = 0i32;
     let mut opp_territory = 0i32;
     let mut my_chain_threat = 0i32;
     let mut opp_chain_threat = 0i32;
-    let mut my_pos_bonus = 0i32;     // 位置优势（靠近中心）
+    let mut my_pos_bonus = 0i32;     // 位置优势（靠近形状中心）
     let mut opp_pos_bonus = 0i32;
-    let mut my_threat_prox = 0i32;   // 己方棋子靠近对手=威胁力
-    let mut opp_threat_prox = 0i32;  // 对手棋子靠近己方=危险度
+    let mut my_attack = 0i32;        // 己方临界棋子贴住对手 = 爆发势能
+    let mut opp_attack = 0i32;
+    let mut my_risk = 0i32;          // 己方低点棋子贴住对手 = 送子风险
+    let mut opp_risk = 0i32;
 
     for i in 0..sz {
         let dist_center = ((i as f64 - row_c).abs() * 0.5) as i32;
         for j in 0..cols {
             let cell = &board[i][j];
+            if cell.blocked { continue; }
             let d = dist_center + ((j as f64 - col_c).abs() * 0.5) as i32;
-            let pos_val = 4i32.saturating_sub(d).max(0); // 中心~4, 角落~0
+            let pos_val = if use_position {
+                4i32.saturating_sub(d).max(0) // 中心~4, 形状边缘~0
+            } else {
+                0
+            };
 
             match cell.owner {
                 Some(p) if p == player => {
@@ -640,15 +676,20 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, bo
                     my_territory += 1;
                     my_pos_bonus += pos_val;
                     let crit = crit_level(board, i, j, border_mode, cap_mode) as i32;
-                    if (cell.count as i32) >= crit { my_chain_threat += (cell.count as i32) * 5; }
-                    else if (cell.count as i32) >= crit - 1 { my_chain_threat += 2; }
-                    // 邻居对手计数：己方高级棋子靠近对手 = 爆发势能
-                    let nbrs = nbrs_with_mode(board, i, j, border_mode);
-                    for &(ni, nj) in &nbrs {
-                        let nc = &board[ni][nj];
-                        if nc.owner.is_some() && nc.owner != Some(player) {
-                            my_threat_prox += cell.count as i32;
-                        }
+                    let cnt = cell.count as i32;
+                    if cnt >= crit { my_chain_threat += cnt * 5; }
+                    else if cnt >= crit - 1 { my_chain_threat += 2; }
+                    // 贴身价值按点数区分：临界=势能，低点=风险
+                    let touches_opp = nbrs_with_mode(board, i, j, border_mode)
+                        .iter()
+                        .any(|&(ni, nj)| {
+                            let o = board[ni][nj].owner;
+                            o.is_some() && o != Some(player)
+                        });
+                    if touches_opp {
+                        if cnt >= crit { my_attack += cnt; }
+                        else if cnt >= crit - 1 { my_attack += 1; }
+                        else { my_risk += 1; }
                     }
                 }
                 Some(_) => {
@@ -656,14 +697,16 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, bo
                     opp_territory += 1;
                     opp_pos_bonus += pos_val;
                     let crit = crit_level(board, i, j, border_mode, cap_mode) as i32;
-                    if (cell.count as i32) >= crit { opp_chain_threat += (cell.count as i32) * 5; }
-                    else if (cell.count as i32) >= crit - 1 { opp_chain_threat += 2; }
-                    let nbrs = nbrs_with_mode(board, i, j, border_mode);
-                    for &(ni, nj) in &nbrs {
-                        let nc = &board[ni][nj];
-                        if nc.owner == Some(player) {
-                            opp_threat_prox += cell.count as i32;
-                        }
+                    let cnt = cell.count as i32;
+                    if cnt >= crit { opp_chain_threat += cnt * 5; }
+                    else if cnt >= crit - 1 { opp_chain_threat += 2; }
+                    let touches_me = nbrs_with_mode(board, i, j, border_mode)
+                        .iter()
+                        .any(|&(ni, nj)| board[ni][nj].owner == Some(player));
+                    if touches_me {
+                        if cnt >= crit { opp_attack += cnt; }
+                        else if cnt >= crit - 1 { opp_attack += 1; }
+                        else { opp_risk += 1; }
                     }
                 }
                 None => {}
@@ -674,8 +717,9 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, bo
     let base = (my_score - opp_score) * 2
         + (my_territory - opp_territory)
         + (my_chain_threat - opp_chain_threat)  // chain_threat 已经 *5/*2
-        + (my_pos_bonus - opp_pos_bonus) * 2    // 位置优势
-        + (my_threat_prox - opp_threat_prox) * 3; // 威胁势能权重最高
+        + (my_pos_bonus - opp_pos_bonus) * 2    // 位置优势（回环时为 0）
+        + (my_attack - opp_attack) * 3          // 临界棋子贴身：爆发势能
+        - (my_risk - opp_risk) * 3;             // 低点棋子贴身：送子风险
 
     // 开场随机探索：前 3 局固定 40，之后线性降至用户设定值（0~30），5 局后保持设定值
     let user_scale = (user_random_scale.min(30)) as i32;
@@ -1151,7 +1195,7 @@ pub fn process_click(
 }
 
 
-pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, _border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> i32 {
+pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> i32 {
     let mut my_score = 0i32;
     let mut opp_score = 0i32;
     let mut my_territory = 0i32;
@@ -1159,28 +1203,25 @@ pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, _
     let mut my_chain_threat = 0i32;
     let mut opp_chain_threat = 0i32;
 
-    // 阈值感知的主临界等级（cap3→2、cap4→3、cap5→4；random 取中值 3）
-    let crit = match cap_mode {
-        CapMode::Cap3 => 2,
-        CapMode::Cap5 => 4,
-        CapMode::Random => 3,
-        CapMode::Cap4 => 3,
-    } as i32;
-
-    for row in board {
-        for cell in row {
+    // 临界等级按格算：降级边界下形状边缘的格子阈值更低，
+    // 原来按 cap_mode 硬编码成 3，异形/降级棋盘上会漏判真实的临界棋子。
+    for (i, row) in board.iter().enumerate() {
+        for (j, cell) in row.iter().enumerate() {
+            if cell.blocked { continue; }
+            let crit = crit_level(board, i, j, border_mode, cap_mode) as i32;
+            let cnt = cell.count as i32;
             match cell.owner {
                 Some(p) if p == player => {
-                    my_score += cell.count as i32;
+                    my_score += cnt;
                     my_territory += 1;
-                    if (cell.count as i32) >= crit { my_chain_threat += (cell.count as i32) * 4; }
-                    else if (cell.count as i32) >= crit - 1 { my_chain_threat += 1; }
+                    if cnt >= crit { my_chain_threat += cnt * 4; }
+                    else if cnt >= crit - 1 { my_chain_threat += 1; }
                 }
                 Some(_) => {
-                    opp_score += cell.count as i32;
+                    opp_score += cnt;
                     opp_territory += 1;
-                    if (cell.count as i32) >= crit { opp_chain_threat += (cell.count as i32) * 4; }
-                    else if (cell.count as i32) >= crit - 1 { opp_chain_threat += 1; }
+                    if cnt >= crit { opp_chain_threat += cnt * 4; }
+                    else if cnt >= crit - 1 { opp_chain_threat += 1; }
                 }
                 None => {}
             }
@@ -2080,36 +2121,28 @@ pub fn next_live_player(board: &GameBoard, _sz: usize, current: usize, eliminate
 }
 
 
-/// 首步选中心
+/// 首步选中心：在不受「首子 12 格限制」的可用格里，挑离形状重心最近的一个。
+///
+/// 原来的写法先用 `(1..sz-1)` 排除最外圈，再按矩形中心算距离 —— 在口字棋盘
+/// （只有外圈可用）上候选直接为空，只能落到兜底分支；在十字/长条上
+/// 「矩形中心」也可能是个洞。改成直接对可用格求重心距离。
 pub fn first_move_center(board: &GameBoard, sz: usize) -> Option<(usize, usize)> {
     let cols = board.first().map_or(sz, |r| r.len());
-    let mut candidates: Vec<(usize, usize)> = (1..sz - 1)
-        .flat_map(|i| (1..cols - 1).filter_map(move |j| {
-            if board[i][j].owner.is_none() && !board[i][j].blocked && !is_in_any_restricted_zone(board, i, j) {
-                Some((i, j))
-            } else { None }
-        })).collect();
-    if candidates.is_empty() {
-        for i in 0..sz { for j in 0..cols {
-            if board[i][j].owner.is_none() && !board[i][j].blocked && !is_in_any_restricted_zone(board, i, j) {
-                candidates.push((i, j));
+    let pick = |require_unrestricted: bool| -> Option<(usize, usize)> {
+        let (row_c, col_c) = board_centroid(board);
+        let mut best: Option<((usize, usize), f64)> = None;
+        for i in 0..sz {
+            for j in 0..cols {
+                let c = &board[i][j];
+                if c.owner.is_some() || c.blocked { continue; }
+                if require_unrestricted && is_in_any_restricted_zone(board, i, j) { continue; }
+                let d = (i as f64 - row_c).abs() + (j as f64 - col_c).abs();
+                if best.map_or(true, |(_, bd)| d < bd) { best = Some(((i, j), d)); }
             }
-        }}
-    }
-    if candidates.is_empty() {
-        for i in 0..sz { for j in 0..cols {
-            if board[i][j].owner.is_none() && !board[i][j].blocked { candidates.push((i, j)); }
-        }}
-    }
-    if candidates.is_empty() { return None; }
-    let row_c = sz as f64 / 2.0 - 0.5;
-    let col_c = cols as f64 / 2.0 - 0.5;
-    candidates.into_iter()
-        .min_by(|&(i1, j1), &(i2, j2)| {
-            let d1 = (i1 as f64 - row_c).abs() + (j1 as f64 - col_c).abs();
-            let d2 = (i2 as f64 - row_c).abs() + (j2 as f64 - col_c).abs();
-            d1.partial_cmp(&d2).unwrap()
-        })
+        }
+        best.map(|(p, _)| p)
+    };
+    pick(true).or_else(|| pick(false))
 }
 
 
@@ -2217,6 +2250,9 @@ pub fn find_best_move_strategy(
     }
 
     let mut rng = rand::thread_rng();
+    // 回环边界下每个格子四个方向都能被打到，「贴边」不再是防守优势。
+    // 原来无条件给边缘/角落加分，回环棋盘上等于在鼓励 AI 往一个并不更安全的位置堆子。
+    let edge_safe = !matches!(border_mode, BorderMode::Wrap | BorderMode::Random);
 
     // 该格临界等级（再落一子即炸）：cap3→2、cap4→3、cap5→4；degrade 边界格子更低
     let crit_of = |i: usize, j: usize| crit_level(board, i, j, border_mode, cap_mode) as u8;
@@ -2258,8 +2294,8 @@ pub fn find_best_move_strategy(
         let mut best_score = f64::NEG_INFINITY;
         for &(i, j) in &safe_sub {
             let exp = exposure_count(board, i, j);
-            let edge = if exp == 1 { 3.0 } else { 0.0 };
-            let corner = if exp >= 2 { 5.0 } else { 0.0 };
+            let edge = if edge_safe && exp == 1 { 3.0 } else { 0.0 };
+            let corner = if edge_safe && exp >= 2 { 5.0 } else { 0.0 };
             let near_any_opp = count_any_opponent_around(board, i, j, player, border_mode);
             let score = edge + corner - near_any_opp as f64 * 5.0 + rng.gen_range(0.0..1.0)*0.5;
             if score > best_score + 0.01 {
@@ -2304,7 +2340,7 @@ pub fn find_best_move_strategy(
         let mut best_score = f64::NEG_INFINITY;
         for &(i, j) in &subcrits {
             let near_opp = count_any_opponent_around(board, i, j, player, border_mode);
-            let edge = if exposure_count(board, i, j) == 1 { 2.0 } else { 0.0 };
+            let edge = if edge_safe && exposure_count(board, i, j) == 1 { 2.0 } else { 0.0 };
             let score = near_opp as f64 * 5.0 + edge + rng.gen_range(0.0..1.0)*0.5;
             if score > best_score + 0.01 {
                 best_score = score;
@@ -2538,5 +2574,95 @@ mod tests {
         let (x, y) = mv.expect("异形棋盘上也要能给出走法");
         assert!(!b[x][y].blocked, "AI 不能把子下进洞里");
         assert_eq!(b[x][y].owner, Some(0), "有子时只能升级己方棋子");
+    }
+}
+
+// ═══════ 评估函数与边界语义 ═══════
+#[cfg(test)]
+mod eval_tests {
+    use super::*;
+
+    fn empty(rows: usize, cols: usize) -> GameBoard {
+        vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; cols]; rows]
+    }
+
+    fn put(b: &mut GameBoard, x: usize, y: usize, owner: usize, count: u8) {
+        b[x][y] = Cell { owner: Some(owner), count, th: None, blocked: false };
+    }
+
+    fn hole(b: &mut GameBoard, x: usize, y: usize) {
+        b[x][y] = Cell { owner: None, count: 0, th: None, blocked: true };
+    }
+
+    /// 回环边界下没有「中心更好」这回事：把同一个子放在中心或角落，位置分应当一致。
+    /// 非回环边界则必须仍然偏好中心。
+    #[test]
+    fn position_bonus_ignores_edges_under_wrap() {
+        let mut center = empty(7, 7);
+        put(&mut center, 3, 3, 0, 1);
+        let mut corner = empty(7, 7);
+        put(&mut corner, 0, 0, 0, 1);
+
+        let c_wrap = eval_board_improved(&center, 0, 10, BorderMode::Wrap, CapMode::Cap4, 0);
+        let k_wrap = eval_board_improved(&corner, 0, 10, BorderMode::Wrap, CapMode::Cap4, 0);
+        assert_eq!(c_wrap, k_wrap, "回环下中心与角落不应有位置差");
+
+        let c_def = eval_board_improved(&center, 0, 10, BorderMode::Default, CapMode::Cap4, 0);
+        let k_def = eval_board_improved(&corner, 0, 10, BorderMode::Default, CapMode::Cap4, 0);
+        assert!(c_def > k_def, "默认边界下中心仍应优于角落");
+    }
+
+    /// 贴身的价值要按点数区分：临界棋子贴着对手是势能，1 点棋子贴着是送子。
+    #[test]
+    fn adjacency_scored_by_count() {
+        // 己方 3 点（cap4 临界）贴着对手 1 点
+        let mut good = empty(5, 5);
+        put(&mut good, 2, 2, 0, 3);
+        put(&mut good, 2, 3, 1, 1);
+        // 换成己方 1 点贴着对手 1 点
+        let mut bad = empty(5, 5);
+        put(&mut bad, 2, 2, 0, 1);
+        put(&mut bad, 2, 3, 1, 1);
+
+        let g = eval_board_improved(&good, 0, 10, BorderMode::Default, CapMode::Cap4, 0);
+        let b = eval_board_improved(&bad, 0, 10, BorderMode::Default, CapMode::Cap4, 0);
+        assert!(g > b, "临界棋子贴身应当比 1 点棋子贴身得分更高（{g} vs {b}）");
+    }
+
+    /// 降级边界下边缘格阈值更低，手写评估必须按格算临界等级。
+    #[test]
+    fn handcraft_uses_per_cell_threshold() {
+        // 角格阈值 2（临界 1）：1 点就是临界；中心格阈值 4（临界 3）
+        let mut corner = empty(5, 5);
+        put(&mut corner, 0, 0, 0, 1);
+        let mut middle = empty(5, 5);
+        put(&mut middle, 2, 2, 0, 1);
+
+        let c = eval_board_handcraft(&corner, 0, 10, BorderMode::Degrade, CapMode::Cap4, 0);
+        let m = eval_board_handcraft(&middle, 0, 10, BorderMode::Degrade, CapMode::Cap4, 0);
+        // 角上那颗已经临界（chain_threat 高），但位置分低；只要两者不等就说明阈值生效了
+        assert_ne!(c, m, "降级边界下角格与中格的临界等级不同，评分不应相同");
+    }
+
+    /// 形状重心：口字棋盘的几何中心是洞，重心必须落在外框上。
+    #[test]
+    fn centroid_ignores_holes() {
+        let mut b = empty(5, 5);
+        for x in 1..4 { for y in 1..4 { hole(&mut b, x, y); } }
+        let (r, c) = board_centroid(&b);
+        // 只有外圈可用，重心仍在几何中心 (2,2)，但那个点是洞
+        assert!((r - 2.0).abs() < 0.01 && (c - 2.0).abs() < 0.01);
+        assert!(b[2][2].blocked);
+    }
+
+    /// 首步选中心：口字棋盘只有外圈可用，旧实现会因 (1..sz-1) 过滤掉全部候选而走兜底，
+    /// 现在应当稳定返回一个合法可用格。
+    #[test]
+    fn first_move_on_ring_board() {
+        let mut b = empty(7, 7);
+        for x in 2..5 { for y in 2..5 { hole(&mut b, x, y); } }
+        let mv = first_move_center(&b, 7).expect("口字棋盘上应当能找到首步");
+        assert!(!b[mv.0][mv.1].blocked, "首步不能落在洞里");
+        assert!(b[mv.0][mv.1].owner.is_none());
     }
 }

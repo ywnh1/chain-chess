@@ -2871,7 +2871,7 @@ function openAiHelpModal(){
 function updateAiHelpRows(){
   const sel=document.querySelector('#aiHelpAlgBtns .am-btn.selected');
   const val=sel?sel.dataset.value:'alphabeta';
-  const needDepth=val==='alphabeta'||val==='pvs'||val==='mcts';
+  const needDepth=val==='alphabeta'||val==='pvs';
   const needEval=val==='alphabeta'||val==='pvs';
   const dr=document.getElementById('aiHelpDepthRow');if(dr)dr.style.display=needDepth?'block':'none';
   const er=document.getElementById('aiHelpEvalRow');if(er)er.style.display=needEval?'block':'none';
@@ -2889,8 +2889,7 @@ async function requestAiSuggestion(){
   const evalSel=document.querySelector('#aiHelpEvalToggle .tg-btn.selected');
   const useMlEval=evalSel?evalSel.dataset.value==='true':true;
   let cmd;
-  if(alg==='mcts'){cmd='ai_move_mcts';}
-  else if(alg==='pvs'){cmd='ai_move_v2';}
+  if(alg==='pvs'){cmd='ai_move_v2';}
   else if(alg==='alphabeta'){cmd='ai_move';}
   else{cmd='ai_move_strategy';}
   const args={
@@ -3034,8 +3033,7 @@ async function triggerAI(){
   let useMlEval = aiConfigs[curPlayer] ? (aiConfigs[curPlayer].useMlEval ?? true) : true;
   // 所有算法统一走 Rust 引擎
   let cmd;
-  if(alg==='mcts'){cmd='ai_move_mcts';}
-  else if(alg==='pvs'){cmd='ai_move_v2';}
+  if(alg==='pvs'){cmd='ai_move_v2';}
   else if(alg==='alphabeta'){cmd='ai_move';}
   else{cmd='ai_move_strategy';}
   const args = {
@@ -4024,6 +4022,8 @@ function replayGame(){
   if(capMode==='random')capMode=resolveRandomCap();
   if(borderMode==='random')borderMode=resolveRandomBorder();
   _colorNames=c.colorNames||null;
+  // 恢复棋盘形状（随机/自定义棋盘靠它，否则「再来一局」会变回普通矩形）
+  boardCells=c.cells||null;
   if(c.mode==='ai'){
     clearBoardDOM();
     location.hash='#game';
@@ -4614,6 +4614,18 @@ const HINTS = {
       '<p><strong>形状</strong>：除了正方形，还能选长方形（长宽各 5–19），或者用形状编辑器自己点出一个不规则棋盘——挖掉的格子就是「洞」。异形棋盘也支持全部边界：回环会绕过洞落到下一格，反弹会把撞到洞的能量弹回对面，降级则按形状轮廓算边缘和拐角；默认边界下棋子飞进洞才会消失。</p>'+
       '<p class="hint-tip">第一次玩就用默认 7×7，先感受一下「3 点再点一下就炸」是什么节奏。</p>'
   },
+  'random-board': {
+    title: '随机棋盘',
+    body:
+      '<p>按当前人数自动生成一块异形棋盘：棋盘大小随人数变化，再随机挖掉一些格子，'+
+      '每次点「开始游戏」都会重新生成一块。</p>'+
+      '<ul>'+
+      '<li><strong>大小按人数</strong>：2 人 6×6，3~4 人 7×7，5~6 人 9×9，7 人以上 11×11</li>'+
+      '<li><strong>保证连通</strong>：生成时会检查所有可用格连成一片，不会出现孤岛</li>'+
+      '<li><strong>保证够用</strong>：可用格数按人数上限折算后一定容得下当前人数</li>'+
+      '</ul>'+
+      '<p class="hint-tip">挖掉的格子是「洞」，算形状边界：回环绕过去、反弹弹回来、降级按轮廓判定。</p>'
+  },
   'border-mode': {
     title: '棋盘边界是什么',
     body:
@@ -4664,7 +4676,7 @@ const HINTS = {
       '<li><strong>AI 策略</strong>：照固定规则出招，不搜索，一秒就下完。最快也最弱，新手拿它练手</li>'+
       '<li><strong>A-B（Alpha-Beta）</strong>：会往后推演好几步再决定，四种里最强（360 局含异形棋盘测试胜率 75.6%）</li>'+
       '<li><strong>PVS</strong>：A-B 的加速版，规则棋盘上两者接近（60.0%），同样深度下更快</li>'+
-      '<li><strong>MCTS</strong>：靠大量随机模拟试出胜负，不按套路出牌，偶尔下出让人意外的棋</li>'+
+      '<li><strong>策略</strong>：按人工优先级出招，最快，新手和低配设备用得上</li>'+
       '</ul>'+
       '<p class="hint-tip">想轻松赢选「AI 策略」，想被打服选「A-B」。</p>'
   },
@@ -4767,7 +4779,7 @@ function updateModalRows(){
   var sel=btns.querySelector('.am-btn.selected');
   var val=sel?sel.dataset.value:'human';
   var isAI=val!=='human';
-  var needDepth=val==='alphabeta'||val==='pvs'||val==='mcts';
+  var needDepth=val==='alphabeta'||val==='pvs';
   var needEval=val==='alphabeta'||val==='pvs';
   document.getElementById('playerDepthRow').style.display=needDepth?'block':'none';
   document.getElementById('playerRandomRow').style.display=needDepth?'block':'none';
@@ -4910,7 +4922,110 @@ function restoreLastSetup(){
 function currentShapeMode(){
   // 注意用 getSelStr：getSel 是数字版，对 'square' 这种值取 parseInt 会得到 NaN
   const v=getSelStr('shapeModeGroup');
-  return (v==='rect'||v==='custom')?v:'square';
+  return (v==='rect'||v==='custom'||v==='random')?v:'square';
+}
+
+/* ═══════ 随机棋盘 ═══════
+ * 按人数挑一个大小合适的棋盘，再挖成连通的异形。
+ * 生成结果必须满足两件事：
+ *   1) 可用格连通 —— 断开的区域等于死棋，对局没法展开
+ *   2) 可用格数折算的人数上限 ≥ 当前人数 —— 否则开局就有一半人没地方落子
+ * 随机挖法：先挖贴边/贴角的矩形块（天然形成 L / U / 口 这类形状），
+ * 再撒几个散点。每挖一次都校验上面两条，不合格就回滚。 */
+let _randomShapeCache={cnt:0,board:null};
+
+function randomBoardSize(cnt){
+  // 与 getMaxPlayersByArea 的分档对齐，并留出挖洞后仍够用的余量
+  if(cnt<=2)return 6;
+  if(cnt<=4)return 7;
+  if(cnt<=6)return 9;
+  return 11;
+}
+
+// 连通性检查：从第一个可用格出发，能否走遍所有可用格
+function isConnectedCells(cells){
+  const rows=cells.length,cols=cells[0]?cells[0].length:0;
+  let start=null,total=0;
+  for(let i=0;i<rows;i++)for(let j=0;j<cols;j++)if(cells[i][j]==='1'){total++;if(!start)start=[i,j]}
+  if(!start)return false;
+  const seen=new Set([start[0]*cols+start[1]]);
+  const q=[start];
+  while(q.length){
+    const [i,j]=q.pop();
+    const nb=[[i-1,j],[i+1,j],[i,j-1],[i,j+1]];
+    for(const [ni,nj] of nb){
+      if(ni<0||nj<0||ni>=rows||nj>=cols)continue;
+      if(cells[ni][nj]!=='1')continue;
+      const k=ni*cols+nj;
+      if(seen.has(k))continue;
+      seen.add(k);q.push([ni,nj]);
+    }
+  }
+  return seen.size===total;
+}
+
+function countOpenCells(cells){
+  let n=0;
+  for(const row of cells)for(const c of row)if(c==='1')n++;
+  return n;
+}
+
+// 生成一块随机异形棋盘。force=true 时忽略缓存，重新生成（点「开始游戏」时用）
+function makeRandomShape(cnt,force){
+  if(!force&&_randomShapeCache.cnt===cnt&&_randomShapeCache.board)return _randomShapeCache.board;
+  const need=Math.max(12,cnt*6);        // 每人至少 6 个可用格，否则挤成一团
+  let best=null;
+  for(let attempt=0;attempt<40;attempt++){
+    const size=randomBoardSize(cnt);
+    const cells=Array.from({length:size},()=>Array(size).fill('1'));
+    const area=size*size;
+    const keepTarget=Math.max(need,Math.floor(area*(0.6+Math.random()*0.25)));
+    let open=area;
+
+    const tryCarve=(i,j)=>{
+      if(cells[i][j]!=='1')return false;
+      cells[i][j]='0';
+      const left=open-1;
+      if(left<keepTarget||left<need){cells[i][j]='1';return false}
+      if(!isConnectedCells(cells)){cells[i][j]='1';return false}
+      open=left;return true;
+    };
+
+    // 1) 挖 2~4 个贴角或贴边的矩形块
+    const blocks=2+Math.floor(Math.random()*3);
+    for(let b=0;b<blocks;b++){
+      const h=1+Math.floor(Math.random()*Math.max(1,Math.floor(size/3)));
+      const w=1+Math.floor(Math.random()*Math.max(1,Math.floor(size/3)));
+      const i0=Math.random()<0.5?0:size-h;
+      const j0=Math.random()<0.5?0:size-w;
+      for(let i=i0;i<i0+h;i++)for(let j=j0;j<j0+w;j++){
+        if(open<=keepTarget)break;
+        tryCarve(i,j);
+      }
+    }
+    // 2) 散点：随机再抠掉几个边角格，形状不会太规整
+    const dots=Math.floor(size*size*0.04);
+    for(let k=0;k<dots;k++){
+      if(open<=keepTarget)break;
+      const i=Math.floor(Math.random()*size),j=Math.floor(Math.random()*size);
+      const nearEdge=(i===0||j===0||i===size-1||j===size-1);
+      if(nearEdge)tryCarve(i,j);
+    }
+
+    const board={rows:size,cols:size,cells:cells.map(r=>r.join(''))};
+    if(getMaxPlayersByArea(open)>=cnt&&isConnectedCells(cells)){
+      best=board;
+      break;
+    }
+    if(!best&&getMaxPlayersByArea(open)>=cnt)best=board;
+  }
+  if(!best){
+    // 极端情况兜底：整盘可用，至少保证能开局
+    const size=randomBoardSize(cnt);
+    best={rows:size,cols:size,cells:Array.from({length:size},()=>'1'.repeat(size))};
+  }
+  _randomShapeCache={cnt,board:best};
+  return best;
 }
 function fillRectSizeSelects(){
   [['rectRows',size||7],['rectCols',cols||7]].forEach(function(p){
@@ -4929,6 +5044,12 @@ function fillRectSizeSelects(){
 // 读出当前选中的棋盘尺寸（长方形走行/列选择器，其余按正方形）
 function readSetupBoard(){
   const mode=currentShapeMode();
+  if(mode==='random'){
+    // 用当前人数生成（带缓存，setup 页反复调用不会抖动）；
+    // 真正开局时 startUnifiedGame 会强制重新生成一次
+    const cnt=getSel('setupPlayersGroup')||2;
+    return makeRandomShape(cnt,false);
+  }
   if(mode==='custom'){
     const v=appSettings.customShape?validateBeShape(appSettings.customShape):null;
     if(v)return {rows:v.rows,cols:v.cols,cells:v.cells};
@@ -4952,9 +5073,18 @@ function applyShapeMode(jumpToEditor){
   const mode=currentShapeMode();
   const sq=document.getElementById('squareSizeRow');
   const rc=document.getElementById('rectSizeRow');
-  // 只有正方形才显示那排尺寸按钮；长方形走行/列选择器；自定义两者都不显示
+  const rr=document.getElementById('randomShapeRow');
+  // 只有正方形才显示那排尺寸按钮；长方形走行/列选择器；自定义与随机都不显示
   if(sq)sq.style.display=(mode==='square')?'':'none';
   if(rc)rc.style.display=(mode==='rect')?'':'none';
+  if(rr)rr.style.display=(mode==='random')?'block':'none';
+  if(mode==='random'){
+    const hint=document.getElementById('randomShapeHint');
+    const cnt=getSel('setupPlayersGroup')||2;
+    const b=makeRandomShape(cnt,false);
+    if(hint)hint.textContent='按当前 '+cnt+' 人生成：'+b.rows+'×'+b.cols+'，'
+      +countOpenCells(b.cells)+' 个可用格（每次点「开始游戏」都会重新随机）。';
+  }
   // 形状变化可能影响边界/阈值的兼容性（如降级 + 3/5 级互斥），刷新一次按钮状态
   if(typeof updateModeConflictUI==='function')updateModeConflictUI();
   if(mode==='custom'&&jumpToEditor){Router.navigate('board-editor');return;}
@@ -4979,7 +5109,9 @@ function initShapeMode(){
 function setupLobbySync(){
   const cnt=getSel('setupPlayersGroup')||2;
   const bd=readSetupBoard();
-  const maxP=getMaxPlayersByArea(bd.rows*bd.cols);
+  // 可用格数才是真容量：异形棋盘挖掉的洞不算，否则会允许比实际能落子的更多玩家
+  const openCells=bd.cells?countOpenCells(bd.cells):bd.rows*bd.cols;
+  const maxP=getMaxPlayersByArea(openCells);
   const pg=document.getElementById('setupPlayersGroup');
   if(pg){
     pg.querySelectorAll('.gb').forEach(b=>{b.style.display=parseInt(b.dataset.value)<=maxP?'':'none'});
@@ -5003,9 +5135,10 @@ function setupLobbySync(){
 }
 
 function startUnifiedGame(){
-  const bd=readSetupBoard();
-  const sz=bd.rows;
   const cnt=getSel('setupPlayersGroup')||2;
+  // 随机棋盘：点「开始游戏」这一下才真正生成，每次都不一样
+  const bd=(currentShapeMode()==='random')?makeRandomShape(cnt,true):readSetupBoard();
+  const sz=bd.rows;
   size=bd.rows;cols=bd.cols;boardCells=bd.cells||null;   // 行、列、空洞位图
   // 记住本次开局配置，下次进 setup 页时恢复（appSettings 会持久化）
   appSettings.lastSetup={sz:sz,cnt:cnt};
@@ -5020,6 +5153,7 @@ function startUnifiedGame(){
   else startAIFromSetup(sz,cnt);
 }
 function startLocalFromSetup(sz,cnt){
+  const bdCells=boardCells;   // 本局棋盘形状（随机/自定义时非 null），存进 _lastGameConfig 供「再来一局」
   clearSavedGameState();
   location.hash='#game';
   resetRoundHistory();
@@ -5049,9 +5183,10 @@ function startLocalFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
-  _lastGameConfig={mode:'local',size,cols,maxPlayers,colorNames,borderMode:userBorderMode,capMode:userCapMode};
+  _lastGameConfig={mode:'local',size,cols,maxPlayers,colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode};
 }
 function startAIFromSetup(sz,cnt){
+  const bdCells=boardCells;   // 本局棋盘形状（随机/自定义时非 null），存进 _lastGameConfig 供「再来一局」
   clearSavedGameState();
   location.hash='#game';
   resetRoundHistory();
@@ -5091,9 +5226,10 @@ function startAIFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'ai',size,cols,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode:userBorderMode,capMode:userCapMode};
+  _lastGameConfig={mode:'ai',size,cols,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode};
 }
 function startEveFromSetup(sz,cnt){
+  const bdCells=boardCells;   // 本局棋盘形状（随机/自定义时非 null），存进 _lastGameConfig 供「再来一局」
   clearSavedGameState();
   location.hash='#game';
   resetRoundHistory();
@@ -5127,7 +5263,7 @@ function startEveFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'eve',size,cols,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,borderMode:userBorderMode,capMode:userCapMode};
+  _lastGameConfig={mode:'eve',size,cols,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode};
 }
 window.addEventListener('popstate',()=>{
   const cur = Router._current;
@@ -6059,11 +6195,11 @@ function renderWvReport(){
 // ── AI 计算性能检测 ──────────────────────────────────────────
 
 function dbBuildAiPlayers(algType, count, depth){
-  const ALGS = ['strategy', 'alphabeta', 'pvs', 'mcts'];
+  const ALGS = ['strategy', 'alphabeta', 'pvs'];
   const players = [];
   for(let i = 0; i < count; i++){
     const alg = algType === 'mixed' ? ALGS[i % ALGS.length] : algType;
-    players.push({ algorithm: alg, depth: alg === 'mcts' ? 1 : depth });
+    players.push({ algorithm: alg, depth: depth });
   }
   return players;
 }

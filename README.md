@@ -46,14 +46,14 @@
 
 ### 游戏设置
 
-- **棋盘形状**：正方形 5×5 到 19×19、长方形（长宽各 5–19），或用形状编辑器自己点出不规则形状
+- **棋盘形状**：正方形 5×5 到 19×19、长方形（长宽各 5–19）、随机棋盘（按人数自动生成异形），或用形状编辑器自己点出不规则形状
 - **自定义棋盘**：20×20 工作区里点格子控制哪些格可用，内置十字 / 口字 / L / U 四个预设，可导出导入 JSON
 - **玩家配置**：弹窗里设置每位玩家的类型（人类 / 各类 AI）、名称、算法、搜索深度、随机刻度和评估函数（ML / 手写）
 - **随机刻度**：0%~30% 可调，开局固定 40%，逐渐降到设定值
 
 ### AI 引擎
 
-- **四种算法**：策略（启发式规则）、Alpha-Beta 剪枝、PVS NegaMax、MCTS 蒙特卡洛树搜索
+- **三种算法**：策略（启发式规则）、Alpha-Beta 剪枝、PVS NegaMax（MCTS 因胜率过低已在游戏内移除）
 - **Rust + Rayon**：都用 Rust 实现，Rayon 多核并行，深度 1~10 层可配
 
 ### 用户界面
@@ -175,22 +175,7 @@ PVS（Principal Variation Search，主变例搜索）是 Alpha-Beta 的精炼版
 - **动态分支控制**：浅层多搜（depth=1 搜 14 条），深层少搜（depth=3 搜 8 条）
 - **根级 Rayon 并行**：多核加速根层搜索
 
-360 局两两对战评测（7×7 及 5 种棋盘形状、ML 评估、深度 2）里，搜索算法整体领先：Alpha-Beta 胜率 75.6%，PVS 60.0%，策略 51.1%，MCTS 13.3%（深度 1 的迭代量不够）。策略算法在 3 点阈值下反超 A-B（38.3% vs 30.0%），阈值越高越吃推演。完整报告在 `tauri/tests/ai_performance_analysis.md` 与应用内「关于 → AI 性能评测」。
-
-### 🎲 MCTS 蒙特卡洛树搜索
-
-另一条路子：不用完整的评估函数，靠大量随机模拟（单次最多 40 步，提前终局就停）判断走法好坏。
-
-```
-SELECT → EXPAND → PLAYOUT → BACKPROPAGATE
-```
-
-- **UCB1**：平衡探索与利用
-- **随机 Playout**：均匀随机选走法模拟
-- **渐进展开**：子节点访问满 3 次才展开新分支
-- **迭代数**：depth=1~10 对应 400~4000 次迭代，树节点上限 2000
-
-擅长找剪枝搜索不容易发现的非直觉走法。
+360 局两两对战评测（7×7 及 5 种棋盘形状、ML 评估、深度 2）里，搜索算法整体领先：Alpha-Beta 胜率 75.6%，PVS 60.0%，策略 51.1%。早前还有一档 MCTS，深度 1 只有 13.3%，已在游戏内移除。策略算法在 3 点阈值下反超 A-B（38.3% vs 30.0%），阈值越高越吃推演。完整报告在 `tauri/tests/ai_performance_analysis.md` 与应用内「关于 → AI 性能评测」。
 
 ### 🤖 评估函数
 
@@ -220,7 +205,7 @@ Alpha-Beta 和 PVS 可以换用两种评估函数：
 │  Web 前端（JS）   │     │  Rust 引擎        │
 │                  │     │                  │
 │  ┌─ UI 渲染 ──┐  │     │  ┌─ AI 搜索 ──┐  │
-│  │ 棋盘/弹窗/   │  │     │  │A-B/PVS/MCTS│  │
+│  │ 棋盘/弹窗/   │  │     │  │  A-B/PVS   │  │
 │  │ 图表/路由    │  │     │  └───────────┘  │
 │  └────────────┘  │     │  ┌─ 评估函数 ─┐   │
 │  ┌─ 音效 ────┐  │◄────►│  │增强/手写   │   │
@@ -236,7 +221,7 @@ Alpha-Beta 和 PVS 可以换用两种评估函数：
 - **共享引擎**：`engine/`（crate `chain_chess_core`）放规则、AI 搜索、评估与内嵌模型，两个宿主共用同一份代码
 - **桌面（Windows / Linux）/ Android**：Tauri v2 宿主（`tauri/src-tauri/`）承接命令与存储，Rayon 多核并行
 - **浏览器 PWA**：`docs/wasm/` 只留 wasm-bindgen 导出层，依赖 `engine/` 编成 WASM；`engine.js` 在浏览器侧模拟 Tauri invoke 语义，`tauriInvoke` 自动降级到 `ChainEngine.webInvoke`
-- **AI 引擎**：Alpha-Beta 用 `alpha_beta_pruning` crate，PVS 和 MCTS 自己实现
+- **AI 引擎**：Alpha-Beta 用 `alpha_beta_pruning` crate，PVS 与策略算法自己实现
 - **并行计算**：Rayon `par_iter()` 多核并行搜索（桌面端；WASM 版单线程顺序执行）
 - **评估函数**：XGBoost 模型（内嵌，可扩展）或纯手写启发式，可按 AI 单独切换
 - **存储**：桌面和移动端用 JSON 文件（`history.json`、`round_data.json`、`saved_game.json`），PWA 用 `localStorage`（`chainchess:` 前缀）
