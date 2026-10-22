@@ -74,17 +74,22 @@ fn default_ml() -> bool { true }
 /// 棋盘形状 → (行, 列, 可用位图)。全部确定性生成（不用随机），
 /// 这样同一 seed 下的成绩可以跨版本直接比。
 ///
+/// 形状与前端形状编辑器的预设保持一致（`applyBePreset`，边宽取 1/3）：
 /// - square：正方形，全部可用（与旧口径一致，可对比历史数据）
 /// - rect：长方形，列比行多 2
 /// - holes：正方形，中央挖两个对角洞（四个方向都能碰到洞）
-/// - ring：口字，只留一圈外框
-/// - cross：十字，只留中间一横一竖
+/// - ring：口字，外框宽 `m`，内部掏空
+/// - cross：十字，中间横竖各一条宽 `m` 的带子
+///
+/// 带宽不能取 1：一条线宽的十字在速爆 3 下，爆炸只剩一个可落点，
+/// 「随机一个方向不送点」必然命中，玩家会直接自爆，评测数据没有意义。
 fn build_shape(kind: &str, size: usize) -> (usize, usize, Vec<Vec<bool>>) {
     let (rows, cols) = match kind {
         "rect" => (size, (size + 2).min(19)),
         _ => (size, size),
     };
     let mut open = vec![vec![true; cols]; rows];
+    let m = (rows.min(cols) / 3).max(1);   // 与前端预设一致：边宽取 1/3
     match kind {
         "holes" if rows >= 3 && cols >= 3 => {
             let (a, b) = (rows / 2 - 1, cols / 2 - 1);
@@ -92,19 +97,21 @@ fn build_shape(kind: &str, size: usize) -> (usize, usize, Vec<Vec<bool>>) {
             open[a + 1][b + 1] = false;
         }
         "ring" => {
-            if rows >= 3 && cols >= 3 {
-                for row in open.iter_mut().take(rows - 1).skip(1) {
-                    for cell in row.iter_mut().take(cols - 1).skip(1) {
+            for (i, row) in open.iter_mut().enumerate() {
+                for (j, cell) in row.iter_mut().enumerate() {
+                    if i >= m && i < rows.saturating_sub(m)
+                        && j >= m && j < cols.saturating_sub(m) {
                         *cell = false;
                     }
                 }
             }
         }
         "cross" => {
-            let (mi, mj) = (rows / 2, cols / 2);
             for (i, row) in open.iter_mut().enumerate() {
                 for (j, cell) in row.iter_mut().enumerate() {
-                    if i != mi && j != mj { *cell = false; }
+                    let in_h = i >= m && i < rows.saturating_sub(m);
+                    let in_v = j >= m && j < cols.saturating_sub(m);
+                    if !in_h && !in_v { *cell = false; }
                 }
             }
         }
@@ -124,32 +131,41 @@ fn build_board(rows: usize, cols: usize, open: &[Vec<bool>]) -> GameBoard {
     b
 }
 
-/// 两格的切比雪夫距离。回环模式下按"绕一圈更近"算 ——
-/// 否则棋盘两端的首子看着很远，实际在回环上紧挨着，一步就分胜负。
-fn cheb(a: (usize, usize), b: (usize, usize), rows: usize, cols: usize, wrap: bool) -> usize {
-    let di = a.0.abs_diff(b.0);
-    let dj = a.1.abs_diff(b.1);
-    if wrap && rows > 0 && cols > 0 {
-        di.min(rows - di).max(dj.min(cols - dj))
-    } else {
-        di.max(dj)
+/// 两个可用格在「当前边界语义」下的最短步数（BFS）。
+///
+/// 不能只看直线距离：回环会把隔着洞的两格连成邻居 —— 口字棋盘上下两条外框
+/// 中间只隔着一排洞，直线看着很远，实际一步就到，首子放这儿会一步被炸光。
+fn border_dist(board: &GameBoard, from: (usize, usize), to: (usize, usize), bm: BorderMode) -> usize {
+    if from == to { return 0; }
+    let rows = board.len();
+    let cols = board.first().map_or(0, |r| r.len());
+    let mut seen = vec![vec![false; cols]; rows];
+    let mut q: std::collections::VecDeque<((usize, usize), usize)> = std::collections::VecDeque::new();
+    seen[from.0][from.1] = true;
+    q.push_back((from, 0));
+    while let Some(((x, y), d)) = q.pop_front() {
+        for (nx, ny) in nbrs_with_mode(board, x, y, bm) {
+            if seen[nx][ny] { continue; }
+            if (nx, ny) == to { return d + 1; }
+            seen[nx][ny] = true;
+            q.push_back(((nx, ny), d + 1));
+        }
     }
+    usize::MAX / 4   // 不连通：当作极远
 }
 
 /// 合法首子布局：从可用格里挑 n 个，先取贴近中心的，之后每次挑
-/// 「离已选格子最远」的那个，尽量满足「首子 12 格限制」的分散要求。
-/// 异形棋盘上可用格本身就不规则，用贪心比固定圆环更稳。
-fn spread_starts(
-    rows: usize,
-    cols: usize,
-    open: &[Vec<bool>],
-    n: usize,
-    wrap: bool,
-) -> Vec<(usize, usize)> {
+/// 「按边界语义离已选格子最远」的那个，让开局有展开空间。
+///
+/// 距离用 BFS（见 border_dist），而不是直线距离 —— 异形棋盘 + 回环下，
+/// 直线距离会骗人，导致首子实际紧挨着、一步定胜负。
+fn spread_starts(board: &GameBoard, n: usize, bm: BorderMode) -> Vec<(usize, usize)> {
+    let rows = board.len();
+    let cols = board.first().map_or(0, |r| r.len());
     let mut cand: Vec<(usize, usize)> = Vec::new();
     for i in 0..rows {
         for j in 0..cols {
-            if open[i][j] { cand.push((i, j)); }
+            if !board[i][j].blocked { cand.push((i, j)); }
         }
     }
     if cand.is_empty() { return cand; }
@@ -165,21 +181,17 @@ fn spread_starts(
     if let Some(&first) = cand.first() { picked.push(first); }
     while picked.len() < n && picked.len() < cand.len() {
         let mut best: Option<(usize, usize)> = None;
-        let mut best_d: i64 = -1;
-        for &(i, j) in &cand {
-            if picked.contains(&(i, j)) { continue; }
-            let d = picked.iter()
-                .map(|&p| cheb(p, (i, j), rows, cols, wrap) as i64)
-                .min()
-                .unwrap_or(0);
-            if d > best_d { best_d = d; best = Some((i, j)); }
+        let mut best_d: usize = 0;
+        for &p in &cand {
+            if picked.contains(&p) { continue; }
+            let d = picked.iter().map(|&q| border_dist(board, p, q, bm)).min().unwrap_or(0);
+            if best.is_none() || d > best_d { best_d = d; best = Some(p); }
         }
         match best {
             Some(p) => picked.push(p),
             None => break,
         }
     }
-    // 空间不够时（比如十字棋盘只有十几格）按候选顺序补齐，允许距离不足
     for &p in &cand {
         if picked.len() >= n { break; }
         if !picked.contains(&p) { picked.push(p); }
@@ -187,6 +199,8 @@ fn spread_starts(
     picked
 }
 
+
+/// 各算法的搜索深度：MCTS 用自己的深度（迭代 = 深度 × 800）。
 fn alg_depth(alg: &str, cfg: &BenchConfig) -> usize {
     if alg == "mcts" { cfg.mcts_depth } else { cfg.depth }
 }
@@ -203,18 +217,15 @@ fn run_game(
 ) -> (Option<usize>, usize, Vec<usize>) {
     let (rows, cols, open) = build_shape(shape, size);
     let mut board = build_board(rows, cols, &open);
-    let starts = spread_starts(rows, cols, &open, players.len(), bm == BorderMode::Wrap);
+    let starts = spread_starts(&board, players.len(), bm);
     let max_players = players.len();
     assert_eq!(starts.len(), max_players, "{shape}: 可用格不足以安排首子");
     for (p, &(x, y)) in starts.iter().enumerate() {
-        // 首子等级 = 阈值 n-1（cap3→2、cap4→3、cap5→4）
-        let th: u32 = match cm {
-            CapMode::Cap3 => 3,
-            CapMode::Cap4 => 4,
-            CapMode::Cap5 => 5,
-            CapMode::Random => 3, // 每步随机阈值模式：开局首子取中间等级
-        };
-        board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: board[x][y].th, blocked: false };
+        // 首子等级 = 「本格的」阈值 − 1。不能按 cap_mode 硬编码：
+        // 降级边界下形状边缘的格子阈值是 3 或 2，写成 3 点会让首子直接超临界，
+        // AI 无棋可走（get_moves 只收 count < 阈值 的己方格），对局 0 步就结束。
+        let th = cell_threshold(&board, x, y, bm, cm);
+        board[x][y] = Cell { owner: Some(p), count: th.saturating_sub(1) as u8, th: board[x][y].th, blocked: false };
     }
     let mut ai_configs = std::collections::HashMap::new();
     for (p, alg) in players.iter().enumerate() {
@@ -228,9 +239,23 @@ fn run_game(
             }),
         );
     }
+    if std::env::var("AI_BENCH_DEBUG").is_ok() {
+        eprintln!("[{shape}/{bm:?}/{cm:?}] 首子={starts:?} 棋盘={rows}x{cols}");
+        for row in &board {
+            let line: String = row.iter().map(|c| match c.owner {
+                Some(o) => char::from_digit(o as u32, 10).unwrap_or('?'),
+                None if c.blocked => '#',
+                None => '.',
+            }).collect();
+            eprintln!("   {line}");
+        }
+    }
     let r = simulate_to_end(
         board, rows, max_players, 0, vec![], bm, cm, None, gc, ai_configs,
     );
+    if std::env::var("AI_BENCH_DEBUG").is_ok() {
+        eprintln!("  -> winner={:?} steps={} order={:?}", r.winner, r.history.len(), r.eliminated_order);
+    }
     (r.winner, r.history.len(), r.eliminated_order)
 }
 

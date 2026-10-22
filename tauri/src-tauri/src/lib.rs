@@ -250,15 +250,11 @@ fn run_ai_bench_game(cfg: &AiBenchGameConfig, game_count: u32) -> AiBenchGameRes
     }
     let mut board: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz];
     let starts = spread_starts(sz, max_players);
-    // 首子等级 = 阈值 n-1（cap3→2、cap4→3、cap5→4；随机模式取中间等级 3）
-    let th: u32 = match cfg.cap_mode {
-        CapMode::Cap3 => 3,
-        CapMode::Cap4 => 4,
-        CapMode::Cap5 => 5,
-        CapMode::Random => 3,
-    };
+    // 首子等级 = 「本格的」阈值 − 1。降级边界下角格阈值是 2，
+    // 按 cap_mode 硬编码成 3 点会让首子直接超临界，AI 无棋可走、0 步结束。
     for (p, &(x, y)) in starts.iter().enumerate() {
-        board[x][y] = Cell { owner: Some(p), count: (th - 1) as u8, th: None, blocked: false };
+        let th = cell_threshold(&board, x, y, cfg.border_mode, cfg.cap_mode);
+        board[x][y] = Cell { owner: Some(p), count: th.saturating_sub(1) as u8, th: None, blocked: false };
     }
     let mut ai_configs: HashMap<String, serde_json::Value> = HashMap::new();
     for (p, pl) in cfg.players.iter().enumerate() {
