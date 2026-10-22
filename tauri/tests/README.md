@@ -23,7 +23,8 @@ tauri/src-tauri/
   两格连成邻居，直线距离会骗人），首子等级取「本格阈值 − 1」（降级边界下边缘格阈值
   更低，硬编码会让首子超临界、AI 无棋可走）
 - **评估函数**：`--ml`（默认）走 XGBoost 模型，`--no-ml` 走手写规则；策略 / MCTS 不用评估函数
-- **口径**：应用内「AI 性能评测」页对应 `--mode duel`（4 边界 × 3 阈值 × 6 配对 × 6 局 = 432 局）
+- **口径**：应用内「AI 性能评测」页对应 `--quick`（5 形状 × 4 边界 × 3 阈值 × 6 配对 × 1 局 = 360 局）。
+  页面内容由 `gen_report_html.py` 从 `ai_report.json` 生成，改了报告格式或重跑数据后执行一次即可
 
 ## 使用
 
@@ -36,7 +37,7 @@ cargo build --release --bin ai_bench
 cd ..
 python3 tests/ai_strength.py                          # 默认：7×7，每组合 6 局，4 算法混战
 python3 tests/ai_strength.py --games 10 --size 9      # 更多局数 / 更大棋盘
-python3 tests/ai_strength.py --mode duel              # 两两对阵（全配对，432 局）
+python3 tests/ai_strength.py --mode duel              # 两两对阵（正方形单形状，432 局）
 python3 tests/ai_strength.py --quick                  # 快速全覆盖：duel + 5 形状 + 每组合 1 局（360 局）
 python3 tests/ai_strength.py --mode duel --shapes all # 两两对阵 + 全部形状（2160 局）
 python3 tests/ai_strength.py --mode duel --no-ml      # 手写评估对照
@@ -66,6 +67,15 @@ python3 tests/ai_strength.py --out report.md --out-json data.json    # 自定义
 | `--seed` | 0 | 对局号偏移（同 seed 可复现同一批对局） |
 | `--out` | tests/ai_report.md | Markdown 报告路径 |
 | `--out-json` | tests/ai_report.json | 对局数据 JSON（供图表/分析） |
+
+## 刷新应用内评测页
+
+页面里的数字全部由数据生成，重跑对局后执行：
+
+```bash
+python3 tests/gen_report_html.py                    # 用默认 ai_report.json，写两份 index.html
+python3 tests/ai_strength.py --from-json tests/ai_report.json   # 只重建 Markdown 报告（不重跑）
+```
 
 ## 输出
 

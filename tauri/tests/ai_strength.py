@@ -80,6 +80,8 @@ def parse_args():
                     help='A-B / PVS 改用手写评估，做对照')
     ap.add_argument('--tag', default='', help='报告标题后缀，例如 “ML 模型” / “手写评估”')
     ap.add_argument('--seed', type=int, default=0, help='对局种子偏移（默认 0）')
+    ap.add_argument('--from-json', default='',
+                    help='不跑对局，直接从已有 JSON 重建报告（改报告格式时用）')
     ap.add_argument('--out', default=os.path.join(HERE, 'ai_report.md'), help='Markdown 报告输出路径')
     ap.add_argument('--out-json', default=os.path.join(HERE, 'ai_report.json'), help='对局数据 JSON 输出路径')
     return ap.parse_args()
@@ -207,18 +209,28 @@ def main():
         a.games = 1
         a.shapes = 'all'
         a.mode = 'duel'
-    if not os.path.exists(a.bin):
-        print(f'[错误] 找不到引擎二进制: {a.bin}\n'
-              f'请先编译: cd tauri/src-tauri && cargo build --release --bin ai_bench', file=sys.stderr)
-        sys.exit(1)
+    if a.from_json:
+        # 复用已有数据：报告格式改了也不用重跑几千局
+        with open(a.from_json, encoding='utf-8') as f:
+            saved = json.load(f)
+        config = saved['config']
+        results = saved['results']
+        total = len(results)
+        a.use_ml = config.get('useMlEval', True)
+        print(f'从 {a.from_json} 重建报告（{total} 局）', flush=True)
+    else:
+        if not os.path.exists(a.bin):
+            print(f'[错误] 找不到引擎二进制: {a.bin}\n'
+                  f'请先编译: cd tauri/src-tauri && cargo build --release --bin ai_bench', file=sys.stderr)
+            sys.exit(1)
 
-    config = build_config(a)
-    print(f'引擎: {a.bin}', flush=True)
-    print(f'配置: {json.dumps(config, ensure_ascii=False)}', flush=True)
+        config = build_config(a)
+        print(f'引擎: {a.bin}', flush=True)
+        print(f'配置: {json.dumps(config, ensure_ascii=False)}', flush=True)
 
-    print('启动 ai_bench ...', flush=True)
-    meta, results = run_bench(a.bin, config)
-    total = (meta or {}).get('total', len(results))
+        print('启动 ai_bench ...', flush=True)
+        meta, results = run_bench(a.bin, config)
+        total = (meta or {}).get('total', len(results))
 
     # 统计
     wins = defaultdict(int)          # alg -> 胜场
@@ -232,6 +244,7 @@ def main():
     shape_steps = defaultdict(list)                       # shape -> steps
     shape_bm_wins = defaultdict(lambda: defaultdict(int)) # (shape,bm) -> alg -> wins
     shape_bm_games = defaultdict(int)                     # (shape,bm) -> 局数
+    capped = []                                           # 打到步数上限、无人被淘汰的对局
     duel_rows = []                   # (algA, algB) -> {a,b,tie}
     duel_stat = defaultdict(lambda: {'a': 0, 'b': 0})
 
@@ -262,6 +275,10 @@ def main():
                 cell_winner[key][alg] += 1
                 shape_wins[shape][alg] += 1
                 shape_bm_wins[(shape, r['bm'])][alg] += 1
+        # 打到上限：引擎此时按"第一个存活玩家"判胜，先后手直接决定胜负，
+        # 不是真实对局结果。单独统计，避免把这种局当正常胜负算进胜率。
+        if r['steps'] >= 1000 and not (r.get('order') or []):
+            capped.append(r)
         if r['mode'] == 'duel' and len(players) == 2:
             aalg, balg = players[0], players[1]
             if w is not None:
@@ -382,6 +399,32 @@ def main():
     L.append('')
 
     # 观察
+    if capped:
+        from collections import Counter as _C
+        by_alg = _C()
+        for x in capped:
+            if x['winner'] is not None:
+                by_alg[x['players'][x['winner']]] += 1
+        L.append(f'## {CN[1 + sec]}、未分胜负的对局（打到 {1000} 步上限）')
+        L.append('')
+        L.append(f'共 **{len(capped)} / {total}** 局（{pct(len(capped), total):.1f}%）没有任何玩家被淘汰。')
+        L.append('引擎在步数上限处按「第一个存活玩家」判胜，先后手直接决定结果，'
+                 '所以这些局的胜负不是真实实力，统计时请单独看待。')
+        L.append('')
+        L.append('| 形状 | 边界 | 阈值 | 对阵 | 被判胜 |')
+        L.append('|:--:|:--:|:--:|:--:|:--:|')
+        for x in capped:
+            L.append(f"| {SHAPE_LABEL.get(x['shape'], x['shape'])} | {BM_LABEL.get(x['bm'], x['bm'])} | "
+                     f"cap{x['cm']} | {ALG_LABEL.get(x['players'][0], x['players'][0])} vs "
+                     f"{ALG_LABEL.get(x['players'][1], x['players'][1])} | "
+                     f"{ALG_LABEL.get(x['players'][x['winner']], '—') if x['winner'] is not None else '—'} |")
+        L.append('')
+        L.append('其中被判胜的分布：' + '、'.join(f'{ALG_LABEL.get(a, a)} {n} 局' for a, n in by_alg.most_common())
+                 + '。这些局全部落在对局偏长的组合（长方形 / 口字 / 挖洞 × 慢节奏阈值），'
+                   '说明长局僵持是当前规则下的真实短板，值得单独研究终结机制。')
+        L.append('')
+        sec += 1
+
     L.append(f'## {CN[1 + sec]}、简要观察')
     L.append('')
     L.append('- 综合胜率最高：**' + ALG_LABEL.get(ranked[0], ranked[0]) + '**（' + fmt_pct(wins[ranked[0]], games_by_alg[ranked[0]]) + '）')
@@ -405,13 +448,14 @@ def main():
     report = '\n'.join(L)
     with open(a.out, 'w', encoding='utf-8') as f:
         f.write(report)
-    with open(a.out_json, 'w', encoding='utf-8') as f:
-        json.dump({'config': config, 'results': results}, f, ensure_ascii=False, indent=1)
+    if not a.from_json:
+        with open(a.out_json, 'w', encoding='utf-8') as f:
+            json.dump({'config': config, 'results': results}, f, ensure_ascii=False, indent=1)
 
     print('\n' + '=' * 60)
     print(f'完成！共 {total} 局，报告已写入:')
     print(f'  Markdown: {a.out}')
-    print(f'  数据 JSON: {a.out_json}')
+    print(f'  数据 JSON: {a.out_json}' if not a.from_json else '  （数据 JSON 未改动，来自 --from-json）')
     print('=' * 60)
 
 

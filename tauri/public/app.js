@@ -4662,8 +4662,8 @@ const HINTS = {
       '<ul>'+
       '<li><strong>人类</strong>：自己点，不用 AI</li>'+
       '<li><strong>AI 策略</strong>：照固定规则出招，不搜索，一秒就下完。最快也最弱，新手拿它练手</li>'+
-      '<li><strong>A-B（Alpha-Beta）</strong>：会往后推演好几步再决定，四种里最强（432 局测试胜率 73.6%）</li>'+
-      '<li><strong>PVS</strong>：A-B 的加速版，棋力几乎一样（71.3%），同样深度下更快</li>'+
+      '<li><strong>A-B（Alpha-Beta）</strong>：会往后推演好几步再决定，四种里最强（360 局含异形棋盘测试胜率 75.6%）</li>'+
+      '<li><strong>PVS</strong>：A-B 的加速版，规则棋盘上两者接近（60.0%），同样深度下更快</li>'+
       '<li><strong>MCTS</strong>：靠大量随机模拟试出胜负，不按套路出牌，偶尔下出让人意外的棋</li>'+
       '</ul>'+
       '<p class="hint-tip">想轻松赢选「AI 策略」，想被打服选「A-B」。</p>'
