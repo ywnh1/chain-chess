@@ -30,7 +30,7 @@ fn print_usage(program: &str) {
     eprintln!("");
     eprintln!("混合随机模式每局随机:");
     eprintln!("  棋盘大小 5~13  |  玩家数 2~4  |  边界 default/wrap/bounce/degrade  |  阈值 3/4/5");
-    eprintln!("  AI 算法 alphabeta/pvs/strategy/mcts 与深度、ML 开关随机");
+    eprintln!("  AI 算法 alphabeta/pvs/strategy 与深度、ML 开关随机");
     eprintln!("  seed 固定时整批输出可复现；换 seed 得到不同批数据");
     eprintln!("");
     eprintln!("固定局面可选参数: border = default|wrap|bounce|degrade（默认 default）, cap = 3|4|5|random（默认 4）");
@@ -131,7 +131,6 @@ fn main() {
         ("alphabeta", 2),
         ("strategy", 0),
         ("alphabeta", 1),  // 浅搜索快棋
-        ("mcts", 1),       // MCTS 探索
         ("strategy", 0),
         ("alphabeta", 2),
     ];

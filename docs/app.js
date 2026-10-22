@@ -3555,7 +3555,7 @@ function getPlayerTypeLabel(p){
   if(!aiPlayers.has(p))return '人类';
   var cfg=aiConfigs[p]||{};
   var alg=cfg.algorithm||'strategy';
-  var labels={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS'};
+  var labels={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS'};
   return labels[alg]||'AI '+alg;
 }
 
@@ -3578,25 +3578,23 @@ function renderRankingList(container, boardState, playerCnt, eliminatedSet, colo
     var typeRaw,typeLabel,typeCss,detailStr='';
     if(playerTypesOverride&&playerTypesOverride[p]){
       typeRaw=playerTypesOverride[p];
-      var typeMap={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS',human:'人类'};
-      var cssMap={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',mcts:'ai-mcts',human:'human'};
+      var typeMap={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',human:'人类'};
+      var cssMap={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',human:'human'};
       typeLabel=typeMap[typeRaw]||typeRaw;
       typeCss='rank-type '+cssMap[typeRaw];
     }else if(aiCfgMap&&aiCfgMap[p]){
       var cfg=aiCfgMap[p];
       typeRaw=cfg.algorithm||'strategy';
-      var typeMap2={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS'};
-      var cssMap2={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',mcts:'ai-mcts'};
+      var typeMap2={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS'};
+      var cssMap2={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs'};
       typeLabel=typeMap2[typeRaw]||('AI '+typeRaw);
       typeCss='rank-type '+(cssMap2[typeRaw]||'');
       if(typeRaw==='strategy'){
         detailStr='';
       }else{
         detailStr='深度: '+cfg.depth+'  随机: '+cfg.randomScale+'%';
-        if(typeRaw!=='mcts'){
-          if(cfg.useMlEval===false)detailStr+=' 手写评估';
-          else if(cfg.useMlEval===true||cfg.useMlEval===undefined)detailStr+=' ML评估';
-        }
+        if(cfg.useMlEval===false)detailStr+=' 手写评估';
+        else if(cfg.useMlEval===true||cfg.useMlEval===undefined)detailStr+=' ML评估';
       }
     }else{
       typeRaw='human';
@@ -3727,25 +3725,23 @@ function showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap
   var typeRaw,typeLabel,typeCss,detailStr='';
   if(playerTypesOverride&&playerTypesOverride[pid]){
     typeRaw=playerTypesOverride[pid];
-    var tm={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS',human:'人类'};
-    var tmc={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',mcts:'ai-mcts',human:'human'};
+    var tm={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',human:'人类'};
+    var tmc={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',human:'human'};
     typeLabel=tm[typeRaw]||typeRaw;
     typeCss=tmc[typeRaw]||'';
   }else if(aiCfgMap&&aiCfgMap[pid]){
     var cfg=aiCfgMap[pid];
     typeRaw=cfg.algorithm||'strategy';
-    var tm2={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS',mcts:'MCTS'};
-    var tmc2={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs',mcts:'ai-mcts'};
+    var tm2={strategy:'AI 策略',alphabeta:'A-B',pvs:'PVS'};
+    var tmc2={strategy:'ai-strategy',alphabeta:'ai-alphabeta',pvs:'ai-pvs'};
     typeLabel=tm2[typeRaw]||('AI '+typeRaw);
     typeCss=tmc2[typeRaw]||'';
     if(typeRaw==='strategy'){
       detailStr='';
     }else{
       detailStr='深度: '+cfg.depth+' | 随机: '+cfg.randomScale+'%';
-      if(typeRaw!=='mcts'){
-        if(cfg.useMlEval===false)detailStr+=' | 手写评估';
-        else if(cfg.useMlEval===true||cfg.useMlEval===undefined)detailStr+=' | ML评估';
-      }
+      if(cfg.useMlEval===false)detailStr+=' | 手写评估';
+      else if(cfg.useMlEval===true||cfg.useMlEval===undefined)detailStr+=' | ML评估';
     }
   }else{
     typeRaw='human';
@@ -4882,7 +4878,7 @@ function generatePlayerConfigs(){
     const dot=document.createElement('span');dot.className='color-dot';dot.style.background=COLORS[i%COLORS.length];
     const info=document.createElement('div');info.className='player-info';
     const nameText=cfg.name||('玩家 '+(i+1));
-    const typeLabels={human:'人类',strategy:'AI·策略',alphabeta:'AI·A-B',pvs:'AI·PVS',mcts:'AI·MCTS'};
+    const typeLabels={human:'人类',strategy:'AI·策略',alphabeta:'AI·A-B',pvs:'AI·PVS'};
     const typeText=typeLabels[cfg.type]||'人类';
     let detail=typeText;
     if(cfg.type!=='human'&&cfg.type!=='strategy')detail+=' · 深度 '+cfg.depth;
@@ -6202,7 +6198,7 @@ function dbBuildAiPlayers(algType, count, depth){
 }
 
 function dbAlgName(alg){
-  return ({ strategy: '策略', alphabeta: 'A-B', pvs: 'PVS', mcts: 'MCTS' })[alg] || alg;
+  return ({ strategy: '策略', alphabeta: 'A-B', pvs: 'PVS' })[alg] || alg;
 }
 
 async function startAiBench(){

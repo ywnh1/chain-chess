@@ -102,7 +102,7 @@ mod wasm_exports {
         ok(&ProcessMoveResult { board: b, eliminated, killed_by, chain_count, game_over, winner, steps, exploded })
     }
 
-    /// AI 走棋命令（按 algorithm 分派：mcts / pvs / alphabeta / strategy）
+    /// AI 走棋命令（按 algorithm 分派：pvs / alphabeta / strategy）
     #[wasm_bindgen]
     pub fn ai_move_cmd(json: &str) -> String {
         let r: AiReq = match serde_json::from_str(json) {
@@ -114,7 +114,6 @@ mod wasm_exports {
         let rnd = r.random_scale.unwrap_or(0);
         let cap_mode = r.cap_mode.unwrap_or_default();
         let mv = match alg {
-            "mcts" => find_best_move_mcts(&r.board, r.size, r.player, r.depth, &r.eliminated, r.max_players, r.border_mode, cap_mode),
             "pvs" => find_best_move_pvs(&r.board, r.size, r.player, r.depth, &r.eliminated, r.max_players, r.game_count, use_ml, r.border_mode, cap_mode, rnd),
             "strategy" => find_best_move_strategy(&r.board, r.size, r.player, &r.eliminated, r.max_players, r.game_count, r.first_move_pos, r.border_mode, cap_mode),
             _ => find_best_move(&r.board, r.size, r.player, r.depth, &r.eliminated, r.max_players, r.game_count, r.first_move_pos, use_ml, r.border_mode, cap_mode, rnd),
@@ -200,12 +199,12 @@ mod wasm_exports {
         }
         let mut ai_configs: HashMap<String, serde_json::Value> = HashMap::new();
         for (p, pl) in r.players.iter().enumerate() {
-            let is_mcts = pl.algorithm == "mcts";
+
             ai_configs.insert(
                 p.to_string(),
                 serde_json::json!({
                     "algorithm": pl.algorithm,
-                    "depth": pl.depth.unwrap_or(if is_mcts { 1 } else { 2 }),
+                    "depth": pl.depth.unwrap_or(2),
                     "useMlEval": pl.use_ml_eval.unwrap_or(true),
                     "randomScale": pl.random_scale.unwrap_or(0),
                 }),

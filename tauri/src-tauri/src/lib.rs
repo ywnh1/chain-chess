@@ -258,12 +258,12 @@ fn run_ai_bench_game(cfg: &AiBenchGameConfig, game_count: u32) -> AiBenchGameRes
     }
     let mut ai_configs: HashMap<String, serde_json::Value> = HashMap::new();
     for (p, pl) in cfg.players.iter().enumerate() {
-        let is_mcts = pl.algorithm == "mcts";
+
         ai_configs.insert(
             p.to_string(),
             serde_json::json!({
                 "algorithm": pl.algorithm,
-                "depth": pl.depth.unwrap_or(if is_mcts { 1 } else { 2 }),
+                "depth": pl.depth.unwrap_or(2),
                 "useMlEval": pl.use_ml_eval.unwrap_or(true),
                 "randomScale": pl.random_scale.unwrap_or(0),
             }),
@@ -275,31 +275,6 @@ fn run_ai_bench_game(cfg: &AiBenchGameConfig, game_count: u32) -> AiBenchGameRes
         elapsed_ms: t0.elapsed().as_secs_f64() * 1000.0,
         steps: r.history.len(),
         winner: r.winner,
-    }
-}
-
-#[tauri::command]
-async fn ai_move_mcts(
-    _random_scale: u32,  // MCTS 不走 eval 随机，保留参数兼容前端
-    board: GameBoard,
-    size: usize,
-    player: usize,
-    depth: usize,
-    eliminated: Vec<usize>,
-    max_players: usize,
-    border_mode: BorderMode,
-    cap_mode: Option<CapMode>,
-) -> Result<[usize; 2], String> {
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        let cap_mode = cap_mode.unwrap_or_default();
-        find_best_move_mcts(&board, size, player, depth, &eliminated, max_players, border_mode, cap_mode)
-    })
-    .await
-    .map_err(|e| format!("Task failed: {}", e))?;
-
-    match result {
-        Some((x, y)) => Ok([x, y]),
-        None => Err("No valid move".into()),
     }
 }
 
@@ -764,7 +739,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ai_move,
             ai_move_v2,
-            ai_move_mcts,
             ai_move_strategy,
             simulate_to_end_cmd,
             bench_ai_game,
@@ -1163,12 +1137,12 @@ pub fn generate_selfplay_data(
 /// 随机生成一组玩家 AI 配置（算法 / 深度 / ML 开关随机），保证数据多样性。
 /// 深度按棋盘大小缩放：大棋盘用浅搜索，避免单局耗时爆炸（alphabeta 无分支限制，13×13 depth=3 会极慢）。
 fn random_ai_configs(board_size: usize, max_players: usize, rng: &mut impl rand::Rng) -> Vec<PlayerAiConfig> {
-    // 算法池：alphabeta/pvs 为主，strategy 增加启发式多样性，mcts 低频（较慢）
+    // 算法池：alphabeta/pvs 为主，strategy 增加启发式多样性。
+    // 不含 mcts —— 游戏内已移除，训练数据要与实际对局分布一致。
     let alg_pool = [
         "alphabeta", "alphabeta", "alphabeta",
         "pvs", "pvs",
         "strategy", "strategy",
-        "mcts",
     ];
     // 深度上限：≤7 深搜 1-3；9 中搜 1-2；≥11 浅搜 1
     let max_d = if board_size <= 7 { 3 } else if board_size <= 9 { 2 } else { 1 };
@@ -1176,7 +1150,6 @@ fn random_ai_configs(board_size: usize, max_players: usize, rng: &mut impl rand:
     for _ in 0..max_players {
         let alg = alg_pool[rng.gen_range(0..alg_pool.len())];
         let depth = match alg {
-            "mcts" => 1,
             "strategy" => 0,
             _ => rng.gen_range(1..=max_d),
         };

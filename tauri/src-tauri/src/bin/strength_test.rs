@@ -10,7 +10,7 @@
 //   --mcts-depth N   MCTS 深度（默认 1）
 //   --caps 3,4,5     阈值模式列表（默认 3,4,5）
 //   --borders a,b,c  边界模式列表（默认 default,wrap,bounce,degrade）
-//   --algs a,b,c     参战算法（默认 strategy,alphabeta,pvs,mcts）
+//   --algs a,b,c     参战算法（默认 strategy,alphabeta,pvs）
 //   --ml / --no-ml   是否用 ML 评估（默认 --ml）
 //   --seed N         随机种子（默认 42）
 //
@@ -66,7 +66,7 @@ fn parse_opts() -> Opts {
         games: 6, size: 7, depth: 2, mcts_depth: 1,
         caps: parse_caps("3,4,5"),
         borders: parse_borders("default,wrap,bounce,degrade"),
-        algs: parse_algs("strategy,alphabeta,pvs,mcts"),
+        algs: parse_algs("strategy,alphabeta,pvs"),
         use_ml: true, seed: 42,
     };
     let mut i = 0;

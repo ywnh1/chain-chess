@@ -1313,7 +1313,6 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 .rank-type.ai-strategy{background:rgba(240,179,75,.08);color:var(--accent)}
 .rank-type.ai-alphabeta{background:rgba(155,89,182,.1);color:#BB8FCE}
 .rank-type.ai-pvs{background:rgba(52,152,219,.1);color:#85C1E9}
-.rank-type.ai-mcts{background:rgba(231,76,60,.08);color:#F1948A}
 .rank-gap{font-size:.6rem;color:var(--dim);opacity:.5}
 .rank-chain-badge{font-size:.6rem;color:var(--accent);background:rgba(240,179,75,.08);padding:0 5px;border-radius:4px;white-space:nowrap}
 /* 淘汰信息行：被谁击败 */
@@ -1421,7 +1420,6 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 .rank-modal-type-badge.ai-strategy{background:rgba(240,179,75,.1);color:var(--accent)}
 .rank-modal-type-badge.ai-alphabeta{background:rgba(155,89,182,.12);color:#BB8FCE}
 .rank-modal-type-badge.ai-pvs{background:rgba(52,152,219,.12);color:#85C1E9}
-.rank-modal-type-badge.ai-mcts{background:rgba(231,76,60,.1);color:#F1948A}
 .rank-modal-type-detail{font-size:.65rem;color:var(--dim);flex:1}
 /* Chain stats row */
 .rank-modal-chain-row{

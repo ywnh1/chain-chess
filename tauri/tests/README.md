@@ -1,6 +1,6 @@
 # AI 实力测试（tauri 端引擎）
 
-一键测试**不同棋盘（5 种形状 × 4 种边界 × 3 种爆炸阈值）下各 AI 算法（策略 / A-B / PVS / MCTS）的胜率**，
+一键测试**不同棋盘（5 种形状 × 4 种边界 × 3 种爆炸阈值）下各 AI 算法（策略 / A-B / PVS）的胜率**，
 带实时进度条，输出 Markdown 报告 + 对局数据 JSON。
 
 ## 架构
@@ -22,7 +22,7 @@ tauri/src-tauri/
 - **初始局面**：从可用格里贪心散布首子，**距离用边界语义的 BFS**（回环会把隔着洞的
   两格连成邻居，直线距离会骗人），首子等级取「本格阈值 − 1」（降级边界下边缘格阈值
   更低，硬编码会让首子超临界、AI 无棋可走）
-- **评估函数**：`--ml`（默认）走 XGBoost 模型，`--no-ml` 走手写规则；策略 / MCTS 不用评估函数
+- **评估函数**：`--ml`（默认）走 XGBoost 模型，`--no-ml` 走手写规则；策略不用评估函数
 - **口径**：应用内「AI 性能评测」页对应 `--quick`（5 形状 × 4 边界 × 3 阈值 × 6 配对 × 1 局 = 360 局）。
   页面内容由 `gen_report_html.py` 从 `ai_report.json` 生成，改了报告格式或重跑数据后执行一次即可
 
@@ -58,9 +58,9 @@ python3 tests/ai_strength.py --out report.md --out-json data.json    # 自定义
 | `--quick` | 关 | 快速全覆盖：duel + 全部形状 + 每组合 1 局 |
 | `--borders` | default,wrap,bounce,degrade | 边界模式过滤 |
 | `--caps` | 3,4,5 | 爆炸阈值过滤（引擎不再支持 mixed） |
-| `--algs` | strategy,alphabeta,pvs,mcts | 参与算法（ffa 每玩家一算法；duel 用前两个或全配对） |
+| `--algs` | strategy,alphabeta,pvs | 参与算法（ffa 每玩家一算法；duel 用前两个或全配对）。MCTS 已从游戏移除，传 `mcts` 仍可复测 |
 | `--depth` | 2 | A-B/PVS 搜索深度 |
-| `--mcts-depth` | 1 | MCTS 深度（迭代 = depth×800） |
+| `--mcts-depth` | 1 | MCTS 深度（仅在显式传 `--algs ...,mcts` 复测时有用） |
 | `--random` | 5 | 搜索随机刻度 % |
 | `--ml` / `--no-ml` | `--ml` | A-B / PVS 用 ML 模型还是手写评估 |
 | `--tag` | 空 | 报告标题后缀（区分 ML / 手写对照） |

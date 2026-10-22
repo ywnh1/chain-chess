@@ -33,7 +33,7 @@ Tauri 宿 `tauri/src-tauri/` 和 PWA 宿主 `docs/wasm/` 都依赖它。
 | WASM 导出 | 对应 Tauri 命令 |
 |---|---|
 | `process_move_cmd` | `process_move` |
-| `ai_move_cmd`（按 `algorithm` 分派） | `ai_move` / `ai_move_v2` / `ai_move_mcts` / `ai_move_strategy` |
+| `ai_move_cmd`（按 `algorithm` 分派） | `ai_move` / `ai_move_v2` / `ai_move_strategy` |
 | `simulate_to_end_cmd` | `simulate_to_end` |
 | `bench_ai_game_cmd` | `bench_ai_game`（设备性能检测 · AI 计算基准） |
 | `engine_version` | — |

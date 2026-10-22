@@ -346,11 +346,10 @@
     } else if (cmd === 'bench_ai_game') {
       json = m.bench_ai_game_cmd(JSON.stringify(args || {}));
     } else {
-      // ai_move / ai_move_v2 / ai_move_mcts / ai_move_strategy
+      // ai_move / ai_move_v2 / ai_move_strategy（MCTS 已移除）
       const a = Object.assign({}, args);
       if (!a.algorithm) {
-        a.algorithm = cmd === 'ai_move_mcts' ? 'mcts'
-          : cmd === 'ai_move_v2' ? 'pvs'
+        a.algorithm = cmd === 'ai_move_v2' ? 'pvs'
           : cmd === 'ai_move' ? 'alphabeta'
           : 'strategy';
       }
@@ -383,7 +382,6 @@
       case 'process_move':
       case 'ai_move':
       case 'ai_move_v2':
-      case 'ai_move_mcts':
       case 'ai_move_strategy':
       case 'simulate_to_end':
         return engineInvoke(cmd, args);

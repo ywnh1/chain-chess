@@ -9,7 +9,7 @@
 //   "shapes": ["square","rect","holes","ring","cross"],   // 棋盘形状（缺省 square）
 //   "borders": ["default","wrap","bounce","degrade"],
 //   "caps": ["3","4","5"],
-//   "algs": ["strategy","alphabeta","pvs","mcts"],   // ffa 模式每玩家一算法
+//   "algs": ["strategy","alphabeta","pvs"],           // ffa 模式每玩家一算法
 //   "duelPairs": [["strategy","alphabeta"]],          // duel 模式（缺省自动全配对）
 //   "depth": 2, "mctsDepth": 1, "randomScale": 5, "useMlEval": true,
 //   "seed": 0
@@ -64,7 +64,8 @@ fn default_caps() -> Vec<CapMode> {
     vec![CapMode::Cap3, CapMode::Cap4, CapMode::Cap5]
 }
 fn default_algs() -> Vec<String> {
-    vec!["strategy".into(), "alphabeta".into(), "pvs".into(), "mcts".into()]
+    // 游戏内已移除 MCTS；显式传 "mcts" 仍可复测（引擎实现保留）
+    vec!["strategy".into(), "alphabeta".into(), "pvs".into()]
 }
 fn default_depth() -> usize { 2 }
 fn default_mcts_depth() -> usize { 1 }
@@ -211,7 +212,7 @@ fn spread_starts(board: &GameBoard, n: usize, bm: BorderMode, variant: u32) -> V
 }
 
 
-/// 各算法的搜索深度：MCTS 用自己的深度（迭代 = 深度 × 800）。
+/// 各算法的搜索深度：MCTS 用自己的深度（迭代 = 深度 × 400，仅在显式复测时使用）。
 fn alg_depth(alg: &str, cfg: &BenchConfig) -> usize {
     if alg == "mcts" { cfg.mcts_depth } else { cfg.depth }
 }
