@@ -1,7 +1,7 @@
 # AI 实力测试（tauri 端引擎）
 
-一键测试**不同棋盘（4 种边界 × 3 种爆炸阈值）下各 AI 算法（策略 / A-B / PVS / MCTS）的胜率**，
-带进度条，输出 Markdown 报告 + 对局数据 JSON。
+一键测试**不同棋盘（5 种形状 × 4 种边界 × 3 种爆炸阈值）下各 AI 算法（策略 / A-B / PVS / MCTS）的胜率**，
+带实时进度条，输出 Markdown 报告 + 对局数据 JSON。
 
 ## 架构
 
@@ -16,7 +16,10 @@ tauri/src-tauri/
 
 - **引擎**：`engine/` 共享 crate（`chain_chess_core`），与正式对战完全同源
 - **对局**：`simulate_to_end`（一键终局同款），4 算法各执一色混战（ffa）或两两对阵（duel）
-- **初始局面**：按「首子 12 格距离限制」内圈均匀散布每玩家一枚首子（首子等级 = 阈值−1），模拟真实中盘
+- **棋盘形状**：`square` 正方形 / `rect` 长方形 / `holes` 挖洞 / `ring` 口字 / `cross` 十字，
+  全部确定性生成（同一 seed 可跨版本比较）；异形棋盘的空洞由引擎按形状边界处理
+- **初始局面**：从可用格里贪心散布首子（首子等级 = 阈值−1），回环模式按环形距离算，
+  避免棋盘两端"看着远、实际相邻"导致一步定胜负
 - **评估函数**：`--ml`（默认）走 XGBoost 模型，`--no-ml` 走手写规则；策略 / MCTS 不用评估函数
 - **口径**：应用内「AI 性能评测」页对应 `--mode duel`（4 边界 × 3 阈值 × 6 配对 × 6 局 = 432 局）
 
@@ -32,6 +35,8 @@ cd ..
 python3 tests/ai_strength.py                          # 默认：7×7，每组合 6 局，4 算法混战
 python3 tests/ai_strength.py --games 10 --size 9      # 更多局数 / 更大棋盘
 python3 tests/ai_strength.py --mode duel              # 两两对阵（全配对，432 局）
+python3 tests/ai_strength.py --quick                  # 快速全覆盖：duel + 5 形状 + 每组合 1 局（360 局）
+python3 tests/ai_strength.py --mode duel --shapes all # 两两对阵 + 全部形状（2160 局）
 python3 tests/ai_strength.py --mode duel --no-ml      # 手写评估对照
 python3 tests/ai_strength.py --mode duel --tag "ML 模型"   # 给报告加标题后缀
 python3 tests/ai_strength.py --algs strategy,alphabeta --mode duel   # 指定算法对阵
@@ -46,6 +51,8 @@ python3 tests/ai_strength.py --out report.md --out-json data.json    # 自定义
 | `--size` | 7 | 棋盘大小 |
 | `--games` | 6 | 每组合对局数（总对局 = 组合数 × games） |
 | `--mode` | ffa | `ffa` 多算法混战 / `duel` 两两对阵 |
+| `--shapes` | square | `square,rect,holes,ring,cross`，或 `all` |
+| `--quick` | 关 | 快速全覆盖：duel + 全部形状 + 每组合 1 局 |
 | `--borders` | default,wrap,bounce,degrade | 边界模式过滤 |
 | `--caps` | 3,4,5 | 爆炸阈值过滤（引擎不再支持 mixed） |
 | `--algs` | strategy,alphabeta,pvs,mcts | 参与算法（ffa 每玩家一算法；duel 用前两个或全配对） |

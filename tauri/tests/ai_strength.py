@@ -9,6 +9,8 @@
 
     python3 tests/ai_strength.py                                   # 默认 7×7、每组合 6 局、4 算法混战
     python3 tests/ai_strength.py --mode duel                       # 应用内评测页口径：432 局两两对阵
+    python3 tests/ai_strength.py --mode duel --shapes all          # 加上 5 种棋盘形状（含异形）
+    python3 tests/ai_strength.py --quick                           # 快速冒烟：1 局/组合、形状全测
     python3 tests/ai_strength.py --no-ml                           # 手写评估函数对照
     python3 tests/ai_strength.py --games 10 --size 9
     python3 tests/ai_strength.py --mode duel --algs strategy,alphabeta
@@ -46,9 +48,14 @@ except ImportError:
 ALG_LABEL = {'strategy': '策略', 'alphabeta': 'A-B', 'pvs': 'PVS', 'mcts': 'MCTS'}
 BM_LABEL = {'default': '默认', 'wrap': '回环', 'bounce': '反弹', 'degrade': '降级'}
 CAP_LABEL = {'3': '速爆3', '4': '标准4', '5': '重炮5'}
+SHAPE_LABEL = {
+    'square': '正方形', 'rect': '长方形', 'holes': '挖洞',
+    'ring': '口字', 'cross': '十字',
+}
 ALL_BORDERS = ['default', 'wrap', 'bounce', 'degrade']
 ALL_CAPS = ['3', '4', '5']
 ALL_ALGS = ['strategy', 'alphabeta', 'pvs', 'mcts']
+ALL_SHAPES = ['square', 'rect', 'holes', 'ring', 'cross']
 
 
 def parse_args():
@@ -56,6 +63,10 @@ def parse_args():
     ap.add_argument('--bin', default=DEFAULT_BIN, help='ai_bench 二进制路径')
     ap.add_argument('--size', type=int, default=7, help='棋盘大小（默认 7）')
     ap.add_argument('--games', type=int, default=6, help='每组合对局数（默认 6）')
+    ap.add_argument('--shapes', default='square',
+                    help='棋盘形状，逗号分隔（square/rect/holes/ring/cross），all=全部。默认 square')
+    ap.add_argument('--quick', action='store_true',
+                    help='快速模式：两两对阵、每组合 1 局、全部形状（360 局，覆盖最广）')
     ap.add_argument('--mode', choices=['ffa', 'duel'], default='ffa', help='ffa=多算法混战(默认)，duel=两两对阵')
     ap.add_argument('--borders', default=','.join(ALL_BORDERS), help='边界模式列表，逗号分隔')
     ap.add_argument('--caps', default=','.join(ALL_CAPS), help='爆炸阈值列表，逗号分隔（3/4/5）')
@@ -86,11 +97,23 @@ def model_fingerprint():
         return '未找到 engine/xgb_model_board.json'
 
 
+def resolve_shapes(a):
+    """--shapes 解析：all → 全部；逗号分隔；校验未知值。"""
+    raw = [x.strip() for x in a.shapes.split(',') if x.strip()]
+    if 'all' in raw:
+        return list(ALL_SHAPES)
+    bad = [x for x in raw if x not in ALL_SHAPES]
+    if bad:
+        raise SystemExit(f'未知形状: {", ".join(bad)}（可选: {", ".join(ALL_SHAPES)} 或 all）')
+    return raw or ['square']
+
+
 def build_config(a):
     return {
         'size': a.size,
         'games': a.games,
         'mode': a.mode,
+        'shapes': resolve_shapes(a),
         'borders': [x.strip() for x in a.borders.split(',') if x.strip()],
         'caps': [x.strip() for x in a.caps.split(',') if x.strip()],
         'algs': [x.strip() for x in a.algs.split(',') if x.strip()],
@@ -103,17 +126,25 @@ def build_config(a):
 
 
 def run_bench(bin_path, config):
-    """启动 ai_bench，逐行产出 (meta, results, done)。"""
+    """启动 ai_bench，逐行读取结果并实时刷新进度条，返回 (meta, results)。
+
+    进度信息写 stderr，stdout 只留最终报告，`... | tee` 时也能看到进度。
+    """
     proc = subprocess.Popen(
         [bin_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         text=True, bufsize=1, encoding='utf-8', errors='replace',
     )
+    meta = None
+    results = []
+    done = False
+    bar = None
+    last_pct = -1
     try:
         proc.stdin.write(json.dumps(config) + '\n')
         proc.stdin.close()
-        meta = None
-        results = []
-        done = False
+        if tqdm is not None:
+            bar = tqdm(total=None, desc='AI 对局', unit='局',
+                       dynamic_ncols=True, file=sys.stderr, leave=True)
         for line in proc.stdout:
             line = line.strip()
             if not line:
@@ -125,17 +156,39 @@ def run_bench(bin_path, config):
             if 'meta' in obj:
                 if 'total' in obj['meta']:
                     meta = obj['meta']
+                    if bar is not None:
+                        bar.total = meta['total']
+                        bar.refresh()
                 elif obj['meta'].get('done'):
                     done = True
             elif 'fatal' in obj:
+                if bar is not None:
+                    bar.close()
                 raise RuntimeError(obj['fatal'])
             else:
                 results.append(obj)
+                total = (meta or {}).get('total') or 0
+                if bar is not None:
+                    bar.update(1)
+                elif total:
+                    pct = len(results) * 100 // total
+                    if pct != last_pct and pct % 5 == 0:
+                        last_pct = pct
+                        print(f'\r  {len(results)}/{total} 局（{pct}%）', end='', file=sys.stderr, flush=True)
         proc.wait()
+        if bar is not None:
+            bar.close()
+        elif results:
+            print('', file=sys.stderr)
         if not done:
             raise RuntimeError('ai_bench 提前退出（exit=%s）' % proc.returncode)
         return meta, results
     finally:
+        if bar is not None:
+            try:
+                bar.close()
+            except Exception:
+                pass
         if proc.poll() is None:
             proc.kill()
 
@@ -150,6 +203,10 @@ def fmt_pct(n, d):
 
 def main():
     a = parse_args()
+    if a.quick:
+        a.games = 1
+        a.shapes = 'all'
+        a.mode = 'duel'
     if not os.path.exists(a.bin):
         print(f'[错误] 找不到引擎二进制: {a.bin}\n'
               f'请先编译: cd tauri/src-tauri && cargo build --release --bin ai_bench', file=sys.stderr)
@@ -170,6 +227,11 @@ def main():
     steps_by_key = defaultdict(list) # (bm,cm) -> steps
     cell_winner = defaultdict(lambda: defaultdict(int))  # (bm,cm) -> alg -> wins
     cell_games = defaultdict(int)
+    shape_wins = defaultdict(lambda: defaultdict(int))   # shape -> alg -> wins
+    shape_games = defaultdict(int)                        # shape -> 局数
+    shape_steps = defaultdict(list)                       # shape -> steps
+    shape_bm_wins = defaultdict(lambda: defaultdict(int)) # (shape,bm) -> alg -> wins
+    shape_bm_games = defaultdict(int)                     # (shape,bm) -> 局数
     duel_rows = []                   # (algA, algB) -> {a,b,tie}
     duel_stat = defaultdict(lambda: {'a': 0, 'b': 0})
 
@@ -180,6 +242,10 @@ def main():
         key = (r['bm'], r['cm'])
         cell_games[key] += 1
         steps_by_key[key].append(r['steps'])
+        shape = r.get('shape') or 'square'
+        shape_games[shape] += 1
+        shape_steps[shape].append(r['steps'])
+        shape_bm_games[(shape, r['bm'])] += 1
         w = r['winner']
         order = r.get('order') or []
         for idx, alg in enumerate(players):
@@ -194,6 +260,8 @@ def main():
             if w is not None and players[w] == alg:
                 wins[alg] += 1
                 cell_winner[key][alg] += 1
+                shape_wins[shape][alg] += 1
+                shape_bm_wins[(shape, r['bm'])][alg] += 1
         if r['mode'] == 'duel' and len(players) == 2:
             aalg, balg = players[0], players[1]
             if w is not None:
@@ -217,10 +285,12 @@ def main():
         L.append(f'- **评估函数**: ML 模型（{model_fingerprint()}）；策略 / MCTS 不使用评估函数，不受此影响')
     else:
         L.append('- **评估函数**: 手写规则（--no-ml）；策略 / MCTS 不使用评估函数，不受此影响')
-    L.append(f'- **棋盘**: {config["size"]}×{config["size"]} · 模式: '
+    shapes = config.get('shapes') or ['square']
+    shape_txt = ', '.join(SHAPE_LABEL.get(x, x) for x in shapes)
+    L.append(f'- **棋盘**: {config["size"]}×{config["size"]}（基准边长）· 形状: {shape_txt} · 模式: '
              f'{"混战（每算法一名）" if config["mode"] == "ffa" else "两两对阵"}')
-    L.append(f'- **组合**: {len(config["borders"])} 边界 × {len(config["caps"])} 阈值 = '
-             f'{len(config["borders"]) * len(config["caps"])} 组 · 每组合 {config["games"]} 局 · 共 {total} 局')
+    L.append(f'- **组合**: {len(shapes)} 形状 × {len(config["borders"])} 边界 × {len(config["caps"])} 阈值 = '
+             f'{len(shapes) * len(config["borders"]) * len(config["caps"])} 组 · 每组合 {config["games"]} 局 · 共 {total} 局')
     L.append(f'- **搜索**: A-B/PVS 深度 {config["depth"]} · MCTS 深度 {config["mctsDepth"]} · '
              f'随机刻度 {config["randomScale"]}% · 种子 {config["seed"]}')
     L.append('')
@@ -258,8 +328,48 @@ def main():
         L.append(f'| {BM_LABEL.get(bm, bm)} | ' + ' | '.join(cells) + ' |')
     L.append('')
 
+    # 形状维度（只有一种形状时省略，避免报告变长）
+    if len(shapes) > 1:
+        L.append('## 三、分棋盘形状')
+        L.append('')
+        L.append('| 形状 | 局数 | 平均步数 | 胜场最多 | 胜率 |')
+        L.append('|:--:|:--:|:--:|:--:|:--:|')
+        for sh in shapes:
+            g = shape_games.get(sh, 0)
+            if g == 0:
+                continue
+            st = shape_steps.get(sh) or [0]
+            cw = shape_wins.get(sh) or {}
+            best = max(cw.items(), key=lambda kv: kv[1]) if cw else ('-', 0)
+            L.append(f'| {SHAPE_LABEL.get(sh, sh)} | {g} | {sum(st) / len(st):.0f} | '
+                     f'{ALG_LABEL.get(best[0], best[0])} | {fmt_pct(best[1], g)} |')
+        L.append('')
+
+        L.append('### 形状 × 边界（胜场最多者）')
+        L.append('')
+        L.append('| 形状 \\ 边界 | ' + ' | '.join(BM_LABEL.get(b, b) for b in config['borders']) + ' |')
+        L.append('|' + '---|' * (len(config['borders']) + 1))
+        for sh in shapes:
+            cells = []
+            for bm in config['borders']:
+                g = shape_bm_games.get((sh, bm), 0)
+                cw = shape_bm_wins.get((sh, bm)) or {}
+                if g == 0 or not cw:
+                    cells.append('-')
+                else:
+                    best = max(cw.items(), key=lambda kv: kv[1])
+                    cells.append(f'{ALG_LABEL.get(best[0], best[0])} {fmt_pct(best[1], g)}')
+            L.append(f'| {SHAPE_LABEL.get(sh, sh)} | ' + ' | '.join(cells) + ' |')
+        L.append('')
+        n_extra = 1
+    else:
+        n_extra = 0
+
     # 平均步数矩阵
-    L.append('## 三、平均对局步数（组合维度）')
+    CN = ['三', '四', '五', '六', '七']
+    sec = 0 if n_extra == 0 else 1   # 形状小节占用「三」之后的下标
+
+    L.append(f'## {CN[0 + sec]}、平均对局步数（组合维度）')
     L.append('')
     L.append(header)
     L.append('|' + '---|' * (len(config['caps']) + 1))
@@ -272,7 +382,7 @@ def main():
     L.append('')
 
     # 观察
-    L.append('## 四、简要观察')
+    L.append(f'## {CN[1 + sec]}、简要观察')
     L.append('')
     L.append('- 综合胜率最高：**' + ALG_LABEL.get(ranked[0], ranked[0]) + '**（' + fmt_pct(wins[ranked[0]], games_by_alg[ranked[0]]) + '）')
     L.append('- 综合胜率最低：' + ALG_LABEL.get(ranked[-1], ranked[-1]) + '（' + fmt_pct(wins[ranked[-1]], games_by_alg[ranked[-1]]) + '）')
@@ -281,7 +391,7 @@ def main():
     L.append('')
 
     if config['mode'] == 'duel':
-        L.append('## 五、两两对阵')
+        L.append(f'## {CN[2 + sec]}、两两对阵')
         L.append('')
         L.append('| 对阵 | 胜A | 胜B | 平局折半 |')
         L.append('|:--:|:--:|:--:|:--:|')
