@@ -1,7 +1,7 @@
 /* @ts-self-types="./chain_chess_engine.d.ts" */
 
 /**
- * AI 走棋命令（按 algorithm 分派：mcts / pvs / alphabeta / strategy）
+ * AI 走棋命令（按 algorithm 分派：pvs / alphabeta / strategy）
  * @param {string} json
  * @returns {string}
  */

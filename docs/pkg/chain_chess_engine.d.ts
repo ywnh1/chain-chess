@@ -2,7 +2,7 @@
 /* eslint-disable */
 
 /**
- * AI 走棋命令（按 algorithm 分派：mcts / pvs / alphabeta / strategy）
+ * AI 走棋命令（按 algorithm 分派：pvs / alphabeta / strategy）
  */
 export function ai_move_cmd(json: string): string;
 
