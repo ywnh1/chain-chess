@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "chain-chess"
-version = "3.4.1"
+version = "3.4.2"
 dependencies = [
  "chain_chess_core",
  "rand 0.8.7",
