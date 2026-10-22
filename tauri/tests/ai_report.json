@@ -1,58 +1,50 @@
 {
  "config": {
   "size": 7,
-  "games": 1,
+  "games": 10,
   "mode": "duel",
   "shapes": [
    "square",
-   "rect",
-   "holes",
-   "ring",
-   "cross"
+   "ring"
   ],
   "borders": [
    "default",
-   "wrap",
-   "bounce",
-   "degrade"
+   "wrap"
   ],
   "caps": [
-   "3",
-   "4",
-   "5"
+   "4"
   ],
   "algs": [
    "strategy",
    "alphabeta",
-   "pvs",
-   "mcts"
+   "pvs"
   ],
   "depth": 2,
   "mctsDepth": 1,
   "randomScale": 5,
   "useMlEval": true,
-  "seed": 0
+  "seed": 7
  },
  "results": [
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 0,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
     "strategy",
     "alphabeta"
    ],
    "shape": "square",
-   "steps": 33,
-   "winner": 0
+   "steps": 208,
+   "winner": 1
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 1,
    "mode": "duel",
    "order": [
@@ -60,75 +52,75 @@
    ],
    "players": [
     "strategy",
-    "pvs"
+    "alphabeta"
    ],
    "shape": "square",
-   "steps": 564,
+   "steps": 214,
    "winner": 1
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 2,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
     "strategy",
-    "mcts"
+    "alphabeta"
    ],
    "shape": "square",
-   "steps": 133,
-   "winner": 0
+   "steps": 158,
+   "winner": 1
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 3,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
-    "alphabeta",
-    "pvs"
+    "strategy",
+    "alphabeta"
    ],
    "shape": "square",
-   "steps": 967,
-   "winner": 0
+   "steps": 54,
+   "winner": 1
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 4,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
-    "alphabeta",
-    "mcts"
+    "strategy",
+    "alphabeta"
    ],
    "shape": "square",
-   "steps": 37,
-   "winner": 0
+   "steps": 252,
+   "winner": 1
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 5,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
-    "pvs",
-    "mcts"
+    "strategy",
+    "alphabeta"
    ],
    "shape": "square",
-   "steps": 39,
-   "winner": 0
+   "steps": 54,
+   "winner": 1
   },
   {
    "bm": "default",
@@ -143,13 +135,61 @@
     "alphabeta"
    ],
    "shape": "square",
-   "steps": 410,
+   "steps": 190,
    "winner": 1
   },
   {
    "bm": "default",
    "cm": "4",
    "id": 7,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 262,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 8,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 124,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 9,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 190,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 10,
    "mode": "duel",
    "order": [
     0
@@ -165,70 +205,22 @@
   {
    "bm": "default",
    "cm": "4",
-   "id": 8,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 35,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 9,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "square",
-   "steps": 150,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 10,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 71,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
    "id": 11,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
-    "pvs",
-    "mcts"
+    "strategy",
+    "pvs"
    ],
    "shape": "square",
-   "steps": 58,
+   "steps": 72,
    "winner": 1
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
    "id": 12,
    "mode": "duel",
    "order": [
@@ -236,15 +228,15 @@
    ],
    "players": [
     "strategy",
-    "alphabeta"
+    "pvs"
    ],
    "shape": "square",
-   "steps": 466,
+   "steps": 116,
    "winner": 1
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
    "id": 13,
    "mode": "duel",
    "order": [
@@ -255,12 +247,12 @@
     "pvs"
    ],
    "shape": "square",
-   "steps": 134,
+   "steps": 82,
    "winner": 1
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
    "id": 14,
    "mode": "duel",
    "order": [
@@ -268,39 +260,7 @@
    ],
    "players": [
     "strategy",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 231,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 15,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
     "pvs"
-   ],
-   "shape": "square",
-   "steps": 227,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 16,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
    ],
    "shape": "square",
    "steps": 55,
@@ -308,87 +268,119 @@
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
+   "id": 15,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 63,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 16,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 57,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "4",
    "id": 17,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
-    "pvs",
-    "mcts"
+    "strategy",
+    "pvs"
    ],
    "shape": "square",
-   "steps": 79,
+   "steps": 39,
    "winner": 0
   },
   {
-   "bm": "wrap",
-   "cm": "3",
+   "bm": "default",
+   "cm": "4",
    "id": 18,
    "mode": "duel",
    "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "square",
-   "steps": 75,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 19,
-   "mode": "duel",
-   "order": [
-    1
+    0
    ],
    "players": [
     "strategy",
     "pvs"
    ],
    "shape": "square",
-   "steps": 67,
-   "winner": 0
+   "steps": 148,
+   "winner": 1
   },
   {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 20,
+   "bm": "default",
+   "cm": "4",
+   "id": 19,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
     "strategy",
-    "mcts"
+    "pvs"
    ],
    "shape": "square",
-   "steps": 102,
+   "steps": 92,
    "winner": 1
   },
   {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 21,
+   "bm": "default",
+   "cm": "4",
+   "id": 20,
    "mode": "duel",
    "order": [
-    0
+    1
    ],
    "players": [
     "alphabeta",
     "pvs"
    ],
    "shape": "square",
-   "steps": 72,
-   "winner": 1
+   "steps": 43,
+   "winner": 0
   },
   {
-   "bm": "wrap",
-   "cm": "3",
+   "bm": "default",
+   "cm": "4",
+   "id": 21,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 123,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "4",
    "id": 22,
    "mode": "duel",
    "order": [
@@ -396,32 +388,160 @@
    ],
    "players": [
     "alphabeta",
-    "mcts"
+    "pvs"
    ],
    "shape": "square",
-   "steps": 90,
+   "steps": 182,
    "winner": 1
   },
   {
-   "bm": "wrap",
-   "cm": "3",
+   "bm": "default",
+   "cm": "4",
    "id": 23,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
-    "pvs",
-    "mcts"
+    "alphabeta",
+    "pvs"
    ],
    "shape": "square",
-   "steps": 93,
+   "steps": 55,
    "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 24,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 37,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 25,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 188,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 26,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 198,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 27,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 31,
+   "winner": 0
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 28,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 180,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 29,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 294,
+   "winner": 1
   },
   {
    "bm": "wrap",
    "cm": "4",
-   "id": 24,
+   "id": 30,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 100,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 31,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 100,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 32,
    "mode": "duel",
    "order": [
     0
@@ -437,7 +557,119 @@
   {
    "bm": "wrap",
    "cm": "4",
-   "id": 25,
+   "id": 33,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 96,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 34,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 80,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 35,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 98,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 36,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 100,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 37,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 98,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 38,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 70,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 39,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "square",
+   "steps": 100,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 40,
    "mode": "duel",
    "order": [
     0
@@ -447,29 +679,189 @@
     "pvs"
    ],
    "shape": "square",
-   "steps": 90,
+   "steps": 76,
    "winner": 1
   },
   {
    "bm": "wrap",
    "cm": "4",
-   "id": 26,
+   "id": 41,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
     "strategy",
-    "mcts"
+    "pvs"
    ],
    "shape": "square",
-   "steps": 65,
+   "steps": 41,
    "winner": 0
   },
   {
    "bm": "wrap",
    "cm": "4",
-   "id": 27,
+   "id": 42,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 67,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 43,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 96,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 44,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 94,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 45,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 59,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 46,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 93,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 47,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 69,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 48,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 94,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 49,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 96,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 50,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 96,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 51,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "square",
+   "steps": 98,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 52,
    "mode": "duel",
    "order": [
     1
@@ -485,279 +877,7 @@
   {
    "bm": "wrap",
    "cm": "4",
-   "id": 28,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 85,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 29,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 79,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 30,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "square",
-   "steps": 171,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 31,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "square",
-   "steps": 178,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 32,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 109,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 33,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "square",
-   "steps": 143,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 34,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 143,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 35,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 137,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 36,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "square",
-   "steps": 203,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 37,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "square",
-   "steps": 27,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 38,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 91,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 39,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "square",
-   "steps": 55,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 40,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 88,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 41,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 355,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 42,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "square",
-   "steps": 56,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 43,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "square",
-   "steps": 74,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 44,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 115,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 45,
+   "id": 53,
    "mode": "duel",
    "order": [
     1
@@ -771,184 +891,56 @@
    "winner": 0
   },
   {
-   "bm": "bounce",
+   "bm": "wrap",
    "cm": "4",
-   "id": 46,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 115,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 47,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 50,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 48,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "square",
-   "steps": 235,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 49,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "square",
-   "steps": 94,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 50,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 111,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 51,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "square",
-   "steps": 33,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 52,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 73,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 53,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 129,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
    "id": 54,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
-    "strategy",
-    "alphabeta"
+    "alphabeta",
+    "pvs"
    ],
    "shape": "square",
-   "steps": 174,
+   "steps": 96,
    "winner": 1
   },
   {
-   "bm": "degrade",
-   "cm": "3",
+   "bm": "wrap",
+   "cm": "4",
    "id": 55,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
-    "strategy",
+    "alphabeta",
     "pvs"
    ],
    "shape": "square",
-   "steps": 217,
+   "steps": 95,
    "winner": 0
   },
   {
-   "bm": "degrade",
-   "cm": "3",
+   "bm": "wrap",
+   "cm": "4",
    "id": 56,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
-    "strategy",
-    "mcts"
+    "alphabeta",
+    "pvs"
    ],
    "shape": "square",
-   "steps": 43,
-   "winner": 0
+   "steps": 96,
+   "winner": 1
   },
   {
-   "bm": "degrade",
-   "cm": "3",
+   "bm": "wrap",
+   "cm": "4",
    "id": 57,
    "mode": "duel",
    "order": [
@@ -959,12 +951,12 @@
     "pvs"
    ],
    "shape": "square",
-   "steps": 226,
+   "steps": 100,
    "winner": 1
   },
   {
-   "bm": "degrade",
-   "cm": "3",
+   "bm": "wrap",
+   "cm": "4",
    "id": 58,
    "mode": "duel",
    "order": [
@@ -972,30 +964,30 @@
    ],
    "players": [
     "alphabeta",
-    "mcts"
+    "pvs"
    ],
    "shape": "square",
-   "steps": 89,
+   "steps": 97,
    "winner": 0
   },
   {
-   "bm": "degrade",
-   "cm": "3",
+   "bm": "wrap",
+   "cm": "4",
    "id": 59,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
-    "pvs",
-    "mcts"
+    "alphabeta",
+    "pvs"
    ],
    "shape": "square",
-   "steps": 15,
+   "steps": 43,
    "winner": 0
   },
   {
-   "bm": "degrade",
+   "bm": "default",
    "cm": "4",
    "id": 60,
    "mode": "duel",
@@ -1006,12 +998,12 @@
     "strategy",
     "alphabeta"
    ],
-   "shape": "square",
-   "steps": 88,
+   "shape": "ring",
+   "steps": 350,
    "winner": 1
   },
   {
-   "bm": "degrade",
+   "bm": "default",
    "cm": "4",
    "id": 61,
    "mode": "duel",
@@ -1020,14 +1012,14 @@
    ],
    "players": [
     "strategy",
-    "pvs"
+    "alphabeta"
    ],
-   "shape": "square",
-   "steps": 30,
+   "shape": "ring",
+   "steps": 238,
    "winner": 1
   },
   {
-   "bm": "degrade",
+   "bm": "default",
    "cm": "4",
    "id": 62,
    "mode": "duel",
@@ -1036,14 +1028,14 @@
    ],
    "players": [
     "strategy",
-    "mcts"
+    "alphabeta"
    ],
-   "shape": "square",
-   "steps": 84,
+   "shape": "ring",
+   "steps": 718,
    "winner": 1
   },
   {
-   "bm": "degrade",
+   "bm": "default",
    "cm": "4",
    "id": 63,
    "mode": "duel",
@@ -1051,64 +1043,64 @@
     0
    ],
    "players": [
-    "alphabeta",
-    "pvs"
+    "strategy",
+    "alphabeta"
    ],
-   "shape": "square",
-   "steps": 88,
+   "shape": "ring",
+   "steps": 204,
    "winner": 1
   },
   {
-   "bm": "degrade",
+   "bm": "default",
    "cm": "4",
    "id": 64,
    "mode": "duel",
    "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 43,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 65,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 47,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 66,
-   "mode": "duel",
-   "order": [
-    1
+    0
    ],
    "players": [
     "strategy",
     "alphabeta"
    ],
-   "shape": "square",
-   "steps": 175,
-   "winner": 0
+   "shape": "ring",
+   "steps": 282,
+   "winner": 1
   },
   {
-   "bm": "degrade",
-   "cm": "5",
+   "bm": "default",
+   "cm": "4",
+   "id": 65,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "ring",
+   "steps": 440,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 66,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "ring",
+   "steps": 482,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
    "id": 67,
    "mode": "duel",
    "order": [
@@ -1116,80 +1108,16 @@
    ],
    "players": [
     "strategy",
-    "pvs"
+    "alphabeta"
    ],
-   "shape": "square",
-   "steps": 164,
+   "shape": "ring",
+   "steps": 294,
    "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 68,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 36,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 69,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "square",
-   "steps": 616,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 70,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 55,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 71,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "square",
-   "steps": 117,
-   "winner": 0
   },
   {
    "bm": "default",
-   "cm": "3",
-   "id": 72,
+   "cm": "4",
+   "id": 68,
    "mode": "duel",
    "order": [
     0
@@ -1198,13 +1126,77 @@
     "strategy",
     "alphabeta"
    ],
-   "shape": "rect",
-   "steps": 564,
+   "shape": "ring",
+   "steps": 124,
    "winner": 1
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
+   "id": 69,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "ring",
+   "steps": 322,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 70,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "ring",
+   "steps": 290,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 71,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "ring",
+   "steps": 228,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
+   "id": 72,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "ring",
+   "steps": 158,
+   "winner": 1
+  },
+  {
+   "bm": "default",
+   "cm": "4",
    "id": 73,
    "mode": "duel",
    "order": [
@@ -1214,73 +1206,73 @@
     "strategy",
     "pvs"
    ],
-   "shape": "rect",
-   "steps": 77,
+   "shape": "ring",
+   "steps": 69,
    "winner": 0
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 74,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
     "strategy",
-    "mcts"
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 61,
-   "winner": 0
+   "shape": "ring",
+   "steps": 310,
+   "winner": 1
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 75,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
-    "alphabeta",
+    "strategy",
     "pvs"
    ],
-   "shape": "rect",
-   "steps": 147,
+   "shape": "ring",
+   "steps": 325,
    "winner": 0
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 76,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
-    "alphabeta",
-    "mcts"
+    "strategy",
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 87,
-   "winner": 0
+   "shape": "ring",
+   "steps": 238,
+   "winner": 1
   },
   {
    "bm": "default",
-   "cm": "3",
+   "cm": "4",
    "id": 77,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
-    "pvs",
-    "mcts"
+    "strategy",
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 25,
-   "winner": 0
+   "shape": "ring",
+   "steps": 158,
+   "winner": 1
   },
   {
    "bm": "default",
@@ -1292,10 +1284,10 @@
    ],
    "players": [
     "strategy",
-    "alphabeta"
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 108,
+   "shape": "ring",
+   "steps": 334,
    "winner": 1
   },
   {
@@ -1310,8 +1302,8 @@
     "strategy",
     "pvs"
    ],
-   "shape": "rect",
-   "steps": 140,
+   "shape": "ring",
+   "steps": 292,
    "winner": 1
   },
   {
@@ -1320,28 +1312,30 @@
    "id": 80,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
-    "strategy",
-    "mcts"
+    "alphabeta",
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 111,
-   "winner": 0
+   "shape": "ring",
+   "steps": 288,
+   "winner": 1
   },
   {
    "bm": "default",
    "cm": "4",
    "id": 81,
    "mode": "duel",
-   "order": [],
+   "order": [
+    1
+   ],
    "players": [
     "alphabeta",
     "pvs"
    ],
-   "shape": "rect",
-   "steps": 1000,
+   "shape": "ring",
+   "steps": 229,
    "winner": 0
   },
   {
@@ -1354,10 +1348,10 @@
    ],
    "players": [
     "alphabeta",
-    "mcts"
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 93,
+   "shape": "ring",
+   "steps": 103,
    "winner": 0
   },
   {
@@ -1369,64 +1363,64 @@
     1
    ],
    "players": [
-    "pvs",
-    "mcts"
+    "alphabeta",
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 95,
+   "shape": "ring",
+   "steps": 381,
    "winner": 0
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
    "id": 84,
    "mode": "duel",
    "order": [
-    0
+    1
    ],
    "players": [
-    "strategy",
-    "alphabeta"
+    "alphabeta",
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 92,
-   "winner": 1
+   "shape": "ring",
+   "steps": 125,
+   "winner": 0
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
    "id": 85,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
-    "strategy",
+    "alphabeta",
     "pvs"
    ],
-   "shape": "rect",
-   "steps": 92,
+   "shape": "ring",
+   "steps": 698,
    "winner": 1
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
    "id": 86,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
-    "strategy",
-    "mcts"
+    "alphabeta",
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 79,
+   "shape": "ring",
+   "steps": 167,
    "winner": 0
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
    "id": 87,
    "mode": "duel",
    "order": [
@@ -1436,46 +1430,62 @@
     "alphabeta",
     "pvs"
    ],
-   "shape": "rect",
-   "steps": 575,
+   "shape": "ring",
+   "steps": 795,
    "winner": 0
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
    "id": 88,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
     "alphabeta",
-    "mcts"
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 71,
-   "winner": 0
+   "shape": "ring",
+   "steps": 712,
+   "winner": 1
   },
   {
    "bm": "default",
-   "cm": "5",
+   "cm": "4",
    "id": 89,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
-    "pvs",
-    "mcts"
+    "alphabeta",
+    "pvs"
    ],
-   "shape": "rect",
-   "steps": 195,
+   "shape": "ring",
+   "steps": 187,
    "winner": 0
   },
   {
    "bm": "wrap",
-   "cm": "3",
+   "cm": "4",
    "id": 90,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "alphabeta"
+   ],
+   "shape": "ring",
+   "steps": 76,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 91,
    "mode": "duel",
    "order": [
     1
@@ -1484,88 +1494,72 @@
     "strategy",
     "alphabeta"
    ],
-   "shape": "rect",
+   "shape": "ring",
    "steps": 81,
    "winner": 0
   },
   {
    "bm": "wrap",
-   "cm": "3",
-   "id": 91,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 113,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
+   "cm": "4",
    "id": 92,
    "mode": "duel",
    "order": [
-    1
+    0
    ],
    "players": [
     "strategy",
-    "mcts"
+    "alphabeta"
    ],
-   "shape": "rect",
-   "steps": 93,
-   "winner": 0
+   "shape": "ring",
+   "steps": 80,
+   "winner": 1
   },
   {
    "bm": "wrap",
-   "cm": "3",
+   "cm": "4",
    "id": 93,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
-    "alphabeta",
-    "pvs"
+    "strategy",
+    "alphabeta"
    ],
-   "shape": "rect",
-   "steps": 190,
+   "shape": "ring",
+   "steps": 66,
    "winner": 1
   },
   {
    "bm": "wrap",
-   "cm": "3",
+   "cm": "4",
    "id": 94,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
-    "alphabeta",
-    "mcts"
+    "strategy",
+    "alphabeta"
    ],
-   "shape": "rect",
-   "steps": 100,
+   "shape": "ring",
+   "steps": 76,
    "winner": 1
   },
   {
    "bm": "wrap",
-   "cm": "3",
+   "cm": "4",
    "id": 95,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
-    "pvs",
-    "mcts"
+    "strategy",
+    "alphabeta"
    ],
-   "shape": "rect",
-   "steps": 100,
+   "shape": "ring",
+   "steps": 80,
    "winner": 1
   },
   {
@@ -1580,2280 +1574,14 @@
     "strategy",
     "alphabeta"
    ],
-   "shape": "rect",
-   "steps": 126,
+   "shape": "ring",
+   "steps": 52,
    "winner": 1
   },
   {
    "bm": "wrap",
    "cm": "4",
    "id": 97,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 124,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 98,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 93,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 99,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 131,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 100,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 119,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 101,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 123,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 102,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "rect",
-   "steps": 188,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 103,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 301,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 104,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 193,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 105,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 623,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 106,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 271,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 107,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 205,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 108,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "rect",
-   "steps": 295,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 109,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 571,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 110,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 171,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 111,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 1000,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 112,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 99,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 113,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 145,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 114,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "rect",
-   "steps": 198,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 115,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 70,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 116,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 79,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 117,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 182,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 118,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 119,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 119,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 99,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 120,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "rect",
-   "steps": 204,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 121,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 346,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 122,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 171,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 123,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 1000,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 124,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 101,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 125,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 101,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 126,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "rect",
-   "steps": 1000,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 127,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 707,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 128,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 81,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 129,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 1000,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 130,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 63,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 131,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 153,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 132,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "rect",
-   "steps": 38,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 133,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 100,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 134,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 121,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 135,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 124,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 136,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 91,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 137,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 59,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 138,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "rect",
-   "steps": 252,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 139,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 540,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 140,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 427,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 141,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "rect",
-   "steps": 187,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 142,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 77,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 143,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "rect",
-   "steps": 80,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 144,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 762,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 145,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 347,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 146,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 99,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 147,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 1000,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 148,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 103,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 149,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 285,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 150,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 312,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 151,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 224,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 152,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 100,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 153,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 658,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 154,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 105,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 155,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 167,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 156,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 592,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 157,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 560,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 158,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 163,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 159,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 111,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 160,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 133,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 161,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 215,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 162,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 77,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 163,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 63,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 164,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 65,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 165,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 71,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 166,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 64,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 167,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 45,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 168,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 89,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 169,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 88,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 170,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 94,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 171,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 93,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 172,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 49,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 173,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 56,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 174,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 142,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 175,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 67,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 176,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 137,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 177,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 158,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 178,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 113,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 179,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 79,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 180,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 548,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 181,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 143,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 182,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 147,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 183,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 208,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 184,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 161,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 185,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 153,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 186,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 58,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 187,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 102,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 188,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 106,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 189,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 67,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 190,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 73,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 191,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 105,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 192,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 426,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 193,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 262,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 194,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 427,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 195,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 274,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 196,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 95,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 197,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 111,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 198,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 807,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 199,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 375,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 200,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 277,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 201,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 693,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 202,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 87,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 203,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 173,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 204,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 88,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 205,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 68,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 206,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 76,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 207,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 82,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 208,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 55,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 209,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 79,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 210,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "holes",
-   "steps": 616,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 211,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 280,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 212,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 271,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 213,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "holes",
-   "steps": 1000,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 214,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 199,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 215,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "holes",
-   "steps": 143,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 216,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "ring",
-   "steps": 218,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 217,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 224,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 218,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 265,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 219,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 412,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 220,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 183,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 221,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 641,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 222,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "ring",
-   "steps": 458,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 223,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 265,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 224,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 106,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 225,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 99,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 226,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 177,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 227,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 249,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 228,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "ring",
-   "steps": 1000,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 229,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 1000,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 230,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 1000,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 231,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 495,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 232,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 657,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 233,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 699,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 234,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "ring",
-   "steps": 60,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 235,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 58,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 236,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 73,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 237,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 51,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 238,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 47,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 239,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 41,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 240,
    "mode": "duel",
    "order": [
     0
@@ -3869,14 +1597,14 @@
   {
    "bm": "wrap",
    "cm": "4",
-   "id": 241,
+   "id": 98,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
     "strategy",
-    "pvs"
+    "alphabeta"
    ],
    "shape": "ring",
    "steps": 82,
@@ -3885,455 +1613,7 @@
   {
    "bm": "wrap",
    "cm": "4",
-   "id": 242,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 83,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 243,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 85,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 244,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 73,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 245,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 69,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 246,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "ring",
-   "steps": 126,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 247,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 109,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 248,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 131,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 249,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 114,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 250,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 101,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 251,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 61,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 252,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "ring",
-   "steps": 618,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 253,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 501,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 254,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 591,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 255,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 188,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 256,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 147,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 257,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 145,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 258,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "ring",
-   "steps": 98,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 259,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 102,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 260,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 143,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 261,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 193,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 262,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 99,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 263,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 71,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 264,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "ring",
-   "steps": 166,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 265,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 111,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 266,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 214,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 267,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 184,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 268,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 175,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 269,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 124,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 270,
+   "id": 99,
    "mode": "duel",
    "order": [
     1
@@ -4343,109 +1623,93 @@
     "alphabeta"
    ],
    "shape": "ring",
-   "steps": 465,
+   "steps": 87,
    "winner": 0
   },
   {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 271,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 342,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 272,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 647,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 273,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 506,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 274,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 769,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 275,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 173,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
+   "bm": "wrap",
    "cm": "4",
-   "id": 276,
+   "id": 100,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
     "strategy",
-    "alphabeta"
+    "pvs"
+   ],
+   "shape": "ring",
+   "steps": 76,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 101,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "ring",
+   "steps": 76,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 102,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "ring",
+   "steps": 43,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 103,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
+   ],
+   "shape": "ring",
+   "steps": 74,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 104,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "strategy",
+    "pvs"
    ],
    "shape": "ring",
    "steps": 58,
    "winner": 1
   },
   {
-   "bm": "degrade",
+   "bm": "wrap",
    "cm": "4",
-   "id": 277,
+   "id": 105,
    "mode": "duel",
    "order": [
     0
@@ -4455,185 +1719,45 @@
     "pvs"
    ],
    "shape": "ring",
-   "steps": 52,
+   "steps": 74,
    "winner": 1
   },
   {
-   "bm": "degrade",
+   "bm": "wrap",
    "cm": "4",
-   "id": 278,
+   "id": 106,
    "mode": "duel",
    "order": [
     0
    ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 62,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 279,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "ring",
-   "steps": 57,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 280,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 55,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 281,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 60,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 282,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "ring",
-   "steps": 270,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 283,
-   "mode": "duel",
-   "order": [],
    "players": [
     "strategy",
     "pvs"
    ],
    "shape": "ring",
-   "steps": 1000,
-   "winner": 0
+   "steps": 76,
+   "winner": 1
   },
   {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 284,
+   "bm": "wrap",
+   "cm": "4",
+   "id": 107,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
     "strategy",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 816,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 285,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "alphabeta",
     "pvs"
    ],
    "shape": "ring",
-   "steps": 565,
-   "winner": 0
+   "steps": 58,
+   "winner": 1
   },
   {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 286,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 335,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 287,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "ring",
-   "steps": 411,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 288,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 43,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 289,
+   "bm": "wrap",
+   "cm": "4",
+   "id": 108,
    "mode": "duel",
    "order": [
     1
@@ -4642,94 +1766,14 @@
     "strategy",
     "pvs"
    ],
-   "shape": "cross",
-   "steps": 47,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 290,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
+   "shape": "ring",
    "steps": 69,
    "winner": 0
   },
   {
-   "bm": "default",
-   "cm": "3",
-   "id": 291,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 31,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 292,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 27,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "3",
-   "id": 293,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 13,
-   "winner": 0
-  },
-  {
-   "bm": "default",
+   "bm": "wrap",
    "cm": "4",
-   "id": 294,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 52,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 295,
+   "id": 109,
    "mode": "duel",
    "order": [
     1
@@ -4738,314 +1782,14 @@
     "strategy",
     "pvs"
    ],
-   "shape": "cross",
-   "steps": 27,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 296,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 35,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 297,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 27,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 298,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 33,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "4",
-   "id": 299,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
+   "shape": "ring",
    "steps": 59,
    "winner": 0
   },
   {
-   "bm": "default",
-   "cm": "5",
-   "id": 300,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 106,
-   "winner": 1
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 301,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 39,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 302,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 535,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 303,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 31,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 304,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 133,
-   "winner": 0
-  },
-  {
-   "bm": "default",
-   "cm": "5",
-   "id": 305,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 525,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 306,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 47,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 307,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 51,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 308,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 57,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 309,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 37,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 310,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 42,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "3",
-   "id": 311,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 31,
-   "winner": 0
-  },
-  {
    "bm": "wrap",
    "cm": "4",
-   "id": 312,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 48,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 313,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 60,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 314,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 47,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "4",
-   "id": 315,
+   "id": 110,
    "mode": "duel",
    "order": [
     0
@@ -5054,382 +1798,62 @@
     "alphabeta",
     "pvs"
    ],
-   "shape": "cross",
-   "steps": 64,
+   "shape": "ring",
+   "steps": 72,
    "winner": 1
   },
   {
    "bm": "wrap",
    "cm": "4",
-   "id": 316,
+   "id": 111,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
     "alphabeta",
-    "mcts"
+    "pvs"
    ],
-   "shape": "cross",
-   "steps": 35,
+   "shape": "ring",
+   "steps": 69,
    "winner": 0
   },
   {
    "bm": "wrap",
    "cm": "4",
-   "id": 317,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 45,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 318,
+   "id": 112,
    "mode": "duel",
    "order": [
     0
    ],
    "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 110,
-   "winner": 1
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 319,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
+    "alphabeta",
     "pvs"
    ],
-   "shape": "cross",
-   "steps": 70,
+   "shape": "ring",
+   "steps": 68,
    "winner": 1
   },
   {
    "bm": "wrap",
-   "cm": "5",
-   "id": 320,
+   "cm": "4",
+   "id": 113,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
-    "strategy",
-    "mcts"
+    "alphabeta",
+    "pvs"
    ],
-   "shape": "cross",
+   "shape": "ring",
    "steps": 75,
    "winner": 0
   },
   {
    "bm": "wrap",
-   "cm": "5",
-   "id": 321,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 55,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 322,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 77,
-   "winner": 0
-  },
-  {
-   "bm": "wrap",
-   "cm": "5",
-   "id": 323,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 107,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 324,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 136,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 325,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 56,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 326,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 5,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 327,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 105,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 328,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 27,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "3",
-   "id": 329,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 43,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
    "cm": "4",
-   "id": 330,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 38,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 331,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 31,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 332,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 43,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 333,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 11,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 334,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 29,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "4",
-   "id": 335,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 25,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 336,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 98,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 337,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 118,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 338,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 249,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 339,
+   "id": 114,
    "mode": "duel",
    "order": [
     0
@@ -5438,284 +1862,46 @@
     "alphabeta",
     "pvs"
    ],
-   "shape": "cross",
-   "steps": 86,
-   "winner": 1
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 340,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 67,
-   "winner": 0
-  },
-  {
-   "bm": "bounce",
-   "cm": "5",
-   "id": 341,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 55,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 342,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 85,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 343,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 101,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 344,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 71,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 345,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 29,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 346,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 55,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "3",
-   "id": 347,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 129,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 348,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 40,
-   "winner": 1
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 349,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 19,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 350,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "strategy",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 23,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 351,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "pvs"
-   ],
-   "shape": "cross",
-   "steps": 49,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 352,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "alphabeta",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 47,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "4",
-   "id": 353,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 19,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 354,
-   "mode": "duel",
-   "order": [],
-   "players": [
-    "strategy",
-    "alphabeta"
-   ],
-   "shape": "cross",
-   "steps": 712,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 355,
-   "mode": "duel",
-   "order": [
-    0
-   ],
-   "players": [
-    "strategy",
-    "pvs"
-   ],
-   "shape": "cross",
+   "shape": "ring",
    "steps": 80,
    "winner": 1
   },
   {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 356,
+   "bm": "wrap",
+   "cm": "4",
+   "id": 115,
    "mode": "duel",
    "order": [
-    0
+    1
    ],
    "players": [
-    "strategy",
-    "mcts"
+    "alphabeta",
+    "pvs"
    ],
-   "shape": "cross",
-   "steps": 316,
-   "winner": 1
+   "shape": "ring",
+   "steps": 75,
+   "winner": 0
   },
   {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 357,
+   "bm": "wrap",
+   "cm": "4",
+   "id": 116,
+   "mode": "duel",
+   "order": [
+    1
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "ring",
+   "steps": 41,
+   "winner": 0
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 117,
    "mode": "duel",
    "order": [
     0
@@ -5724,40 +1910,40 @@
     "alphabeta",
     "pvs"
    ],
-   "shape": "cross",
-   "steps": 68,
+   "shape": "ring",
+   "steps": 80,
    "winner": 1
   },
   {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 358,
+   "bm": "wrap",
+   "cm": "4",
+   "id": 118,
+   "mode": "duel",
+   "order": [
+    0
+   ],
+   "players": [
+    "alphabeta",
+    "pvs"
+   ],
+   "shape": "ring",
+   "steps": 78,
+   "winner": 1
+  },
+  {
+   "bm": "wrap",
+   "cm": "4",
+   "id": 119,
    "mode": "duel",
    "order": [
     1
    ],
    "players": [
     "alphabeta",
-    "mcts"
+    "pvs"
    ],
-   "shape": "cross",
-   "steps": 294,
-   "winner": 0
-  },
-  {
-   "bm": "degrade",
-   "cm": "5",
-   "id": 359,
-   "mode": "duel",
-   "order": [
-    1
-   ],
-   "players": [
-    "pvs",
-    "mcts"
-   ],
-   "shape": "cross",
-   "steps": 21,
+   "shape": "ring",
+   "steps": 77,
    "winner": 0
   }
  ]

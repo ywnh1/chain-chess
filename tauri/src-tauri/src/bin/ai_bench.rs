@@ -178,27 +178,30 @@ fn spread_starts(board: &GameBoard, n: usize, bm: BorderMode, variant: u32) -> V
     });
 
     let mut picked: Vec<(usize, usize)> = Vec::with_capacity(n);
-    // 第一个首子不是永远取「离重心最近」那一个：那样每局开局完全相同，
-    // 而 A-B / PVS 的决策是确定性的（棋盘哈希 + randomScale），cap4 下又没有
-    // 随机爆炸方向 —— 同一开局会让 --games N 的四局变成同一局跑 N 遍。
-    // 这里从最靠近重心的前 k 个候选里按 variant 轮换，保证每局开局不同。
+    // 首子必须随机化。A-B / PVS 的决策是确定性的（棋盘哈希 + randomScale），
+    // cap4 下爆炸方向也没有随机成分 —— 同一开局会让 --games N 变成同一局跑 N 遍。
+    // 光轮换第一个首子只够 6 种开局，实测 20 局里仍有大量完全相同的重复局。
+    // 这里用 variant 做种，每个首子都在「前 k 个最优候选」里随机挑，
+    // 开局空间从 6 种扩到几十种；同一 variant 仍然完全可复现。
+    let mut rs = variant.wrapping_mul(2654435761).wrapping_add(1013904223);
+    let mut next = || { rs = rs.wrapping_mul(1664525).wrapping_add(1013904223); rs };
     if !cand.is_empty() {
-        let k = cand.len().min(6);
-        let idx = (variant as usize) % k;
-        picked.push(cand[idx]);
+        let k = cand.len().min(12);           // 第一个：靠近重心的一档（7×7 上约 13 格）
+        picked.push(cand[(next() as usize) % k]);
     }
     while picked.len() < n && picked.len() < cand.len() {
-        let mut best: Option<(usize, usize)> = None;
-        let mut best_d: usize = 0;
-        for &p in &cand {
-            if picked.contains(&p) { continue; }
-            let d = picked.iter().map(|&q| border_dist(board, p, q, bm)).min().unwrap_or(0);
-            if best.is_none() || d > best_d { best_d = d; best = Some(p); }
-        }
-        match best {
-            Some(p) => picked.push(p),
-            None => break,
-        }
+        // 按「离已选首子的最短距离」降序，从前 k 个里随机挑一个
+        let mut scored: Vec<(usize, (usize, usize))> = cand.iter()
+            .filter(|p| !picked.contains(p))
+            .map(|&p| {
+                let d = picked.iter().map(|&q| border_dist(board, p, q, bm)).min().unwrap_or(0);
+                (d, p)
+            })
+            .collect();
+        if scored.is_empty() { break; }
+        scored.sort_unstable_by(|a, b| b.0.cmp(&a.0));
+        let k = scored.len().min(5);
+        picked.push(scored[(next() as usize) % k].1);
     }
     for &p in &cand {
         if picked.len() >= n { break; }

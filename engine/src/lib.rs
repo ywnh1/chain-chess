@@ -733,19 +733,35 @@ pub fn eval_board_improved(board: &GameBoard, player: usize, game_count: u32, bo
     };
 
     if random_scale > 0 {
-        let hash: u64 = board.iter().enumerate().flat_map(|(i, row)| {
-            row.iter().enumerate().map(move |(j, c)| {
-                ((i as u64).wrapping_mul(31).wrapping_add(j as u64))
-                    .wrapping_mul(7)
-                    .wrapping_add(c.owner.unwrap_or(99) as u64)
-                    .wrapping_mul(c.count as u64)
-            })
-        }).fold(0u64, |a, b| a.wrapping_mul(6364136223846793005).wrapping_add(b));
-        let rnd = (hash % 100) as i32;
+        let rnd = (board_perturbation(board, game_count) % 100) as i32;
         base + rnd * random_scale / 100 - random_scale / 2
     } else {
         base
     }
+}
+
+
+/// 评估扰动的伪随机源：棋盘指纹 + 对局计数。
+///
+/// 只哈希棋盘是不够的 —— 相同局面永远得到相同的扰动，两个确定性搜索
+/// （A-B / PVS）在同一开局下会走出完全一样的棋，`randomScale` 实际只区分
+/// 不同棋盘、不产生对局间差异。混入 game_count 后，同一个局面在不同对局里
+/// 会得到不同扰动，随机刻度才真正起到「同一局面下偶尔换一种走法」的作用。
+#[inline]
+fn board_perturbation(board: &GameBoard, game_count: u32) -> u64 {
+    let h = board.iter().enumerate().flat_map(|(i, row)| {
+        row.iter().enumerate().map(move |(j, c)| {
+            ((i as u64).wrapping_mul(31).wrapping_add(j as u64))
+                .wrapping_mul(7)
+                .wrapping_add(c.owner.unwrap_or(99) as u64)
+                .wrapping_mul(c.count as u64)
+        })
+    }).fold(0u64, |a, b| a.wrapping_mul(6364136223846793005).wrapping_add(b));
+    // 与对局号混合后再过一轮 splitmix，避免低位规律性
+    let mut z = h ^ (game_count as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
 }
 
 
@@ -1244,16 +1260,7 @@ pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, b
     };
 
     if random_scale > 0.0 {
-        // 使用确定性伪随机（基于棋盘哈希），避免多线程问题
-        let hash: u64 = board.iter().enumerate().flat_map(|(i, row)| {
-            row.iter().enumerate().map(move |(j, c)| {
-                ((i as u64).wrapping_mul(31).wrapping_add(j as u64))
-                    .wrapping_mul(7)
-                    .wrapping_add(c.owner.unwrap_or(99) as u64)
-                    .wrapping_mul(c.count as u64)
-            })
-        }).fold(0u64, |a, b| a.wrapping_mul(6364136223846793005).wrapping_add(b));
-        let rnd = (hash % 100) as f64 / 100.0; // 0..1
+        let rnd = (board_perturbation(board, game_count) % 100) as f64 / 100.0; // 0..1
         base + (rnd * random_scale - random_scale * 0.5) as i32
     } else {
         base
