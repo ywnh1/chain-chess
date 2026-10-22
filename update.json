@@ -1,12 +1,12 @@
 {
-  "version": "3.4.1",
-  "notes": "Multiple irregular-board fixes: AI and taps no longer land in holes, only the default border stays selectable, undo and replay keep the shape, restart keeps the column count; fixed garbled Chinese in the update notes; retrained AI model, stronger on irregular and rectangular boards",
-  "notes_zh": "修复异型棋盘多处问题：AI 与点击不再落进空洞、仅保留默认边界、悔棋与回放不丢形状、重开不丢列数；修复更新说明中文乱码；AI 模型重训，不规则与长方形棋盘上更强",
-  "pub_date": "2026-10-11T00:00:00Z",
+  "version": "3.4.2",
+  "notes": "Random board generation (an irregular board sized to the player count, different every game); irregular boards now support all four border modes; background orbs and the in-game player-colour background can be turned off in settings; download centre and contact links added; MCTS removed; fixed AI evaluation bias under wrap borders; rules page rewritten",
+  "notes_zh": "新增随机棋盘（按人数生成异形盘，每局不同）、异形棋盘支持全部边界、设置可关背景光球与背景跟随、补下载中心与联系作者入口；移除 MCTS；修正回环下 AI 评估失真；重写规则页",
+  "pub_date": "2026-10-22T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 13538728
+      "size": 13526440
     },
     "windows": {
       "url": "https://ywnh1.free.leoi.org",
