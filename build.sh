@@ -107,10 +107,34 @@ sync_version() {
       _UPDSYNC=$(python3 - <<'PYEOF'
 import re, json, sys
 h = open('download.html', encoding='utf-8').read()
-m = re.search(r"\{v:'v[^']*',\s*\n\s*zh:'([^']*)',\s*\n\s*en:'([^']*)'\}", h)
-if not m:
+# 只取 CHANGELOG 的第一条（最新那条），逐字符配对大括号，
+# 避免正则跨条目误匹配。格式是：
+#   {\n  v: 'vX.Y.Z · 第 N 版',\n  zh: '...',\n  en: '...'\n},
+i = h.find('var CHANGELOG')
+if i < 0:
     print('WARN'); sys.exit(0)
-zh, en = m.group(1).strip(), m.group(2).strip()
+start = h.find('{', i)
+if start < 0:
+    print('WARN'); sys.exit(0)
+depth, end = 0, -1
+for k in range(start, len(h)):
+    if h[k] == '{':
+        depth += 1
+    elif h[k] == '}':
+        depth -= 1
+        if depth == 0:
+            end = k + 1
+            break
+if end < 0:
+    print('WARN'); sys.exit(0)
+entry = h[start:end]
+mz = re.search(r"zh:\s*'([^']*)'", entry)
+me = re.search(r"en:\s*'([^']*)'", entry)
+if not mz or not me:
+    print('WARN'); sys.exit(0)
+zh, en = mz.group(1).strip(), me.group(1).strip()
+if not zh or not en:
+    print('WARN'); sys.exit(0)
 d = json.load(open('update.json', encoding='utf-8'))
 if d.get('notes_zh') == zh and d.get('notes') == en:
     print('SAME'); sys.exit(0)
