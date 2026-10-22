@@ -54,7 +54,7 @@ SHAPE_LABEL = {
 }
 ALL_BORDERS = ['default', 'wrap', 'bounce', 'degrade']
 ALL_CAPS = ['3', '4', '5']
-ALL_ALGS = ['strategy', 'alphabeta', 'pvs', 'mcts']
+ALL_ALGS = ['strategy', 'alphabeta', 'pvs']   # MCTS 已在游戏内移除，默认不参与评测
 ALL_SHAPES = ['square', 'rect', 'holes', 'ring', 'cross']
 
 
@@ -299,17 +299,19 @@ def main():
     L.append('')
     L.append(f'- **测试时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     if a.use_ml:
-        L.append(f'- **评估函数**: ML 模型（{model_fingerprint()}）；策略 / MCTS 不使用评估函数，不受此影响')
+        L.append(f'- **评估函数**: ML 模型（{model_fingerprint()}）；策略不使用评估函数，不受此影响')
     else:
-        L.append('- **评估函数**: 手写规则（--no-ml）；策略 / MCTS 不使用评估函数，不受此影响')
+        L.append('- **评估函数**: 手写规则（--no-ml）；策略不使用评估函数，不受此影响')
     shapes = config.get('shapes') or ['square']
     shape_txt = ', '.join(SHAPE_LABEL.get(x, x) for x in shapes)
     L.append(f'- **棋盘**: {config["size"]}×{config["size"]}（基准边长）· 形状: {shape_txt} · 模式: '
              f'{"混战（每算法一名）" if config["mode"] == "ffa" else "两两对阵"}')
     L.append(f'- **组合**: {len(shapes)} 形状 × {len(config["borders"])} 边界 × {len(config["caps"])} 阈值 = '
              f'{len(shapes) * len(config["borders"]) * len(config["caps"])} 组 · 每组合 {config["games"]} 局 · 共 {total} 局')
-    L.append(f'- **搜索**: A-B/PVS 深度 {config["depth"]} · MCTS 深度 {config["mctsDepth"]} · '
-             f'随机刻度 {config["randomScale"]}% · 种子 {config["seed"]}')
+    search_txt = f'A-B/PVS 深度 {config["depth"]}'
+    if 'mcts' in (config.get('algs') or []):
+        search_txt += f' · MCTS 深度 {config["mctsDepth"]}'
+    L.append(f'- **搜索**: {search_txt} · 随机刻度 {config["randomScale"]}% · 种子 {config["seed"]}')
     L.append('')
 
     # 总体排名

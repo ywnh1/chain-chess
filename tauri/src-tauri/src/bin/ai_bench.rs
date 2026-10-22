@@ -159,7 +159,7 @@ fn border_dist(board: &GameBoard, from: (usize, usize), to: (usize, usize), bm: 
 ///
 /// 距离用 BFS（见 border_dist），而不是直线距离 —— 异形棋盘 + 回环下，
 /// 直线距离会骗人，导致首子实际紧挨着、一步定胜负。
-fn spread_starts(board: &GameBoard, n: usize, bm: BorderMode) -> Vec<(usize, usize)> {
+fn spread_starts(board: &GameBoard, n: usize, bm: BorderMode, variant: u32) -> Vec<(usize, usize)> {
     let rows = board.len();
     let cols = board.first().map_or(0, |r| r.len());
     let mut cand: Vec<(usize, usize)> = Vec::new();
@@ -178,7 +178,15 @@ fn spread_starts(board: &GameBoard, n: usize, bm: BorderMode) -> Vec<(usize, usi
     });
 
     let mut picked: Vec<(usize, usize)> = Vec::with_capacity(n);
-    if let Some(&first) = cand.first() { picked.push(first); }
+    // 第一个首子不是永远取「离重心最近」那一个：那样每局开局完全相同，
+    // 而 A-B / PVS 的决策是确定性的（棋盘哈希 + randomScale），cap4 下又没有
+    // 随机爆炸方向 —— 同一开局会让 --games N 的四局变成同一局跑 N 遍。
+    // 这里从最靠近重心的前 k 个候选里按 variant 轮换，保证每局开局不同。
+    if !cand.is_empty() {
+        let k = cand.len().min(6);
+        let idx = (variant as usize) % k;
+        picked.push(cand[idx]);
+    }
     while picked.len() < n && picked.len() < cand.len() {
         let mut best: Option<(usize, usize)> = None;
         let mut best_d: usize = 0;
@@ -217,7 +225,7 @@ fn run_game(
 ) -> (Option<usize>, usize, Vec<usize>) {
     let (rows, cols, open) = build_shape(shape, size);
     let mut board = build_board(rows, cols, &open);
-    let starts = spread_starts(&board, players.len(), bm);
+    let starts = spread_starts(&board, players.len(), bm, gc);
     let max_players = players.len();
     assert_eq!(starts.len(), max_players, "{shape}: 可用格不足以安排首子");
     for (p, &(x, y)) in starts.iter().enumerate() {
