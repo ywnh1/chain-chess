@@ -73,6 +73,19 @@
       </div>
     </div>
 
+    <!-- 我创建的自定义棋盘（仅「自定义」形状时显示） -->
+    <div class="form-row" id="customBoardRow"
+      style="display:none;flex-direction:column;align-items:stretch;gap:6px">
+      <label>我创建的自定义棋盘</label>
+      <div id="customBoardList" class="custom-board-list"></div>
+      <div style="display:flex;gap:8px">
+        <button class="glass-btn primary" id="customBoardNewBtn" style="flex:1;padding:6px 10px;font-size:.78rem">＋ 新建</button>
+        <button class="glass-btn" id="customBoardEditBtn" style="flex:1;padding:6px 10px;font-size:.78rem">编辑当前</button>
+        <button class="glass-btn danger" id="customBoardDelBtn"
+          style="flex:0 0 auto;padding:6px 10px;font-size:.78rem">删除</button>
+      </div>
+    </div>
+
     <!-- 棋盘大小（正方形） -->
     <div class="form-row" id="squareSizeRow"><label>棋盘大小<button type="button" class="hint-btn"
           onclick="openHint('board-size')" aria-label="棋盘大小说明">!</button></label>
@@ -1005,6 +1018,8 @@
 
         <p><strong>棋盘形状</strong>：正方形是 5×5 到 19×19；也可以选长方形（长宽各 5–19），或者用形状编辑器自己点出一个不规则棋盘（十字、口字、L、U
           之类）。挖掉的格子是「洞」。异形棋盘同样支持全部边界：默认边界下棋子飞进洞会消失；回环会绕过洞落到下一格；反弹把撞到洞的能量弹回对面；降级按形状轮廓算边缘和拐角。</p>
+        <p><strong>我创建的自定义棋盘</strong>：画好的形状可以起名保存，出现在「自定义」下面的列表里，最多 30 块。点一块即可切换使用，「编辑当前」改它，「删除」移除它，「新建」从当前棋盘继续画。
+          编辑器里按住格子滑动能连续涂上或擦掉，按下的第一格决定这一笔是涂还是擦。</p>
         <ul>
           <li>5×5 ~ 7×7：几步就进连爆，节奏快，<strong>新手选 7×7</strong></li>
           <li>9×9 ~ 13×13：攻守都比较从容，适合用来练</li>
@@ -1157,6 +1172,10 @@
       </div>
 
       <div class="about-card">
+        <div class="form-row">
+          <label>名称</label>
+          <input type="text" id="beNameInput" maxlength="12" placeholder="给这块棋盘起个名字" autocomplete="off">
+        </div>
         <div class="cs-actions">
           <button class="glass-btn primary" id="beSaveBtn">保存并使用</button>
           <button class="glass-btn" id="beExportBtn">导出</button>

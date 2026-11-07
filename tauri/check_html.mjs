@@ -49,17 +49,27 @@ for(const c of strContainers)
   if(!m)e.push("applyShapeMode 不见了");
   else{
     const run=(mode,jump)=>{
-      let navigated=null;
+      let navigated=null, editorArg='<未调用>';
       const mk=()=>({style:{}});
-      const els={squareSizeRow:mk(),rectSizeRow:mk()};
-      const fn=new Function("currentShapeMode","document","Router","setupLobbySync","return "+m[0])(
+      const els={squareSizeRow:mk(),rectSizeRow:mk(),randomShapeRow:mk(),customBoardRow:mk()};
+      // applyShapeMode 现在还会读自定义棋盘列表、并通过 openBoardEditor 进编辑器，
+      // 这里一并注入，保证跑的是真实分支而不是被 typeof 短路掉的降级路径。
+      const fn=new Function(
+        "currentShapeMode","document","Router","setupLobbySync",
+        "renderCustomBoardList","getActiveCustomBoard","openBoardEditor",
+        "return "+m[0]
+      )(
         ()=>mode,
         {getElementById:id=>els[id]||null},
         {navigate:id=>{navigated=id;}},
-        ()=>{}
+        ()=>{},
+        ()=>{},
+        ()=>null,                                  // 没有任何自定义棋盘
+        (id)=>{editorArg=id;navigated='board-editor';}
       );
       fn(jump);
-      return {sq:els.squareSizeRow.style.display,rc:els.rectSizeRow.style.display,nav:navigated};
+      return {sq:els.squareSizeRow.style.display,rc:els.rectSizeRow.style.display,
+              nav:navigated, editorArg, cbr:els.customBoardRow.style.display};
     };
     const a=run('square',false);
     if(a.sq==='none')e.push("正方形模式不该隐藏尺寸按钮");
@@ -72,6 +82,11 @@ for(const c of strContainers)
     if(c.rc!=='none')e.push("自定义模式不该显示长宽选择器");
     if(run('custom',true).nav!=='board-editor')e.push("用户点自定义时该跳形状编辑器");
     if(run('custom',false).nav)e.push("初始化时不该跳编辑器（会退不出来）");
+    // 自定义棋盘栏目只在自定义形状下出现
+    if(run('custom',false).cbr==='none')e.push("自定义模式应显示「我创建的自定义棋盘」栏目");
+    if(run('square',false).cbr!=='none')e.push("非自定义模式不该显示自定义棋盘栏目");
+    // 一块棋盘都没存过时，点自定义进编辑器应当是「新建」
+    if(run('custom',true).editorArg!==null)e.push("没有已存棋盘时，点自定义应以新建（id=null）进编辑器");
   }
 }
 // 空洞不是棋盘格子：processClick 在引擎结果返回前就会直接改棋盘，

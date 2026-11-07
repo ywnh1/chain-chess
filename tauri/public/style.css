@@ -1443,7 +1443,8 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 .theme-group .tg-btn.selected{background:rgba(240,179,75,.15);border-color:var(--accent);color:var(--accent)}
 
 /* ═══════ 自定义棋盘形状编辑器 ═══════ */
-.be-grid{display:grid;gap:2px;margin-top:8px;touch-action:manipulation}
+.be-grid{display:grid;gap:2px;margin-top:8px;touch-action:none;user-select:none;-webkit-user-select:none}
+/* 在格子上按住滑动即可连续涂抹 / 擦除；touch-action:none 防止触屏时页面跟着滚 */
 .be-grid .be-cell{aspect-ratio:1/1;border-radius:3px;background:var(--glass-w-04);
   border:1px solid var(--glass-w-08);cursor:pointer;transition:.1s}
 .be-grid .be-cell.on{background:rgba(240,179,75,.32);border-color:rgba(240,179,75,.6)}
@@ -1451,6 +1452,20 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 #beExportArea{width:100%;font-size:.72rem;font-family:monospace;line-height:1.4;
   background:var(--glass-w-04);color:var(--text);border:1px solid var(--border);
   border-radius:8px;padding:8px;box-sizing:border-box;resize:vertical}
+
+/* ═══════ 自定义棋盘库（开局页） ═══════ */
+.custom-board-list{display:flex;flex-direction:column;gap:4px;max-height:168px;overflow-y:auto}
+.custom-board-list .cs-note{margin:0}
+.custom-board-item{display:flex;flex-direction:column;align-items:flex-start;gap:1px;
+  width:100%;text-align:left;cursor:pointer;font-family:inherit;
+  background:var(--glass-w-04);border:1px solid var(--glass-w-08);border-radius:var(--radius-sm);
+  padding:7px 10px;color:var(--text);transition:border-color .15s ease,background .15s ease}
+.custom-board-item:hover{background:var(--glass-w-08);border-color:var(--btn-border-hover)}
+.custom-board-item.selected{background-image:var(--btn-gold-bg);border-color:rgba(240,179,75,.55);
+  color:var(--accent);box-shadow:var(--btn-gold-glow)}
+.custom-board-item .cb-name{font-size:.82rem;font-weight:600}
+.custom-board-item .cb-meta{font-size:.68rem;color:var(--dim)}
+.custom-board-item.selected .cb-meta{color:var(--accent);opacity:.75}
 
 /* ═══════ 自定义音效编辑器 ═══════ */
 .cs-note{font-size:.76rem;color:var(--dim);line-height:1.65;margin:8px 0 0}

@@ -1763,6 +1763,9 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
         history: compact,
         playerTypes: getPlayerTypesArray(),
         killedBy: {...eliminationInfo},
+        // 淘汰先后（轮次展开后的扁平顺序）。没有它，回放只能按玩家编号排，
+        // 会让「先淘汰的人」显示在后淘汰的人前面。
+        eliminatedOrder: [].concat.apply([], eliminationRounds || []),
       }
     });
     // 保存成功后清理磁盘上的回合数据（不再需要）
@@ -2125,6 +2128,128 @@ function beUsableCount(){
   for(let i=0;i<BE_N;i++)for(let j=0;j<BE_N;j++)if(beGrid[i][j])n++;
   return n;
 }
+/* ── 自定义棋盘库 ──
+ * appSettings.customBoards: [{id,name,rows,cols,cells,savedAt}]
+ * appSettings.activeCustomBoard: 当前选中的 id
+ * 旧版只有一个 customShape；读取时若还没有列表就把它迁移成第一条记录，
+ * 迁移后立刻写成数组，之后再删空也不会被反复迁移回来。 */
+const CUSTOM_BOARDS_MAX = 30;
+
+function shapeCellCount(shape){
+  let n=0;
+  for(let i=0;i<shape.rows;i++)for(let j=0;j<shape.cols;j++)if(shape.cells[i][j]==='1')n++;
+  return n;
+}
+
+function getCustomBoards(){
+  let list=appSettings.customBoards;
+  if(!Array.isArray(list)){
+    list=[];
+    const legacy=appSettings.customShape?validateBeShape(appSettings.customShape):null;
+    if(legacy){
+      list.push({id:'legacy',name:'我的棋盘',rows:legacy.rows,cols:legacy.cols,
+        cells:legacy.cells,savedAt:Date.now()});
+      appSettings.activeCustomBoard='legacy';
+    }
+    appSettings.customBoards=list;
+  }
+  // 逐项校验：旧存档、手改的 JSON 都可能不合法，坏数据直接跳过
+  const out=[];
+  for(const b of list){
+    if(!b)continue;
+    const v=validateBeShape(b);
+    if(!v)continue;
+    out.push({
+      id:b.id||('b'+Math.random().toString(36).slice(2,9)),
+      name:String(b.name||'自定义棋盘').slice(0,12),
+      rows:v.rows,cols:v.cols,cells:v.cells,
+      savedAt:b.savedAt||0,
+    });
+  }
+  return out;
+}
+
+function saveCustomBoards(list){
+  appSettings.customBoards=list.slice(0,CUSTOM_BOARDS_MAX);
+  saveSettings();
+}
+
+function getActiveCustomBoard(){
+  const list=getCustomBoards();
+  if(!list.length)return null;
+  const id=appSettings.activeCustomBoard;
+  return list.find(function(b){return b.id===id})||list[0];
+}
+
+function upsertCustomBoard(shape,name,id){
+  const list=getCustomBoards();
+  const rec={
+    id:id||('b'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)),
+    name:(name||'自定义棋盘').slice(0,12),
+    rows:shape.rows,cols:shape.cols,cells:shape.cells.slice(),
+    savedAt:Date.now(),
+  };
+  const i=list.findIndex(function(b){return b.id===rec.id});
+  if(i>=0)list[i]=rec; else list.unshift(rec);
+  saveCustomBoards(list);
+  appSettings.activeCustomBoard=rec.id;
+  saveSettings();
+  return rec;
+}
+
+function deleteCustomBoard(id){
+  const before=getCustomBoards();
+  const list=before.filter(function(b){return b.id!==id});
+  saveCustomBoards(list);
+  if(appSettings.activeCustomBoard===id){
+    appSettings.activeCustomBoard=list.length?list[0].id:null;
+    saveSettings();
+  }
+  return list.length!==before.length;
+}
+
+// 开局页的列表：点一项即切换使用中的棋盘
+function renderCustomBoardList(){
+  const box=document.getElementById('customBoardList');
+  if(!box)return;
+  const list=getCustomBoards();
+  const active=getActiveCustomBoard();
+  box.replaceChildren();
+  if(!list.length){
+    const p=document.createElement('p');
+    p.className='cs-note';
+    p.textContent='还没有自定义棋盘。点「新建」去画一个。';
+    box.appendChild(p);
+    return;
+  }
+  list.forEach(function(b){
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='custom-board-item'+(active&&active.id===b.id?' selected':'');
+    const n=shapeCellCount(b);
+    btn.innerHTML='';
+    const nm=document.createElement('span');nm.className='cb-name';nm.textContent=b.name;
+    const meta=document.createElement('span');meta.className='cb-meta';
+    meta.textContent=b.rows+'×'+b.cols+' · 可用 '+n+' 格 · 最多 '+getMaxPlayersByArea(n)+' 人';
+    btn.appendChild(nm);btn.appendChild(meta);
+    btn.onclick=function(){
+      appSettings.activeCustomBoard=b.id;
+      saveSettings();
+      renderCustomBoardList();
+      if(typeof setupLobbySync==='function')setupLobbySync();
+    };
+    box.appendChild(btn);
+  });
+}
+
+// 进入编辑器：id 为空表示新建
+let _beTargetId=null;
+let beEditingId=null;
+function openBoardEditor(id){
+  _beTargetId=id||null;
+  Router.navigate('board-editor');
+}
+
 function updateBeInfo(){
   const el=document.getElementById('beInfo');
   if(!el)return;
@@ -2143,15 +2268,53 @@ function renderBeGrid(){
     el.dataset.i=i;el.dataset.j=j;
     el.setAttribute('role','gridcell');
     el.setAttribute('aria-label',(beGrid[i][j]?'可用':'空洞')+' 第'+(i+1)+'行第'+(j+1)+'列');
-    el.onclick=function(){
-      const a=+this.dataset.i,b=+this.dataset.j;
-      beGrid[a][b]=!beGrid[a][b];
-      this.classList.toggle('on',beGrid[a][b]);
-      updateBeInfo();
-    };
     frag.appendChild(el);
   }
   box.appendChild(frag);
+
+  // 一笔涂抹：按下时决定这一笔是「涂上」还是「擦掉」（取起点格的反），
+  // 之后滑过多少格都保持同一状态 —— 否则滑过已选格会来回翻转。
+  let paintState=null;
+  // 返回是否真的改了格子：滑动时只有变化才刷新计数，
+  // 否则每挪一格都要重扫 400 格，手机上会掉帧
+  const paintCell=function(el){
+    if(paintState===null||!el)return false;
+    const a=+el.dataset.i,b=+el.dataset.j;
+    if(isNaN(a)||isNaN(b))return false;
+    if(beGrid[a][b]===paintState)return false;
+    beGrid[a][b]=paintState;
+    el.classList.toggle('on',paintState);
+    return true;
+  };
+  box.onpointerdown=function(ev){
+    if(ev.button!==undefined&&ev.button!==0)return;   // 只响应左键 / 单指
+    const t=ev.target.closest?ev.target.closest('.be-cell'):null;
+    if(!t||!box.contains(t))return;
+    const a=+t.dataset.i,b=+t.dataset.j;
+    paintState=!beGrid[a][b];
+    paintCell(t);
+    updateBeInfo();
+    try{box.setPointerCapture(ev.pointerId)}catch(e){}
+    ev.preventDefault();
+  };
+  box.onpointermove=function(ev){
+    if(paintState===null)return;
+    // 指针捕获后事件目标固定为 box，靠坐标反查实际格子
+    const el=document.elementFromPoint(ev.clientX,ev.clientY);
+    const t=el&&el.closest?el.closest('.be-cell'):null;
+    if(t&&box.contains(t)&&paintCell(t))updateBeInfo();
+    ev.preventDefault();
+  };
+  const endPaint=function(ev){
+    if(paintState===null)return;
+    paintState=null;
+    try{box.releasePointerCapture(ev.pointerId)}catch(e){}
+  };
+  box.onpointerup=endPaint;
+  box.onpointercancel=endPaint;
+  // 指针离开页面后再回来时状态可能残留，统一兜底
+  box.onpointerleave=function(ev){ if(ev.buttons===0)endPaint(ev); };
+
   updateBeInfo();
 }
 // 裁到最小外接矩形，产出 {rows, cols, cells}（cells 每行一个 0/1 串）
@@ -2191,13 +2354,39 @@ function loadBeShape(shape){
   renderBeGrid();
 }
 function initBoardEditor(){
-  if(!beGrid.length){
-    const saved=appSettings.customShape;
-    const v=saved?validateBeShape(saved):null;
-    if(v)loadBeShape(v);
-    else beGrid=applyBePreset('all');
+  // _beTargetId 由 openBoardEditor 传入：有 id = 编辑那块，没有 = 新建
+  const targetId=_beTargetId;
+  _beTargetId=null;
+  beEditingId=targetId||null;
+
+  let shape=null;
+  if(targetId){
+    const rec=getCustomBoards().find(function(b){return b.id===targetId});
+    if(rec)shape={rows:rec.rows,cols:rec.cols,cells:rec.cells};
+    // 目标已被删掉：当作新建，别把失效 id 带进保存流程
+    else beEditingId=null;
   }
-  renderBeGrid();
+  if(!shape){
+    // 新建时以当前使用中的棋盘为起点，省得每次从空白画起
+    const a=getActiveCustomBoard();
+    if(a)shape={rows:a.rows,cols:a.cols,cells:a.cells};
+  }
+  if(shape){
+    loadBeShape(shape);
+  }else{
+    beGrid=applyBePreset('all');
+    renderBeGrid();
+  }
+
+  const ni=document.getElementById('beNameInput');
+  if(ni){
+    if(beEditingId){
+      const rec=getCustomBoards().find(function(b){return b.id===beEditingId});
+      ni.value=rec?rec.name:'';
+    }else{
+      ni.value='自定义 '+(getCustomBoards().length+1);
+    }
+  }
   const box=document.getElementById('bePresets');
   if(box){
     box.querySelectorAll('.tg-btn').forEach(function(b){
@@ -2219,13 +2408,17 @@ function initBoardEditor(){
 function beSaveShape(){
   const shape=cropBeShape();
   if(!shape){alert('至少要留一个可用格子');return;}
-  const n=shape.cells.join('').split('1').length-1;
+  const n=shapeCellCount(shape);
   if(n<9){alert('可用格子只有 '+n+' 个，太少了，填不下几个人');return;}
-  appSettings.customShape=shape;
+  const nameEl=document.getElementById('beNameInput');
+  const name=(nameEl&&nameEl.value.trim())||('自定义 '+(getCustomBoards().length+1));
+  const rec=upsertCustomBoard(shape,name,beEditingId);
+  beEditingId=rec.id;
+  appSettings.customShape=shape;   // 旧字段同步一份，回滚到旧版本时还能用
   saveSettings();
   const g=document.getElementById('shapeModeGroup');
   if(g)g.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value==='custom')});
-  alert('已保存：'+shape.rows+'×'+shape.cols+'，可用 '+n+' 格');
+  alert('已保存「'+rec.name+'」：'+shape.rows+'×'+shape.cols+'，可用 '+n+' 格');
   Router.navigate('gameSetup');
 }
 function beExportShape(){
@@ -3189,7 +3382,7 @@ async function showPauseOverlay(){
   rankTitle.style.cssText='margin:0 0 6px 0;font-size:.85rem;color:var(--text);text-align:center';
   rankTitle.textContent='当前排名';
   statsGrid.appendChild(rankTitle);
-  renderRankingList(statsGrid, board, maxPlayers, eliminatedPlayers, _colorNames||COLOR_NAMES, aiConfigs, null, chainStats, fullHistory, null, null, curPlayer);
+  renderRankingList(statsGrid, board, maxPlayers, eliminatedPlayers, _colorNames||COLOR_NAMES, aiConfigs, null, chainStats, fullHistory, null, null, curPlayer, null, eliminationRounds);
   // 图表区域
   let chartArea=document.getElementById('pauseCharts');
   chartArea.innerHTML='';
@@ -3561,7 +3754,36 @@ function getPlayerTypeLabel(p){
 }
 
 // 绘制排名列表
-function renderRankingList(container, boardState, playerCnt, eliminatedSet, colorNames, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerDataOverride, playerTypesOverride, currentPlayerIdx, killerMap){
+/// 淘汰顺序表：pid -> 序号（0 = 最早淘汰）。
+///
+/// rounds 是按时间先后排列的轮次数组，轮次内保持原顺序；不在任何轮次里的
+/// 玩家（旧存档、一键终局后只剩一个轮次等）按 eliminatedSet 的插入顺序追加。
+///
+/// 旧实现把「轮次下标」和「Set 插入位置」当成同一个量来比较 ——
+/// 两个索引空间混用，会让先淘汰的人排到后淘汰的人前面。
+function buildEliminationSeq(eliminatedSet, rounds){
+  var seq=new Map();
+  var n=0;
+  if(Array.isArray(rounds)){
+    for(var r=0;r<rounds.length;r++){
+      var grp=rounds[r];
+      if(!Array.isArray(grp))continue;
+      for(var k=0;k<grp.length;k++){
+        var pid=grp[k];
+        if(seq.has(pid))continue;   // 同一人重复出现只认第一次
+        seq.set(pid,n++);
+      }
+    }
+  }
+  if(eliminatedSet&&typeof eliminatedSet.forEach==='function'){
+    eliminatedSet.forEach(function(pid){
+      if(!seq.has(pid))seq.set(pid,n++);
+    });
+  }
+  return seq;
+}
+
+function renderRankingList(container, boardState, playerCnt, eliminatedSet, colorNames, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerDataOverride, playerTypesOverride, currentPlayerIdx, killerMap, elimRounds){
   var data=[];
   var maxPieces=0;
   for(var p=0;p<playerCnt;p++){
@@ -3604,36 +3826,22 @@ function renderRankingList(container, boardState, playerCnt, eliminatedSet, colo
     }
     data.push({index:p,name:(colorNames&&colorNames[p])||getPlayerLabel(p),pieces:pieces,points:points,type:typeLabel,typeCss:typeCss,typeRaw:typeRaw,detail:detailStr,eliminated:(eliminatedSet&&eliminatedSet.has(p)),isWinner:p===winnerP,chain:chainStatsMap&&chainStatsMap[p]});
   }
-  // 统一排名：活跃玩家按棋子数降序，同棋子数按点数降序
-  // 淘汰玩家按淘汰顺序排列（先淘汰者末位）
-  var elimOrder=[];
-  if(eliminatedSet&&eliminatedSet.size>0){
-    elimOrder=Array.from(eliminatedSet);
-  }
+  // 统一排名：活跃玩家按棋子数降序，同棋子数按点数降序；
+  // 淘汰玩家按淘汰先后排——后淘汰的在前，先淘汰的垫底。
+  // 顺序取自 buildEliminationSeq，不再把「轮次下标」与「Set 插入位置」混着比。
+  var elimSeq=buildEliminationSeq(eliminatedSet,
+    elimRounds!==undefined?elimRounds:eliminationRounds);
   data.sort(function(a,b){
     if(a.eliminated&&!b.eliminated)return 1;
     if(!a.eliminated&&b.eliminated)return -1;
     if(a.eliminated&&b.eliminated){
-      var ra=getEliminationRound(a.index);
-      var rb=getEliminationRound(b.index);
-      if(ra!==rb)return rb-ra; // 后淘汰者（更大轮次）排前面，先淘汰者排后面
-      return 0; // 同一轮淘汰 = 并列
+      var sa=elimSeq.has(a.index)?elimSeq.get(a.index):1e9;
+      var sb=elimSeq.has(b.index)?elimSeq.get(b.index):1e9;
+      return sb-sa; // 序号大 = 淘汰得晚 = 排前面
     }
     if(b.pieces!==a.pieces)return b.pieces-a.pieces;
     return b.points-a.points;
   });
-  function getEliminationRound(pid){
-    if(typeof eliminationRounds!=='undefined'&&eliminationRounds.length>0){
-      for(var ri=0;ri<eliminationRounds.length;ri++){
-        if(eliminationRounds[ri].indexOf(pid)>=0)return ri;
-      }
-    }
-    if(eliminatedSet&&eliminatedSet.has(pid)){
-      var eo=elimOrder.indexOf(pid);
-      return eo>=0?eo:999;
-    }
-    return 999;
-  }
   var leaderPieces=data.length>0?data[0].pieces:0;
   var table=document.createElement('div');table.className='rank-list';
   for(var i=0;i<data.length;i++){
@@ -4151,7 +4359,7 @@ async function showSettlement(winner,colorNames,history){
   rankTitle.style.cssText='margin:0 0 6px 0;font-size:.85rem;color:var(--text);text-align:center';
   rankTitle.textContent='最终排名';
   inner.appendChild(rankTitle);
-  renderRankingList(inner, board, maxPlayers, eliminatedPlayers, colorNames||_colorNames||COLOR_NAMES, aiConfigs, winner, chainStats, fullHistory, null, null, null);
+  renderRankingList(inner, board, maxPlayers, eliminatedPlayers, colorNames||_colorNames||COLOR_NAMES, aiConfigs, winner, chainStats, fullHistory, null, null, null, null, eliminationRounds);
   renderGameCharts(inner, fullHistory, {
     winner, colorNames, colors: COLORS, eliminated: eliminatedPlayers,
     chainStats, maxChain: maxChainOverall, showTitle: false, _noBack: true, _noGrid: true,
@@ -4236,7 +4444,9 @@ function showHistoryDetail(r){
   for(var pe=0;pe<histPlayerCnt;pe++){
     if(!finalSnap[String(pe)]||!finalSnap[String(pe)].pieces)histEliminated.add(pe);
   }
-  renderRankingList(inner, [], histPlayerCnt, histEliminated, r.colorNames, null, r.winner, r.chainStats, historyData, finalSnap, r.playerTypes, null, r.killedBy);
+  // 回放必须用记录自己的淘汰顺序；传 null 而不是省略，
+  // 否则会读到当前对局残留的全局 eliminationRounds（串味）
+  renderRankingList(inner, [], histPlayerCnt, histEliminated, r.colorNames, null, r.winner, r.chainStats, historyData, finalSnap, r.playerTypes, null, r.killedBy, r.eliminatedOrder||null);
   renderGameCharts(inner, historyData, {
     winner: r.winner, colorNames: r.colorNames, colors: COLORS,
     chainStats: r.chainStats, maxChain: r.maxChain,
@@ -5048,9 +5258,9 @@ function readSetupBoard(){
     return makeRandomShape(cnt,false);
   }
   if(mode==='custom'){
-    const v=appSettings.customShape?validateBeShape(appSettings.customShape):null;
-    if(v)return {rows:v.rows,cols:v.cols,cells:v.cells};
-    const s=getSel('setupSizeGrid')||7;   // 还没存过自定义形状，退回正方形，别让开局卡住
+    const rec=getActiveCustomBoard();
+    if(rec)return {rows:rec.rows,cols:rec.cols,cells:rec.cells};
+    const s=getSel('setupSizeGrid')||7;   // 一块都还没建：退回正方形，别让开局卡住
     return {rows:s,cols:s,cells:null};
   }
   if(mode==='rect'){
@@ -5082,14 +5292,41 @@ function applyShapeMode(jumpToEditor){
     if(hint)hint.textContent='按当前 '+cnt+' 人生成：'+b.rows+'×'+b.cols+'，'
       +countOpenCells(b.cells)+' 个可用格（每次点「开始游戏」都会重新随机）。';
   }
+  const cbr=document.getElementById('customBoardRow');
+  if(cbr)cbr.style.display=(mode==='custom')?'flex':'none';
+  if(mode==='custom')renderCustomBoardList();
   // 形状变化可能影响边界/阈值的兼容性（如降级 + 3/5 级互斥），刷新一次按钮状态
   if(typeof updateModeConflictUI==='function')updateModeConflictUI();
-  if(mode==='custom'&&jumpToEditor){Router.navigate('board-editor');return;}
+  if(mode==='custom'&&jumpToEditor){
+    // 点「自定义」进来 = 编辑当前选中的那块；一块都没有就走新建
+    const a=getActiveCustomBoard();
+    openBoardEditor(a?a.id:null);
+    return;
+  }
   setupLobbySync();
 }
 // 进入开局页时初始化形状选择（默认正方形）
 function initShapeMode(){
   fillRectSizeSelects();
+  // 自定义棋盘栏目的三个按钮：都走 openBoardEditor / deleteCustomBoard，
+  // 只在「自定义」形状下可见，但绑定一次即可（板块常驻 DOM）
+  const nb=document.getElementById('customBoardNewBtn');
+  if(nb)nb.onclick=function(){openBoardEditor(null)};
+  const eb=document.getElementById('customBoardEditBtn');
+  if(eb)eb.onclick=function(){
+    const a=getActiveCustomBoard();
+    if(!a){openBoardEditor(null);return;}
+    openBoardEditor(a.id);
+  };
+  const db=document.getElementById('customBoardDelBtn');
+  if(db)db.onclick=function(){
+    const a=getActiveCustomBoard();
+    if(!a){alert('还没有可删除的棋盘');return;}
+    if(!confirm('删除「'+a.name+'」？'))return;
+    deleteCustomBoard(a.id);
+    renderCustomBoardList();
+    setupLobbySync();
+  };
   const g=document.getElementById('shapeModeGroup');
   if(g){
     g.querySelectorAll('.tg-btn').forEach(function(b){
