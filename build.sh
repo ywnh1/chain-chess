@@ -938,6 +938,33 @@ if [ "$PUBLISH" = true ]; then
     echo "  ⚠️  未找到 /storage/emulated/0/用户/，跳过设备复制"
   fi
 
+  # 1.5) 按 release/ 里的实际文件大小刷新 update.json 的三个 size。
+  # APK / exe / linux 都由 CI 出，构建步骤不会跑，没人写这几个数字；
+  # 这里在发布时统一按文件真实字节数对齐，避免「检查更新」里显示旧大小。
+  # 缺哪个文件就保留原值，不覆盖成 0。
+  if [ -f "update.json" ] && command -v jq >/dev/null 2>&1; then
+    _sizes=$(python3 - "$VERSION" <<'PYEOF_SZ'
+import json, os, sys
+v = sys.argv[1]
+# 文件名 → 平台。linux 沿用历史口径取 deb 的大小。
+targets = {'android': f'release/chainchess-{v}.apk',
+           'windows': f'release/chainchess-{v}.exe',
+           'linux':   f'release/chainchess-{v}.deb'}
+d = json.load(open('update.json', encoding='utf-8'))
+for plat, path in targets.items():
+    if os.path.isfile(path):
+        d['platforms'][plat]['size'] = os.path.getsize(path)
+        print(f'{plat}={os.path.getsize(path)}')
+    else:
+        print(f'{plat}=SKIP({path} 不存在，保留 {d["platforms"][plat]["size"]})')
+with open('update.json', 'w', encoding='utf-8') as f:
+    json.dump(d, f, ensure_ascii=False, indent=2)
+    f.write('\n')
+PYEOF_SZ
+)
+    echo "  📏 update.json 尺寸:" && echo "$_sizes" | sed 's/^/     /'
+  fi
+
   # 2) 复制 update.json + PWA 必要内容到发布仓库（仅当仓库存在时）
   if [ -d "../chain-chess-release" ]; then
     if [ -f "update.json" ]; then
