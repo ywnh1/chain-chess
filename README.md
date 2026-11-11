@@ -104,6 +104,27 @@ npx tauri build        # 构建可执行文件
 
 ### Android APK / Windows exe / Linux deb·AppImage
 
+日常发版走 GitHub Actions 出包（`.github/workflows/`），本机只需要打包 PWA：
+
+```bash
+# 发版：只同步版本号并提交，构建交给 CI
+./build.sh --sync-only --commit
+
+# PWA zip 必须本机出：要有 wasm-pack 编 WASM
+./build.sh --zip
+
+# CI 产物下载进 release/ 之后，做发布同步（不构建）
+./build.sh --publish-only --commit
+```
+
+三个 CI 都可以在 Actions 页面用 `workflow_dispatch` 手动触发，或由 `v*` tag 自动触发：
+
+- `android-apk.yml` → `chainchess-<version>.apk`（arm64，`release.keystore` 签名）
+- `windows-exe.yml` → `chainchess-<version>.exe`
+- `linux-amd64.yml` → `chainchess-<version>.deb` / `.AppImage`（amd64）
+
+本机也保留了离线构建路径（需要自备 Android SDK/NDK）：
+
 ```bash
 ./build.sh --apk chainchess        # 构建签名 APK
 ./build.sh --exe                   # 构建 Windows exe（cargo-xwin 交叉编译）
@@ -114,11 +135,10 @@ npx tauri build        # 构建可执行文件
 ./build.sh --release chainchess    # 构建全部并发布到设备与发布仓库
 ```
 
-- **APK**：脚本自动编译 arm64 APK，用 `release.keystore` 签名后输出到 `release/`（需要 keystore 密码）。
-- **exe**：`cargo-xwin` 交叉编译 `x86_64-pc-windows-msvc`，不需要密码，输出 `release/chainchess-<version>.exe`。
-- **linux**：`npx tauri build --bundles deb` 出 deb，再用 `appimagetool` 打包 AppImage（没装 appimagetool 时只出 deb），输出 `release/chainchess-<version>.deb` / `.AppImage`。
-- **zip**：重新编译 WASM 引擎（`docs/wasm` → `docs/pkg`），再把 `docs/` 的静态资源和 `pkg/*.wasm` 打包成 `release/chain-chess-pwa-v<version>.zip`（排除 wasm 源码和 pkg-node）；`--all` / `--release` 复用已有的 `pkg/`，不重编。
-- **all / release**：`--all` 一次编译 apk + exe + linux + zip；`--release` 额外发布到 Android 设备和 `../chain-chess-release` 仓库。
+- **APK**：arm64，用 `release.keystore` 签名后输出到 `release/`（需要 keystore 密码）。
+- **exe**：`cargo-xwin` 交叉编译 `x86_64-pc-windows-msvc`，不需要密码。
+- **linux**：`npx tauri build --bundles deb` 出 deb，再用 `appimagetool` 打包 AppImage（没装时只出 deb）。
+- **zip**：重新编译 WASM 引擎（`docs/wasm` → `docs/pkg`），再把 `docs/` 的静态资源和 `pkg/*.wasm` 打包成 `release/chain-chess-pwa-v<version>.zip`（排除 wasm 源码和 pkg-node）。
 - 每次构建都会更新 `update.json` 里对应平台的 URL 与 size。
 
 ### 浏览器 PWA（本地预览）
@@ -131,22 +151,13 @@ python3 -m http.server 8899
 
 PWA 必须通过 HTTP(S) 访问，`file://` 下 WASM 动态加载用不了。首次打开后可以安装，之后离线也能玩。
 
-首次构建 APK 需要先初始化 Android 项目：
-
-```bash
-cd tauri
-npx tauri android init
-cd ..
-./build.sh chainchess
-```
-
 预编译好的应用可以在[下载中心](https://ywnh1.free.leoi.org)下载，或者直接去 [Gitee Releases](https://gitee.com/ywnh1/chain-chess-release/releases)。
 
 ---
 
 ## 🤖 AI 引擎详解
 
-内置四款 AI，分属三种思路：启发式规则、树搜索剪枝、随机模拟。
+内置三款 AI，分属两种思路：启发式规则、树搜索剪枝。
 
 ### ⚡ 策略算法（启发式规则）
 

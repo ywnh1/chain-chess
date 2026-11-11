@@ -22,9 +22,26 @@ log.log
 # ─── Rust / Tauri ───
 tauri/node_modules/
 tauri/src-tauri/target/
-tauri/src-tauri/gen/android/
 tauri/src-tauri/gen/schemas/
 tauri/src-tauri/.cargo/
+
+# Android 工程：骨架必须进仓库（CI 靠它编 APK），只忽略构建产物与本机配置。
+# 原来这里是整目录 `gen/android/`，导致 MainActivity.kt、buildSrc/src、
+# gradle-wrapper.jar 都不在仓库里 —— 本机能编是因为文件都在本地，
+# 换一台机器（或 CI）就编不了。
+tauri/src-tauri/gen/android/.gradle/
+tauri/src-tauri/gen/android/build/
+tauri/src-tauri/gen/android/app/build/
+tauri/src-tauri/gen/android/buildSrc/.gradle/
+tauri/src-tauri/gen/android/buildSrc/build/
+tauri/src-tauri/gen/android/app/src/main/assets/
+tauri/src-tauri/gen/android/app/src/main/jniLibs/
+tauri/src-tauri/gen/android/app/tauri.properties
+tauri/src-tauri/gen/android/app/tauri.build.gradle.kts
+tauri/src-tauri/gen/android/app/proguard-tauri.pro
+tauri/src-tauri/gen/android/tauri.settings.gradle
+tauri/src-tauri/gen/android/keystore.properties
+tauri/src-tauri/gen/android/local.properties
 
 # ─── Android / APK 构建 ───
 *.apk

@@ -255,6 +255,7 @@ ZIP_ONLY=false
 ALL=false
 NATIVE=false
 PUBLISH=false
+PUBLISH_ONLY=false
 HELP=false
 SHOW_VERSION=false
 COMMIT=false
@@ -270,6 +271,7 @@ for arg in "$@"; do
     --all|-A)     ALL=true ;;
     --native|-n)  NATIVE=true ;;
     --release|-r) PUBLISH=true ;;
+    --publish-only|-P) PUBLISH=true; PUBLISH_ONLY=true ;;
     --commit|-c)  COMMIT=true ;;
     --sync-only|-s) SYNC_ONLY=true ;;
     --help|-h)    HELP=true ;;
@@ -302,7 +304,10 @@ README badge / update.json —— 发版只需改 tauri.conf.json 一处。
   -z, --zip            重新编译 WASM 并打包 PWA zip（无平台条目，不更新 size）
   -A, --all <密码>     编译 apk + exe + linux + zip 全部，只更新本次编译的 size
   -n, --native <密码>  编译安卓 Native APK，不碰 update.json
-  -r, --release <密码> 只编 Android APK 并发布（exe / linux / zip 交给 CI）：
+  -P, --publish-only   不构建，只把 release/ 现有产物 + update.json + PWA
+                       同步到设备与 ../chain-chess-release（配合 CI 产物用）
+  -r, --release <密码> 编 Android APK 并发布（日常发版走 CI 的 android-apk.yml，
+                       这里留作离线/备用；exe / linux / zip 交给 CI）：
                        release/ → /storage/emulated/0/用户/
                        update.json + PWA 必要内容 → ../chain-chess-release
   -c, --commit         构建后自动 git commit（主仓库的版本号文件 + ../chain-chess-release
@@ -318,7 +323,9 @@ README badge / update.json —— 发版只需改 tauri.conf.json 一处。
   $0 -z                     # 仅打包 PWA zip
   $0 -A chainchess          # 编译全部（apk+exe+zip），不发布
   $0 -n chainchess          # 编译 Native APK，不碰 update.json
-  $0 -r chainchess          # 编译全部 + 更新全部 size + 发布
+  $0 -s -c                  # 只同步版本号并提交（发版，构建交给 CI）
+  $0 -P -c                  # CI 产物已放进 release/：只做发布同步并提交
+  $0 -r chainchess          # 备用：本机编 APK + 发布
   $0 -r -c chainchess       # 同上，并自动 commit 两个仓库（需手动 push）
   $0 -s                     # 只同步版本号（改完 tauri.conf.json 后执行）
   $0 -V                     # 打印项目版本号
@@ -356,7 +363,7 @@ fi
 if [ "$ALL" = true ]; then
   APK=true; EXE=true; ZIP=true; LINUX=true
 fi
-if [ "$PUBLISH" = true ]; then
+if [ "$PUBLISH" = true ] && [ "$PUBLISH_ONLY" = false ]; then
   # exe / linux / zip 已经搬到 GitHub Actions（.github/workflows/），
   # 本地 -r 只编 Android，并同步版本号 / 拷发布文件
   APK=true
@@ -366,7 +373,8 @@ if [ "$NATIVE" = true ]; then
   APK=true
 fi
 # 未指定平台时默认 APK + exe 都构建
-if [ "$APK" = false ] && [ "$EXE" = false ] && [ "$ZIP" = false ] && [ "$LINUX" = false ]; then
+if [ "$APK" = false ] && [ "$EXE" = false ] && [ "$ZIP" = false ] && [ "$LINUX" = false ] \
+   && [ "$PUBLISH_ONLY" = false ]; then
   APK=true
   EXE=true
 fi
