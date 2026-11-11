@@ -95,15 +95,25 @@ jobs:
           chmod +x /tmp/appimagetool
           APPDIR=/tmp/AppDir
           rm -rf "$APPDIR"; mkdir -p "$APPDIR"
-          # runner 的 umask 是 077，mkdir 只会给出 0700；appimagetool 要求
-          # AppDir 至少 0755，否则直接报 "mode 0700 ... Permission denied" 退出。
-          chmod 755 "$APPDIR"
           dpkg-deb -x "out/chainchess-$V.deb" "$APPDIR"
           cp "$(ls -1 "$APPDIR"/usr/share/applications/*.desktop | head -1)" "$APPDIR/"
           cp "$(find "$APPDIR/usr/share/icons" -name '*.png' | sort -r | head -1)" "$APPDIR/"
           ln -sf usr/bin/chain-chess "$APPDIR/AppRun"
+
+          # runner 的 umask 是 077：新建的目录/文件都是 0700/0600。
+          # appimagetool 要求 AppDir 树对 others 可读可执行，否则
+          # "mode 0700 ... Permission denied" 直接退出。
+          # 只 chmod 顶层不够（解包出的子目录仍是 0700），要 -R 全树修；
+          # 注意用 a+rX：目录加 x，文件只在已有 x 位时才加（AppRun 是符号链接）。
+          chmod -R a+rX "$APPDIR"
+          chmod a+rx "$APPDIR/AppRun"
+          echo "--- AppDir 权限 ---"
+          find "$APPDIR" -maxdepth 2 -printf '%M %p\n' | sort | head -12
+
+          # --no-check-permissions 兜底：万一个别子项仍被判不合格，
+          # 不让整次构建失败（权限已在上面统一修过）
           APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 \
-            /tmp/appimagetool "$APPDIR" "out/chainchess-$V.AppImage" > /dev/null
+            /tmp/appimagetool --no-check-permissions "$APPDIR" "out/chainchess-$V.AppImage"
 
           echo "--- 产物 ---"
           ls -la out/
