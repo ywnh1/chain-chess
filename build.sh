@@ -8,10 +8,11 @@
 #       ./build.sh -z                 # 重新编译 WASM + 打包 PWA zip 到 release/（update.json 无 pwa 条目，不更新 size）
 #       ./build.sh -A chainchess      # 编译 apk + exe + linux + zip 全部到 release/，只更新本次编译的 size
 #       ./build.sh -n chainchess      # 编译安卓 Native APK 到 release/，不碰 update.json
-#       ./build.sh -r chainchess      # 只编 Android APK 并发布（exe / linux / zip 交给 CI），
-#                                     #   并发布：release/ → /storage/emulated/0/用户/，
+#       ./build.sh -r                 # 不构建，只发布：release/ → /storage/emulated/0/用户/，
 #                                     #   update.json + PWA 必要内容 → ../chain-chess-release
-#       ./build.sh -r -c chainchess   # 同上，并自动 commit 两个仓库（push 仍手动）
+#                                     #   （APK / exe / linux 由 CI 出，产物先下载进 release/）
+#       ./build.sh -r -c              # 同上，并自动 commit 两个仓库（push 仍手动）
+#       ./build.sh -s -c              # 只同步版本号并提交，不构建不发布
 #       ./build.sh -V                 # 打印当前项目版本号（来源 tauri.conf.json）
 #
 # 版本号：tauri/src-tauri/tauri.conf.json 是唯一来源。每次构建自动同步到
@@ -270,7 +271,8 @@ for arg in "$@"; do
     --zip|-z)     ZIP=true; ZIP_ONLY=true ;;
     --all|-A)     ALL=true ;;
     --native|-n)  NATIVE=true ;;
-    --release|-r) PUBLISH=true ;;
+    # -r 与 -P 等价：只做发布同步，不构建（APK / exe / linux 都交给 CI）
+    --release|-r) PUBLISH=true; PUBLISH_ONLY=true ;;
     --publish-only|-P) PUBLISH=true; PUBLISH_ONLY=true ;;
     --commit|-c)  COMMIT=true ;;
     --sync-only|-s) SYNC_ONLY=true ;;
@@ -304,12 +306,11 @@ README badge / update.json —— 发版只需改 tauri.conf.json 一处。
   -z, --zip            重新编译 WASM 并打包 PWA zip（无平台条目，不更新 size）
   -A, --all <密码>     编译 apk + exe + linux + zip 全部，只更新本次编译的 size
   -n, --native <密码>  编译安卓 Native APK，不碰 update.json
-  -P, --publish-only   不构建，只把 release/ 现有产物 + update.json + PWA
-                       同步到设备与 ../chain-chess-release（配合 CI 产物用）
-  -r, --release <密码> 编 Android APK 并发布（日常发版走 CI 的 android-apk.yml，
-                       这里留作离线/备用；exe / linux / zip 交给 CI）：
-                       release/ → /storage/emulated/0/用户/
-                       update.json + PWA 必要内容 → ../chain-chess-release
+  -r, --release        只发布，不构建：同步版本号后把 release/ 现有产物 +
+                       update.json + PWA 必要内容同步到设备与 ../chain-chess-release。
+                       APK / exe / linux 由 .github/workflows/ 出，产物下载进
+                       release/ 后再跑本选项
+  -P, --publish-only   -r 的同义词
   -c, --commit         构建后自动 git commit（主仓库的版本号文件 + ../chain-chess-release
                        的发布产物）。只 commit 不 push，push 仍需手动执行
   -s, --sync-only      只把版本号同步到各落点并复核，不构建（改完 tauri.conf.json 后可用）
@@ -324,8 +325,8 @@ README badge / update.json —— 发版只需改 tauri.conf.json 一处。
   $0 -A chainchess          # 编译全部（apk+exe+zip），不发布
   $0 -n chainchess          # 编译 Native APK，不碰 update.json
   $0 -s -c                  # 只同步版本号并提交（发版，构建交给 CI）
-  $0 -P -c                  # CI 产物已放进 release/：只做发布同步并提交
-  $0 -r chainchess          # 备用：本机编 APK + 发布
+  $0 -r -c                  # CI 产物已放进 release/：发布同步并提交
+  $0 -a chainchess          # 备用：本机编 APK
   $0 -r -c chainchess       # 同上，并自动 commit 两个仓库（需手动 push）
   $0 -s                     # 只同步版本号（改完 tauri.conf.json 后执行）
   $0 -V                     # 打印项目版本号
@@ -359,14 +360,11 @@ if [ "$SYNC_ONLY" = true ]; then
 fi
 
 # 模式语义展开
-# --all: apk + exe + zip；--release: 只编 APK 并发布（其余交给 CI）
+# --all: apk + exe + zip
+# --release / --publish-only: 不构建任何东西，只同步版本号 + 拷发布文件
+#   （APK / exe / linux 全由 .github/workflows/ 出）
 if [ "$ALL" = true ]; then
   APK=true; EXE=true; ZIP=true; LINUX=true
-fi
-if [ "$PUBLISH" = true ] && [ "$PUBLISH_ONLY" = false ]; then
-  # exe / linux / zip 已经搬到 GitHub Actions（.github/workflows/），
-  # 本地 -r 只编 Android，并同步版本号 / 拷发布文件
-  APK=true
 fi
 # --native: 编译 native APK
 if [ "$NATIVE" = true ]; then
@@ -391,7 +389,7 @@ if [ "$APK" = true ]; then
     echo "用法: $0 --apk <keystore_password>"
     echo "       $0 --all <keystore_password>"
     echo "       $0 --native <keystore_password>"
-    echo "       $0 --release <keystore_password>"
+    echo "       $0 --release"
     echo "       $0 --exe"
     echo "       $0 --zip"
     exit 1
@@ -407,7 +405,9 @@ START_EPOCH=$(date +%s)
 # ── 构建模式提示 ──────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [ "$PUBLISH" = true ]; then
+if [ "$PUBLISH" = true ] && [ "$PUBLISH_ONLY" = true ]; then
+  echo "  📦 构建目标: 无（只发布；APK / exe / linux 由 CI 出，产物需已在 release/）"
+elif [ "$PUBLISH" = true ]; then
   echo "  📦 构建目标: Android APK（发布模式；exe / linux / zip 由 CI 出）"
 elif [ "$ALL" = true ]; then
   echo "  📦 构建目标: APK + Windows exe + Linux deb/AppImage + PWA zip（全部，不发布）"

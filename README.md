@@ -113,8 +113,8 @@ npx tauri build        # 构建可执行文件
 # PWA zip 必须本机出：要有 wasm-pack 编 WASM
 ./build.sh --zip
 
-# CI 产物下载进 release/ 之后，做发布同步（不构建）
-./build.sh --publish-only --commit
+# CI 产物下载进 release/ 之后，做发布同步（-r 不构建，与 --publish-only 等价）
+./build.sh -r -c
 ```
 
 三个 CI 都可以在 Actions 页面用 `workflow_dispatch` 手动触发，或由 `v*` tag 自动触发：
@@ -132,7 +132,7 @@ npx tauri build        # 构建可执行文件
 ./build.sh --zip                   # 重新编译 WASM 并打包 PWA zip
 ./build.sh --all chainchess        # 一次构建 apk + exe + linux + zip
 ./build.sh --native chainchess     # APK 加 target-cpu=native 极致优化
-./build.sh --release chainchess    # 构建全部并发布到设备与发布仓库
+./build.sh --release              # 不构建，只发布到设备与发布仓库
 ```
 
 - **APK**：arm64，用 `release.keystore` 签名后输出到 `release/`（需要 keystore 密码）。
