@@ -1218,6 +1218,148 @@
       box-shadow: 0 2px 10px rgba(240, 179, 75, .2), inset 0 1px 0 rgba(255, 255, 255, .1);
       pointer-events: none;
     }
+
+    /* ═══ 推荐应用弹窗（一次性） ═══ */
+    .promo-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 900;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, .58);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    .promo-modal.show {
+      display: flex;
+      animation: promoFade .22s ease both;
+    }
+
+    @keyframes promoFade {
+      from { opacity: 0 }
+      to { opacity: 1 }
+    }
+
+    @keyframes promoPop {
+      from { opacity: 0; transform: translateY(10px) scale(.97) }
+      to { opacity: 1; transform: none }
+    }
+
+    .promo-card {
+      position: relative;
+      width: 100%;
+      max-width: 360px;
+      padding: 24px 22px 18px;
+      border-radius: var(--radius);
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, .12);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .08);
+      animation: promoPop .28s var(--ease) both;
+    }
+
+    .promo-close {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--dim);
+      font-size: 1.2rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: background .15s ease, color .15s ease;
+    }
+
+    .promo-close:hover {
+      background: rgba(255, 255, 255, .08);
+      color: var(--text);
+    }
+
+    .promo-card h3 {
+      font-size: 1.02rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .promo-card .promo-name {
+      font-size: .86rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .promo-card .promo-desc {
+      font-size: .8rem;
+      line-height: 1.7;
+      color: var(--dim);
+    }
+
+    .promo-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .promo-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: .82rem;
+      font-weight: 600;
+      font-family: inherit;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, .12);
+      background: rgba(255, 255, 255, .06);
+      color: var(--text);
+      transition: background .15s ease, border-color .15s ease, transform .1s ease;
+    }
+
+    .promo-btn:hover {
+      background: rgba(255, 255, 255, .1);
+      border-color: rgba(255, 255, 255, .2);
+    }
+
+    .promo-btn:active {
+      transform: scale(.97);
+    }
+
+    .promo-btn.primary {
+      color: var(--accent);
+      border-color: rgba(240, 179, 75, .5);
+      background: linear-gradient(180deg, rgba(240, 179, 75, .18) 0%, rgba(240, 179, 75, .06) 100%);
+    }
+
+    .promo-btn.primary:hover {
+      background: linear-gradient(180deg, rgba(240, 179, 75, .26) 0%, rgba(240, 179, 75, .1) 100%);
+      border-color: rgba(240, 179, 75, .7);
+    }
+
+    .promo-btn:focus-visible,
+    .promo-close:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .promo-modal.show,
+      .promo-card {
+        animation: none;
+      }
+    }
   </style>
 </head>
 
@@ -1586,6 +1728,23 @@
     </footer>
   </main>
 
+  <!-- 推荐应用弹窗：一次性，关掉后不再出现（localStorage: ew_promo_seen） -->
+  <div id="promoModal" class="promo-modal" aria-hidden="true">
+    <div class="promo-card" role="dialog" aria-modal="true" aria-labelledby="promoTitle">
+      <button type="button" class="promo-close" data-promo-dismiss aria-label="关闭">×</button>
+      <h3 id="promoTitle">试试新应用</h3>
+      <p class="promo-name">Easy Words · 高中英语词汇出题器</p>
+      <p class="promo-desc">外研社高中英语词汇出题器。按书 / 单元 / 页码 / 首字母抽词，
+        四种出题形式，导出 PDF 或 Word 卷子。同样是 Tauri + Rust 写的，Windows 与 Android 都能装。</p>
+      <div class="promo-actions">
+        <button type="button" class="promo-btn" data-promo-dismiss>以后再说</button>
+        <a class="promo-btn primary" href="https://github.com/ywnh1/easy-words" target="_blank" rel="noopener"
+          data-promo-go>去看看</a>
+      </div>
+    </div>
+  </div>
+
+
   <script>
       (function () {
         var VERSION = '3.4.3';
@@ -1690,6 +1849,77 @@
   </script>
 
 
+
+  <script>
+    // 推荐应用弹窗：只在首页出现一次，关闭或点进去都记账，之后不再打扰。
+    // 用 localStorage 而不是 cookie：下载页是纯静态的，没有服务端。
+    (function () {
+      var KEY = 'ew_promo_seen';
+      var modal = document.getElementById('promoModal');
+      if (!modal) return;
+
+      function seen() {
+        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+      }
+      function markSeen() {
+        try { localStorage.setItem(KEY, '1'); } catch (e) { }
+      }
+
+      var lastFocus = null;
+
+      function open() {
+        modal.classList.add('show');
+        modal.setAttribute('aria-hidden', 'false');
+        lastFocus = document.activeElement;
+        var go = modal.querySelector('[data-promo-go]');
+        if (go) { try { go.focus(); } catch (e) { } }
+      }
+
+      function close() {
+        modal.classList.remove('show');
+        modal.setAttribute('aria-hidden', 'true');
+        markSeen();
+        if (lastFocus && document.contains(lastFocus)) {
+          try { lastFocus.focus(); } catch (e) { }
+        }
+      }
+
+      Array.prototype.forEach.call(modal.querySelectorAll('[data-promo-dismiss]'), function (el) {
+        el.addEventListener('click', close);
+      });
+      var goBtn = modal.querySelector('[data-promo-go]');
+      if (goBtn) {
+        goBtn.addEventListener('click', function () {
+          // 点了也记一笔，避免下次又来问
+          markSeen();
+          try {
+            if (window.LA && typeof LA.track === 'function') LA.track('promo_easywords', {});
+          } catch (e) { }
+        });
+      }
+      // 点遮罩空白处关闭
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) close();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.classList.contains('show')) close();
+      });
+
+      // 首页与下载页都弹（这两个是主要入口，只在首页弹的话多数人看不到）；
+      // 「直接游玩」和「联系作者」不弹 —— 那两个页面访客目的很明确，不该拦
+      function onLanding() {
+        var h = (location.hash || '').replace(/^#/, '');
+        return h === '' || h === '/' || h === 'download' || h === '/download';
+      }
+
+      if (!seen() && onLanding()) {
+        // 延迟一点：先让内容渲染完，避免和首屏动画抢注意力
+        setTimeout(function () {
+          if (!seen() && onLanding()) open();
+        }, 1400);
+      }
+    })();
+  </script>
   <script>
     // 多页面路由（hash：#/、#/download、#/play、#/contact）
     (function () {
