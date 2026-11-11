@@ -95,6 +95,9 @@ jobs:
           chmod +x /tmp/appimagetool
           APPDIR=/tmp/AppDir
           rm -rf "$APPDIR"; mkdir -p "$APPDIR"
+          # runner 的 umask 是 077，mkdir 只会给出 0700；appimagetool 要求
+          # AppDir 至少 0755，否则直接报 "mode 0700 ... Permission denied" 退出。
+          chmod 755 "$APPDIR"
           dpkg-deb -x "out/chainchess-$V.deb" "$APPDIR"
           cp "$(ls -1 "$APPDIR"/usr/share/applications/*.desktop | head -1)" "$APPDIR/"
           cp "$(find "$APPDIR/usr/share/icons" -name '*.png' | sort -r | head -1)" "$APPDIR/"

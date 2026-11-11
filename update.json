@@ -1,5 +1,5 @@
 {
-  "version": "3.4.2",
+  "version": "3.4.3",
   "notes": "Save custom boards with names and switch or edit them anytime; the board editor now supports press-and-drag to toggle cells continuously; new app icon; fixed a wrong elimination order in the in-game ranking (all players tied after a fast finish)",
   "notes_zh": "新增自定义棋盘存档（可命名保存、随时切换与编辑）、棋盘编辑器支持按住滑动连续涂改、换用新图标；修复局中排名淘汰顺序错乱（一键终局时全部并列）",
   "pub_date": "2026-11-11T00:00:00Z",
