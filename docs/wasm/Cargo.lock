@@ -20,7 +20,7 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "chain_chess_core"
-version = "3.3.9"
+version = "3.4.3"
 dependencies = [
  "alpha_beta_pruning",
  "rand",
@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "chain_chess_engine"
-version = "3.2.3"
+version = "3.4.3"
 dependencies = [
  "chain_chess_core",
  "getrandom",

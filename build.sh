@@ -26,7 +26,7 @@ mkdir -p release
 # ── 配置 ──────────────────────────────────────────────────
 KEYSTORE="release.keystore"
 PRODUCT="chainchess"
-VERSION="3.3.7"          # 兜底值；实际取 tauri.conf.json，见下方「版本号单一来源」
+VERSION="3.4.3"          # 兜底值；实际取 tauri.conf.json，见下方「版本号单一来源」
 
 CARGO_CONFIG="tauri/src-tauri/.cargo/config.toml"
 CARGO_TOML="tauri/src-tauri/Cargo.toml"
@@ -158,6 +158,43 @@ PYEOF
       esac
     fi
   fi
+
+  # 子 crate 与 lock 文件：不参与产物命名，但版本号必须与主版本一致，
+  # 否则 cargo / npm 元数据里会看到旧版本（曾经 engine 停在 3.3.9、
+  # wasm 停在 3.2.3、package-lock 停在 1.1.0）。
+  sync_one "engine/Cargo.toml" \
+    "0,/^version = \"[0-9][^\"]*\"/s//version = \"$_v\"/"
+  sync_one "docs/wasm/Cargo.toml" \
+    "0,/^version = \"[0-9][^\"]*\"/s//version = \"$_v\"/"
+
+  # Cargo.lock 里本项目 crate 的版本（都是 path 依赖，改版本不影响解析）
+  for _lock in engine/Cargo.lock tauri/src-tauri/Cargo.lock docs/wasm/Cargo.lock; do
+    sync_one "$_lock" \
+      "/^name = \"chain_chess_core\"$/,/^version = /s/^version = \"[^\"]*\"$/version = \"$_v\"/"
+  done
+  sync_one "docs/wasm/Cargo.lock" \
+    "/^name = \"chain_chess_engine\"$/,/^version = /s/^version = \"[^\"]*\"$/version = \"$_v\"/"
+
+  # npm lock 的根包版本（node_modules 里依赖的版本不动）
+  sync_one "tauri/package-lock.json" \
+    "1,10s/\"version\": \"[0-9][^\"]*\"/\"version\": \"$_v\"/"
+
+  # wasm-pack 生成的包元数据
+  sync_one "docs/pkg/package.json" \
+    "0,/\"version\": \"[0-9][^\"]*\"/s//\"version\": \"$_v\"/"
+  sync_one "docs/pkg-node/package.json" \
+    "0,/\"version\": \"[0-9][^\"]*\"/s//\"version\": \"$_v\"/"
+
+  # Android 生成的 versionName / versionCode（本机构建直接读这个文件，
+  # 不经 build.sh 的 `npx tauri android build` 会用它）
+  if [ -f "tauri/src-tauri/gen/android/app/tauri.properties" ]; then
+    _base="${_v%%-*}"
+    _vc=$(( $(echo "$_base" | cut -d. -f1) * 1000000 \
+          + $(echo "$_base" | cut -d. -f2) * 1000 \
+          + $(echo "$_base" | cut -d. -f3) ))
+    sync_one "tauri/src-tauri/gen/android/app/tauri.properties" \
+      "s/^tauri\.android\.versionName=.*/tauri.android.versionName=$_base/;s/^tauri\.android\.versionCode=.*/tauri.android.versionCode=$_vc/"
+  fi
   return 0
 }
 
@@ -171,7 +208,25 @@ verify_version_sync() {
      - $3  ($1)"
     return 0
   }
+  # Cargo.lock 里按 crate 名定位其 version 行
+  vlock() {
+    [ -f "$1" ] || return 0
+    _got=$(awk -v n="$2" '$0 == "name = \"" n "\"" { f=1; next } f && /^version = / { gsub(/[^0-9.]/, ""); print; exit }' "$1")
+    [ "$_got" = "$_v" ] || _bad="$_bad
+     - $3  ($1: $2 $_got)"
+    return 0
+  }
   vcheck "tauri/src-tauri/Cargo.toml" "^version = \"$_v\"$"              "Cargo.toml version"
+  vcheck "engine/Cargo.toml"          "^version = \"$_v\"$"              "engine/Cargo.toml version"
+  vcheck "docs/wasm/Cargo.toml"       "^version = \"$_v\"$"              "docs/wasm/Cargo.toml version"
+  vlock  "engine/Cargo.lock"         "chain_chess_core"                "engine/Cargo.lock"
+  vlock  "tauri/src-tauri/Cargo.lock" "chain_chess_core"               "tauri/Cargo.lock"
+  vlock  "docs/wasm/Cargo.lock"       "chain_chess_core"                "docs/wasm/Cargo.lock core"
+  vlock  "docs/wasm/Cargo.lock"       "chain_chess_engine"              "docs/wasm/Cargo.lock engine"
+  vcheck "tauri/package-lock.json"    "\"version\": \"$_v\""            "package-lock.json version"
+  vcheck "docs/pkg/package.json"      "\"version\": \"$_v\""            "docs/pkg/package.json version"
+  vcheck "docs/pkg-node/package.json" "\"version\": \"$_v\""            "docs/pkg-node/package.json version"
+  vcheck "tauri/src-tauri/gen/android/app/tauri.properties" "versionName=$_v" "android versionName"
   vcheck "tauri/package.json"          "\"version\": \"$_v\""            "package.json version"
   vcheck "README.md"                   "badge/version-$_v-orange"        "README badge"
   vcheck "tauri/public/index.html"     "style\.css\?v=$_v"               "public/index.html 资源戳"
