@@ -1675,7 +1675,12 @@ function lanInitPage(){
 }
 Router.register('lan', {
   back: 'welcome',
-  enter() { document.body.style.background = ''; lanInitPage(); },
+  enter() {
+    document.body.style.background = '';
+    // 还能从别的页回到这里，只有一条路：对局打完后按返回。旧房间已经没用了。
+    if(gameMode === 'lan' && gameOver) { gameMode = null; lanStopNet(); }
+    lanInitPage();
+  },
   // 离开页面就断开，不留幽灵房间。这里只断网、不再调 exitGame：
   // 结算后返回本页时 gameMode 还是 'lan'，exitGame 会再跳一次 welcome 把导航绕死。
   leave() {
@@ -1910,7 +1915,9 @@ function loadHistoryList(){
       const div = document.createElement('div');
       div.className = 'history-item';
       div.style.cssText = 'border-color:var(--accent2);cursor:default';
-      const modeLabel = effectiveState.gameMode === 'ai' ? 'AI对战' : (effectiveState.gameMode === 'eve' ? 'AI斗蛐蛐' : '本地对战');
+      const modeLabel = effectiveState.gameMode === 'ai' ? 'AI对战'
+        : effectiveState.gameMode === 'eve' ? 'AI斗蛐蛐'
+        : effectiveState.gameMode === 'lan' ? '局域网' : '本地对战';
       const elimArr = effectiveState.eliminatedPlayers;
       const liveCount = effectiveState.maxPlayers - (elimArr ? (Array.isArray(elimArr) ? elimArr.length : (elimArr.size || 0)) : 0);
       div.innerHTML = `
@@ -1933,7 +1940,9 @@ function loadHistoryList(){
       const div = document.createElement('div');
       div.className = 'history-item';
       div.style.cssText = 'border-color:var(--accent2);cursor:default';
-      const modeLabel = backupState.gameMode === 'ai' ? 'AI对战' : (backupState.gameMode === 'eve' ? 'AI斗蛐蛐' : '本地对战');
+      const modeLabel = backupState.gameMode === 'ai' ? 'AI对战'
+        : backupState.gameMode === 'eve' ? 'AI斗蛐蛐'
+        : backupState.gameMode === 'lan' ? '局域网' : '本地对战';
       const elimArr = backupState.eliminatedPlayers;
       const liveCount = backupState.maxPlayers - (elimArr ? (Array.isArray(elimArr) ? elimArr.length : (elimArr.size || 0)) : 0);
       div.innerHTML = `
@@ -4899,7 +4908,8 @@ async function showSettlement(winner,colorNames,history){
   renderGameCharts(inner, fullHistory, {
     winner, colorNames, colors: COLORS, eliminated: eliminatedPlayers,
     chainStats, maxChain: maxChainOverall, showTitle: false, _noBack: true, _noGrid: true,
-    onReplay: () => { Router.navigate(_originPage || 'welcome'); }
+    // 联机局不给「再来一局」：房间状态在别人手里，重开要走房间流程
+    onReplay: gameMode === 'lan' ? null : () => { Router.navigate(_originPage || 'welcome'); }
   });
   // 回放对局按钮
   if(hasReplayMoves(fullHistory)){
@@ -6115,6 +6125,7 @@ window.addEventListener('popstate',()=>{
         else Router.switchPage(prev || 'welcome');                  // CheckoutPage => 对应大厅
       },
       'game':          () => {                                      // 13 => 9
+        if(gameMode === 'lan') { openModal('lanExitConfirm'); return; }   // 联机不能暂停，只能退出
         if(gameOver) exitGame(true);
         else if(isPaused) resumeGame();
         else togglePause();
