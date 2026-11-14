@@ -67,13 +67,30 @@ jobs:
           RUST=tauri/src-tauri
           mkdir -p out
 
-          # Tauri 在多个 bin 里挑主二进制时会挑到 src/bin/ 下的 CLI 工具
+          is_gui() { strings -a "$1" 2>/dev/null | grep -qi webkit; }
+
+          echo "--- target/release 顶层 ---"
+          ls -1 "$RUST"/target/release | head -20
+          echo "--- deps 里的 chain_chess* ---"
+          ls -1 "$RUST"/target/release/deps 2>/dev/null | grep -i 'chain_chess' | head -20 || true
+          echo "（以上为空说明 deps 下没有该产物，将使用顶层主程序）"
+
+          # Tauri 在多个 bin 里挑主二进制时可能挑到 src/bin/ 下的 CLI 工具
           # （productName 是中文，匹配不上任何 bin），然后按 mainBinaryName
           # 改名，光看文件名看不出来。与本机 build.sh 同一处理：按 GUI 独有的
-          # webkit 特征串找出 cargo 编出的真主程序。
-          GUI=$(ls -1t "$RUST"/target/release/deps/chain_chess-* | grep -v '\.d$' | head -1)
-          test -n "$GUI"
-          strings -a "$GUI" | grep -qi webkit || { echo "不是 GUI 产物: $GUI"; exit 1; }
+          # webkit 特征串确认，不靠文件名猜。
+          #
+          # 但**不能假设产物只在 deps/ 下**：这里曾经直接 ls deps/chain_chess-*
+          # 并因找不到而整个构建失败（Tauri 实际报的路径是
+          # target/release/chain-chess）。两个来源都试：
+          #   1) Tauri 报告的顶层主程序 target/release/<mainBinaryName>
+          #   2) older cargo 在 deps/ 下留的 chain_chess-<hash> 硬链接
+          GUI=""
+          for cand in "$RUST"/target/release/chain-chess \
+                      $(ls -1t "$RUST"/target/release/deps/chain_chess-* 2>/dev/null | grep -v '\.d$' || true); do
+            if [ -f "$cand" ] && is_gui "$cand"; then GUI="$cand"; break; fi
+          done
+          echo "GUI 产物: ${GUI:-（未找到）}"
 
           # 同一目录会累积历史 deb，只认当前版本
           SRC=$(ls -1t "$RUST"/target/release/bundle/deb/*_"$V"_*.deb | head -1)
@@ -83,8 +100,16 @@ jobs:
           dpkg-deb -R "$SRC" "$TMP"
           # Tauri 拿中文 productName 当 Package 字段，dpkg 要求以字母数字开头
           sed -i 's/^Package: .*/Package: chain-chess/' "$TMP/DEBIAN/control"
-          strings -a "$TMP/usr/bin/chain-chess" | grep -qi webkit \
-            || cp "$GUI" "$TMP/usr/bin/chain-chess"
+          # deb 里打的不是 GUI 才替换；没有可用 GUI 产物时保留原样并说明
+          if is_gui "$TMP/usr/bin/chain-chess"; then
+            echo "deb 内已是 GUI 产物，无需替换"
+          elif [ -n "$GUI" ]; then
+            echo "deb 内是 CLI 产物，替换为: $GUI"
+            cp "$GUI" "$TMP/usr/bin/chain-chess"
+          else
+            echo "❌ deb 内不是 GUI 产物，且找不到 GUI 二进制"
+            exit 1
+          fi
           dpkg-deb -b "$TMP" "out/chainchess-$V.deb" > /dev/null
           rm -rf "$TMP"
 

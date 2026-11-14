@@ -603,9 +603,21 @@ if [ "$LINUX" = true ]; then
   # Tauri 挑主二进制时会挑到 src/bin/ 下的 CLI 工具（battle 等），deb 里装的就是
   # 那个 CLI 而不是 GUI；它还会顺手把产物改成 mainBinaryName，所以光看文件名看不
   # 出来。按 GUI 独有的 webkit 特征串找出 cargo 编出的真主程序，换进 deb。
-  _gui_bin=$(ls -1t "$RUST_DIR"/target/release/deps/chain_chess-* 2>/dev/null | grep -v '\.d$' | head -1)
-  if [ -z "$_gui_bin" ] || ! strings -a "$_gui_bin" 2>/dev/null | grep -qi 'webkit'; then
-    echo "❌ 错误: 找不到 Tauri GUI 主程序产物（$RUST_DIR/target/release/deps/chain_chess-*）"
+  #
+  # 别假设产物只在 deps/ 下：Tauri 报告的路径是 target/release/<mainBinaryName>，
+  # 而 CI 上 deps/ 里根本没有 chain_chess-*（linux-amd64.yml 因此失败过一次）。
+  # 两个来源都试，再用 webkit 确认。
+  _gui_bin=""
+  for _cand in "$RUST_DIR/target/release/chain-chess" \
+               $(ls -1t "$RUST_DIR"/target/release/deps/chain_chess-* 2>/dev/null | grep -v '\.d$' || true); do
+    if [ -f "$_cand" ] && strings -a "$_cand" 2>/dev/null | grep -qi 'webkit'; then
+      _gui_bin="$_cand"
+      break
+    fi
+  done
+  if [ -z "$_gui_bin" ]; then
+    echo "❌ 错误: 找不到 Tauri GUI 主程序产物"
+    echo "   已试: $RUST_DIR/target/release/chain-chess 与 $RUST_DIR/target/release/deps/chain_chess-*"
     exit 1
   fi
 
