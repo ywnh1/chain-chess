@@ -1276,8 +1276,7 @@
         <ul class="tp-list">
           <li><span class="tp-name">51.la 站点统计 SDK</span><span class="tp-lic">第三方统计</span><span class="tp-desc">SDK 地址
               sdk.51.la/js-sdk-pro.min.js ·
-              页面加载时引入并自动初始化（autoTrack）。用来统计访问量（PV/UV）、访问来源和大致设备环境，看有多少人在玩。它<strong>不会读取或上传棋盘、走法、对局记录、玩家名称</strong>等任何游戏内容。脚本加载失败（断网、被插件拦截）时游戏功能不受影响。桌面
-              / Android 应用使用与网页版相同的页面，因此也会引入该脚本。</span></li>
+              页面加载时引入并自动初始化（autoTrack）。用来统计访问量（PV/UV）、访问来源和大致设备环境，看有多少人在玩。它<strong>不会读取或上传棋盘、走法、对局记录、玩家名称</strong>等任何游戏内容。脚本加载失败（断网、被插件拦截）时游戏功能不受影响。<strong>该 SDK 只在网页版 PWA 中加载</strong>；Windows / Linux / Android 应用不包含任何统计 SDK，也不会引入这个脚本。</span></li>
           <li><span class="tp-name">Gitee 仓库接口</span><span class="tp-lic">更新检查</span><span class="tp-desc">接口地址
               gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json ·
               启动时静默请求一次，或在更多里点「检查更新」时请求。只读取公开仓库里的版本号文件，用来判断有没有新版本；不发送账号、设备标识或游戏数据（请求本身的 IP 与 User-Agent 由 HTTP
@@ -1301,7 +1300,7 @@
 
       <div class="about-card">
         <h3>本应用不包含</h3>
-        <p>无广告 SDK、无账号 / 登录 / 支付 SDK、无崩溃上报 SDK、无社交分享 SDK、无用户画像或行为分析 SDK（访问量统计仅由上面的 51.la 提供）。</p>
+        <p>无广告 SDK、无账号 / 登录 / 支付 SDK、无崩溃上报 SDK、无社交分享 SDK、无用户画像或行为分析 SDK（访问量统计仅由上面的 51.la 在网页版 PWA 中提供；桌面 / Android 应用不含任何统计 SDK）。</p>
       </div>
 
       <div class="about-card">

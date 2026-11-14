@@ -15,6 +15,8 @@ use tauri::Manager;
 #[cfg(not(target_os = "android"))]
 use semver::Version;
 
+mod lan;
+
 // ─── State ───
 
 pub struct AppState {
@@ -734,6 +736,7 @@ pub fn run() {
                 history_file: Mutex::new(history_path),
                 app_data_dir: Mutex::new(data_dir),
             });
+            app.manage(lan::LanState::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -762,6 +765,14 @@ pub fn run() {
             save_round_history,
             load_round_history,
             clear_round_history,
+            lan::lan_host,
+            lan::lan_join,
+            lan::lan_send,
+            lan::lan_send_to,
+            lan::lan_poll,
+            lan::lan_stop,
+            lan::lan_local_ip,
+            lan::lan_discover,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

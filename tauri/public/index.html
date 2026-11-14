@@ -4,18 +4,7 @@
   SPDX-License-Identifier: MIT
 -->
 <html lang="zh">
-<!-- 51.la 站点统计（autoTrack 自动跟踪；失败时记录，测试版在应用内显示） -->
-<script charset="UTF-8" id="LA_COLLECT" src="https://sdk.51.la/js-sdk-pro.min.js"></script>
-<script>
-  window.__LA_STATS__ = {ok: false};
-  try {
-    LA.init({id: "3QmOPWHEuNfIW4mp", ck: "3QmOPWHEuNfIW4mp", autoTrack: true});
-    window.__LA_STATS__.ok = true;
-  } catch (e) {
-    window.__LA_STATS__.error = String(e && e.message || e);
-    console.error('[51.la] 初始化失败:', e);
-  }
-</script>
+<!-- 桌面 / Android 应用端不加载任何统计 SDK（51.la 仅网页版 PWA 使用） -->
 
 <head>
   <meta charset="UTF-8">
@@ -51,10 +40,64 @@
         role="button" tabindex="0" aria-label="关于连锁棋"><img src="icons/icon-192.png" alt="连锁棋"><span>连锁棋</span></div>
       <div class="tagline">多人联手，一触即发</div>
       <button class="glass-btn primary start-btn" onclick="Router.navigate('gameSetup')">开始游戏</button>
+      <button class="glass-btn" style="width:100%;margin-top:10px" onclick="Router.navigate('lan')">局域网联机</button>
       <div class="welcome-footer">
         <button onclick="Router.navigate('settings')" class="glass-btn about-foot-btn">更多</button>
         <button onclick="Router.navigate('history')" class="glass-btn history-foot-btn">历史记录</button>
       </div>
+    </div>
+  </div>
+
+  <!-- LAN Multiplayer Screen -->
+  <div id="lan" class="screen">
+    <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+    <h2>局域网联机</h2>
+
+    <div id="lanIntroView">
+      <div class="about-card">
+        <p>同一 Wi-Fi / 热点下的设备直连，不经过任何服务器。主机创建房间，其他人输入房间地址加入。</p>
+        <p style="font-size:.75rem;color:var(--dim)">若发现不了房间，请确认两台设备在同一网段，并允许本应用使用本地网络。</p>
+      </div>
+
+      <div class="form-row"><label>昵称</label>
+        <input id="lanNick" maxlength="12" placeholder="玩家" style="flex:1">
+      </div>
+
+      <div class="form-row"><label>棋盘大小</label>
+        <select id="lanBoardSize">
+          <option value="5">5×5</option><option value="6">6×6</option>
+          <option value="7" selected>7×7</option><option value="8">8×8</option>
+          <option value="9">9×9</option><option value="10">10×10</option>
+          <option value="11">11×11</option><option value="12">12×12</option>
+          <option value="13">13×13</option><option value="14">14×14</option>
+          <option value="15">15×15</option><option value="16">16×16</option>
+          <option value="17">17×17</option><option value="18">18×18</option>
+          <option value="19">19×19</option>
+        </select>
+      </div>
+
+      <button class="glass-btn primary" id="lanHostBtn" style="width:100%;margin-top:6px">创建房间</button>
+
+      <div class="form-row" style="margin-top:14px"><label>加入房间</label>
+        <div style="display:flex;gap:8px;flex:1">
+          <input id="lanAddrInput" placeholder="192.168.1.23:端口" style="flex:1">
+          <button class="glass-btn" id="lanJoinBtn">加入</button>
+        </div>
+      </div>
+      <button class="glass-btn" id="lanDiscoverBtn" style="width:100%;margin-top:6px">搜索附近房间</button>
+      <div id="lanFoundBox" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+    </div>
+
+    <div id="lanRoomView" style="display:none">
+      <div class="about-card">
+        <p style="margin:0">房间地址：<strong id="lanRoomAddr" style="user-select:all">—</strong></p>
+        <p id="lanRoomTip" style="font-size:.75rem;color:var(--dim);margin:6px 0 0"></p>
+      </div>
+      <div id="lanPlayerList" style="display:flex;flex-direction:column;gap:6px;margin:10px 0"></div>
+      <p id="lanRoomHint" style="font-size:.78rem;color:var(--dim);text-align:center;margin:8px 0"></p>
+      <button class="glass-btn primary" id="lanReadyBtn" style="width:100%;margin-top:6px">准备</button>
+      <button class="glass-btn primary" id="lanStartBtn" style="width:100%;margin-top:6px;display:none">开始游戏</button>
+      <button class="glass-btn danger" id="lanLeaveBtn" style="width:100%;margin-top:6px">离开房间</button>
     </div>
   </div>
 
@@ -1259,22 +1302,28 @@
 
       <div class="about-card">
         <h3>数据放在哪</h3>
-        <p>连锁棋没有账号系统，也不需要登录。<strong>棋盘、走法、对局记录全部保存在你自己的设备上</strong>，不会上传到任何服务器。应用只在两处会访问网络：访问量统计与版本更新检查。</p>
+        <p>连锁棋没有账号系统，也不需要登录。<strong>棋盘、走法、对局记录全部保存在你自己的设备上</strong>，不会上传到任何服务器。应用只在检查版本更新时访问网络。</p>
       </div>
 
       <div class="about-card">
         <h3>会联网的第三方服务</h3>
         <ul class="tp-list">
-          <li><span class="tp-name">51.la 站点统计 SDK</span><span class="tp-lic">第三方统计</span><span class="tp-desc">SDK 地址
-              sdk.51.la/js-sdk-pro.min.js ·
-              页面加载时引入并自动初始化（autoTrack）。用来统计访问量（PV/UV）、访问来源和大致设备环境，看有多少人在玩。它<strong>不会读取或上传棋盘、走法、对局记录、玩家名称</strong>等任何游戏内容。脚本加载失败（断网、被插件拦截）时游戏功能不受影响。桌面
-              / Android 应用使用与网页版相同的页面，因此也会引入该脚本。</span></li>
           <li><span class="tp-name">Gitee 仓库接口</span><span class="tp-lic">更新检查</span><span class="tp-desc">接口地址
               gitee.com/api/v5/repos/ywnh1/chain-chess-release/contents/update.json ·
               启动时静默请求一次，或在更多里点「检查更新」时请求。只读取公开仓库里的版本号文件，用来判断有没有新版本；不发送账号、设备标识或游戏数据（请求本身的 IP 与 User-Agent 由 HTTP
               协议附带，代码未额外附加任何信息）。</span></li>
         </ul>
-        <p>除了这两个域名，应用不会主动请求别的地方。</p>
+        <p>除了这个域名，应用不会主动请求别的地方。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>局域网联机</h3>
+        <p>局域网联机只在同一 Wi-Fi / 热点内直接建连：房主在本机监听一个端口，其他人输入地址或通过局域网广播找到房间。棋步只在你和房间内玩家的设备之间传输，不经过互联网，也不发往任何第三方服务器。离开房间或退出应用即断开。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>统计 SDK 只在网页版 PWA</h3>
+        <p><strong>Windows / Linux / Android 应用不加载任何统计 / 分析 SDK</strong>，页面里没有第三方脚本。访问量统计（51.la 站点统计）只存在于网页版 PWA，由网页在浏览器中加载；它与本应用无关，也不会收到本应用的任何数据。</p>
       </div>
 
       <div class="about-card">
@@ -1292,12 +1341,12 @@
 
       <div class="about-card">
         <h3>本应用不包含</h3>
-        <p>无广告 SDK、无账号 / 登录 / 支付 SDK、无崩溃上报 SDK、无社交分享 SDK、无用户画像或行为分析 SDK（访问量统计仅由上面的 51.la 提供）。</p>
+        <p>无广告 SDK、无统计 / 分析 SDK（网页版 PWA 的 51.la 统计不在本应用中加载）、无账号 / 登录 / 支付 SDK、无崩溃上报 SDK、无社交分享 SDK、无用户画像或行为分析 SDK。</p>
       </div>
 
       <div class="about-card">
         <h3>不想被统计怎么办</h3>
-        <p>网页版可以用浏览器的隐私扩展或广告拦截规则屏蔽 sdk.51.la 域名，屏蔽后所有游戏功能照常可用；彻底断开网络也能正常游玩（只有「检查更新」会失败）。</p>
+        <p>本应用不含统计 SDK，不需要做任何处理。网页版 PWA 可以用浏览器的隐私扩展或广告拦截规则屏蔽 sdk.51.la 域名，屏蔽后所有游戏功能照常可用；彻底断开网络也能正常游玩（只有「检查更新」会失败）。</p>
         <p>开源库的许可证清单见「关于 → 许可证」页，完整源码以 MIT 协议公开在 GitHub。</p>
       </div>
     </div>
@@ -1350,7 +1399,7 @@
     <div class="top">
       <div class="top-left">
         <button onclick="undoLastMove()" id="undoBtn" disabled>悔棋</button>
-        <button onclick="togglePause()" id="pauseBtn">暂停</button>
+        <button onclick="onPauseBtn()" id="pauseBtn">暂停</button>
         <button id="autoSkipBtn" onclick="toggleAutoSkip()" title="自动跳过连爆动画">跳过</button>
         <button id="fastFinishBtn" onclick="confirmFastFinish()" style="display:none" title="场上只剩 AI 时直接算出终局结果">⚡
           一键终局</button>
@@ -1475,6 +1524,17 @@
     </div>
   </div>
   <!-- Modal: Exit Confirmation (page 14) -->
+  <div id="lanExitConfirm" class="modal">
+    <div class="modal-inner">
+      <h3>退出局域网对局</h3>
+      <p style="text-align:center;font-size:.88rem;color:var(--dim);margin-bottom:4px">退出会断开与房间的连接，确定吗？</p>
+      <div class="modal-actions">
+        <button class="glass-btn" onclick="closeModal('lanExitConfirm')">取消</button>
+        <button class="glass-btn primary" onclick="closeModal('lanExitConfirm');lanLeaveRoom()">退出</button>
+      </div>
+    </div>
+  </div>
+
   <div id="exitConfirm" class="modal">
     <div class="modal-inner">
       <h3>退出应用</h3>

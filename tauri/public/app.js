@@ -12,7 +12,7 @@
     if(_w)_w.classList.add('active');
   }catch(e){}
 })();
-/* ═══════ 测试版错误显示：未捕获错误 / 未处理拒绝 / 51.la 统计失败均在 UI 显示 ═══════ */
+/* ═══════ 测试版错误显示：未捕获错误 / 未处理拒绝在 UI 显示 ═══════ */
 (function(){
   var lastErr = ''; var lastTs = 0;
   function dbgReport(msg){
@@ -41,10 +41,6 @@
     var msg = (r && (r.message || r)) || '未处理的 Promise 拒绝';
     dedup('⚠️ 测试版错误: ' + String(msg));
   });
-  // 51.la 统计初始化结果（浏览器环境下失败才显示；Tauri 环境 skipped 不显示）
-  if (window.__LA_STATS__ && !window.__LA_STATS__.ok) {
-    dedup('⚠️ 51.la 统计初始化失败: ' + (window.__LA_STATS__.error || '未知原因'));
-  }
 })();
 
 
@@ -1173,6 +1169,449 @@ Router.register('checkout', {
   _checkoutPrev: 'welcome'
 });
 
+// ════════════════════════════════════════════════════════
+// 局域网联机（Rust 传输层 lan.rs：主机 TCP + UDP 广播发现）
+//
+// 对局只同步「动作」：落子坐标 + 随机种子。双方用同一引擎各自推演，
+// 棋盘进度自然一致，流量只有几十字节。主机是唯一的转发点。
+// ════════════════════════════════════════════════════════
+let lanRole = null;        // 'host' | 'client' | null
+let lanMyPid = 0;          // 本机座位号（主机 = 0）
+let lanPlayers = [];       // 按 pid 索引：{pid,name,ready,host}
+let lanSeats = null;       // 主机：peerId -> pid
+let lanRoomAddr = '';
+let lanBoardSize = 7;
+let lanPollTimer = null;
+let lanDrainBusy = false;
+
+function lanSupported(){
+  return !!(window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke);
+}
+function lanNickValue(){
+  const el = document.getElementById('lanNick');
+  let n = ((el && el.value) || '').trim().slice(0, 12);
+  if(!n) n = '玩家' + Math.floor(Math.random() * 900 + 100);
+  try{ localStorage.setItem('lanNick', n); }catch(e){}
+  return n;
+}
+function lanRosterData(){
+  return lanPlayers.filter(Boolean).map(p => ({pid:p.pid, name:p.name, ready:!!p.ready, host:!!p.host}));
+}
+function lanSend(msg){
+  return tauriInvoke('lan_send', {msg});
+}
+function lanSendTo(id, msg){
+  return tauriInvoke('lan_send_to', {id, msg});
+}
+function lanBroadcastExcept(exceptPeerId, msg){
+  if(!lanSeats) return;
+  lanSeats.forEach(function(pid, peerId){
+    if(peerId !== exceptPeerId) lanSendTo(peerId, msg).catch(function(){});
+  });
+}
+
+/* ─── 轮询事件队列 ─── */
+function lanStartPolling(){
+  if(lanPollTimer) return;
+  lanPollTimer = setInterval(lanDrainEvents, 120);
+}
+function lanStopNet(){
+  if(lanPollTimer){ clearInterval(lanPollTimer); lanPollTimer = null; }
+  try{ tauriInvoke('lan_stop').catch(function(){}); }catch(e){}
+  lanRole = null; lanSeats = null; lanPlayers = []; lanMyPid = 0; lanRoomAddr = '';
+}
+async function lanDrainEvents(){
+  if(lanDrainBusy) return;
+  lanDrainBusy = true;
+  try{
+    let evs = [];
+    try{ evs = await tauriInvoke('lan_poll'); }catch(e){ return; }
+    for(const ev of (evs || [])) await lanHandleEvent(ev);
+  }finally{
+    lanDrainBusy = false;
+  }
+}
+async function lanHandleEvent(ev){
+  if(!ev || typeof ev !== 'object') return;
+  if(ev.type === 'msg'){ await lanHandleMessage(ev.id, ev.data); return; }
+  if(ev.type === 'peer'){
+    if(ev.event === 'leave') lanHostPeerLeft(ev.id);
+    return;
+  }
+  if(ev.type === 'closed') lanOnConnectionLost();
+}
+async function lanHandleMessage(peerId, msg){
+  if(!msg || typeof msg !== 'object') return;
+  if(lanRole === 'host'){
+    if(msg.t === 'hello') lanHostHello(peerId, msg.name);
+    else if(msg.t === 'ready') lanHostSetReady(peerId, !!msg.ready);
+    else if(msg.t === 'move') await lanHostGotMove(peerId, msg);
+    else if(msg.t === 'leave') lanHostPeerLeft(peerId);
+  }else if(lanRole === 'client'){
+    if(msg.t === 'welcome'){
+      lanMyPid = msg.you | 0;
+      lanPlayers = [];
+      (msg.players || []).forEach(function(p){ lanPlayers[p.pid | 0] = p; });
+      if(msg.size) lanBoardSize = msg.size | 0;
+      lanRenderRoom();
+    }else if(msg.t === 'roster'){
+      lanPlayers = [];
+      (msg.players || []).forEach(function(p){ lanPlayers[p.pid | 0] = p; });
+      if(msg.size) lanBoardSize = msg.size | 0;
+      lanRenderRoom();
+    }else if(msg.t === 'start'){
+      if(msg.you != null) lanMyPid = msg.you | 0;
+      lanBeginGame({
+        size: msg.size | 0, cols: (msg.cols | 0) || (msg.size | 0),
+        maxPlayers: msg.maxPlayers | 0, names: msg.names || {},
+        borderMode: msg.borderMode || 'default', capMode: msg.capMode || '4',
+        cells: msg.cells || null
+      });
+    }else if(msg.t === 'move'){
+      const mx = msg.x | 0, my = msg.y | 0;
+      // 越界坐标直接丢掉：localClick 会按 board[x][y] 取格子，负下标会抛异常
+      if((msg.player | 0) === curPlayer && board[mx] && board[mx][my]) {
+        await localClick(mx, my, (msg.seed >>> 0));
+      }
+    }else if(msg.t === 'peerGone'){
+      gameOver = true;
+      showMsg((msg.name || '对手') + ' 已离开，对局结束', 'error');
+    }else if(msg.t === 'error'){
+      showMsg(msg.msg || '主机报错', 'error');
+    }
+  }
+}
+
+/* ─── 主机侧 ─── */
+function lanHostHello(peerId, name){
+  if(!lanSeats) lanSeats = new Map();
+  if(gameMode === 'lan'){
+    lanSendTo(peerId, {t:'error', msg:'对局已开始，请稍后再加入'}).catch(function(){});
+    return;
+  }
+  if(!lanSeats.has(peerId)){
+    if(lanSeats.size >= 9){   // 加房主共 10 人
+      lanSendTo(peerId, {t:'error', msg:'房间已满'}).catch(function(){});
+      return;
+    }
+    const used = new Set([0].concat(Array.from(lanSeats.values())));
+    let pid = 1;
+    while(used.has(pid)) pid++;
+    lanSeats.set(peerId, pid);
+  }
+  const pid = lanSeats.get(peerId);
+  lanPlayers[pid] = {
+    pid: pid,
+    name: String(name || ('玩家' + (pid + 1))).slice(0, 12),
+    ready: false, host: false
+  };
+  lanSendTo(peerId, {t:'welcome', you:pid, size:lanBoardSize, players:lanRosterData()}).catch(function(){});
+  lanSend({t:'roster', players:lanRosterData(), size:lanBoardSize}).catch(function(){});
+  lanRenderRoom();
+}
+function lanHostSetReady(peerId, ready){
+  if(!lanSeats) return;
+  const pid = lanSeats.get(peerId);
+  if(pid === undefined || !lanPlayers[pid]) return;
+  lanPlayers[pid].ready = ready;
+  lanSend({t:'roster', players:lanRosterData(), size:lanBoardSize}).catch(function(){});
+  lanRenderRoom();
+}
+function lanHostPeerLeft(peerId){
+  if(!lanSeats) return;
+  const pid = lanSeats.get(peerId);
+  if(pid === undefined) return;
+  const p = lanPlayers[pid];
+  lanSeats.delete(peerId);
+  lanPlayers[pid] = null;
+  if(gameMode === 'lan'){
+    gameOver = true;
+    lanBroadcastExcept(peerId, {t:'peerGone', name:(p && p.name) || '对手'});
+    showMsg(((p && p.name) || '对手') + ' 已离开，对局结束', 'error');
+  }else{
+    lanSend({t:'roster', players:lanRosterData(), size:lanBoardSize}).catch(function(){});
+    lanRenderRoom();
+  }
+}
+async function lanHostGotMove(peerId, msg){
+  if(!lanSeats) return;
+  const pid = lanSeats.get(peerId);
+  if(pid === undefined || pid !== curPlayer) return;
+  const x = msg.x | 0, y = msg.y | 0, seed = msg.seed >>> 0;
+  // 先做一遍与 localClick 相同的合法性校验：非法落子不往外转发，
+  // 否则其他客户端已经应用、主机却拒绝了，两边就分叉了。
+  const c = board[x] && board[x][y];
+  if(!c || c.blocked) return;
+  const mine = hasPieces(pid, board);
+  if(mine){
+    if(c.owner !== pid) return;
+  }else{
+    if(c.owner !== null) return;
+    if(isInRestrictedZone(x, y, board)) return;
+  }
+  lanBroadcastExcept(peerId, {t:'move', player:pid, x:x, y:y, seed:seed});
+  await localClick(x, y, seed);
+}
+
+/* ─── 入口与房间 ─── */
+async function lanCreateRoom(){
+  if(!lanSupported()){ showMsg('局域网联机需要桌面 / Android 应用', 'error'); return; }
+  const name = lanNickValue();
+  const sizeEl = document.getElementById('lanBoardSize');
+  lanBoardSize = parseInt(sizeEl && sizeEl.value) || 7;
+  lanStopNet();
+  let port = 0;
+  try{
+    port = await tauriInvoke('lan_host', {port:null, name:name});
+  }catch(e){
+    showMsg('创建房间失败：' + ((e && e.message) || e), 'error');
+    return;
+  }
+  let ip = '127.0.0.1';
+  try{ ip = await tauriInvoke('lan_local_ip'); }catch(e){}
+  lanRole = 'host';
+  lanSeats = new Map();
+  lanMyPid = 0;
+  lanRoomAddr = ip + ':' + port;
+  lanPlayers = [{pid:0, name:name, ready:true, host:true}];
+  lanStartPolling();
+  lanRenderRoom();
+}
+async function lanJoinRoom(addr){
+  if(!lanSupported()){ showMsg('局域网联机需要桌面 / Android 应用', 'error'); return; }
+  addr = String(addr || '').trim();
+  if(!/^.+:\d+$/.test(addr)){ showMsg('地址要写成 IP:端口，例如 192.168.1.23:41234', 'error'); return; }
+  const name = lanNickValue();
+  lanStopNet();
+  try{
+    await tauriInvoke('lan_join', {addr:addr, name:name});
+  }catch(e){
+    showMsg('加入失败：' + ((e && e.message) || e), 'error');
+    return;
+  }
+  lanRole = 'client';
+  lanMyPid = -1;
+  lanPlayers = [];
+  lanRoomAddr = addr;
+  lanStartPolling();
+  lanSend({t:'hello', name:name}).catch(function(){});
+  lanRenderRoom();
+}
+function lanToggleReady(){
+  if(lanRole !== 'client') return;
+  const me = lanPlayers[lanMyPid];
+  const next = !(me && me.ready);
+  if(me) me.ready = next;
+  lanSend({t:'ready', ready:next}).catch(function(){});
+  lanRenderRoom();
+}
+function lanHostStart(){
+  if(lanRole !== 'host') return;
+  const others = lanPlayers.filter(Boolean).filter(function(p){ return !p.host; });
+  if(!others.length){ showMsg('至少还需要一位玩家加入', 'error'); return; }
+  if(others.some(function(p){ return !p.ready; })){ showMsg('还有玩家没准备', 'error'); return; }
+  // 座位可能因为中途有人离开而出现空洞（pid 不连续）。开局前按当前在座的人
+  // 重新编号，否则 maxPlayers 和实际 pid 对不上，空位还会把回合推进卡死。
+  const alive = lanPlayers.filter(Boolean).slice().sort(function(a, b){ return a.pid - b.pid; });
+  const pidMap = new Map();
+  const names = {};
+  alive.forEach(function(p, idx){ pidMap.set(p.pid, idx); names[idx] = p.name; });
+  const cfg = {
+    size: lanBoardSize, cols: lanBoardSize, maxPlayers: alive.length,
+    names: names, borderMode: 'default', capMode: '4', cells: null
+  };
+  // 每个客户端单独发，带上它自己的新座位号
+  if(lanSeats){
+    lanSeats.forEach(function(oldPid, peerId){
+      const newPid = pidMap.get(oldPid);
+      if(newPid === undefined) return;
+      lanSendTo(peerId, {t:'start', you:newPid, size:cfg.size, cols:cfg.cols,
+        maxPlayers:cfg.maxPlayers, names:cfg.names, borderMode:cfg.borderMode,
+        capMode:cfg.capMode, cells:cfg.cells}).catch(function(){});
+    });
+  }
+  // 本地座位号与玩家表同步重编号
+  lanMyPid = pidMap.get(lanMyPid) || 0;
+  lanPlayers = [];
+  alive.forEach(function(p){ const np = pidMap.get(p.pid); lanPlayers[np] = {pid:np, name:p.name, ready:!!p.ready, host:!!p.host}; });
+  lanBeginGame(cfg);
+}
+function lanBeginGame(cfg){
+  if(!cfg || !cfg.maxPlayers) return;
+  clearSavedGameState();
+  resetRoundHistory();
+  undoStack = [];
+  size = cfg.size | 0;
+  cols = (cfg.cols | 0) || size;
+  maxPlayers = cfg.maxPlayers | 0;
+  boardCells = cfg.cells || null;
+  borderMode = cfg.borderMode || 'default';
+  capMode = cfg.capMode || '4';
+  board = mkBoard(size, cols, boardCells);
+  curPlayer = 0; gameOver = false; isPaused = false; firstMovePos = null;
+  const pauseBtn = document.getElementById('pauseBtn');
+  if(pauseBtn) pauseBtn.textContent = '退出';   // 联机不能暂停，这个按钮只用于离开对局
+  gameMode = 'lan';
+  _originPage = 'lan';
+  aiPlayers = new Set(); aiConfigs = {}; aiThinking = false;
+  eliminatedPlayers = new Set(); eliminationRounds = []; eliminationInfo = {};
+  gameHistory = []; chainStats = {};
+  maxChainOverall = {player:null, length:0};
+  _colorNames = {};
+  for(let i = 0; i < maxPlayers; i++) _colorNames[i] = (cfg.names && cfg.names[i]) || ('玩家' + (i + 1));
+  recordHistory();
+  renderBoard(true);
+  show('game');
+  document.body.style.background = '';
+  renderPlayerBar();
+  updateFastFinishBtn();
+  lanStartPolling();
+}
+/// 对局页的暂停/退出按钮：联机时不能暂停（会挡住远端落子），改为退出确认
+function onPauseBtn(){
+  // 断线后 lanRole 会先被清掉，但仍在 lan 对局页：也要走退出确认，不能落回「暂停」
+  if(gameMode === 'lan'){ openModal('lanExitConfirm'); return; }
+  togglePause();
+}
+function lanSendMove(x, y, seed){
+  if(gameMode !== 'lan' || !lanRole) return;
+  if(lanRole === 'host') lanSend({t:'move', player:curPlayer, x:x, y:y, seed:seed}).catch(function(){});
+  else lanSend({t:'move', x:x, y:y, seed:seed}).catch(function(){});
+}
+function lanOnConnectionLost(){
+  const wasPlaying = gameMode === 'lan';
+  lanStopNet();
+  if(wasPlaying){
+    gameOver = true;
+    showMsg('与主机断开连接，对局结束', 'error');
+  }else{
+    showMsg('与主机断开连接', 'error');
+    lanRenderRoom();
+  }
+}
+function lanLeaveRoom(){
+  if(lanRole) lanSend({t:'leave'}).catch(function(){});
+  lanStopNet();
+  if(gameMode === 'lan'){ exitGame(); return; }
+  lanRenderRoom();
+}
+
+/* ─── 页面渲染 ─── */
+function lanRenderRoom(){
+  const intro = document.getElementById('lanIntroView');
+  const room = document.getElementById('lanRoomView');
+  if(!intro || !room) return;
+  if(!lanRole){
+    intro.style.display = '';
+    room.style.display = 'none';
+    return;
+  }
+  intro.style.display = 'none';
+  room.style.display = '';
+  const addrEl = document.getElementById('lanRoomAddr');
+  if(addrEl) addrEl.textContent = lanRoomAddr || '—';
+  const tip = document.getElementById('lanRoomTip');
+  if(tip){
+    if(lanRole === 'host'){
+      tip.textContent = lanRoomAddr.indexOf('127.') === 0
+        ? '没拿到本机局域网 IP（检查 Wi-Fi 是否已连接），其他人可能连不上。'
+        : '让其他设备在同一 Wi-Fi 下输入上面的地址，或点「搜索附近房间」。';
+    }else{
+      tip.textContent = '已连接到主机，等待房主开始。';
+    }
+  }
+  const readyBtn = document.getElementById('lanReadyBtn');
+  const startBtn = document.getElementById('lanStartBtn');
+  const hint = document.getElementById('lanRoomHint');
+  if(readyBtn){
+    readyBtn.style.display = lanRole === 'client' ? '' : 'none';
+    const me = lanPlayers[lanMyPid];
+    readyBtn.textContent = (me && me.ready) ? '取消准备' : '准备';
+  }
+  if(startBtn) startBtn.style.display = lanRole === 'host' ? '' : 'none';
+  if(hint){
+    if(lanRole === 'host'){
+      const others = lanPlayers.filter(Boolean).filter(function(p){ return !p.host; });
+      hint.textContent = !others.length ? '等待其他玩家加入…'
+        : (others.every(function(p){ return p.ready; }) ? '都准备好了，可以开始' : '等待玩家准备');
+    }else{
+      const me = lanPlayers[lanMyPid];
+      hint.textContent = (me && me.ready) ? '已准备，等待房主开始…' : '点「准备」告诉房主你好了';
+    }
+  }
+  lanRenderPlayerList();
+}
+function lanRenderPlayerList(){
+  const box = document.getElementById('lanPlayerList');
+  if(!box) return;
+  box.innerHTML = '';
+  const list = lanPlayers.filter(Boolean).slice().sort(function(a, b){ return a.pid - b.pid; });
+  for(const p of list){
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;' +
+      'background:' + (COLORS_LIGHT[p.pid] || 'rgba(255,255,255,.06)') + ';color:' + (COLORS[p.pid] || '#ccc');
+    const dot = document.createElement('span');
+    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:' + (COLORS[p.pid] || '#888');
+    const name = document.createElement('span');
+    name.style.flex = '1';
+    name.textContent = p.name + (p.pid === lanMyPid ? '（你）' : '');
+    const tag = document.createElement('span');
+    tag.style.cssText = 'font-size:.72rem;color:var(--dim)';
+    tag.textContent = p.host ? '房主' : (p.ready ? '已准备' : '未准备');
+    row.appendChild(dot); row.appendChild(name); row.appendChild(tag);
+    box.appendChild(row);
+  }
+}
+async function lanDiscoverRooms(){
+  const box = document.getElementById('lanFoundBox');
+  if(box){ box.textContent = '搜索中…'; box.style.cssText = 'color:var(--dim);font-size:.78rem;margin-top:8px'; }
+  let list = [];
+  try{ list = await tauriInvoke('lan_discover', {timeoutMs:700}); }catch(e){}
+  if(!box) return;
+  box.innerHTML = '';
+  if(!list || !list.length){
+    box.textContent = '没找到房间（确认同一 Wi-Fi，或直接输入地址）';
+    return;
+  }
+  for(const r of list){
+    const b = document.createElement('button');
+    b.className = 'glass-btn';
+    b.textContent = (r.name || '房间') + ' · ' + r.addr;
+    b.onclick = function(){ lanJoinRoom(r.addr); };
+    box.appendChild(b);
+  }
+}
+function lanInitPage(){
+  const nick = document.getElementById('lanNick');
+  if(nick && !nick.value){
+    try{ nick.value = localStorage.getItem('lanNick') || ''; }catch(e){}
+  }
+  const hostBtn = document.getElementById('lanHostBtn');
+  const joinBtn = document.getElementById('lanJoinBtn');
+  const discBtn = document.getElementById('lanDiscoverBtn');
+  const readyBtn = document.getElementById('lanReadyBtn');
+  const startBtn = document.getElementById('lanStartBtn');
+  const leaveBtn = document.getElementById('lanLeaveBtn');
+  if(hostBtn) hostBtn.onclick = lanCreateRoom;
+  if(joinBtn) joinBtn.onclick = function(){ lanJoinRoom(document.getElementById('lanAddrInput') && document.getElementById('lanAddrInput').value); };
+  if(discBtn) discBtn.onclick = lanDiscoverRooms;
+  if(readyBtn) readyBtn.onclick = lanToggleReady;
+  if(startBtn) startBtn.onclick = lanHostStart;
+  if(leaveBtn) leaveBtn.onclick = lanLeaveRoom;
+  lanRenderRoom();
+}
+Router.register('lan', {
+  back: 'welcome',
+  enter() { document.body.style.background = ''; lanInitPage(); },
+  // 离开页面就断开，不留幽灵房间。这里只断网、不再调 exitGame：
+  // 结算后返回本页时 gameMode 还是 'lan'，exitGame 会再跳一次 welcome 把导航绕死。
+  leave() {
+    if(!lanRole) return;
+    lanSend({t:'leave'}).catch(function(){});
+    lanStopNet();
+  }
+});
+
 // ─── 兼容旧函数（逐步迁移） ───
 function show(s) { Router.navigate(s); }
 function goHome() {
@@ -1223,7 +1662,7 @@ function computeStats(records){
   return s;
 }
 
-const _MODE_LABEL={local:'本地',ai:'AI对战',eve:'斗蛐蛐'};
+const _MODE_LABEL={local:'本地',ai:'AI对战',eve:'斗蛐蛐',lan:'局域网'};
 
 function renderHistoryStats(list){
   const box=document.getElementById('historyStats');
@@ -1778,6 +2217,8 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
 }// ─── 保存未完成游戏历史记录（用于异常退出后继续游戏） ───
 async function saveUnfinishedGameHistory(){
   if(!gameMode||gameOver)return;
+  // 联机对局不存断点：离开后房间就不在了，续不上反而添乱
+  if(gameMode==='lan')return;
   // ★ 在 await 之前捕获所有全局变量的快照（避免 exitGame 在 await 期间重置全局变量后读取到空值）
   const _board = board;
   const _size = size;
@@ -1974,6 +2415,7 @@ function loadGameFromState(saved){
 // ─── 已保存游戏状态管理（用于继续游戏） ───
 function saveCurrentGameState(historyOverride){
   if(!gameMode||gameOver)return;
+  if(gameMode==='lan')return;   // 同上：联机对局不做本地断点
   // historyOverride 可选：外部传入完整历史（解决刷盘后 gameHistory 不全的问题）
   const hist = historyOverride || gameHistory;
   // 构建用于恢复的完整游戏状态
@@ -3000,8 +3442,8 @@ function renderPlayerBar(){
     t.style.color=COLORS[p];
     let label=(_colorNames&&_colorNames[p])||(aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`);
     t.innerHTML=`${label} <span class="cnt">${cnt[p]}</span>`;
-    t.style.cursor='pointer';
-    t.onclick=function(e){e.stopPropagation();openInGamePlayerConfig(p)};
+    t.style.cursor=gameMode==='lan'?'default':'pointer';
+    if(gameMode!=='lan')t.onclick=function(e){e.stopPropagation();openInGamePlayerConfig(p)};
     el.appendChild(t);
   }
   // 回合计数。用 gameHistory.length（每次落子在 recordHistory 里 push 一条）。
@@ -3333,6 +3775,7 @@ async function triggerAI(){
 
 function togglePause(){
   if(gameOver)return;
+  if(gameMode==='lan'){showMsg('局域网对局不能暂停','');return;}
   isPaused=!isPaused;
   let btn=document.getElementById('pauseBtn');
   if(isPaused){
@@ -3427,6 +3870,7 @@ function saveUndoState(){
   updateUndoBtn();
 }
 function undoLastMove(){
+  if(gameMode==='lan'){showMsg('局域网对局不能悔棋','');return;}
   if(undoStack.length===0||gameOver||aiThinking||animating)return;
   let state=undoStack.pop();
   board=state.board;
@@ -3585,7 +4029,7 @@ async function animateBoardDiff(oldBoard, newBoard, sz){
   renderBoard(true);
 }
 
-async function localClick(x,y){
+async function localClick(x,y,seedOverride){
   if(gameOver||aiThinking||isPaused||animating)return;
   // AI 首子由玩家放置：轮到 AI 且 AI 无棋子时，人类可点击为空 AI 放置首子
   if(aiPlayers.has(curPlayer) && hasPieces(curPlayer,board)){
@@ -3658,7 +4102,7 @@ async function localClick(x,y){
   // 落子波纹视觉反馈
   const clickEl=cells?.[x]?.[y];
   if(clickEl)addRipple(clickEl);
-  const rndSeed=(Math.floor(Math.random()*0x7fffffff))>>>0;
+  const rndSeed=seedOverride!=null?seedOverride:((Math.floor(Math.random()*0x7fffffff))>>>0);
   let elim, killedBy;
   try {
     let result=await tauriInvoke('process_move',{
@@ -3677,6 +4121,8 @@ async function localClick(x,y){
   }
   handleEliminations(elim, killedBy, curPlayer);
   recordHistory({x:x,y:y,player:curPlayer,seed:rndSeed});
+  // 联机：本地落子广播给其他设备；远端落子（seedOverride 非空）不再回发
+  if(gameMode==='lan'&&seedOverride==null)lanSendMove(x,y,rndSeed);
   renderBoard(true);
   let alive=[];
   for(let p=0;p<maxPlayers;p++){
@@ -3700,6 +4146,10 @@ async function localClick(x,y){
 
 function handleClick(x,y){
   if(board[x]&&board[x][y]&&board[x][y].blocked)return;   // 空洞点不动
+  if(gameMode==='lan'&&curPlayer!==lanMyPid){
+    if(!gameOver&&!animating)showMsg('等待其他玩家落子','');
+    return;
+  }
   if(!aiThinking&&!isPaused&&!animating)localClick(x,y);
 }
 
@@ -4391,7 +4841,7 @@ async function showSettlement(winner,colorNames,history){
   homeBtn.className = 'glass-btn primary';
   homeBtn.textContent = '返回主菜单';
   homeBtn.style.marginTop = '6px';
-  homeBtn.onclick = () => { Router.navigate('welcome'); };
+  homeBtn.onclick = () => { if(gameMode==='lan'&&lanRole)lanLeaveRoom(); else Router.navigate('welcome'); };
   inner.appendChild(homeBtn);
   Router.navigate('checkout', prevPage);
   await saveGameHistory(winner, undefined, undefined, undefined, fullHistory);
@@ -4653,6 +5103,7 @@ function showFullscreenChart(canvasId){
 
 /* ==================== GAME ACTIONS ==================== */
 function exitGame(){
+  if(lanRole) lanStopNet();
   // 退出时清理已保存状态（不再自动保存，由 endGameNow 管理）
   clearSavedGameState();
   // 刷盘残留历史再退出，清理磁盘回合数据
@@ -5563,6 +6014,7 @@ window.addEventListener('popstate',()=>{
       'welcome':       () => showExitConfirm(),                     // 1 => 14
       'gameSetup':     () => Router.switchPage('welcome'),          // new => welcome
       'history':       () => Router.switchPage('welcome'),          // 5 => 1
+      'lan':           () => Router.switchPage('welcome'),          // 局域网联机 => 1（离开会断网）
       'settings':      () => Router.switchPage('welcome'),          // settings => 1
       'about':         () => Router.switchPage('settings'),         // 6 => settings
       'about-ai':      () => Router.switchPage('about'),            // 10 => 6
