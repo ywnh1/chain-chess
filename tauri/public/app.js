@@ -1256,7 +1256,9 @@ async function lanHandleMessage(peerId, msg){
   if(lanRole === 'host'){
     if(msg.t === 'hello') lanHostHello(peerId, msg.name);
     else if(msg.t === 'ready') lanHostSetReady(peerId, !!msg.ready);
-    else if(msg.t === 'move') await lanHostGotMove(peerId, msg);
+    // 不 await：一手落子的动画有几百毫秒，阻塞在这里会拖住整个事件队列
+    //（leave / ready 都排在后面）。落子本身由 lanApplyRemote 串行化。
+    else if(msg.t === 'move') lanHostGotMove(peerId, msg).catch(function(e){ logWarn('lan move failed:', e); });
     else if(msg.t === 'leave') lanHostPeerLeft(peerId);
   }else if(lanRole === 'client'){
     if(msg.t === 'welcome'){
