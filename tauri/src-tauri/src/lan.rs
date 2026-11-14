@@ -580,6 +580,12 @@ mod tests {
     #[test]
     fn discover_finds_local_room() {
         let _guard = serial();
+        // 没网 / 端口被别的进程占着的环境（CI 容器、共享机器）跳过硬性断言，
+        // 这种环境里广播本来就收不到回声，不是代码坏了。
+        if local_ipv4().is_none() || UdpSocket::bind(("0.0.0.0", DISCOVERY_PORT)).is_err() {
+            eprintln!("跳过 discover 用例：本机无局域网地址或发现端口被占用");
+            return;
+        }
         let host_state = LanState::new();
         let port = host(&host_state.inner, None, "测试房间".into()).expect("起主机失败");
         // UDP 应答线程是刚 spawn 的，给它一点时间完成 bind
