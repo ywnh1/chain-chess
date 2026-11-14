@@ -712,7 +712,8 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 .hint-body{max-height:60vh;overflow-y:auto;text-align:left;font-size:.85rem;line-height:1.75;color:var(--text)}
 .hint-body p{margin:0 0 10px}
 .hint-body p:last-child{margin-bottom:0}
-.hint-body ul{margin:0 0 10px;padding-left:18px}
+.hint-body ul,.hint-body ol{margin:0 0 10px;padding-left:18px}
+.hint-body code{font-family:var(--font-mono,monospace);font-size:.86em;padding:1px 5px;border-radius:4px;background:var(--glass-w-08)}
 .hint-body li{margin:5px 0}
 .hint-body strong{color:var(--accent)}
 .hint-body .hint-tip{margin:10px 0 0;padding:8px 10px;border-radius:8px;background:rgba(240,179,75,.1);color:var(--dim);font-size:.8rem;line-height:1.6}
@@ -1147,6 +1148,16 @@ body.orbs-on .orb-container{display:block}
   transform:scale(1.03);box-shadow:0 6px 40px rgba(240,179,75,.25),0 2px 12px rgba(0,0,0,.25);
   border-color:rgba(240,179,75,.35);
 }
+/* 局域联机：与「开始游戏」同宽同高，视觉上次一级。
+   min-height 统一钉死，否则两按钮字号不同会导致高度差几个像素。 */
+.start-btn,.lan-btn{min-height:52px;box-sizing:border-box}
+.lan-btn{
+  width:100%;max-width:260px;padding:12px 0;font-size:var(--text-base);font-weight:var(--weight-medium);
+  border-radius:var(--radius);letter-spacing:2px;
+  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  transition:all .4s cubic-bezier(.22,1,.36,1);
+}
+.lan-btn:hover,.lan-btn:active{transform:scale(1.02)}
 .welcome-footer{display:flex;gap:8px;width:100%;max-width:260px;justify-content:center}
 .welcome-footer .glass-btn{
   padding:12px 0;border-radius:var(--radius-sm);font-size:.85rem;letter-spacing:1px;

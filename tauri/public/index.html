@@ -40,7 +40,7 @@
         role="button" tabindex="0" aria-label="关于连锁棋"><img src="icons/icon-192.png" alt="连锁棋"><span>连锁棋</span></div>
       <div class="tagline">多人联手，一触即发</div>
       <button class="glass-btn primary start-btn" onclick="Router.navigate('gameSetup')">开始游戏</button>
-      <button class="glass-btn" style="width:100%;margin-top:10px" onclick="Router.navigate('lan')">局域网联机</button>
+      <button class="glass-btn lan-btn" onclick="Router.navigate('lan')">局域网联机</button>
       <div class="welcome-footer">
         <button onclick="Router.navigate('settings')" class="glass-btn about-foot-btn">更多</button>
         <button onclick="Router.navigate('history')" class="glass-btn history-foot-btn">历史记录</button>
@@ -644,6 +644,12 @@
           <strong>合成音效</strong>：落子、爆炸、淘汰、获胜各有音效（Web Audio API）<br>
           <strong>三端形态</strong>：桌面 / Android / 浏览器 PWA，同一引擎，离线可玩
         </p>
+      </div>
+
+      <!-- 局域网联机教程 → 二级页 -->
+      <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-lan')">
+        <span class="nav-label">局域网联机教程</span>
+        <span class="nav-arrow">→</span>
       </div>
 
       <!-- AI 介绍 → 二级页 -->
@@ -1348,6 +1354,82 @@
         <h3>不想被统计怎么办</h3>
         <p>本应用不含统计 SDK，不需要做任何处理。网页版 PWA 可以用浏览器的隐私扩展或广告拦截规则屏蔽 sdk.51.la 域名，屏蔽后所有游戏功能照常可用；彻底断开网络也能正常游玩（只有「检查更新」会失败）。</p>
         <p>开源库的许可证清单见「关于 → 许可证」页，完整源码以 MIT 协议公开在 GitHub。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- About LAN page (二级) -->
+  <div id="about-lan" class="screen">
+    <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+    <div class="about-scroll">
+      <h2>局域网联机教程</h2>
+
+      <div class="about-card">
+        <h3>这是个什么功能</h3>
+        <p>同一个 Wi-Fi 或手机热点下的几台设备，直接连起来打一局。不经过互联网，也没有服务器：房主的手机/电脑自己开一个端口，其他人连上去。<strong>只有桌面版和 Android 版有</strong>，浏览器 PWA 没有（网页不能监听端口）。</p>
+        <p style="font-size:.8rem;color:var(--dim)">支持 2~10 人。棋步只在房间里那几台设备之间传，流量很小。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>第一步：所有人连同一个网络</h3>
+        <p>最简单的是开一台手机的热点，其他人连这个热点。用家里的路由器也行，但要确认大家连的是同一个 Wi-Fi（2.4G 和 5G 常被拆成两个不同的网，连岔了就互相看不见）。</p>
+        <p><strong>不用连互联网也能玩</strong>：没有外网、只开热点照样能联机。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>第二步：一个人创建房间</h3>
+        <ol>
+          <li>首页点<strong>「局域网联机」</strong></li>
+          <li>填个昵称（最多 12 个字）</li>
+          <li>选棋盘大小（房主定，整局不变）</li>
+          <li>点<strong>「创建房间」</strong></li>
+        </ol>
+        <p>房间地址会显示成 <code>192.168.x.x:端口</code>，这就是其他人要连的东西。<strong>念给旁边的人，或者自己念给自己听</strong>——地址只在局域网内有效，出了这个网络就没人能连。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>第三步：其他人加入</h3>
+        <p>两条路，任选：</p>
+        <ul>
+          <li><strong>直接输地址</strong>：把房主念的那串 <code>192.168.x.x:端口</code> 填进输入框，点「加入」</li>
+          <li><strong>搜索附近房间</strong>：点「搜索附近房间」，等一两秒，列表里出现房间后点一下就连上</li>
+        </ul>
+        <p>搜不到就先手输地址——有些路由器会拦局域网广播，但直连一般不受影响。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>第四步：准备，然后开局</h3>
+        <p>加入的人点<strong>「准备」</strong>，房主那边会看到「已准备」。等所有人都准备好了，房主点<strong>「开始游戏」</strong>，大家同时进入棋盘。</p>
+        <p>房主自己在开局前不能准备/取消——他本来就是发起人。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>对局中</h3>
+        <ul>
+          <li>轮到谁，谁的格子才能点；不是你的回合点了会提示「等待其他玩家落子」</li>
+          <li><strong>不能暂停、不能悔棋</strong>：一暂停就挡住别人落子，一悔棋两边的棋盘就对不上了。所以对局中右上角的「暂停」变成了「退出」</li>
+          <li>谁掉线或者退出，这局就结束（房主的连接是唯一的转发点，他走了所有人都断）</li>
+          <li>打完可以在结算页看排名和图表，对局也会进历史记录，模式标成「局域网」</li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <h3>连不上？按顺序排查</h3>
+        <ol>
+          <li><strong>两台设备真的在同一个网吗</strong>：看各自 Wi-Fi 详情里的 IP，前三段要一样（比如都是 <code>192.168.1.x</code>）。2.4G / 5G 分开的路由器最容易在这翻车</li>
+          <li><strong>地址抄对了吗</strong>：IP 加冒号加端口（<code>192.168.1.23:41234</code>），少个冒号或者端口写错就连不上</li>
+          <li><strong>房主那边地址显示 127.0.0.1</strong>：说明房主本机没拿到局域网地址（Wi-Fi 没连上或只有移动数据），换到真正的 Wi-Fi 上再建一次</li>
+          <li><strong>路由器开了「AP 隔离 / 客户机隔离」</strong>：这个选项会让设备之间互相看不见，得在路由器后台关掉</li>
+          <li><strong>系统防火墙</strong>：Windows 第一次建房间可能弹窗问要不要允许，要选「允许专用网络」</li>
+          <li><strong>Android 提示没有本地网络权限</strong>：在系统设置里给连锁棋放开局域网/本地网络权限（部分系统的「附近设备」权限也管这个）</li>
+        </ol>
+      </div>
+
+      <div class="about-card">
+        <h3>还是不行？</h3>
+        <p>把这几项一起发过来：两台设备各自的 IP、房主界面显示的地址、有没有弹错误提示、手机/电脑型号。可以直接到<strong>「关于 → 联系作者」</strong>反馈，或者点下面的按钮。</p>
+        <button class="glass-btn primary" style="width:100%;margin-top:8px"
+          onclick="window.open('https://ywnh1.free.leoi.org/#/contact','_blank','noopener')">联系作者 / 反馈问题</button>
       </div>
     </div>
   </div>

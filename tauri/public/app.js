@@ -222,10 +222,36 @@ function showIntroModal(ver){
   if(title)title.textContent='欢迎使用连锁棋 v'+ver;
   const howto=(typeof HINTS!=='undefined'&&HINTS['howto'])?HINTS['howto'].body:'';
   const latest=latestChangelogDesc();
-  // 顺序：本版更新在前、怎么玩在后；两段都是原生 details，默认折叠
+  // 局域网联机只有桌面 / Android 应用有（浏览器不能监听端口），没有就不显示这一段
+  const lanHelp=(typeof lanSupported==='function'&&lanSupported())
+    ? '<details class="intro-fold" open><summary class="intro-sec">局域网联机（新）</summary>'+
+      '<div class="intro-desc">'+
+      '<p>同一个 Wi-Fi / 热点下，几台设备直接连起来打，不经过服务器。</p>'+
+      '<ol>'+
+      '<li><strong>所有人连同一个网络</strong>（最简单的办法：开一台手机的热点）</li>'+
+      '<li>一个人点「创建房间」，把显示的 <code>192.168.x.x:端口</code> 念给其他人</li>'+
+      '<li>其他人输地址加入，或者点「搜索附近房间」</li>'+
+      '<li>加入的人点「准备」，房主点「开始游戏」</li>'+
+      '</ol>'+
+      '<p style="font-size:.78rem;color:var(--dim)">对局中不能暂停、不能悔棋（会让两边棋盘对不上）；房主掉线则这局结束。</p>'+
+      '<button class="glass-btn" style="width:100%;margin-top:8px" '+
+      'onclick="closeModal(\'introModal\');Router.navigate(\'about-lan\')">看完整联机教程</button>'+
+      '</div></details>'
+    : '';
+  const feedback=
+    '<details class="intro-fold"><summary class="intro-sec">遇到问题 / 反馈</summary>'+
+    '<div class="intro-desc">'+
+    '<p>联机连不上时，先把这几项记下来再反馈：两台设备各自的 IP、房主界面显示的地址、有没有弹错误提示、设备型号。</p>'+
+    '<p style="font-size:.78rem;color:var(--dim)">常见原因：两台设备不在同一个网（2.4G / 5G 被拆开）、路由器开了 AP 隔离、系统防火墙没放行、地址抄错或端口写错。</p>'+
+    '<button class="glass-btn primary" style="width:100%;margin-top:8px" '+
+    'onclick="window.open(\'https://ywnh1.free.leoi.org/#/contact\',\'_blank\',\'noopener\')">联系作者 / 反馈问题</button>'+
+    '</div></details>';
+  // 顺序：本版更新在前、然后联机教程、怎么玩、反馈；每段都是原生 details，默认折叠
   body.innerHTML=
     (latest?'<details class="intro-fold"><summary class="intro-sec">本版更新</summary><p class="intro-desc">'+latest+'</p></details>':'')+
-    '<details class="intro-fold"><summary class="intro-sec">怎么玩</summary>'+howto+'</details>';
+    lanHelp+
+    '<details class="intro-fold"><summary class="intro-sec">怎么玩</summary>'+howto+'</details>'+
+    feedback;
   body.scrollTop=0;
   openModal('introModal');
 }
@@ -1086,6 +1112,11 @@ Router.register('game', {
 Router.register('about', {
   back: 'settings',
   enter() { document.body.style.background=''; },
+  leave() {}
+});
+Router.register('about-lan', {
+  back: 'about',
+  enter() { document.body.style.background = ''; },
   leave() {}
 });
 Router.register('about-ai', {
@@ -6143,6 +6174,7 @@ window.addEventListener('popstate',()=>{
       'lan':           () => Router.switchPage('welcome'),          // 局域网联机 => 1（离开会断网）
       'settings':      () => Router.switchPage('welcome'),          // settings => 1
       'about':         () => Router.switchPage('settings'),         // 6 => settings
+      'about-lan':     () => Router.switchPage('about'),            // 联机教程 => 6
       'about-ai':      () => Router.switchPage('about'),            // 10 => 6
       'about-changelog': () => Router.switchPage('about'),          // 11 => 6
       'about-benchmark': () => Router.switchPage('about'),            // 12 => 6
