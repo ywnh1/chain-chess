@@ -1189,10 +1189,20 @@ function lanSupported(){
 }
 function lanNickValue(){
   const el = document.getElementById('lanNick');
-  let n = ((el && el.value) || '').trim().slice(0, 12);
-  if(!n) n = '玩家' + Math.floor(Math.random() * 900 + 100);
+  const n = lanCleanName(el && el.value, '玩家' + Math.floor(Math.random() * 900 + 100));
   try{ localStorage.setItem('lanNick', n); }catch(e){}
   return n;
+}
+/// 远端玩家名进 UI 前先洗一遍：去掉控制字符与 HTML 元字符。
+/// 这些名字会被写进玩家条 / 结算标题，虽然现在都用 textContent 插入，
+/// 但输入侧不校验就等于把安全性押在「以后没人用 innerHTML」上。
+function lanCleanName(raw, fallback){
+  const t = String(raw == null ? '' : raw)
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/[<>&"'`]/g, '')
+    .trim()
+    .slice(0, 12);
+  return t || fallback;
 }
 function lanRosterData(){
   return lanPlayers.filter(Boolean).map(p => ({pid:p.pid, name:p.name, ready:!!p.ready, host:!!p.host}));
@@ -1219,6 +1229,7 @@ function lanStopNet(){
   if(lanPollTimer){ clearInterval(lanPollTimer); lanPollTimer = null; }
   try{ tauriInvoke('lan_stop').catch(function(){}); }catch(e){}
   lanRole = null; lanSeats = null; lanPlayers = []; lanMyPid = 0; lanRoomAddr = '';
+  lanInbox = [];
 }
 async function lanDrainEvents(){
   if(lanDrainBusy) return;
@@ -1270,9 +1281,11 @@ async function lanHandleMessage(peerId, msg){
     }else if(msg.t === 'move'){
       const mx = msg.x | 0, my = msg.y | 0;
       // 越界坐标直接丢掉：localClick 会按 board[x][y] 取格子，负下标会抛异常
-      if((msg.player | 0) === curPlayer && board[mx] && board[mx][my]) {
-        await localClick(mx, my, (msg.seed >>> 0));
+      if(board[mx] && board[mx][my]) {
+        lanApplyRemote({player: msg.player | 0, x: mx, y: my, seed: msg.seed >>> 0});
       }
+    }else if(msg.t === 'reject'){
+      showMsg('主机没有接受这一手，请重新落子', 'error');
     }else if(msg.t === 'peerGone'){
       gameOver = true;
       showMsg((msg.name || '对手') + ' 已离开，对局结束', 'error');
@@ -1302,7 +1315,7 @@ function lanHostHello(peerId, name){
   const pid = lanSeats.get(peerId);
   lanPlayers[pid] = {
     pid: pid,
-    name: String(name || ('玩家' + (pid + 1))).slice(0, 12),
+    name: lanCleanName(name, '玩家' + (pid + 1)),
     ready: false, host: false
   };
   lanSendTo(peerId, {t:'welcome', you:pid, size:lanBoardSize, players:lanRosterData()}).catch(function(){});
@@ -1334,9 +1347,9 @@ function lanHostPeerLeft(peerId){
   }
 }
 async function lanHostGotMove(peerId, msg){
-  if(!lanSeats) return;
+  if(!lanSeats || gameMode !== 'lan') return;   // 大厅里收到的落子一律不理
   const pid = lanSeats.get(peerId);
-  if(pid === undefined || pid !== curPlayer) return;
+  if(pid === undefined) return;
   const x = msg.x | 0, y = msg.y | 0, seed = msg.seed >>> 0;
   // 先做一遍与 localClick 相同的合法性校验：非法落子不往外转发，
   // 否则其他客户端已经应用、主机却拒绝了，两边就分叉了。
@@ -1349,8 +1362,63 @@ async function lanHostGotMove(peerId, msg){
     if(c.owner !== null) return;
     if(isInRestrictedZone(x, y, board)) return;
   }
-  lanBroadcastExcept(peerId, {t:'move', player:pid, x:x, y:y, seed:seed});
-  await localClick(x, y, seed);
+  // 走同一个队列：主机也在播动画时，这一手不能丢，
+  // 且必须「先应用成功、再转发」，否则转发出去的和本地棋盘会对不上。
+  await lanApplyRemote({player: pid, x: x, y: y, seed: seed, exceptPeerId: peerId});
+}
+
+/* ─── 远端落子队列 ───
+ * 落子动画期间（animating）不能直接改棋盘，但消息也不能丢：
+ * 丢掉一手，两端 curPlayer 就永久错位，只能重开。所以先入队，
+ * 等本地空闲了按序应用。每手都带发起者的随机种子，两端推演结果一致。
+ */
+let lanInbox = [];
+let lanInboxBusy = false;
+
+async function lanApplyRemote(entry){
+  lanInbox.push(entry);
+  if(lanInboxBusy) return;
+  lanInboxBusy = true;
+  // 动画最多等这么久：真卡住了（异常中断、动画状态没复位）也要放行，
+  // 不能因为一个标志位让整局永久卡死。
+  const waitStart = Date.now();
+  try{
+    while(lanInbox.length){
+      if(gameOver || !lanRole){ lanInbox = []; break; }
+      const m = lanInbox[0];
+      if(animating || aiThinking || isPaused){
+        if(Date.now() - waitStart > 20000){
+          lanInbox.shift();
+          showMsg('落子等待超时，这一手被跳过', 'error');
+          continue;
+        }
+        await new Promise(function(r){ setTimeout(r, 60); });
+        continue;
+      }
+      lanInbox.shift();
+      if(m.player !== curPlayer){
+        // 不是他的回合（重复包 / 越权 / 两端状态已分叉）
+        if(lanRole === 'host' && m.exceptPeerId != null){
+          lanSendTo(m.exceptPeerId, {t:'reject'}).catch(function(){});
+        }else if(lanRole === 'client'){
+          showMsg('与主机的状态不同步，建议退出重进','error');
+        }
+        continue;
+      }
+      const beforeCur = curPlayer, wasOver = gameOver;
+      await localClick(m.x, m.y, m.seed);
+      // 主机：应用成功（回合推进或终局）才转发给其他客户端
+      if(lanRole === 'host' && m.exceptPeerId != null){
+        if(curPlayer !== beforeCur || gameOver !== wasOver){
+          lanBroadcastExcept(m.exceptPeerId, {t:'move', player: m.player, x: m.x, y: m.y, seed: m.seed});
+        }else{
+          lanSendTo(m.exceptPeerId, {t:'reject'}).catch(function(){});
+        }
+      }
+    }
+  }finally{
+    lanInboxBusy = false;
+  }
 }
 
 /* ─── 入口与房间 ─── */
@@ -1420,15 +1488,20 @@ function lanHostStart(){
     size: lanBoardSize, cols: lanBoardSize, maxPlayers: alive.length,
     names: names, borderMode: 'default', capMode: '4', cells: null
   };
-  // 每个客户端单独发，带上它自己的新座位号
+  // 每个客户端单独发，带上它自己的新座位号。
+  // lanSeats 必须跟着重编号：主机的落子校验、准备状态、掉线清理都靠它
+  // 把 peerId 映射到座位号，只改 lanPlayers 会让高座位客户端再也落不了子。
   if(lanSeats){
+    const reseat = new Map();
     lanSeats.forEach(function(oldPid, peerId){
       const newPid = pidMap.get(oldPid);
       if(newPid === undefined) return;
+      reseat.set(peerId, newPid);
       lanSendTo(peerId, {t:'start', you:newPid, size:cfg.size, cols:cfg.cols,
         maxPlayers:cfg.maxPlayers, names:cfg.names, borderMode:cfg.borderMode,
         capMode:cfg.capMode, cells:cfg.cells}).catch(function(){});
     });
+    lanSeats = reseat;
   }
   // 本地座位号与玩家表同步重编号
   lanMyPid = pidMap.get(lanMyPid) || 0;
@@ -1606,7 +1679,9 @@ Router.register('lan', {
   // 离开页面就断开，不留幽灵房间。这里只断网、不再调 exitGame：
   // 结算后返回本页时 gameMode 还是 'lan'，exitGame 会再跳一次 welcome 把导航绕死。
   leave() {
-    if(!lanRole) return;
+    // 关键：开局也是「离开 lan 页」（lanBeginGame 里 show('game')），
+    // 那时不能断网，否则一开局就断线。只有还在房间里等开局才拆连接。
+    if(!lanRole || gameMode === 'lan') return;
     lanSend({t:'leave'}).catch(function(){});
     lanStopNet();
   }
@@ -3441,7 +3516,12 @@ function renderPlayerBar(){
     t.style.background=COLORS_LIGHT[p];
     t.style.color=COLORS[p];
     let label=(_colorNames&&_colorNames[p])||(aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`);
-    t.innerHTML=`${label} <span class="cnt">${cnt[p]}</span>`;
+    // 名字可能来自局域网对端，只用 textContent 插入
+    t.textContent=label+' ';
+    let cntEl=document.createElement('span');
+    cntEl.className='cnt';
+    cntEl.textContent=String(cnt[p]);
+    t.appendChild(cntEl);
     t.style.cursor=gameMode==='lan'?'default':'pointer';
     if(gameMode!=='lan')t.onclick=function(e){e.stopPropagation();openInGamePlayerConfig(p)};
     el.appendChild(t);
@@ -4795,7 +4875,13 @@ async function showSettlement(winner,colorNames,history){
   // 设置外框标题（放在玻璃框上方，作为页面固定标题）
   const titleEl = document.getElementById('chkOuterTitle');
   if(winner!==null&&winner!==undefined){
-    titleEl.innerHTML = `<span class="winner-color" style="background:${COLORS[winner]||'#888'}"></span> ${colorNames?.[winner]||getPlayerLabel(winner)} 获胜`;
+    // 名字可能来自局域网对端：色块用 DOM 建，名字走 textContent
+    titleEl.textContent = '';
+    const dot = document.createElement('span');
+    dot.className = 'winner-color';
+    dot.style.background = COLORS[winner] || '#888';
+    titleEl.appendChild(dot);
+    titleEl.appendChild(document.createTextNode(' ' + (colorNames?.[winner]||getPlayerLabel(winner)) + ' 获胜'));
   }else{
     titleEl.textContent = '对局统计';
   }
