@@ -67,29 +67,60 @@ jobs:
           RUST=tauri/src-tauri
           mkdir -p out
 
-          is_gui() { strings -a "$1" 2>/dev/null | grep -qi webkit; }
+          # GUI 判定：先看 ELF 的 DT_NEEDED 里有没有 webkit2gtk。
+          # 这是运行时必需的动态依赖，strip 不会移除，也不会被 LTO 改写；
+          # 比 strings 更可靠（strings 曾在本 CI 上对顶层主程序判负）。
+          # 两条都试，任一命中即算 GUI。
+          is_gui() {
+            _f="$1"
+            [ -f "$_f" ] || return 1
+            if readelf -d "$_f" 2>/dev/null | grep -qi 'NEEDED.*webkit2gtk'; then
+              return 0
+            fi
+            strings -a "$_f" 2>/dev/null | grep -qi 'webkit2gtk'
+          }
+
+          find_gui() {
+            for cand in "$RUST"/target/release/chain-chess \
+                        $(ls -1t "$RUST"/target/release/deps/chain_chess-* 2>/dev/null | grep -v '\.d$' || true); do
+              if [ -f "$cand" ] && is_gui "$cand"; then
+                echo "$cand"
+                return 0
+              fi
+            done
+            return 1
+          }
 
           echo "--- target/release 顶层 ---"
           ls -1 "$RUST"/target/release | head -20
-          echo "--- deps 里的 chain_chess* ---"
-          ls -1 "$RUST"/target/release/deps 2>/dev/null | grep -i 'chain_chess' | head -20 || true
-          echo "（以上为空说明 deps 下没有该产物，将使用顶层主程序）"
+          echo "--- deps 条目数 / chain_chess* ---"
+          ls -1 "$RUST"/target/release/deps 2>/dev/null | wc -l
+          ls -1 "$RUST"/target/release/deps 2>/dev/null | grep -i 'chain_chess' | head -10 || true
 
           # Tauri 在多个 bin 里挑主二进制时可能挑到 src/bin/ 下的 CLI 工具
           # （productName 是中文，匹配不上任何 bin），然后按 mainBinaryName
-          # 改名，光看文件名看不出来。与本机 build.sh 同一处理：按 GUI 独有的
-          # webkit 特征串确认，不靠文件名猜。
+          # 改名，光看文件名看不出来。所以不能信文件名，要验内容。
           #
-          # 但**不能假设产物只在 deps/ 下**：这里曾经直接 ls deps/chain_chess-*
-          # 并因找不到而整个构建失败（Tauri 实际报的路径是
-          # target/release/chain-chess）。两个来源都试：
-          #   1) Tauri 报告的顶层主程序 target/release/<mainBinaryName>
-          #   2) older cargo 在 deps/ 下留的 chain_chess-<hash> 硬链接
-          GUI=""
-          for cand in "$RUST"/target/release/chain-chess \
-                      $(ls -1t "$RUST"/target/release/deps/chain_chess-* 2>/dev/null | grep -v '\.d$' || true); do
-            if [ -f "$cand" ] && is_gui "$cand"; then GUI="$cand"; break; fi
-          done
+          # 也不能假设产物在 deps/ 下：CI 上 deps 里没有 chain_chess-*，
+          # 而顶层 target/release/chain-chess 又不是 GUI（判负）。
+          # 两条路都走完还找不到，就直接按 bin 名重编一次 —— 源码就在这儿，
+          # 不该因为 cargo/Tauri 的产物布局差异让整个发布会卡死。
+          GUI=$(find_gui || true)
+          if [ -z "$GUI" ]; then
+            echo "两种来源都没找到 GUI 产物，按 bin 名重新编译"
+            f="$RUST/target/release/chain-chess"
+            if [ -f "$f" ]; then
+              echo "顶层产物诊断："
+              file "$f"
+              readelf -d "$f" 2>/dev/null | grep NEEDED | head -6 || true
+            fi
+            # 关键：如果顶层那个是 Tauri 改名来的 CLI 副本，cargo 的指纹
+            # 会认为产物已最新而直接 no-op，文件保持 CLI。touch 源文件
+            # 强制它重编这个 bin。
+            touch "$RUST/src/main.rs"
+            ( cd "$RUST" && cargo build --release --bin chain-chess )
+            GUI=$(find_gui || true)
+          fi
           echo "GUI 产物: ${GUI:-（未找到）}"
 
           # 同一目录会累积历史 deb，只认当前版本

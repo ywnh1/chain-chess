@@ -602,19 +602,38 @@ if [ "$LINUX" = true ]; then
 
   # Tauri 挑主二进制时会挑到 src/bin/ 下的 CLI 工具（battle 等），deb 里装的就是
   # 那个 CLI 而不是 GUI；它还会顺手把产物改成 mainBinaryName，所以光看文件名看不
-  # 出来。按 GUI 独有的 webkit 特征串找出 cargo 编出的真主程序，换进 deb。
+  # 出来。所以必须验内容，不能信文件名。
   #
-  # 别假设产物只在 deps/ 下：Tauri 报告的路径是 target/release/<mainBinaryName>，
-  # 而 CI 上 deps/ 里根本没有 chain_chess-*（linux-amd64.yml 因此失败过一次）。
-  # 两个来源都试，再用 webkit 确认。
-  _gui_bin=""
-  for _cand in "$RUST_DIR/target/release/chain-chess" \
-               $(ls -1t "$RUST_DIR"/target/release/deps/chain_chess-* 2>/dev/null | grep -v '\.d$' || true); do
-    if [ -f "$_cand" ] && strings -a "$_cand" 2>/dev/null | grep -qi 'webkit'; then
-      _gui_bin="$_cand"
-      break
+  # 判据用 ELF 的 DT_NEEDED（运行时必需的 libwebkit2gtk），strip 不会移除；
+  # strings 作兜底。两个来源都试：顶层 target/release/chain-chess 与
+  # deps/chain_chess-*。都拿不到就按 bin 名重编一次再找。
+  _is_gui() {
+    [ -f "$1" ] || return 1
+    if readelf -d "$1" 2>/dev/null | grep -qi 'NEEDED.*webkit2gtk'; then
+      return 0
     fi
-  done
+    strings -a "$1" 2>/dev/null | grep -qi 'webkit2gtk'
+  }
+  _find_gui() {
+    for _c in "$RUST_DIR/target/release/chain-chess" \
+              $(ls -1t "$RUST_DIR"/target/release/deps/chain_chess-* 2>/dev/null | grep -v '\.d$' || true); do
+      if _is_gui "$_c"; then
+        echo "$_c"
+        return 0
+      fi
+    done
+    return 1
+  }
+
+  _gui_bin=$(_find_gui || true)
+  if [ -z "$_gui_bin" ]; then
+    echo "  ⚠️  找不到 GUI 产物，按 bin 名重新编译"
+    # touch 强制重编：顶层那个若已被换成 CLI 副本，cargo 指纹会认为它
+    # 已是最新而 no-op，文件就还是 CLI。
+    touch "$RUST_DIR/src/main.rs" 2>/dev/null || true
+    ( cd "$RUST_DIR" && cargo build --release --bin chain-chess )
+    _gui_bin=$(_find_gui || true)
+  fi
   if [ -z "$_gui_bin" ]; then
     echo "❌ 错误: 找不到 Tauri GUI 主程序产物"
     echo "   已试: $RUST_DIR/target/release/chain-chess 与 $RUST_DIR/target/release/deps/chain_chess-*"
@@ -626,10 +645,11 @@ if [ "$LINUX" = true ]; then
   _deb_tmp=$(mktemp -d)
   dpkg-deb -R "$DEB_SRC" "$_deb_tmp"
   sed -i 's/^Package: .*/Package: chain-chess/' "$_deb_tmp/DEBIAN/control"
-  if ! strings -a "$_deb_tmp/usr/bin/chain-chess" 2>/dev/null | grep -qi 'webkit'; then
+  if ! _is_gui "$_deb_tmp/usr/bin/chain-chess"; then
     echo "  ⚠️  deb 里的主程序不是 GUI（Tauri 挑错了 bin），已替换为 GUI 产物"
     cp "$_gui_bin" "$_deb_tmp/usr/bin/chain-chess"
   fi
+  _is_gui "$_deb_tmp/usr/bin/chain-chess" || { echo "❌ 错误: 替换后仍不是 GUI 产物"; exit 1; }
   dpkg-deb -b "$_deb_tmp" "$DEB_OUTPUT" >/dev/null
   rm -rf "$_deb_tmp"
 
