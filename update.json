@@ -1,8 +1,8 @@
 {
-  "version": "3.4.3",
-  "notes": "Save custom boards with names and switch or edit them anytime; the board editor now supports press-and-drag to toggle cells continuously; new app icon; fixed a wrong elimination order in the in-game ranking (all players tied after a fast finish)",
-  "notes_zh": "新增自定义棋盘存档（可命名保存、随时切换与编辑）、棋盘编辑器支持按住滑动连续涂改、换用新图标；修复局中排名淘汰顺序错乱（一键终局时全部并列）",
-  "pub_date": "2026-11-11T00:00:00Z",
+  "version": "4.0.0",
+  "notes": "Fixed desktop and Android being redirected to bad sites by the analytics script, now fully removed; added serverless LAN multiplayer; the LAN guide moved into the teaching page; history records support batch selection; third-party libraries link to their project pages",
+  "notes_zh": "修复桌面与安卓版会因统计脚本跳转不良网站的问题（已彻底移除该 SDK）；新增局域网联机（同一 Wi-Fi 下直连对战，不经过服务器）；教学页合并联机教程、历史记录支持多选批量管理、开源许可补齐项目链接",
+  "pub_date": "2026-11-14T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",

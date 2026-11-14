@@ -2,7 +2,7 @@
   "name": "chain_chess_engine",
   "type": "module",
   "description": "连锁棋 PWA 游戏引擎（WASM）— 由 tauri 核心逻辑提取",
-  "version": "3.4.3",
+  "version": "4.0.0",
   "files": [
     "chain_chess_engine_bg.wasm",
     "chain_chess_engine.js",

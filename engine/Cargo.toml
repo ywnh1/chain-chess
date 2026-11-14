@@ -1,6 +1,6 @@
 [package]
 name = "chain_chess_core"
-version = "3.4.3"
+version = "4.0.0"
 edition = "2021"
 description = "连锁棋共享引擎：棋盘规则 / 爆裂连锁 / AI 搜索 / 评估 / 模拟"
 
