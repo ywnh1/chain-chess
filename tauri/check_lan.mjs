@@ -266,6 +266,25 @@ async function main() {
   ok(!/[<>"]/.test(cleaned), "玩家名没有清洗掉 HTML 元字符: " + cleaned);
   ok(cleaned.includes("张三"), "清洗把正常字符也删了: " + cleaned);
 
+  /* 11. 客户端不信任主机：恶意的 welcome / start 也洗不进来 */
+  net.clients.set(4, { inbox: [] });
+  const evil = makeSandbox("client", 4);
+  clientInbox(4).push({ type: "msg", id: null, data: {
+    t: "welcome", you: 0,
+    players: [{ pid: 0, name: "<img src=x onerror=alert(1)>", ready: true, host: true }],
+  }});
+  await evil.lanDrainEvents();
+  const evilName = ((evil.players || []).filter(Boolean)[0] || {}).name || "";
+  ok(!/[<>]/.test(evilName), "客户端没洗掉主机发来的恶意名字: " + evilName);
+
+  clientInbox(4).push({ type: "msg", id: null, data: {
+    t: "start", you: 0, size: 7, cols: 7, maxPlayers: 1,
+    names: { "0": "<script>x</script>" }, borderMode: "default", capMode: "4",
+  }});
+  await evil.lanDrainEvents();
+  const evilStart = (evil.names || {})[0] || "";
+  ok(!/[<>]/.test(evilStart), "客户端没洗掉 start 里的恶意名字: " + evilStart);
+
   if (errs.length) {
     console.error("❌ 局域网联机自检失败：");
     for (const e of errs) console.error("   - " + e);

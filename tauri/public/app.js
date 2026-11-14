@@ -1264,19 +1264,33 @@ async function lanHandleMessage(peerId, msg){
     if(msg.t === 'welcome'){
       lanMyPid = msg.you | 0;
       lanPlayers = [];
-      (msg.players || []).forEach(function(p){ lanPlayers[p.pid | 0] = p; });
+      // 主机发来的名字不可信（对端可能被改过），本地再洗一遍
+      (msg.players || []).forEach(function(p){
+        const pid = p.pid | 0;
+        lanPlayers[pid] = {pid: pid, name: lanCleanName(p.name, '玩家' + (pid + 1)),
+                           ready: !!p.ready, host: !!p.host};
+      });
       if(msg.size) lanBoardSize = msg.size | 0;
       lanRenderRoom();
     }else if(msg.t === 'roster'){
       lanPlayers = [];
-      (msg.players || []).forEach(function(p){ lanPlayers[p.pid | 0] = p; });
+      (msg.players || []).forEach(function(p){
+        const pid = p.pid | 0;
+        lanPlayers[pid] = {pid: pid, name: lanCleanName(p.name, '玩家' + (pid + 1)),
+                           ready: !!p.ready, host: !!p.host};
+      });
       if(msg.size) lanBoardSize = msg.size | 0;
       lanRenderRoom();
     }else if(msg.t === 'start'){
       if(msg.you != null) lanMyPid = msg.you | 0;
+      const safeNames = {};
+      Object.keys(msg.names || {}).forEach(function(k){
+        const n = parseInt(k, 10);
+        if (isFinite(n) && n >= 0) safeNames[n] = lanCleanName(msg.names[k], '玩家' + (n + 1));
+      });
       lanBeginGame({
         size: msg.size | 0, cols: (msg.cols | 0) || (msg.size | 0),
-        maxPlayers: msg.maxPlayers | 0, names: msg.names || {},
+        maxPlayers: msg.maxPlayers | 0, names: safeNames,
         borderMode: msg.borderMode || 'default', capMode: msg.capMode || '4',
         cells: msg.cells || null
       });
@@ -4689,7 +4703,12 @@ function renderGameCharts(container, history, opts){
   const lastSnap=history.length>0?history[history.length-1].snapshot:{};
   if(showTitle&&winner!==null&&winner!==undefined){
     let t=document.createElement('h2');
-    t.innerHTML=`<span class="winner-color" style="background:${colors[winner]||'#888'}"></span>${cNames[winner]||getPlayerLabel(winner)} 获胜`;
+    // 名字可能来自局域网对端 / 历史记录：只用 textContent 插入
+    const dot=document.createElement('span');
+    dot.className='winner-color';
+    dot.style.background=colors[winner]||'#888';
+    t.appendChild(dot);
+    t.appendChild(document.createTextNode((cNames[winner]||getPlayerLabel(winner))+' 获胜'));
     container.appendChild(t);
   }else if(showTitle&&winner===undefined){
     let t=document.createElement('h2');t.textContent='对局统计';container.appendChild(t);
@@ -4709,9 +4728,18 @@ function renderGameCharts(container, history, opts){
       if(pid===winner)card.style.border=`1px solid ${colors[pid]||'#888'}`;
       let cs=chainStats&&chainStats[pid];
       let csStr=cs&&cs.triggered>0?`<div class="lbl" style="margin-top:4px">连爆 ${cs.triggered} 次 · 最高 ${cs.maxChain} 连</div>`:'';
-      card.innerHTML=`<div class="name"><span class="color-dot" style="background:${colors[pid]||'#888'}"></span>${cNames[pid]||getPlayerLabel(pid)} ${pid===winner?' ★':''}</div>
+      card.innerHTML=`<div class="name"></div>
         <div class="num" style="color:${colors[pid]||'#888'}">${pieces}</div><div class="lbl">棋子</div>
         <div class="num" style="color:${colors[pid]||'#888'}">${points}</div><div class="lbl">点数</div>${csStr}`;
+      // 名字单独用 DOM 插入（其余字段都是本机数字/常量）
+      const nameEl=card.querySelector('.name');
+      if(nameEl){
+        const dotEl=document.createElement('span');
+        dotEl.className='color-dot';
+        dotEl.style.background=colors[pid]||'#888';
+        nameEl.appendChild(dotEl);
+        nameEl.appendChild(document.createTextNode((cNames[pid]||getPlayerLabel(pid))+(pid===winner?' ★':'')));
+      }
       grid.appendChild(card);
     }
     container.appendChild(grid);
