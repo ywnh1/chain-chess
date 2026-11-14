@@ -707,6 +707,26 @@ async fn download_update(url: String, app_handle: tauri::AppHandle) -> Result<St
     Ok(url)
 }
 
+/// 用系统默认浏览器打开任意外部链接。
+///
+/// 为什么不直接用 `<a target="_blank">`：Tauri 的 WebView 不实现新窗口，
+/// 这类链接点了没有任何反应（「联系作者」就这么坏过一次）。
+/// 统一走这个命令，桌面 / Android 都交给系统。
+#[tauri::command]
+async fn open_external(url: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    // 只放行 http(s)：这条命令会被页面里的 onclick 直接调用，
+    // 别让它变成打开本地文件 / 自定义协议的后门。
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err(format!("只允许 http(s) 链接: {}", url));
+    }
+    app_handle
+        .opener()
+        .open_url(&url, None::<&str>)
+        .map_err(|e| format!("打开浏览器失败: {}", e))?;
+    Ok(())
+}
+
 /// 安装/打开已下载的更新文件（通用——所有平台）
 #[tauri::command]
 async fn install_update(path: String, app_handle: tauri::AppHandle) -> Result<(), String> {
@@ -749,6 +769,7 @@ pub fn run() {
             save_settings,
             check_update,
             download_update,
+            open_external,
             install_update,
             process_move,
             save_game_history,

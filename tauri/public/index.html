@@ -339,7 +339,7 @@
       <div class="modal-actions">
         <button class="glass-btn" onclick="closeModal('engineFailModal')">知道了</button>
         <button class="glass-btn primary"
-          onclick="window.open('https://ywnh1.free.leoi.org','_blank','noopener')">前往下载</button>
+          onclick="openExternal('https://ywnh1.free.leoi.org/')">前往下载</button>
       </div>
     </div>
   </div>
@@ -422,7 +422,7 @@
           <span style="color:var(--dim)">→</span>
         </div>
         <div class="form-row" style="cursor:pointer;flex-direction:row;align-items:center;justify-content:space-between"
-          onclick="window.open('https://ywnh1.free.leoi.org/','_blank','noopener')">
+          onclick="openExternal('https://ywnh1.free.leoi.org/')">
           <label style="flex:1">下载中心</label>
           <span style="color:var(--dim)">→</span>
         </div>
@@ -435,9 +435,23 @@
         </div>
       </div>
 
+      <div class="about-card" style="cursor:pointer" onclick="Router.navigate('about-ai')">
+        <div class="form-row">
+          <label style="flex:1">AI 介绍</label>
+          <span style="color:var(--dim)">→</span>
+        </div>
+      </div>
+
+      <div class="about-card" style="cursor:pointer" onclick="Router.navigate('about-benchmark')">
+        <div class="form-row">
+          <label style="flex:1">AI 性能评测</label>
+          <span style="color:var(--dim)">→</span>
+        </div>
+      </div>
+
       <div class="about-card" style="cursor:pointer" onclick="Router.navigate('about-rules')">
         <div class="form-row">
-          <label style="flex:1">游戏规则</label>
+          <label style="flex:1">教学</label>
           <span style="color:var(--dim)">→</span>
         </div>
       </div>
@@ -602,8 +616,8 @@
       <div class="about-info">
         <div class="about-info-row"><span class="info-key">版本</span><span class="info-val">v3.4.3</span></div>
         <div class="about-info-row"><span class="info-key">作者</span><span class="info-val">ywnh1</span></div>
-        <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a
-              href="https://github.com/ywnh1/chain-chess" target="_blank" rel="noopener">GitHub</a></span></div>
+        <div class="about-info-row"><span class="info-key">仓库</span><span class="info-val"><a href="https://github.com/ywnh1/chain-chess" rel="noopener"
+              onclick="openExternal(this.href);return false">GitHub</a></span></div>
         <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-license')"
           style="padding:12px 16px;margin-top:4px"><span class="nav-label">许可证</span><span class="nav-arrow">MIT License
             →</span></div>
@@ -646,23 +660,6 @@
         </p>
       </div>
 
-      <!-- 局域网联机教程 → 二级页 -->
-      <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-lan')">
-        <span class="nav-label">局域网联机教程</span>
-        <span class="nav-arrow">→</span>
-      </div>
-
-      <!-- AI 介绍 → 二级页 -->
-      <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-ai')">
-        <span class="nav-label">AI 介绍</span>
-        <span class="nav-arrow">→</span>
-      </div>
-
-      <!-- AI 性能评测 → 二级页 -->
-      <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-benchmark')">
-        <span class="nav-label">AI 性能评测</span>
-        <span class="nav-arrow">→</span>
-      </div>
       <!-- 更新详情 → 二级页 -->
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-changelog')">
         <span class="nav-label">更新详情</span>
@@ -670,11 +667,12 @@
       </div>
 
       <!-- 联系作者 → 下载中心联系页 -->
-      <a class="about-nav mode-clickable-block" href="https://ywnh1.free.leoi.org/#/contact" target="_blank" rel="noopener"
-        style="text-decoration:none;color:inherit">
+      <div class="about-nav mode-clickable-block" role="button" tabindex="0"
+        onclick="openExternal('https://ywnh1.free.leoi.org/#/contact')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openExternal('https://ywnh1.free.leoi.org/#/contact')}">
         <span class="nav-label">联系作者</span>
         <span class="nav-arrow">→</span>
-      </a>
+      </div>
 
       <!-- 第三方 SDK 与服务 → 二级页 -->
       <div class="about-nav mode-clickable-block" onclick="Router.navigate('about-thirdparty')">
@@ -1010,7 +1008,10 @@
   <div id="about-rules" class="screen">
     <button class="back glass-btn" onclick="Router.back()">← 返回</button>
     <div class="about-scroll">
-      <h2>游戏规则</h2>
+      <h2>教学</h2>
+      <p class="teach-lead">两块内容：先看游戏怎么玩，再看局域网联机怎么连。每节点标题展开。</p>
+
+      <h3 class="teach-group">游戏规则</h3>
 
       <div class="about-card">
         <h3>一句话</h3>
@@ -1139,7 +1140,7 @@
 
         <p><strong>战绩汇总</strong>：列表顶部的几行小字是跨对局的统计 —— 总对局数、已完成局数、历史最长连锁、各模式的局数分布。</p>
 
-        <p><strong>导出 / 导入</strong>：右上角两个按钮。导出得到一个 JSON 文件（含全部记录），导入时会自动按 ID 去重，只补新记录。</p>
+        <p><strong>导出 / 导入 / 多选 / 清空</strong>：列表上方的操作条。导出得到一个 JSON 文件（含全部记录），导入时会自动按 ID 去重，只补新记录；点「多选」进入批量模式（长按任意一条记录同样能进），可批量导出或删除。</p>
 
         <p><strong>进行中的对局</strong>：异常退出或主动暂停后，未完成的对局会排在列表最前面，点「▶ 继续游戏」接着打。</p>
       </div>
@@ -1153,14 +1154,86 @@
           <li><strong>大狗叫声模式</strong>：只在选中「大狗叫」主题时出现，可选叫声的音尾长度</li>
           <li><strong>检查更新</strong>：手动检测新版本</li>
           <li><strong>设备性能检测</strong>：测 WebView 帧率与 AI 计算速度</li>
+          <li><strong>AI 介绍</strong> / <strong>AI 性能评测</strong>：三种算法的思路与 360 局对战成绩</li>
+          <li><strong>教学</strong>：游戏规则 + 局域网联机（就是你现在看的这一页）</li>
         </ul>
       </div>
 
       <div class="about-card">
         <h3>关于本应用在哪？</h3>
-        <p>两个入口都能进：<strong>点首页最上面的图标</strong>（连锁棋那个圆形图标），或者<strong>更多页 → 关于连锁棋</strong>。那里有 AI
-          介绍、性能评测、更新日志、开源许可证和第三方组件清单。</p>
+        <p>两个入口都能进：<strong>点首页最上面的图标</strong>（连锁棋那个圆形图标），或者<strong>更多页 → 关于连锁棋</strong>。那里有更新日志、开源许可证和第三方组件清单；AI
+          介绍与性能评测在<strong>更多页</strong>。</p>
         <p>每次升级后第一次打开，会自动弹一次本版的更新说明（本版更新在前，点标题可以展开看怎么玩），看完关掉就行。</p>
+      </div>
+
+      <h3 class="teach-group">局域网联机</h3>
+
+
+      <div class="about-card">
+        <h3>这是个什么功能</h3>
+        <p>同一个 Wi-Fi 或手机热点下的几台设备，直接连起来打一局。不经过互联网，也没有服务器：房主的手机/电脑自己开一个端口，其他人连上去。<strong>只有桌面版和 Android 版有</strong>，浏览器 PWA 没有（网页不能监听端口）。</p>
+        <p style="font-size:.8rem;color:var(--dim)">支持 2~10 人。棋步只在房间里那几台设备之间传，流量很小。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>第一步：所有人连同一个网络</h3>
+        <p>最简单的是开一台手机的热点，其他人连这个热点。用家里的路由器也行，但要确认大家连的是同一个 Wi-Fi（2.4G 和 5G 常被拆成两个不同的网，连岔了就互相看不见）。</p>
+        <p><strong>不用连互联网也能玩</strong>：没有外网、只开热点照样能联机。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>第二步：一个人创建房间</h3>
+        <ol>
+          <li>首页点<strong>「局域网联机」</strong></li>
+          <li>填个昵称（最多 12 个字）</li>
+          <li>选棋盘大小（房主定，整局不变）</li>
+          <li>点<strong>「创建房间」</strong></li>
+        </ol>
+        <p>房间地址会显示成 <code>192.168.x.x:端口</code>，这就是其他人要连的东西。<strong>念给旁边的人，或者自己念给自己听</strong>——地址只在局域网内有效，出了这个网络就没人能连。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>第三步：其他人加入</h3>
+        <p>两条路，任选：</p>
+        <ul>
+          <li><strong>直接输地址</strong>：把房主念的那串 <code>192.168.x.x:端口</code> 填进输入框，点「加入」</li>
+          <li><strong>搜索附近房间</strong>：点「搜索附近房间」，等一两秒，列表里出现房间后点一下就连上</li>
+        </ul>
+        <p>搜不到就先手输地址——有些路由器会拦局域网广播，但直连一般不受影响。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>第四步：准备，然后开局</h3>
+        <p>加入的人点<strong>「准备」</strong>，房主那边会看到「已准备」。等所有人都准备好了，房主点<strong>「开始游戏」</strong>，大家同时进入棋盘。</p>
+        <p>房主自己在开局前不能准备/取消——他本来就是发起人。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>对局中</h3>
+        <ul>
+          <li>轮到谁，谁的格子才能点；不是你的回合点了会提示「等待其他玩家落子」</li>
+          <li><strong>不能暂停、不能悔棋</strong>：一暂停就挡住别人落子，一悔棋两边的棋盘就对不上了。所以对局中右上角的「暂停」变成了「退出」</li>
+          <li>谁掉线或者退出，这局就结束（房主的连接是唯一的转发点，他走了所有人都断）</li>
+          <li>打完可以在结算页看排名和图表，对局也会进历史记录，模式标成「局域网」</li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <h3>连不上？按顺序排查</h3>
+        <ol>
+          <li><strong>两台设备真的在同一个网吗</strong>：看各自 Wi-Fi 详情里的 IP，前三段要一样（比如都是 <code>192.168.1.x</code>）。2.4G / 5G 分开的路由器最容易在这翻车</li>
+          <li><strong>地址抄对了吗</strong>：IP 加冒号加端口（<code>192.168.1.23:41234</code>），少个冒号或者端口写错就连不上</li>
+          <li><strong>房主那边地址显示 127.0.0.1</strong>：说明房主本机没拿到局域网地址（Wi-Fi 没连上或只有移动数据），换到真正的 Wi-Fi 上再建一次</li>
+          <li><strong>路由器开了「AP 隔离 / 客户机隔离」</strong>：这个选项会让设备之间互相看不见，得在路由器后台关掉</li>
+          <li><strong>系统防火墙</strong>：Windows 第一次建房间可能弹窗问要不要允许，要选「允许专用网络」</li>
+          <li><strong>Android 提示没有本地网络权限</strong>：在系统设置里给连锁棋放开局域网/本地网络权限（部分系统的「附近设备」权限也管这个）</li>
+        </ol>
+      </div>
+
+      <div class="about-card">
+        <h3>还是不行？</h3>
+        <p>把这几项一起发过来：两台设备各自的 IP、房主界面显示的地址、有没有弹错误提示、手机/电脑型号。可以直接到<strong>「关于 → 联系作者」</strong>反馈，或者点下面的按钮。</p>
+        <p style="font-size:.8rem;color:var(--dim)">反馈入口：<strong>更多 → 关于连锁棋 → 联系作者</strong>。</p>
       </div>
     </div>
   </div>
@@ -1275,26 +1348,26 @@
         <ul class="tp-list">
           <li><span class="tp-name">Tauri</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v2 ·
               跨平台桌面应用框架；含 tauri、tauri-build 及官方插件 tauri-plugin-dialog / tauri-plugin-fs / tauri-plugin-opener ·
-              github.com/tauri-apps/tauri</span></li>
+              <a class="tp-link" href="https://github.com/tauri-apps/tauri" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <a class="tp-link" href="https://crates.io/crates/tauri" rel="noopener" onclick="openExternal(this.href);return false">crates.io</a></span></li>
           <li><span class="tp-name">serde</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v1 ·
-              Rust 序列化框架 · github.com/serde-rs/serde</span></li>
+              Rust 序列化框架 · <a class="tp-link" href="https://github.com/serde-rs/serde" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <a class="tp-link" href="https://crates.io/crates/serde" rel="noopener" onclick="openExternal(this.href);return false">crates.io</a></span></li>
           <li><span class="tp-name">serde_json</span><span class="tp-lic">MIT / Apache-2.0</span><span
-              class="tp-desc">v1 · JSON 序列化与反序列化 · github.com/serde-rs/json</span></li>
+              class="tp-desc">v1 · JSON 序列化与反序列化 · <a class="tp-link" href="https://github.com/serde-rs/json" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <a class="tp-link" href="https://crates.io/crates/serde_json" rel="noopener" onclick="openExternal(this.href);return false">crates.io</a></span></li>
           <li><span class="tp-name">rayon</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v1 ·
-              数据并行计算库 · github.com/rayon-rs/rayon</span></li>
+              数据并行计算库 · <a class="tp-link" href="https://github.com/rayon-rs/rayon" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <a class="tp-link" href="https://crates.io/crates/rayon" rel="noopener" onclick="openExternal(this.href);return false">crates.io</a></span></li>
           <li><span class="tp-name">rand</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v0.8 ·
-              随机数生成库 · github.com/rust-random/rand</span></li>
+              随机数生成库 · <a class="tp-link" href="https://github.com/rust-random/rand" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <a class="tp-link" href="https://crates.io/crates/rand" rel="noopener" onclick="openExternal(this.href);return false">crates.io</a></span></li>
           <li><span class="tp-name">reqwest</span><span class="tp-lic">MIT / Apache-2.0</span><span
-              class="tp-desc">v0.12 · HTTP 客户端（版本更新检查）· github.com/seanmonstar/reqwest</span></li>
+              class="tp-desc">v0.12 · HTTP 客户端（版本更新检查）· <a class="tp-link" href="https://github.com/seanmonstar/reqwest" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <a class="tp-link" href="https://crates.io/crates/reqwest" rel="noopener" onclick="openExternal(this.href);return false">crates.io</a></span></li>
           <li><span class="tp-name">semver</span><span class="tp-lic">MIT / Apache-2.0</span><span class="tp-desc">v1 ·
-              语义化版本号解析 · github.com/dtolnay/semver</span></li>
+              语义化版本号解析 · <a class="tp-link" href="https://github.com/dtolnay/semver" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <a class="tp-link" href="https://crates.io/crates/semver" rel="noopener" onclick="openExternal(this.href);return false">crates.io</a></span></li>
           <li><span class="tp-name">wasm-bindgen</span><span class="tp-lic">MIT / Apache-2.0</span><span
               class="tp-desc">v0.2 · Rust ↔ JavaScript WebAssembly 绑定；docs/pkg 生成代码同源 ·
-              github.com/rustwasm/wasm-bindgen</span></li>
+              <a class="tp-link" href="https://github.com/rustwasm/wasm-bindgen" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <a class="tp-link" href="https://crates.io/crates/wasm-bindgen" rel="noopener" onclick="openExternal(this.href);return false">crates.io</a></span></li>
           <li><span class="tp-name">getrandom</span><span class="tp-lic">MIT / Apache-2.0</span><span
-              class="tp-desc">v0.2 · 跨平台随机源（WebAssembly）· github.com/rust-random/getrandom</span></li>
+              class="tp-desc">v0.2 · 跨平台随机源（WebAssembly）· <a class="tp-link" href="https://github.com/rust-random/getrandom" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <a class="tp-link" href="https://crates.io/crates/getrandom" rel="noopener" onclick="openExternal(this.href);return false">crates.io</a></span></li>
           <li><span class="tp-name">alpha_beta_pruning</span><span class="tp-lic">MIT</span><span class="tp-desc">v0.1.0
-              · Alpha-Beta 剪枝搜索 AI 算法库（随项目 vendor 分发）· docs/wasm/vendor/alpha_beta_pruning</span></li>
+              · Alpha-Beta 剪枝搜索 AI 算法库（随项目 vendor 分发）· <a class="tp-link" href="https://github.com/ywnh1/alpha_beta_pruning" rel="noopener" onclick="openExternal(this.href);return false">GitHub</a> · <code>docs/wasm/vendor/alpha_beta_pruning</code></span></li>
         </ul>
       </div>
     </div>
@@ -1358,93 +1431,10 @@
     </div>
   </div>
 
-  <!-- About LAN page (二级) -->
-  <div id="about-lan" class="screen">
-    <button class="back glass-btn" onclick="Router.back()">← 返回</button>
-    <div class="about-scroll">
-      <h2>局域网联机教程</h2>
-
-      <div class="about-card">
-        <h3>这是个什么功能</h3>
-        <p>同一个 Wi-Fi 或手机热点下的几台设备，直接连起来打一局。不经过互联网，也没有服务器：房主的手机/电脑自己开一个端口，其他人连上去。<strong>只有桌面版和 Android 版有</strong>，浏览器 PWA 没有（网页不能监听端口）。</p>
-        <p style="font-size:.8rem;color:var(--dim)">支持 2~10 人。棋步只在房间里那几台设备之间传，流量很小。</p>
-      </div>
-
-      <div class="about-card">
-        <h3>第一步：所有人连同一个网络</h3>
-        <p>最简单的是开一台手机的热点，其他人连这个热点。用家里的路由器也行，但要确认大家连的是同一个 Wi-Fi（2.4G 和 5G 常被拆成两个不同的网，连岔了就互相看不见）。</p>
-        <p><strong>不用连互联网也能玩</strong>：没有外网、只开热点照样能联机。</p>
-      </div>
-
-      <div class="about-card">
-        <h3>第二步：一个人创建房间</h3>
-        <ol>
-          <li>首页点<strong>「局域网联机」</strong></li>
-          <li>填个昵称（最多 12 个字）</li>
-          <li>选棋盘大小（房主定，整局不变）</li>
-          <li>点<strong>「创建房间」</strong></li>
-        </ol>
-        <p>房间地址会显示成 <code>192.168.x.x:端口</code>，这就是其他人要连的东西。<strong>念给旁边的人，或者自己念给自己听</strong>——地址只在局域网内有效，出了这个网络就没人能连。</p>
-      </div>
-
-      <div class="about-card">
-        <h3>第三步：其他人加入</h3>
-        <p>两条路，任选：</p>
-        <ul>
-          <li><strong>直接输地址</strong>：把房主念的那串 <code>192.168.x.x:端口</code> 填进输入框，点「加入」</li>
-          <li><strong>搜索附近房间</strong>：点「搜索附近房间」，等一两秒，列表里出现房间后点一下就连上</li>
-        </ul>
-        <p>搜不到就先手输地址——有些路由器会拦局域网广播，但直连一般不受影响。</p>
-      </div>
-
-      <div class="about-card">
-        <h3>第四步：准备，然后开局</h3>
-        <p>加入的人点<strong>「准备」</strong>，房主那边会看到「已准备」。等所有人都准备好了，房主点<strong>「开始游戏」</strong>，大家同时进入棋盘。</p>
-        <p>房主自己在开局前不能准备/取消——他本来就是发起人。</p>
-      </div>
-
-      <div class="about-card">
-        <h3>对局中</h3>
-        <ul>
-          <li>轮到谁，谁的格子才能点；不是你的回合点了会提示「等待其他玩家落子」</li>
-          <li><strong>不能暂停、不能悔棋</strong>：一暂停就挡住别人落子，一悔棋两边的棋盘就对不上了。所以对局中右上角的「暂停」变成了「退出」</li>
-          <li>谁掉线或者退出，这局就结束（房主的连接是唯一的转发点，他走了所有人都断）</li>
-          <li>打完可以在结算页看排名和图表，对局也会进历史记录，模式标成「局域网」</li>
-        </ul>
-      </div>
-
-      <div class="about-card">
-        <h3>连不上？按顺序排查</h3>
-        <ol>
-          <li><strong>两台设备真的在同一个网吗</strong>：看各自 Wi-Fi 详情里的 IP，前三段要一样（比如都是 <code>192.168.1.x</code>）。2.4G / 5G 分开的路由器最容易在这翻车</li>
-          <li><strong>地址抄对了吗</strong>：IP 加冒号加端口（<code>192.168.1.23:41234</code>），少个冒号或者端口写错就连不上</li>
-          <li><strong>房主那边地址显示 127.0.0.1</strong>：说明房主本机没拿到局域网地址（Wi-Fi 没连上或只有移动数据），换到真正的 Wi-Fi 上再建一次</li>
-          <li><strong>路由器开了「AP 隔离 / 客户机隔离」</strong>：这个选项会让设备之间互相看不见，得在路由器后台关掉</li>
-          <li><strong>系统防火墙</strong>：Windows 第一次建房间可能弹窗问要不要允许，要选「允许专用网络」</li>
-          <li><strong>Android 提示没有本地网络权限</strong>：在系统设置里给连锁棋放开局域网/本地网络权限（部分系统的「附近设备」权限也管这个）</li>
-        </ol>
-      </div>
-
-      <div class="about-card">
-        <h3>还是不行？</h3>
-        <p>把这几项一起发过来：两台设备各自的 IP、房主界面显示的地址、有没有弹错误提示、手机/电脑型号。可以直接到<strong>「关于 → 联系作者」</strong>反馈，或者点下面的按钮。</p>
-        <button class="glass-btn primary" style="width:100%;margin-top:8px"
-          onclick="window.open('https://ywnh1.free.leoi.org/#/contact','_blank','noopener')">联系作者 / 反馈问题</button>
-      </div>
-    </div>
-  </div>
-
   <!-- History Screen -->
   <div id="history" class="screen">
     <button class="back glass-btn" onclick="Router.back()">← 返回</button>
-    <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-      <h2 style="margin:0">历史记录</h2>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button class="glass-btn primary" onclick="exportHistory()">导出</button>
-        <button class="glass-btn primary" onclick="document.getElementById('historyImportInput').click()">导入</button>
-        <button class="glass-btn danger" onclick="clearHistory()">清空</button>
-      </div>
-    </div>
+    <h2 style="margin:0">历史记录</h2>
     <div id="selBar">
       <span class="sel-count" id="selCount">已选择 0 项</span>
       <div class="sel-actions">
@@ -1465,7 +1455,15 @@
         <button type="button" class="hf-chip" data-mode="local" onclick="setHistoryMode(this)">本地</button>
         <button type="button" class="hf-chip" data-mode="ai" onclick="setHistoryMode(this)">AI 对战</button>
         <button type="button" class="hf-chip" data-mode="eve" onclick="setHistoryMode(this)">斗蛐蛐</button>
+        <button type="button" class="hf-chip" data-mode="lan" onclick="setHistoryMode(this)">局域网</button>
       </div>
+    </div>
+    <div class="history-actions" role="group" aria-label="历史记录操作">
+      <button class="glass-btn primary" onclick="exportHistory()">导出</button>
+      <button class="glass-btn primary"
+        onclick="document.getElementById('historyImportInput').click()">导入</button>
+      <button class="glass-btn" id="multiSelectBtn" onclick="enterMultiSelect()">多选</button>
+      <button class="glass-btn danger" onclick="clearHistory()">清空</button>
     </div>
     <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">所有对局记录</p>
     <div id="historyList" class="history-list">

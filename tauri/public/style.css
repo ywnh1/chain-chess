@@ -608,6 +608,10 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 #about-license .tp-name,#about-thirdparty .tp-name{font-weight:var(--weight-semibold)}
 #about-license .tp-lic,#about-thirdparty .tp-lic{font-size:.72em;color:var(--accent);border:1px solid var(--glass-border);border-radius:999px;padding:2px 8px;background:var(--glass-w-06);flex-shrink:0}
 #about-license .tp-desc,#about-thirdparty .tp-desc{flex-basis:100%;font-size:.85em;color:var(--dim);line-height:var(--leading-relaxed)}
+/* 第三方库的可点链接：与正文同尺寸，下划线只在悬停时出现，避免整段看着像链接堆 */
+.tp-link{color:var(--accent2);text-decoration:none;border-bottom:1px dashed rgba(95,195,195,.45)}
+.tp-link:hover,.tp-link:focus-visible{border-bottom-style:solid;color:var(--accent)}
+.tp-desc code{font-size:.9em;padding:1px 4px;border-radius:4px;background:var(--glass-w-08)}
 
 /* 导航条目（指向二级页面，统一为 mode-card 风格） */
 #about .about-nav{background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:20px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:.35s cubic-bezier(.22,1,.36,1);touch-action:manipulation;min-height:56px}
@@ -810,6 +814,9 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 }
 .history-tools input[type="search"]:focus{border-color:var(--accent);outline:none}
 .hf-chips{display:flex;gap:6px;flex-wrap:wrap}
+/* 历史页操作条：四个按钮等宽一排，与上面的搜索/筛选区分开 */
+.history-actions{display:flex;gap:6px;width:100%;margin:0 0 8px}
+.history-actions .glass-btn{flex:1;min-width:0;padding:8px 4px;font-size:.8rem;white-space:nowrap}
 .hf-chip{
   padding:5px 12px;border-radius:999px;
   border:1px solid var(--glass-w-08);background:var(--glass-w-04);
@@ -819,6 +826,13 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 .hf-chip.selected{background:var(--glass-w-12);border-color:var(--accent);color:var(--accent)}
 /* 首次进入引导 */
 .intro-foot{font-size:.74rem;color:var(--dim);margin:8px 0 0;line-height:1.5;text-align:center}
+/* 教学页（规则 + 联机教程）的分组标题：不在 .about-card 内，因此不参与折叠 */
+.teach-lead{font-size:.8rem;color:var(--dim);line-height:1.6;margin:0 0 4px;text-align:center}
+.teach-group{
+  align-self:flex-start;font-size:.95rem;font-weight:700;color:var(--accent);
+  letter-spacing:1px;margin:14px 0 2px;padding-left:2px;
+}
+.teach-group:first-of-type{margin-top:6px}
 .intro-sec{font-size:.9rem;font-weight:700;color:var(--accent);margin:14px 0 6px}
 .intro-sec:first-child{margin-top:0}
 .intro-desc{font-size:.84rem;line-height:1.7;color:var(--text);margin:0}

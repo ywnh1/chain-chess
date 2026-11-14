@@ -235,7 +235,7 @@ function showIntroModal(ver){
       '</ol>'+
       '<p style="font-size:.78rem;color:var(--dim)">对局中不能暂停、不能悔棋（会让两边棋盘对不上）；房主掉线则这局结束。</p>'+
       '<button class="glass-btn" style="width:100%;margin-top:8px" '+
-      'onclick="closeModal(\'introModal\');Router.navigate(\'about-lan\')">看完整联机教程</button>'+
+      'onclick="closeModal(\'introModal\');Router.navigate(\'about-rules\')">看完整联机教程</button>'+
       '</div></details>'
     : '';
   const feedback=
@@ -1114,11 +1114,6 @@ Router.register('about', {
   enter() { document.body.style.background=''; },
   leave() {}
 });
-Router.register('about-lan', {
-  back: 'about',
-  enter() { document.body.style.background = ''; },
-  leave() {}
-});
 Router.register('about-ai', {
   back: 'about',
   enter() { document.body.style.background=''; },
@@ -1770,6 +1765,22 @@ function tauriInvoke(cmd, args){
     ? window.__TAURI_INTERNALS__.invoke(cmd, args || {})
     : Promise.reject(new Error('Not in Tauri'));
 }
+/// 打开外部链接。
+///
+/// WebView 里 `<a target="_blank">` 点了没反应（没有新窗口），所以一律走这里：
+/// Tauri 环境交给 Rust 侧的 open_external（系统浏览器），浏览器 PWA 用 window.open。
+function openExternal(url){
+  if(!url) return;
+  if(window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke){
+    return window.__TAURI_INTERNALS__.invoke('open_external', {url}).catch(function(){
+      // 命令不可用（旧版本 / 未注册）时回退
+      try{ window.open(url, '_blank', 'noopener'); }catch(e){}
+    });
+  }
+  try{ window.open(url, '_blank', 'noopener'); }catch(e){}
+  return Promise.resolve();
+}
+
 // ── 跨对局战绩统计 ──
 // 只统计已结束的对局；字段缺失的老记录跳过该项而不影响整条统计（不做假设，不因此丢数据）。
 function computeStats(records){
@@ -1839,6 +1850,8 @@ function setHistoryMode(btn){
 
 function loadHistoryList(){
   let el=document.getElementById('historyList');
+  // 列表要重建：先退出多选，否则选中集合会指向已经不存在的行
+  if(_multiSelectActive)exitMultiSelect();
   el.innerHTML='<div class="empty">加载中...</div>';
   tauriInvoke('load_game_history').then(raw=>{
     const all=Array.isArray(raw)?raw:[];
@@ -2079,7 +2092,15 @@ let _selectedIds=new Set();
 let _historyRecords={}; // id -> record
 let _longPressTimer=null;
 function enterMultiSelect(){
+  if(_multiSelectActive)return;
+  // 没有任何记录时进入多选没有意义，直接提示（长按列表项也走不到这里）
+  if(!document.querySelector('#historyList .history-item')){
+    showMsg('没有可选择的记录','');
+    return;
+  }
   _multiSelectActive=true;
+  const msBtn=document.getElementById('multiSelectBtn');
+  if(msBtn)msBtn.style.display='none';
   document.getElementById('selBar').style.display='flex';
   document.getElementById('selInvertBtn').style.display='';
   document.getElementById('selExportBtn').style.display='';
@@ -2102,6 +2123,8 @@ function enterMultiSelect(){
 function exitMultiSelect(){
   _multiSelectActive=false;
   _selectedIds.clear();
+  const msBtn=document.getElementById('multiSelectBtn');
+  if(msBtn)msBtn.style.display='';
   document.getElementById('selBar').style.display='none';
   document.getElementById('selInvertBtn').style.display='none';
   document.getElementById('selExportBtn').style.display='none';
@@ -6174,7 +6197,6 @@ window.addEventListener('popstate',()=>{
       'lan':           () => Router.switchPage('welcome'),          // 局域网联机 => 1（离开会断网）
       'settings':      () => Router.switchPage('welcome'),          // settings => 1
       'about':         () => Router.switchPage('settings'),         // 6 => settings
-      'about-lan':     () => Router.switchPage('about'),            // 联机教程 => 6
       'about-ai':      () => Router.switchPage('about'),            // 10 => 6
       'about-changelog': () => Router.switchPage('about'),          // 11 => 6
       'about-benchmark': () => Router.switchPage('about'),            // 12 => 6

@@ -18,7 +18,17 @@ const appJs=readFileSync(resolve(import.meta.dirname,"public/app.js"),"utf-8");
 const hintsBlock=appJs.slice(appJs.indexOf("const HINTS = {"),appJs.indexOf("/** 打开说明弹窗"));
 const hintKeys=new Set([...hintsBlock.matchAll(/'([a-z-]+)': \{\n    title:/g)].map(m=>m[1]));
 for(const m of h.matchAll(/openHint\('([a-z-]+)'\)/g))if(!hintKeys.has(m[1]))e.push("unknown hint key: "+m[1]);
-for(const m of h.matchAll(/<div id="([a-z-]+)" class="screen"/g))if(!appJs.includes(`Router.register('${m[1]}'`))e.push("screen not registered: "+m[1]);
+// 注意 class 可能是 "screen active"（welcome），所以不能写死 class="screen"
+const SCREEN_RE=/<div id="([a-z-]+)" class="screen[^"]*"/g;
+for(const m of h.matchAll(SCREEN_RE))if(!appJs.includes(`Router.register('${m[1]}'`))e.push("screen not registered: "+m[1]);
+// 反向：注册了页面却没有对应 <div class="screen">，navigate 过去就是一片空白。
+// 删页面时忘了删路由（about-lan 就这么残留过一次）。
+const screenIds=new Set([...h.matchAll(SCREEN_RE)].map(m=>m[1]));
+for(const m of appJs.matchAll(/Router\.register\('([a-z-]+)'/g))if(!screenIds.has(m[1]))e.push("registered page has no screen div: "+m[1]);
+// WebView 不实现新窗口：target="_blank" 与 window.open 点了都没反应
+//（「关于 → 联系作者」曾经因此完全点不动，必须走 openExternal）。
+if(/window\.open\(/.test(h))e.push('index.html 还在用 window.open：WebView 里打不开，改用 openExternal()');
+if(/<a[^>]+target="_blank"/.test(h))e.push('index.html 还有 target="_blank" 链接：WebView 里点了没反应，改用 openExternal()');
 // 取值辅助别用错：getSel 是数字版（parseInt），字符串容器必须用 getSelStr。
 // 这个错犯过一次：currentShapeMode 用了 getSel，点「长方形/自定义」永远退回 square。
 const strContainers=["shapeModeGroup","borderModeGroup","capModeGroup","soundThemeGroup","dogBarkGroup"];
