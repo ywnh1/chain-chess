@@ -109,17 +109,21 @@ const CAP_MODE_DESC = {
 };
 // 随机模式解析：开局瞬间用时间戳种子随机确定具体模式，整局不再改变。
 // 解析后与直接选中该模式完全一致（随机只发生在开始的一瞬间）。
-function resolveRandomBorder(){
+// capOverride / borderOverride 供联机使用：联机的随机项必须在房主端解析一次，
+// 再把确定值发给所有人；各端各自调这个函数会抽到不同结果，棋盘直接分叉。
+function resolveRandomBorder(capOverride){
+  const cap=capOverride||capMode;
   // 降级边界与 3/5 级爆炸互斥：阈值模式为 3/5（显式选择）时，随机边界排除降级
-  const opts=(capMode==='3'||capMode==='5')
+  const opts=(cap==='3'||cap==='5')
     ?['default','wrap','bounce']
     :['default','wrap','bounce','degrade'];
   let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
   return opts[s%opts.length];
 }
-function resolveRandomCap(){
+function resolveRandomCap(borderOverride){
+  const border=borderOverride||borderMode;
   // 降级边界与 3/5 级爆炸互斥：边界为降级时，随机阈值只取 4 级（degrade 仅与 4 级兼容）
-  const opts=borderMode==='degrade'?['4']:['3','4','5'];
+  const opts=border==='degrade'?['4']:['3','4','5'];
   let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
   return opts[s%opts.length];
 }
@@ -1206,7 +1210,10 @@ let lanMyPid = 0;          // 本机座位号（主机 = 0）
 let lanPlayers = [];       // 按 pid 索引：{pid,name,ready,host}
 let lanSeats = null;       // 主机：peerId -> pid
 let lanRoomAddr = '';
-let lanBoardSize = 7;
+// 房主正在编辑的对局规则。客户端不用它，只存房主广播过来的 lanRemoteCfg。
+let lanCfg = {shape:'square', size:7, rows:7, cols:7, customId:null, customName:'',
+              borderMode:'default', capMode:'4', aiCount:0, aiStrength:'strategy'};
+let lanRemoteCfg = null;
 let lanPollTimer = null;
 let lanDrainBusy = false;
 
@@ -1296,7 +1303,7 @@ async function lanHandleMessage(peerId, msg){
         lanPlayers[pid] = {pid: pid, name: lanCleanName(p.name, '玩家' + (pid + 1)),
                            ready: !!p.ready, host: !!p.host};
       });
-      if(msg.size) lanBoardSize = msg.size | 0;
+      if(msg.cfg) lanRemoteCfg = msg.cfg;
       lanRenderRoom();
     }else if(msg.t === 'roster'){
       lanPlayers = [];
@@ -1305,7 +1312,11 @@ async function lanHandleMessage(peerId, msg){
         lanPlayers[pid] = {pid: pid, name: lanCleanName(p.name, '玩家' + (pid + 1)),
                            ready: !!p.ready, host: !!p.host};
       });
-      if(msg.size) lanBoardSize = msg.size | 0;
+      if(msg.cfg) lanRemoteCfg = msg.cfg;
+      lanRenderRoom();
+    }else if(msg.t === 'config'){
+      // 房主在对局开始前改规则：客户端只读刷新
+      lanRemoteCfg = msg.cfg || null;
       lanRenderRoom();
     }else if(msg.t === 'start'){
       if(msg.you != null) lanMyPid = msg.you | 0;
@@ -1318,7 +1329,9 @@ async function lanHandleMessage(peerId, msg){
         size: msg.size | 0, cols: (msg.cols | 0) || (msg.size | 0),
         maxPlayers: msg.maxPlayers | 0, names: safeNames,
         borderMode: msg.borderMode || 'default', capMode: msg.capMode || '4',
-        cells: msg.cells || null
+        cells: msg.cells || null,
+        aiSeats: Array.isArray(msg.aiSeats) ? msg.aiSeats : [],
+        aiConfigs: (msg.aiConfigs && typeof msg.aiConfigs === 'object') ? msg.aiConfigs : {}
       });
     }else if(msg.t === 'move'){
       const mx = msg.x | 0, my = msg.y | 0;
@@ -1360,8 +1373,8 @@ function lanHostHello(peerId, name){
     name: lanCleanName(name, '玩家' + (pid + 1)),
     ready: false, host: false
   };
-  lanSendTo(peerId, {t:'welcome', you:pid, size:lanBoardSize, players:lanRosterData()}).catch(function(){});
-  lanSend({t:'roster', players:lanRosterData(), size:lanBoardSize}).catch(function(){});
+  lanSendTo(peerId, {t:'welcome', you:pid, players:lanRosterData(), cfg: lanCfgWire()}).catch(function(){});
+  lanSend({t:'roster', players:lanRosterData(), cfg: lanCfgWire()}).catch(function(){});
   lanRenderRoom();
 }
 function lanHostSetReady(peerId, ready){
@@ -1369,7 +1382,7 @@ function lanHostSetReady(peerId, ready){
   const pid = lanSeats.get(peerId);
   if(pid === undefined || !lanPlayers[pid]) return;
   lanPlayers[pid].ready = ready;
-  lanSend({t:'roster', players:lanRosterData(), size:lanBoardSize}).catch(function(){});
+  lanSend({t:'roster', players:lanRosterData(), cfg: lanCfgWire()}).catch(function(){});
   lanRenderRoom();
 }
 function lanHostPeerLeft(peerId){
@@ -1384,7 +1397,7 @@ function lanHostPeerLeft(peerId){
     lanBroadcastExcept(peerId, {t:'peerGone', name:(p && p.name) || '对手'});
     showMsg(((p && p.name) || '对手') + ' 已离开，对局结束', 'error');
   }else{
-    lanSend({t:'roster', players:lanRosterData(), size:lanBoardSize}).catch(function(){});
+    lanSend({t:'roster', players:lanRosterData(), cfg: lanCfgWire()}).catch(function(){});
     lanRenderRoom();
   }
 }
@@ -1463,13 +1476,238 @@ async function lanApplyRemote(entry){
   }
 }
 
+/* ─── 联机对局规则（房主设定，其他人只读展示） ───
+ * 覆盖的形状/边界/阈值与单机开局完全同一套语义，但随机项（随机棋盘、
+ * 随机边界、随机阈值）必须由房主在开局时解析一次再把确定值发下去 ——
+ * 各端各自抽会得到不同结果，棋盘当场分叉。
+ */
+
+function lanSelStr(id, dflt){
+  const c = document.getElementById(id);
+  const sel = c && c.querySelector('.selected');
+  return (sel && sel.dataset.value) || dflt;
+}
+function lanSelNum(id, dflt){
+  const c = document.getElementById(id);
+  const sel = c && c.querySelector('.selected');
+  const v = sel ? parseInt(sel.dataset.value, 10) : NaN;
+  return isFinite(v) ? v : dflt;
+}
+function lanFindCustomBoard(id){
+  if(typeof getCustomBoards !== 'function') return null;
+  const list = getCustomBoards();
+  if(!list.length) return null;
+  return list.find(function(b){ return b.id === id; }) || list[0];
+}
+
+/// 从页面读房主当前选的规则
+function lanReadCfgFromDom(){
+  const shape = lanSelStr('lanShapeGroup', 'square');
+  const cfg = {
+    shape: shape,
+    size: 7, rows: 7, cols: 7, customId: null, customName: '',
+    borderMode: lanSelStr('lanBorderGroup', 'default'),
+    capMode: lanSelStr('lanCapGroup', '4'),
+    aiCount: 0,
+    aiStrength: 'strategy',
+  };
+  const aiEl = document.getElementById('lanAiCount');
+  const aiN = parseInt(aiEl && aiEl.value, 10);
+  cfg.aiCount = isFinite(aiN) ? Math.max(0, Math.min(9, aiN)) : 0;
+  const stEl = document.getElementById('lanAiStrength');
+  cfg.aiStrength = (stEl && stEl.value) || 'strategy';
+  if(shape === 'square'){
+    cfg.size = lanSelNum('lanSizeGrid', 7);
+    cfg.rows = cfg.cols = cfg.size;
+  }else if(shape === 'rect'){
+    const rr = document.getElementById('lanRectRows');
+    const cc = document.getElementById('lanRectCols');
+    cfg.rows = parseInt(rr && rr.value, 10) || 7;
+    cfg.cols = parseInt(cc && cc.value, 10) || 7;
+  }else if(shape === 'custom'){
+    const sel = document.getElementById('lanCustomBoard');
+    const rec = lanFindCustomBoard(sel && sel.value);
+    if(rec){ cfg.customId = rec.id; cfg.customName = rec.name; cfg.rows = rec.rows; cfg.cols = rec.cols; }
+  }else{
+    cfg.rows = cfg.cols = 0;   // 随机棋盘：开局按人数生成
+  }
+  return cfg;
+}
+
+/// 广播给客户端的精简版（不含 cells：那玩意儿只在 start 里发一次）
+function lanCfgWire(){
+  const c = lanCfg || {};
+  return {
+    shape: c.shape || 'square',
+    size: c.size | 0, rows: c.rows | 0, cols: c.cols | 0,
+    customName: c.customName || '',
+    borderMode: c.borderMode || 'default',
+    capMode: c.capMode || '4',
+    aiCount: c.aiCount | 0,
+    aiStrength: c.aiStrength || 'strategy',
+  };
+}
+
+function lanFillCustomBoards(){
+  const el = document.getElementById('lanCustomBoard');
+  if(!el) return;
+  const list = (typeof getCustomBoards === 'function') ? getCustomBoards() : [];
+  const prev = el.value;
+  el.innerHTML = '';
+  if(!list.length){
+    const o = document.createElement('option');
+    o.value = '';
+    o.textContent = '（还没有自定义棋盘：开始游戏 → 棋盘形状 → 自定义 里建一块）';
+    el.appendChild(o);
+    return;
+  }
+  for(const b of list){
+    const o = document.createElement('option');
+    o.value = b.id;
+    o.textContent = b.name + ' · ' + b.rows + '×' + b.cols;
+    el.appendChild(o);
+  }
+  if(prev && list.some(function(b){ return b.id === prev; })) el.value = prev;
+}
+
+function lanApplyShapeVisibility(){
+  const mode = lanSelStr('lanShapeGroup', 'square');
+  const sq = document.getElementById('lanSquareRow');
+  const rc = document.getElementById('lanRectRow');
+  const cu = document.getElementById('lanCustomRow');
+  const rh = document.getElementById('lanRandomHint');
+  if(sq) sq.style.display = mode === 'square' ? '' : 'none';
+  if(rc) rc.style.display = mode === 'rect' ? '' : 'none';
+  if(cu) cu.style.display = mode === 'custom' ? '' : 'none';
+  if(rh) rh.style.display = mode === 'random' ? '' : 'none';
+  if(mode === 'custom') lanFillCustomBoards();
+}
+
+/// 人机数量为 0 时藏掉「AI 强度」，免得看着像能生效
+function lanSyncAiRow(){
+  const n = parseInt((document.getElementById('lanAiCount') || {}).value, 10) || 0;
+  const row = document.getElementById('lanAiStrengthRow');
+  if(row) row.style.display = n > 0 ? '' : 'none';
+}
+
+function lanSyncRuleDesc(){
+  const bd = document.getElementById('lanBorderDesc');
+  const cd = document.getElementById('lanCapDesc');
+  const b = lanSelStr('lanBorderGroup', 'default');
+  const c = lanSelStr('lanCapGroup', '4');
+  if(bd && BORDER_MODE_DESC[b]) bd.textContent = BORDER_MODE_DESC[b];
+  if(cd && CAP_MODE_DESC[c]) cd.textContent = CAP_MODE_DESC[c];
+}
+
+/// 房主改了规则：互斥纠正 → 刷新描述 → 广播
+/// caller: 'shape' | 'size' | 'border' | 'cap'
+function lanOnRuleChange(caller){
+  // 降级边界与 3/5 级阈值互斥（与单机同一规则）：后点的生效，另一方弹回兼容值
+  const bg = document.getElementById('lanBorderGroup');
+  const cg = document.getElementById('lanCapGroup');
+  if(bg && cg){
+    const b = bg.querySelector('.selected');
+    const c = cg.querySelector('.selected');
+    if(b && c && b.dataset.value === 'degrade' && (c.dataset.value === '3' || c.dataset.value === '5')){
+      if(caller === 'cap'){
+        const d = bg.querySelector('.gb[data-value="default"]');
+        if(d) setSelected(bg, d);
+      }else{
+        const d = cg.querySelector('.gb[data-value="4"]');
+        if(d) setSelected(cg, d);
+      }
+    }
+  }
+  if(caller === 'shape') lanApplyShapeVisibility();
+  lanSyncAiRow();
+  lanSyncRuleDesc();
+  lanCfg = lanReadCfgFromDom();
+  if(lanRole === 'host'){
+    lanSend({t:'config', cfg: lanCfgWire()}).catch(function(){});
+    lanRenderRoom();
+  }
+}
+
+/// 房主开局时解析规则：随机项解析成确定值，随机棋盘按实际人数生成
+/// 返回 {rows, cols, cells, borderMode, capMode} 或 {error}
+function lanResolveMatch(raw, playerCount){
+  let border = raw.borderMode || 'default';
+  let cap = raw.capMode || '4';
+  // 随机项只在这里抽一次；抽到的值原样发给所有客户端
+  if(border === 'random') border = resolveRandomBorder(cap);
+  if(cap === 'random') cap = resolveRandomCap(border);
+  if(border === 'degrade' && (cap === '3' || cap === '5')) cap = '4';
+
+  let rows = 7, cols = 7, cells = null;
+  if(raw.shape === 'random'){
+    const b = makeRandomShape(playerCount, true);   // force：每局重新生成
+    rows = b.rows; cols = b.cols; cells = b.cells;
+  }else if(raw.shape === 'custom'){
+    const rec = lanFindCustomBoard(raw.customId);
+    if(!rec) return {error:'自定义棋盘不存在了，请重新选一块'};
+    rows = rec.rows; cols = rec.cols; cells = rec.cells;
+  }else if(raw.shape === 'rect'){
+    rows = raw.rows | 0; cols = raw.cols | 0;
+  }else{
+    rows = cols = raw.size | 0;
+  }
+  if(rows < 5 || cols < 5) return {error:'棋盘尺寸不合法（至少要 5×5）'};
+
+  // 容量：不规则棋盘挖掉的洞不算，否则会出现开局就有人没地方落子
+  const open = cells ? countOpenCells(cells) : rows * cols;
+  const maxP = getMaxPlayersByArea(open);
+  if(playerCount > maxP){
+    return {error:'现在是 ' + playerCount + ' 人，这块棋盘最多 ' + maxP + ' 人；换个更大的棋盘或减少玩家'};
+  }
+  return {rows:rows, cols:cols, cells:cells, borderMode:border, capMode:cap, open:open, maxP:maxP};
+}
+
+/// 只读摘要（客户端看的）
+function lanConfigSummary(cfg){
+  if(!cfg) return '<p style="color:var(--dim);font-size:.8rem;margin:0">等待房主选择规则…</p>';
+  const shapeLabel = {square:'正方形', rect:'长方形', random:'随机棋盘', custom:'自定义'}[cfg.shape] || '正方形';
+  let where;
+  if(cfg.shape === 'random') where = '按人数生成异形盘';
+  else if(cfg.shape === 'custom') where = (cfg.customName || '自定义棋盘') + '（' + (cfg.rows||0) + '×' + (cfg.cols||0) + '）';
+  else if(cfg.shape === 'rect') where = (cfg.rows||0) + '×' + (cfg.cols||0);
+  else where = (cfg.size||7) + '×' + (cfg.size||7);
+  const borderLabel = {default:'默认边界', wrap:'回环边界', bounce:'反弹边界',
+                       degrade:'降级边界', random:'随机（开局抽一个）'};
+  const capLabel = {'3':'3 级速爆', '4':'4 级标准', '5':'5 级重炮', random:'随机（开局抽一个）'};
+  const aiLabel = {strategy:'策略', alphabeta:'A-B 剪枝', pvs:'PVS 深搜'};
+  const rows = [
+    ['棋盘', shapeLabel + (cfg.shape === 'random' ? '' : ' · ' + where)],
+    ['边界', borderLabel[cfg.borderMode] || cfg.borderMode],
+    ['阈值', capLabel[cfg.capMode] || cfg.capMode],
+    ['人机', (cfg.aiCount | 0) > 0
+      ? (cfg.aiCount + ' 个 · ' + (aiLabel[cfg.aiStrength] || cfg.aiStrength))
+      : '无（只和真人打）'],
+  ];
+  return '<div class="lan-cfg-summary">' + rows.map(function(r){
+    return '<div class="lan-cfg-row"><span class="lan-cfg-k">' + htmlEsc(r[0]) +
+           '</span><span class="lan-cfg-v">' + htmlEsc(r[1]) + '</span></div>';
+  }).join('') + '</div>';
+}
+
+/// 规则区渲染：房主可编辑，其他人只读
+function lanRenderRules(){
+  const hostBox = document.getElementById('lanConfigHost');
+  const roBox = document.getElementById('lanConfigReadonly');
+  const owner = document.getElementById('lanRulesOwner');
+  if(!hostBox || !roBox) return;
+  const isHost = lanRole === 'host';
+  hostBox.style.display = isHost ? '' : 'none';
+  roBox.style.display = isHost ? 'none' : '';
+  if(owner) owner.textContent = isHost ? '（由你决定）' : '（房主已定）';
+  if(!isHost) roBox.innerHTML = lanConfigSummary(lanRemoteCfg);
+}
+
 /* ─── 入口与房间 ─── */
 async function lanCreateRoom(){
   if(!lanSupported()){ showMsg('局域网联机需要桌面 / Android 应用', 'error'); return; }
   const name = lanNickValue();
-  const sizeEl = document.getElementById('lanBoardSize');
-  lanBoardSize = parseInt(sizeEl && sizeEl.value) || 7;
   lanStopNet();
+  lanCfg = lanReadCfgFromDom();   // 建房时把页面上的默认规则记下来
   let port = 0;
   try{
     port = await tauriInvoke('lan_host', {port:null, name:name});
@@ -1518,7 +1756,12 @@ function lanToggleReady(){
 function lanHostStart(){
   if(lanRole !== 'host') return;
   const others = lanPlayers.filter(Boolean).filter(function(p){ return !p.host; });
-  if(!others.length){ showMsg('至少还需要一位玩家加入', 'error'); return; }
+  if(!others.length){
+    showMsg((lanReadCfgFromDom().aiCount | 0) > 0
+      ? '还需要至少一位真人加入（只想和 AI 打，用首页的「开始游戏」更快）'
+      : '至少还需要一位玩家加入', 'error');
+    return;
+  }
   if(others.some(function(p){ return !p.ready; })){ showMsg('还有玩家没准备', 'error'); return; }
   // 座位可能因为中途有人离开而出现空洞（pid 不连续）。开局前按当前在座的人
   // 重新编号，否则 maxPlayers 和实际 pid 对不上，空位还会把回合推进卡死。
@@ -1526,9 +1769,32 @@ function lanHostStart(){
   const pidMap = new Map();
   const names = {};
   alive.forEach(function(p, idx){ pidMap.set(p.pid, idx); names[idx] = p.name; });
+  // 读房主选的规则，随机项（随机棋盘/随机边界/随机阈值）在这里解析一次。
+  // 客户端不能自己解析：各端各自抽会得到不同结果，棋盘当场分叉。
+  lanCfg = lanReadCfgFromDom();
+
+  // 人机座位接在真人后面。AI 由房主这一台设备计算，其他人只收结果 ——
+  // 各端都跑一遍 AI 会各自算出不同的落子，棋盘当场分叉。
+  const humanCount = alive.length;
+  const aiCount = Math.min(lanCfg.aiCount | 0, Math.max(0, 10 - humanCount));
+  const total = humanCount + aiCount;
+  const strength = lanCfg.aiStrength || 'strategy';
+  const aiDepth = strength === 'pvs' ? 3 : 2;
+  const aiSeats = [];
+  const aiConfigsOut = {};
+  for(let k = 0; k < aiCount; k++){
+    const pid = humanCount + k;
+    aiSeats.push(pid);
+    aiConfigsOut[pid] = {algorithm: strength, depth: aiDepth, randomScale: 10, useMlEval: true};
+    names[pid] = 'AI ' + (k + 1);
+  }
+
+  const m = lanResolveMatch(lanCfg, total);
+  if(m.error){ showMsg(m.error, 'error'); return; }
   const cfg = {
-    size: lanBoardSize, cols: lanBoardSize, maxPlayers: alive.length,
-    names: names, borderMode: 'default', capMode: '4', cells: null
+    size: m.rows, cols: m.cols, maxPlayers: total,
+    names: names, borderMode: m.borderMode, capMode: m.capMode, cells: m.cells,
+    aiSeats: aiSeats, aiConfigs: aiConfigsOut
   };
   // 每个客户端单独发，带上它自己的新座位号。
   // lanSeats 必须跟着重编号：主机的落子校验、准备状态、掉线清理都靠它
@@ -1541,7 +1807,8 @@ function lanHostStart(){
       reseat.set(peerId, newPid);
       lanSendTo(peerId, {t:'start', you:newPid, size:cfg.size, cols:cfg.cols,
         maxPlayers:cfg.maxPlayers, names:cfg.names, borderMode:cfg.borderMode,
-        capMode:cfg.capMode, cells:cfg.cells}).catch(function(){});
+        capMode:cfg.capMode, cells:cfg.cells,
+        aiSeats:cfg.aiSeats, aiConfigs:cfg.aiConfigs}).catch(function(){});
     });
     lanSeats = reseat;
   }
@@ -1568,7 +1835,25 @@ function lanBeginGame(cfg){
   if(pauseBtn) pauseBtn.textContent = '退出';   // 联机不能暂停，这个按钮只用于离开对局
   gameMode = 'lan';
   _originPage = 'lan';
-  aiPlayers = new Set(); aiConfigs = {}; aiThinking = false;
+  // AI 座位两端都要知道：客户端靠它显示「AI 1」、禁止点别人的回合；
+  // 但只有房主会真的驱动它们思考（见 triggerAI 开头）。
+  aiPlayers = new Set();
+  aiConfigs = {};
+  const seats = Array.isArray(cfg.aiSeats) ? cfg.aiSeats : [];
+  for(const pid of seats){
+    const n = pid | 0;
+    if(n >= 0 && n < maxPlayers){
+      aiPlayers.add(n);
+      const c = (cfg.aiConfigs && cfg.aiConfigs[n]) || {};
+      aiConfigs[n] = {
+        algorithm: c.algorithm || 'strategy',
+        depth: c.depth || 2,
+        randomScale: (c.randomScale ?? 10),
+        useMlEval: c.useMlEval !== false,
+      };
+    }
+  }
+  aiThinking = false;
   eliminatedPlayers = new Set(); eliminationRounds = []; eliminationInfo = {};
   gameHistory = []; chainStats = {};
   maxChainOverall = {player:null, length:0};
@@ -1581,6 +1866,10 @@ function lanBeginGame(cfg){
   renderPlayerBar();
   updateFastFinishBtn();
   lanStartPolling();
+  // 房主端：座位 0 若是 AI（极端情况：没人加入但已有 AI），起手交给它
+  if(lanRole === 'host' && aiPlayers.has(curPlayer) && !gameOver){
+    setTimeout(()=>triggerAI(), 400);
+  }
 }
 /// 对局页的暂停/退出按钮：联机时不能暂停（会挡住远端落子），改为退出确认
 function onPauseBtn(){
@@ -1647,19 +1936,75 @@ function lanRenderRoom(){
   if(hint){
     if(lanRole === 'host'){
       const others = lanPlayers.filter(Boolean).filter(function(p){ return !p.host; });
-      hint.textContent = !others.length ? '等待其他玩家加入…'
-        : (others.every(function(p){ return p.ready; }) ? '都准备好了，可以开始' : '等待玩家准备');
+      const total = others.length + 1;
+      // 容量预检：规则里的棋盘放不下现在这么多人时先说清楚，别等点开始才报错
+      const capWarn = lanCapacityWarning(total);
+      hint.textContent = capWarn ? capWarn
+        : (!others.length ? '等待其他玩家加入…'
+        : (others.every(function(p){ return p.ready; }) ? '都准备好了，可以开始' : '等待玩家准备'));
+      hint.style.color = capWarn ? 'var(--danger, #ff6060)' : '';
     }else{
       const me = lanPlayers[lanMyPid];
       hint.textContent = (me && me.ready) ? '已准备，等待房主开始…' : '点「准备」告诉房主你好了';
+      hint.style.color = '';
     }
   }
+  lanRenderRules();
   lanRenderPlayerList();
+}
+
+/// 房主端容量预检：当前规则下这个人数是否放得下。
+/// 随机棋盘按人数生成，天然够；只对固定尺寸和自定义棋盘检查。
+function lanCapacityWarning(humanCount){
+  if(lanRole !== 'host') return '';
+  const raw = lanReadCfgFromDom();
+  // AI 也占座位，人数上限要把它们算进去
+  const total = humanCount + (raw.aiCount | 0);
+  if(raw.shape === 'random') return '';
+  let open, label;
+  if(raw.shape === 'custom'){
+    const rec = lanFindCustomBoard(raw.customId);
+    if(!rec) return '还没有可用的自定义棋盘';
+    open = countOpenCells(rec.cells);
+    label = rec.name;
+  }else{
+    open = raw.rows * raw.cols;
+    label = raw.rows + '×' + raw.cols;
+  }
+  const maxP = getMaxPlayersByArea(open);
+  if(total > maxP){
+    const aiNote = (raw.aiCount | 0) ? '（含 ' + raw.aiCount + ' 个 AI）' : '';
+    return '当前 ' + total + ' 人' + aiNote + '，' + label + ' 最多 ' + maxP + ' 人';
+  }
+  return '';
 }
 function lanRenderPlayerList(){
   const box = document.getElementById('lanPlayerList');
   if(!box) return;
   box.innerHTML = '';
+  // AI 座位不是真人，不占 lanPlayers；但房主选了人机数量就得让人看见会开几个 AI
+  const cfgNow = (lanRole === 'host') ? (lanCfg || {}) : (lanRemoteCfg || {});
+  const aiCount = cfgNow.aiCount | 0;
+  const humans = lanPlayers.filter(Boolean).length;
+  if(aiCount > 0){
+    for(let k = 0; k < aiCount; k++){
+      const pid = humans + k;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;' +
+        'background:' + (COLORS_LIGHT[pid] || 'rgba(255,255,255,.06)') + ';color:' + (COLORS[pid] || '#ccc') +
+        ';opacity:.85';
+      const dot = document.createElement('span');
+      dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:' + (COLORS[pid] || '#888');
+      const name = document.createElement('span');
+      name.style.flex = '1';
+      name.textContent = 'AI ' + (k + 1);
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:.72rem;color:var(--dim)';
+      tag.textContent = '电脑';
+      row.appendChild(dot); row.appendChild(name); row.appendChild(tag);
+      box.appendChild(row);
+    }
+  }
   const list = lanPlayers.filter(Boolean).slice().sort(function(a, b){ return a.pid - b.pid; });
   for(const p of list){
     const row = document.createElement('div');
@@ -1713,8 +2058,73 @@ function lanInitPage(){
   if(readyBtn) readyBtn.onclick = lanToggleReady;
   if(startBtn) startBtn.onclick = lanHostStart;
   if(leaveBtn) leaveBtn.onclick = lanLeaveRoom;
+
+  lanInitRuleControls();
   lanRenderRoom();
 }
+
+/// 规则控件的初始化与事件绑定（只在 lan 页进入时跑一次即可，重复绑定无害）
+function lanInitRuleControls(){
+  // 长方形下拉：5~19（与单机开局页同一范围）
+  ['lanRectRows', 'lanRectCols'].forEach(function(id){
+    const el = document.getElementById(id);
+    if(!el || el.options.length) return;
+    for(let v = 5; v <= 19; v++){
+      const o = document.createElement('option');
+      o.value = String(v); o.textContent = String(v);
+      el.appendChild(o);
+    }
+    el.value = '7';
+  });
+
+  // 形状组是 .tg-btn，不在文档级 .size-btn/.gb 委托里，得自己绑。
+  const sg = document.getElementById('lanShapeGroup');
+  if(sg && !sg.dataset.bound){
+    sg.dataset.bound = '1';
+    sg.querySelectorAll('.tg-btn').forEach(function(b){
+      b.onclick = function(){
+        sg.querySelectorAll('.tg-btn').forEach(function(x){ x.classList.remove('selected'); });
+        this.classList.add('selected');
+        lanOnRuleChange('shape');
+      };
+    });
+  }
+
+  // 尺寸/边界/阈值走文档级委托（自动 setSelected），这里只补后续动作。
+  // 用 capture 不行 —— 委托在冒泡阶段改的 selected，所以等一拍再读。
+  [['lanSizeGrid','size'], ['lanBorderGroup','border'], ['lanCapGroup','cap']].forEach(function(pair){
+    const box = document.getElementById(pair[0]);
+    if(!box || box.dataset.bound) return;
+    box.dataset.bound = '1';
+    box.addEventListener('click', function(){
+      setTimeout(function(){ lanOnRuleChange(pair[1]); }, 0);
+    });
+  });
+
+  // 自定义棋盘下拉
+  const cb = document.getElementById('lanCustomBoard');
+  if(cb && !cb.dataset.bound){
+    cb.dataset.bound = '1';
+    cb.onchange = function(){ lanOnRuleChange('shape'); };
+  }
+  const rr = document.getElementById('lanRectRows');
+  const cc = document.getElementById('lanRectCols');
+  [rr, cc].forEach(function(el){
+    if(el && !el.dataset.boundRect){ el.dataset.boundRect = '1'; el.onchange = function(){ lanOnRuleChange('shape'); }; }
+  });
+
+  // 人机数量 / 强度
+  const aiN = document.getElementById('lanAiCount');
+  if(aiN && !aiN.dataset.boundAi){ aiN.dataset.boundAi = '1'; aiN.onchange = function(){ lanOnRuleChange('ai'); }; }
+  const aiS = document.getElementById('lanAiStrength');
+  if(aiS && !aiS.dataset.boundAi){ aiS.dataset.boundAi = '1'; aiS.onchange = function(){ lanOnRuleChange('ai'); }; }
+
+  lanApplyShapeVisibility();
+  lanSyncAiRow();
+  lanSyncRuleDesc();
+  lanCfg = lanReadCfgFromDom();
+}
+
 Router.register('lan', {
   back: 'welcome',
   enter() {
@@ -3720,7 +4130,8 @@ function allAliveAreAI(){
 function updateFastFinishBtn(){
   const btn=document.getElementById('fastFinishBtn');
   if(!btn)return;
-  const show=!gameOver&&allAliveAreAI()&&typeof board!=='undefined'&&board.length>0;
+  // 联机禁用「一键终局」：它在本机模拟到终局，对端收不到，会直接分叉
+  const show=!gameOver&&gameMode!=='lan'&&allAliveAreAI()&&typeof board!=='undefined'&&board.length>0;
   btn.style.display=show?'inline-block':'none';
 }
 function showFastFinishOverlay(show){
@@ -3810,9 +4221,17 @@ function stopAiWaitHint(){
 async function triggerAI(){
   if(gameOver||aiThinking||isPaused||animating)return;
   if(!aiPlayers.has(curPlayer))return;
+  // 联机：AI 只在房主那一台设备上算，落子再广播给其他人。
+  // 客户端要是也跑一遍，会各自算出不同的着法，棋盘立刻分叉。
+  if(gameMode==='lan' && lanRole!=='host')return;
   // AI 首子由玩家放置：AI 无棋子时，由玩家点击落子
   if(!hasPieces(curPlayer,board)){
-    showMsg('请为 '+(window._colorNames&&window._colorNames[curPlayer]||('AI '+(curPlayer+1)))+' 落下首子，点击空位置', 'hint');
+    const who=(window._colorNames&&window._colorNames[curPlayer])||('AI '+(curPlayer+1));
+    if(gameMode==='lan'){
+      showMsg('请为 '+who+' 落下首子（房主点任意空位）', 'hint');
+    }else{
+      showMsg('请为 '+who+' 落下首子，点击空位置', 'hint');
+    }
     return;
   }
   saveUndoState();
@@ -3903,6 +4322,9 @@ async function triggerAI(){
   }
   handleEliminations(elim, killedBy, curPlayer);
   recordHistory({x:x,y:y,player:curPlayer,seed:rndSeed});
+  // 联机：AI 的落子也要广播，否则其他端的棋盘停在这一步。
+  // curPlayer 还没推进，正好是 AI 的座位号；seed 由房主生成后原样下发。
+  if(gameMode==='lan'&&lanRole==='host')lanSendMove(x,y,rndSeed);
   renderBoard(true);
   let alive=[];
   for(let p=0;p<maxPlayers;p++){
@@ -4190,12 +4612,16 @@ async function animateBoardDiff(oldBoard, newBoard, sz){
 
 async function localClick(x,y,seedOverride){
   if(gameOver||aiThinking||isPaused||animating)return;
+  // seedOverride 非空 = 这一手来自局域网对端（含房主算好的 AI 落子）。
+  // 远端来的落子已经由发起端判定过合法性，这里不能再按「轮到 AI 就挡」处理，
+  // 否则客户端会把房主发来的 AI 着法静默吞掉，棋盘从此停在原地。
+  const fromRemote = seedOverride != null;
   // AI 首子由玩家放置：轮到 AI 且 AI 无棋子时，人类可点击为空 AI 放置首子
-  if(aiPlayers.has(curPlayer) && hasPieces(curPlayer,board)){
+  if(!fromRemote && aiPlayers.has(curPlayer) && hasPieces(curPlayer,board)){
     showMsg('轮到 AI 思考，请等待', '');
     return;
   }
-  if(aiPlayers.has(curPlayer)){
+  if(aiPlayers.has(curPlayer) && !hasPieces(curPlayer,board)){
     // AI 无棋子：人类点击为空 AI 放置首子
     let c=board[x][y];
     if(c.owner!==null){showMsg('该位置已有棋子','');return}
@@ -4206,7 +4632,8 @@ async function localClick(x,y,seedOverride){
     playClick();
     const clickEl=cells?.[x]?.[y];
     if(clickEl)addRipple(clickEl);
-    const rndSeed=(Math.floor(Math.random()*0x7fffffff))>>>0;
+    // 联机下这一手可能来自远端：必须沿用对端的 seed，否则两端的爆炸随机不同
+    const rndSeed=seedOverride!=null?seedOverride:((Math.floor(Math.random()*0x7fffffff))>>>0);
     let elim, killedBy;
     try {
       let result=await tauriInvoke('process_move',{
@@ -4225,6 +4652,8 @@ async function localClick(x,y,seedOverride){
     }
     handleEliminations(elim, killedBy, curPlayer);
     recordHistory({x:x,y:y,player:curPlayer,seed:rndSeed});
+    // 联机：给 AI 放首子这一手也要广播；远端来的（seedOverride 非空）不再回发
+    if(gameMode==='lan'&&lanRole==='host'&&seedOverride==null)lanSendMove(x,y,rndSeed);
     renderBoard(true);
     let alive=[];
     for(let p=0;p<maxPlayers;p++){
@@ -4306,8 +4735,16 @@ async function localClick(x,y,seedOverride){
 function handleClick(x,y){
   if(board[x]&&board[x][y]&&board[x][y].blocked)return;   // 空洞点不动
   if(gameMode==='lan'&&curPlayer!==lanMyPid){
-    if(!gameOver&&!animating)showMsg('等待其他玩家落子','');
-    return;
+    // 例外：轮到 AI 且它还没有棋子时，由房主替它落首子
+    const aiNeedsFirst = aiPlayers.has(curPlayer) && !hasPieces(curPlayer,board);
+    if(!(aiNeedsFirst && lanRole==='host')){
+      if(!gameOver&&!animating){
+        if(aiNeedsFirst) showMsg('等待房主为 AI 落下首子', '');
+        else if(aiPlayers.has(curPlayer)) showMsg('AI 正在思考…', '');
+        else showMsg('等待其他玩家落子', '');
+      }
+      return;
+    }
   }
   if(!aiThinking&&!isPaused&&!animating)localClick(x,y);
 }
@@ -5316,7 +5753,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-            {v:'v4.0.0 · 第 49 版',desc:'修复桌面与安卓版会因统计脚本跳转不良网站的问题（已彻底移除该 SDK）；新增局域网联机（同一 Wi-Fi 下直连对战，不经过服务器）；教学页合并联机教程、历史记录支持多选批量管理、开源许可补齐项目链接'},
+            {v:'v4.0.0 · 第 49 版',desc:'修复桌面与安卓版会因统计脚本跳转不良网站的问题（已彻底移除该 SDK）；新增局域网联机（直连对战，房主自选棋盘、边界、阈值与人机数量）；教学页合并联机教程、历史记录支持多选、开源许可补齐项目链接'},
             {v:'v3.4.3 · 第 48 版',desc:'新增自定义棋盘存档（可命名保存、随时切换与编辑）、棋盘编辑器支持按住滑动连续涂改、换用新图标；修复局中排名淘汰顺序错乱（一键终局时全部并列）'},
             {v:'v3.4.2 · 第 47 版',desc:'新增随机棋盘（按人数生成异形盘，每局不同）、异形棋盘支持全部边界、设置可关背景光球与背景跟随、补下载中心与联系作者入口；移除 MCTS；修正回环下 AI 评估失真；重写规则页'},
             {v:'v3.4.1 · 第 46 版',desc:'修复异型棋盘多处问题：AI 与点击不再落进空洞、仅保留默认边界、悔棋与回放不丢形状、重开不丢列数；修复更新说明中文乱码；AI 模型重训，不规则与长方形棋盘上更强'},

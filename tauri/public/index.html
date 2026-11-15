@@ -63,20 +63,8 @@
         <input id="lanNick" maxlength="12" placeholder="玩家" style="flex:1">
       </div>
 
-      <div class="form-row"><label>棋盘大小</label>
-        <select id="lanBoardSize">
-          <option value="5">5×5</option><option value="6">6×6</option>
-          <option value="7" selected>7×7</option><option value="8">8×8</option>
-          <option value="9">9×9</option><option value="10">10×10</option>
-          <option value="11">11×11</option><option value="12">12×12</option>
-          <option value="13">13×13</option><option value="14">14×14</option>
-          <option value="15">15×15</option><option value="16">16×16</option>
-          <option value="17">17×17</option><option value="18">18×18</option>
-          <option value="19">19×19</option>
-        </select>
-      </div>
-
       <button class="glass-btn primary" id="lanHostBtn" style="width:100%;margin-top:6px">创建房间</button>
+      <p style="font-size:.72rem;color:var(--dim);margin:6px 0 0">建房后由房主选棋盘与规则，其他人加入即可看到。</p>
 
       <div class="form-row" style="margin-top:14px"><label>加入房间</label>
         <div style="display:flex;gap:8px;flex:1">
@@ -94,6 +82,105 @@
         <p id="lanRoomTip" style="font-size:.75rem;color:var(--dim);margin:6px 0 0"></p>
       </div>
       <div id="lanPlayerList" style="display:flex;flex-direction:column;gap:6px;margin:10px 0"></div>
+
+      <!-- 对局规则：房主可改，其他人只读 -->
+      <div class="about-card lan-rules">
+        <h3 style="margin:0 0 6px">对局规则<span id="lanRulesOwner" class="lan-rules-owner"></span></h3>
+
+        <div id="lanConfigHost">
+          <div class="form-row"><label>棋盘形状</label>
+            <div id="lanShapeGroup" class="toggle-group">
+              <button class="tg-btn selected" data-value="square">正方形</button>
+              <button class="tg-btn" data-value="rect">长方形</button>
+              <button class="tg-btn" data-value="random">随机</button>
+              <button class="tg-btn" data-value="custom">自定义</button>
+            </div>
+          </div>
+
+          <div class="form-row" id="lanSquareRow"><label>棋盘大小</label>
+            <div id="lanSizeGrid" class="size-grid">
+              <button class="size-btn" data-value="5">5×5</button>
+              <button class="size-btn" data-value="6">6×6</button>
+              <button class="size-btn selected" data-value="7">7×7</button>
+              <button class="size-btn" data-value="8">8×8</button>
+              <button class="size-btn" data-value="9">9×9</button>
+              <button class="size-btn" data-value="10">10×10</button>
+              <button class="size-btn" data-value="11">11×11</button>
+              <button class="size-btn" data-value="12">12×12</button>
+              <button class="size-btn" data-value="13">13×13</button>
+              <button class="size-btn" data-value="14">14×14</button>
+              <button class="size-btn" data-value="15">15×15</button>
+              <button class="size-btn" data-value="16">16×16</button>
+              <button class="size-btn" data-value="17">17×17</button>
+              <button class="size-btn" data-value="18">18×18</button>
+              <button class="size-btn" data-value="19">19×19</button>
+            </div>
+          </div>
+
+          <div class="form-row" id="lanRectRow" style="display:none"><label>行 × 列</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <select id="lanRectRows" style="flex:1"></select>
+              <span style="color:var(--dim)">×</span>
+              <select id="lanRectCols" style="flex:1"></select>
+            </div>
+          </div>
+
+          <div class="form-row" id="lanCustomRow" style="display:none"><label>自定义棋盘</label>
+            <select id="lanCustomBoard" style="flex:1"></select>
+          </div>
+
+          <p id="lanRandomHint" style="display:none;font-size:.72rem;color:var(--dim);margin:0 0 6px">
+            按开局时的实际人数生成一块异形棋盘，每次都不一样。</p>
+
+          <div class="form-row"><label>棋盘边界</label>
+            <div id="lanBorderGroup" class="btn-group border-mode-group">
+              <button class="gb selected" data-value="default">默认边界</button>
+              <button class="gb" data-value="wrap">回环边界</button>
+              <button class="gb" data-value="bounce">反弹边界</button>
+              <button class="gb" data-value="degrade">降级边界</button>
+              <button class="gb" data-value="random">随机边界</button>
+            </div>
+            <p id="lanBorderDesc" class="lan-rule-desc"></p>
+          </div>
+
+          <div class="form-row"><label>爆炸阈值</label>
+            <div id="lanCapGroup" class="btn-group">
+              <button class="gb" data-value="3">3 级</button>
+              <button class="gb selected" data-value="4">4 级</button>
+              <button class="gb" data-value="5">5 级</button>
+              <button class="gb" data-value="random">随机阈值</button>
+            </div>
+            <p id="lanCapDesc" class="lan-rule-desc"></p>
+          </div>
+
+          <div class="form-row"><label>人机数量</label>
+            <select id="lanAiCount">
+              <option value="0" selected>0（只和真人打）</option>
+              <option value="1">1 个 AI</option>
+              <option value="2">2 个 AI</option>
+              <option value="3">3 个 AI</option>
+              <option value="4">4 个 AI</option>
+              <option value="5">5 个 AI</option>
+              <option value="6">6 个 AI</option>
+              <option value="7">7 个 AI</option>
+              <option value="8">8 个 AI</option>
+              <option value="9">9 个 AI</option>
+            </select>
+          </div>
+
+          <div class="form-row" id="lanAiStrengthRow" style="display:none"><label>AI 强度</label>
+            <select id="lanAiStrength">
+              <option value="strategy" selected>策略 · 快（手机推荐）</option>
+              <option value="alphabeta">A-B 剪枝 · 中</option>
+              <option value="pvs">PVS 深搜 · 强（耗电）</option>
+            </select>
+            <p class="lan-rule-desc">AI 由房主这一台设备计算，其他人只接收结果。</p>
+          </div>
+        </div>
+
+        <div id="lanConfigReadonly" style="display:none"></div>
+      </div>
+
       <p id="lanRoomHint" style="font-size:.78rem;color:var(--dim);text-align:center;margin:8px 0"></p>
       <button class="glass-btn primary" id="lanReadyBtn" style="width:100%;margin-top:6px">准备</button>
       <button class="glass-btn primary" id="lanStartBtn" style="width:100%;margin-top:6px;display:none">开始游戏</button>
@@ -1203,9 +1290,24 @@
       </div>
 
       <div class="about-card">
-        <h3>第四步：准备，然后开局</h3>
+        <h3>第四步：房主定规则</h3>
+        <p>房间页的<strong>「对局规则」</strong>只有房主能改，其他人看到的是只读摘要，改一下就会同步过去：</p>
+        <ul>
+          <li><strong>棋盘</strong>：正方形（5×5 ~ 19×19）、长方形（长宽各 5~19）、随机异形盘（按实际人数生成）、或你在「开始游戏 → 自定义」里存过的棋盘</li>
+          <li><strong>边界</strong>：默认 / 回环 / 反弹 / 降级 / 随机</li>
+          <li><strong>阈值</strong>：3 级速爆 / 4 级标准 / 5 级重炮 / 随机</li>
+          <li><strong>人机数量</strong>：0~9 个 AI，和真人一起坐一桌</li>
+          <li><strong>AI 强度</strong>：策略（快）/ A-B 剪枝 / PVS 深搜（强、耗电）</li>
+        </ul>
+        <p>选了「随机边界」或「随机阈值」时，<strong>房主在点开始的那一瞬间抽一次</strong>，抽到什么就通知所有人，整局都按它打 —— 不会各端抽到不同的规则。</p>
+        <p style="font-size:.78rem;color:var(--dim)">棋盘放不下这么多人时会直接拦下来（比如 5×5 最多 5 人），提示里会写清楚差多少。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>第五步：准备，然后开局</h3>
         <p>加入的人点<strong>「准备」</strong>，房主那边会看到「已准备」。等所有人都准备好了，房主点<strong>「开始游戏」</strong>，大家同时进入棋盘。</p>
         <p>房主自己在开局前不能准备/取消——他本来就是发起人。</p>
+        <p><strong>AI 由房主这一台设备计算</strong>，算完把落子发给其他人。所以房主的手机会更热一点；如果房主掉线，AI 也会停。</p>
       </div>
 
       <div class="about-card">
@@ -1214,6 +1316,8 @@
           <li>轮到谁，谁的格子才能点；不是你的回合点了会提示「等待其他玩家落子」</li>
           <li><strong>不能暂停、不能悔棋</strong>：一暂停就挡住别人落子，一悔棋两边的棋盘就对不上了。所以对局中右上角的「暂停」变成了「退出」</li>
           <li>谁掉线或者退出，这局就结束（房主的连接是唯一的转发点，他走了所有人都断）</li>
+          <li>轮到 AI 时自动走，不用等真人；AI 的首子由<strong>房主</strong>代点一下</li>
+          <li>联机不能用「一键终局」——它只在本机算完，对端收不到，会直接分叉</li>
           <li>打完可以在结算页看排名和图表，对局也会进历史记录，模式标成「局域网」</li>
         </ul>
       </div>

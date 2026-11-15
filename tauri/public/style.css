@@ -1180,6 +1180,27 @@ body.orbs-on .orb-container{display:block}
 }
 .about-foot-btn{flex:0 0 auto;min-width:64px;max-width:80px;flex:1}
 .history-foot-btn{flex:2;min-width:0}
+/* ═══════ 局域网联机页 ═══════ */
+/* 与其他长页面（#about / #settings）同一模式：外层锁死视口高度，
+   内部各视图自己滚。房间页内容（规则区 + 玩家列表）比加入页长得多，
+   不锁高度的话底部「开始游戏」会被挤出屏幕。 */
+#lan.screen{
+  width:100%;max-width:480px;gap:8px;
+  height:100dvh;overflow:hidden;
+  padding:calc(8px + env(safe-area-inset-top,0px)) 8px calc(12px + env(safe-area-inset-bottom,0px));
+}
+#lanIntroView,#lanRoomView{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
+.lan-rules .form-row{margin:8px 0}
+.lan-rules h3{display:flex;align-items:baseline;gap:6px;font-size:1rem}
+.lan-rules-owner{font-size:.72rem;font-weight:400;color:var(--dim);letter-spacing:0}
+.lan-rule-desc{font-size:.72rem;color:var(--dim);line-height:1.5;margin:2px 0 0}
+/* 客户端只读摘要 */
+.lan-cfg-summary{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.lan-cfg-row{display:flex;justify-content:space-between;gap:10px;font-size:.82rem;
+  padding:6px 10px;border-radius:8px;background:var(--glass-w-04)}
+.lan-cfg-k{color:var(--dim);flex-shrink:0}
+.lan-cfg-v{color:var(--text);text-align:right;word-break:break-word}
+
 /* ═══════ 统一游戏设置页 ═══════ */
 #gameSetup{gap:.6rem;width:100%;max-width:480px}
 #gameSetup h2{font-size:1.2rem;font-weight:600;margin-bottom:4px;align-self:flex-start}

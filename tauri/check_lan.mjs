@@ -21,6 +21,48 @@ if (i < 0 || j < 0) {
 }
 const code = appJs.slice(i, j);
 
+/* 联机模块依赖几个定义在它之前的函数。直接抽真实实现注入沙箱，
+ * 而不是在测试里重写一份 —— 重写的那份会掩盖真实代码的 bug。 */
+function grabFn(name) {
+  let i = appJs.indexOf("async function " + name + "(");
+  if (i < 0) i = appJs.indexOf("function " + name + "(");
+  if (i < 0) return "";
+  // 从函数首行扫到行首的 "}"，按花括号配平，避免被嵌套块骗
+  let depth = 0, started = false;
+  for (let k = i; k < appJs.length; k++) {
+    const ch = appJs[k];
+    if (ch === "{") { depth++; started = true; }
+    else if (ch === "}") {
+      depth--;
+      if (started && depth === 0) return appJs.slice(i, k + 1);
+    }
+  }
+  return "";
+}
+
+const DEPS = ["getMaxPlayersByArea", "countOpenCells", "resolveRandomBorder",
+              "resolveRandomCap", "htmlEsc", "setSelected"];
+
+/* triggerAI 定义在 LAN 模块之外，单独抽出来注入（它依赖 lanSendMove / lanRole，
+ * 所以必须排在 LAN 模块之后）。 */
+const triggerAiSrc = grabFn("triggerAI");
+if (!triggerAiSrc.includes("function triggerAI(")) {
+  console.error("抽不到 triggerAI");
+  process.exit(1);
+}
+/* localClick 也要用真的：它开头的「轮到 AI 思考」守卫曾经把远端发来的
+ * AI 着法静默吞掉。用桩测不出这个 bug，必须跑真实代码。 */
+const localClickSrc = grabFn("localClick");
+if (!localClickSrc.includes("function localClick(")) {
+  console.error("抽不到 localClick");
+  process.exit(1);
+}
+const depsSrc = DEPS.map(grabFn).join("\n");
+for (const n of DEPS) if (!depsSrc.includes("function " + n + "(")) {
+  console.error("抽不到依赖函数: " + n);
+  process.exit(1);
+}
+
 const errs = [];
 function ok(cond, label) {
   if (!cond) errs.push(label);
@@ -34,27 +76,156 @@ const net = {
   clients: new Map(),   // peerId -> { inbox: [] }
 };
 
+function resetNet() {
+  net.nextPeerId = 1;
+  net.hostInbox = [];
+  net.clients.clear();
+}
+
 function clientInbox(peerId) {
   const c = net.clients.get(peerId);
   return c ? c.inbox : [];
 }
 
-function makeEl(id) {
-  return {
+/// 极简 DOM 元素：只实现联机代码真正用到的部分
+/// （class 选择器 / 属性选择器 / appendChild / innerHTML 清空）。
+function makeEl(id, tag = "div", cls = "") {
+  const classes = new Set(cls ? cls.split(/\s+/).filter(Boolean) : []);
+  const el = {
     id,
+    tagName: tag.toUpperCase(),
     style: {},
+    dataset: {},
     value: "",
     textContent: "",
-    innerHTML: "",
     children: [],
-    appendChild(c) { this.children.push(c); },
+    options: [],
     onclick: null,
-    className: "",
+    onchange: null,
+    classList: {
+      add(c) { classes.add(c); },
+      remove(c) { classes.delete(c); },
+      contains(c) { return classes.has(c); },
+      toggle(c, on) { on ? classes.add(c) : classes.delete(c); },
+    },
+    get _classes() { return [...classes]; },
+    get className() { return [...classes].join(" "); },
+    set className(v) {
+      classes.clear();
+      String(v || "").split(/\s+/).filter(Boolean).forEach((c) => classes.add(c));
+    },
+    appendChild(c) {
+      this.children.push(c);
+      if (this.tagName === "SELECT") this.options.push(c);
+      return c;
+    },
+    // ".a,.b" 形式：任一命中即可（联机代码里 setSelected 就是这么用的）
+    matches(sel) {
+      return String(sel).split(",").some((part) => {
+        const p = part.trim();
+        if (!p) return false;
+        if (p[0] === ".") return classes.has(p.slice(1));
+        return this.tagName === p.toUpperCase();
+      });
+    },
+    addEventListener() {},
+    querySelectorAll(sel) { return queryAll(this, sel); },
+    querySelector(sel) { return queryAll(this, sel)[0] || null; },
+  };
+  // innerHTML = "" 要清空子节点（代码用它重置下拉框）
+  let _html = "";
+  Object.defineProperty(el, "innerHTML", {
+    get() { return _html; },
+    set(v) { _html = v; if (v === "") { el.children = []; el.options = []; } },
+  });
+  return el;
+}
+
+/// 支持 .cls / tag / .cls[data-value="x"] 三种形态
+function queryAll(root, sel) {
+  const m = /^([.#]?[\w-]+)?(?:\[([\w-]+)="([^"]*)"\])?$/.exec(sel);
+  if (!m) return [];
+  const [, name, attr, attrVal] = m;
+  const out = [];
+  (function walk(node) {
+    for (const c of node.children || []) {
+      let ok = true;
+      if (name) {
+        if (name[0] === ".") ok = c.classList.contains(name.slice(1));
+        else if (name[0] === "#") ok = c.id === name.slice(1);
+        else ok = c.tagName === name.toUpperCase();
+      }
+      if (ok && attr) {
+        const v = attr === "data-value" ? c.dataset.value : c[attr];
+        ok = String(v) === attrVal;
+      }
+      if (ok) out.push(c);
+      walk(c);
+    }
+  })(root);
+  return out;
+}
+
+/// 预置联机规则控件（房主页面）。返回按 id 取元素的函数。
+function buildRuleControls() {
+  const mk = (id, tag, cls) => makeEl(id, tag, cls);
+
+  const shape = mk("lanShapeGroup", "div", "toggle-group");
+  for (const [v, label] of [["square", "正方形"], ["rect", "长方形"], ["random", "随机"], ["custom", "自定义"]]) {
+    const b = mk("", "button", "tg-btn" + (v === "square" ? " selected" : ""));
+    b.dataset.value = v; b.textContent = label;
+    shape.appendChild(b);
+  }
+
+  const sizes = mk("lanSizeGrid", "div", "size-grid");
+  for (let v = 5; v <= 19; v++) {
+    const b = mk("", "button", "size-btn" + (v === 7 ? " selected" : ""));
+    b.dataset.value = String(v); b.textContent = v + "×" + v;
+    sizes.appendChild(b);
+  }
+
+  const border = mk("lanBorderGroup", "div", "btn-group");
+  for (const v of ["default", "wrap", "bounce", "degrade", "random"]) {
+    const b = mk("", "button", "gb" + (v === "default" ? " selected" : ""));
+    b.dataset.value = v;
+    border.appendChild(b);
+  }
+
+  const cap = mk("lanCapGroup", "div", "btn-group");
+  for (const v of ["3", "4", "5", "random"]) {
+    const b = mk("", "button", "gb" + (v === "4" ? " selected" : ""));
+    b.dataset.value = v;
+    cap.appendChild(b);
+  }
+
+  const rowsSel = mk("lanRectRows", "select");
+  rowsSel.value = "7";
+  const colsSel = mk("lanRectCols", "select");
+  colsSel.value = "7";
+  const customSel = mk("lanCustomBoard", "select");
+
+  // 人机数量 / 强度：都是 <select>，测试里直接改 value
+  const aiCountSel = mk("lanAiCount", "select");
+  aiCountSel.value = "0";
+  const aiStrengthSel = mk("lanAiStrength", "select");
+  aiStrengthSel.value = "strategy";
+
+  return {
+    lanAiCount: aiCountSel, lanAiStrength: aiStrengthSel,
+    lanAiStrengthRow: mk("lanAiStrengthRow"),
+    lanShapeGroup: shape, lanSizeGrid: sizes, lanBorderGroup: border, lanCapGroup: cap,
+    lanRectRows: rowsSel, lanRectCols: colsSel, lanCustomBoard: customSel,
+    lanSquareRow: mk("lanSquareRow"), lanRectRow: mk("lanRectRow"),
+    lanCustomRow: mk("lanCustomRow"), lanRandomHint: mk("lanRandomHint"),
+    lanBorderDesc: mk("lanBorderDesc"), lanCapDesc: mk("lanCapDesc"),
+    lanConfigHost: mk("lanConfigHost"), lanConfigReadonly: mk("lanConfigReadonly"),
+    lanRulesOwner: mk("lanRulesOwner"),
   };
 }
 
 function makeSandbox(role, peerId = null, port = 43210) {
-  const els = new Map();
+  // 预置联机规则控件（房主页面）与下拉框，其余元素按需创建
+  const els = new Map(Object.entries(buildRuleControls()));
   const document = {
     getElementById(id) {
       if (!els.has(id)) els.set(id, makeEl(id));
@@ -67,6 +238,7 @@ function makeSandbox(role, peerId = null, port = 43210) {
   const messages = [];
   const localClicks = [];
   const sent = [];
+  const aiMoveCalls = [];
   // 每个客户端一条独立的收件队列，按 peerId 注册到假网络
   const inbox = [];
   if (role === "client") net.clients.set(peerId, { inbox });
@@ -99,6 +271,17 @@ function makeSandbox(role, peerId = null, port = 43210) {
         return null;
       case "lan_discover":
         return [];
+      case "process_move":
+        env.lastSeed = args.seed;
+        return { board: __env.getBoard(), eliminated: [], killedBy: [],
+                 steps: null, exploded: null };
+      case "ai_move_strategy":
+      case "ai_move":
+      case "ai_move_v2":
+        // 固定落在 (0,0)，也就是测试里 setAiPiece 给 AI 放的那颗棋子上。
+        // （有棋子之后只能点自己的棋子，落到空格会被合法性质检拦下）
+        aiMoveCalls.push(args.player);
+        return [0, 0];
       default:
         throw new Error("unexpected cmd: " + cmd);
     }
@@ -118,6 +301,8 @@ function makeSandbox(role, peerId = null, port = 43210) {
     clearInterval: () => {},
     messages,
     localClicks,
+    aiMoveCalls,
+    customBoards: [],
   };
 
   const prelude = `
@@ -130,20 +315,52 @@ function makeSandbox(role, peerId = null, port = 43210) {
     let aiPlayers=new Set(), aiConfigs={}, eliminatedPlayers=new Set();
     let eliminationRounds=[], eliminationInfo={}, gameHistory=[], chainStats={};
     let maxChainOverall={player:null,length:0}, undoStack=[];
+    let cells = [];
     const mkBoard=(s,c)=>Array.from({length:s},()=>Array.from({length:c},()=>({owner:null,count:0})));
     const resetRoundHistory=()=>{gameHistory=[]};
     const clearSavedGameState=()=>{};
     const recordHistory=()=>{gameHistory.push({turn:gameHistory.length})};
-    const renderBoard=()=>{}; const show=()=>{}; const renderPlayerBar=()=>{};
+    // renderBoard 在真实代码里负责填充 cells；这里用同尺寸占位元素代替，
+    // 让 triggerAI 里的 cells[x][y] 取得到东西。
+    const renderBoard=()=>{
+      cells = board.map(row=>row.map(()=>({style:{},classList:{add(){},remove(){}}})));
+    };
+    const show=()=>{}; const renderPlayerBar=()=>{};
     const updateFastFinishBtn=()=>{}; const exitGame=()=>{ gameMode=null; };
     const hasPieces=(p,b)=>b.some(r=>r.some(c=>c.owner===p));
     const isInRestrictedZone=()=>false;
-    async function localClick(x,y,seed){
-      if(gameOver || animating) return;             // 与真实实现同样的门禁
-      __env.localClicks.push({x,y,seed,curPlayer});
-      if(board[x] && board[x][y]) board[x][y].owner = curPlayer;
-      curPlayer = (curPlayer + 1) % maxPlayers;
-    }
+    // 随机棋盘与自定义棋盘库：测试里给固定实现（形状相关的正确性在 check_logic 里测）
+    const makeRandomShape=(cnt)=>({rows:8,cols:8,cells:Array.from({length:8},()=>Array(8).fill('1'))});
+    const getCustomBoards=()=>__env.customBoards||[];
+    const BORDER_MODE_DESC={default:'默认边界',wrap:'回环边界',bounce:'反弹边界',degrade:'降级边界',random:'随机边界'};
+    const CAP_MODE_DESC={'3':'3 级','4':'4 级','5':'5 级',random:'随机阈值'};
+    /*__DEPS__*/
+
+    /* ─── triggerAI 跑通所需的桩（只为验证「谁有权驱动 AI」这一件事）─── */
+    let aiAlgorithm = 'strategy', aiDepth = 2, gameCount = 0;
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const saveUndoState = () => { undoStack.push({}); };
+    const startAiWaitHint = () => {};
+    const stopAiWaitHint = () => {};
+    const playClick = () => {};
+    const playGameOver = () => {};
+    const playExplosion = () => {};
+    const addRipple = () => {};
+    const setBg = () => {};
+    const showSettlement = () => {};
+    const logWarn = () => {};
+    const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色','橙色','棕色','深灰色'];
+    // 真实 localClick 通过 tauriInvoke('process_move') + processClick 落子；
+    // 这里在 processClick 里记录，等价于「这一手真的被应用了」。
+    const processClick = async (b,s,x,y,pl) => {
+      __env.localClicks.push({x,y,pl,seed:__env.lastSeed});
+      if(b[x] && b[x][y]) b[x][y].owner = pl;
+      return [];
+    };
+    const handleEliminations = () => {};
+    __env.getBoard = () => board;
+    __env.getCurPlayer = () => curPlayer;
+    __env.setAiPiece = (pid, x, y) => { board[x][y].owner = pid; board[x][y].count = 1; };
     const __set = { setAnimating:(v)=>{animating=v}, setBoard:(b)=>{board=b} };
   `;
   const epilogue = `
@@ -154,6 +371,29 @@ function makeSandbox(role, peerId = null, port = 43210) {
       get maxPlayers(){return maxPlayers}, get names(){return _colorNames},
       get inbox(){return lanInbox},
       get seats(){return lanSeats?Array.from(lanSeats.entries()):null},
+      get remoteCfg(){return lanRemoteCfg},
+      get aiSeats(){return [...aiPlayers]},
+      get aiCfg(){return aiConfigs},
+      get aiThinking(){return aiThinking},
+      get aiMoveCalls(){return __env.aiMoveCalls},
+      triggerAI,
+      setAiPiece:(pid,x,y)=>__env.setAiPiece(pid,x,y),
+      get cfg(){return lanCfg},
+      get size(){return size},
+      get cols(){return cols},
+      get borderMode(){return borderMode},
+      get capMode(){return capMode},
+      // 直接改选中态，模拟用户点按钮 / 改下拉
+      setRule:(groupId, value)=>{
+        const box=document.getElementById(groupId);
+        if(box.tagName==='SELECT'){ box.value=String(value); return; }
+        box.querySelectorAll('button').forEach(function(b){
+          b.classList.toggle('selected', b.dataset.value===value);
+        });
+      },
+      onRuleChange:(caller)=>lanOnRuleChange(caller),
+      resolveMatch:(raw, n)=>lanResolveMatch(raw, n),
+      get customBoards(){ return __env.customBoards; },
       lanCreateRoom, lanJoinRoom, lanHostStart, lanToggleReady, lanDrainEvents,
       lanSendMove, lanLeaveRoom, lanApplyRemote,
       setCurPlayer:(p)=>{curPlayer=p},
@@ -163,7 +403,10 @@ function makeSandbox(role, peerId = null, port = 43210) {
       ...__set,
     };
   `;
-  const fn = new Function("__env", prelude + code + epilogue);
+  // 依赖源码当占位符替换进去；用函数形式避免 $ 被 replace 特殊解释
+  const full = prelude.replace("/*__DEPS__*/", () => depsSrc) + code
+             + triggerAiSrc + localClickSrc + epilogue;
+  const fn = new Function("__env", full);
   return fn(env);
 }
 
@@ -285,12 +528,181 @@ async function main() {
   const evilStart = (evil.names || {})[0] || "";
   ok(!/[<>]/.test(evilStart), "客户端没洗掉 start 里的恶意名字: " + evilStart);
 
+  /* ═══ 场景二：房主选完整规则 → 客户端同步 → 开局带全部配置 ═══ */
+  resetNet();
+  const host2 = makeSandbox("host", null, 43211);
+  const cli2 = makeSandbox("client", 1);
+  const all2 = [host2, cli2];
+
+  await host2.lanCreateRoom();
+  await cli2.lanJoinRoom("192.168.1.5:43210");
+  await settle(all2);
+  cli2.lanToggleReady();
+  await settle(all2);
+
+  /* 12. 房主改规则 → 客户端收到只读规则 */
+  host2.setRule("lanShapeGroup", "rect");
+  host2.onRuleChange("shape");
+  host2.setRule("lanBorderGroup", "wrap");
+  host2.onRuleChange("border");
+  host2.setRule("lanCapGroup", "5");
+  host2.onRuleChange("cap");
+  host2.setRule("lanRectRows", "8");
+  host2.setRule("lanRectCols", "13");
+  host2.onRuleChange("shape");
+  await settle(all2);
+  const rc = cli2.remoteCfg || {};
+  ok(rc.shape === "rect", "客户端没收到形状规则: " + JSON.stringify(rc));
+  ok(rc.rows === 8 && rc.cols === 13, "客户端收到的行列不对: " + rc.rows + "x" + rc.cols);
+  ok(rc.borderMode === "wrap", "客户端收到的边界不对: " + rc.borderMode);
+  ok(rc.capMode === "5", "客户端收到的阈值不对: " + rc.capMode);
+
+  /* 13. 开局：长方形 + 回环 + 5 级要原样落到两端 */
+  host2.lanHostStart();
+  await settle(all2);
+  ok(host2.gameMode === "lan" && cli2.gameMode === "lan", "规则场景开局失败");
+  ok(host2.size === 8 && host2.cols === 13, "房主端棋盘尺寸不对: " + host2.size + "x" + host2.cols);
+  ok(cli2.size === 8 && cli2.cols === 13, "客户端棋盘尺寸不对: " + cli2.size + "x" + cli2.cols);
+  ok(host2.borderMode === "wrap" && cli2.borderMode === "wrap", "边界两端不一致");
+  ok(host2.capMode === "5" && cli2.capMode === "5", "阈值两端不一致");
+
+  /* 14. 降级边界 + 5 级：互斥纠正为 4 级（不能让两端各判各的） */
+  resetNet();
+  const host3 = makeSandbox("host", null, 43212);
+  const cli3 = makeSandbox("client", 1);
+  const all3 = [host3, cli3];
+  await host3.lanCreateRoom();
+  await cli3.lanJoinRoom("192.168.1.5:43210");
+  await settle(all3);
+  cli3.lanToggleReady();
+  await settle(all3);
+  host3.setRule("lanBorderGroup", "degrade");
+  host3.onRuleChange("border");
+  host3.setRule("lanCapGroup", "5");
+  host3.onRuleChange("cap");          // 后点阈值 → 边界弹回默认
+  await settle(all3);
+  host3.lanHostStart();
+  await settle(all3);
+  ok(host3.capMode !== "degrade" && host3.borderMode !== "degrade",
+     "降级+5 级没做互斥纠正: border=" + host3.borderMode + " cap=" + host3.capMode);
+
+  /* 15. 随机项必须由房主解析成确定值再下发 */
+  resetNet();
+  const host4 = makeSandbox("host", null, 43213);
+  const cli4 = makeSandbox("client", 1);
+  const all4 = [host4, cli4];
+  await host4.lanCreateRoom();
+  await cli4.lanJoinRoom("192.168.1.5:43210");
+  await settle(all4);
+  cli4.lanToggleReady();
+  await settle(all4);
+  host4.setRule("lanShapeGroup", "random");
+  host4.onRuleChange("shape");
+  host4.setRule("lanBorderGroup", "random");
+  host4.onRuleChange("border");
+  host4.setRule("lanCapGroup", "random");
+  host4.onRuleChange("cap");
+  await settle(all4);
+  host4.lanHostStart();
+  await settle(all4);
+  ok(host4.borderMode !== "random" && cli4.borderMode !== "random",
+     "随机边界没被解析成确定值: host=" + host4.borderMode + " client=" + cli4.borderMode);
+  ok(host4.capMode !== "random" && cli4.capMode !== "random",
+     "随机阈值没被解析成确定值: host=" + host4.capMode + " client=" + cli4.capMode);
+  ok(host4.borderMode === cli4.borderMode && host4.capMode === cli4.capMode,
+     "随机解析后两端不一致（会直接分叉）");
+
+  /* 16. 容量不够时拒绝开局，不能带着非法配置进对局 */
+  resetNet();
+  const host5 = makeSandbox("host", null, 43214);
+  const cli5a = makeSandbox("client", 1);
+  const cli5b = makeSandbox("client", 2);
+  const all5 = [host5, cli5a, cli5b];
+  await host5.lanCreateRoom();
+  await cli5a.lanJoinRoom("192.168.1.5:43210");
+  await settle(all5);
+  await cli5b.lanJoinRoom("192.168.1.5:43210");
+  await settle(all5);
+  cli5a.lanToggleReady();
+  cli5b.lanToggleReady();
+  await settle(all5);
+  // 5×5 最多 5 人，这里 3 人 → 允许
+  host5.setRule("lanSizeGrid", "5");
+  host5.onRuleChange("size");
+  await settle(all5);
+  host5.lanHostStart();
+  await settle(all5);
+  ok(host5.gameMode === "lan", "5×5 + 3 人应当允许开局");
+  ok(host5.maxPlayers === 3, "人数不对: " + host5.maxPlayers);
+
+  /* 17. 容量拦截：棋盘放不下这么多人就该拒绝，而不是开局后有人没地方落子 */
+  const smallBoard = { id: "small", name: "小盘", rows: 8, cols: 8,
+    cells: Array.from({ length: 8 }, (_, i) =>
+      Array.from({ length: 8 }, (_, j) => (i < 3 && j < 4 ? "1" : "0"))) };  // 只有 12 格
+  host5.customBoards.push(smallBoard);
+  const tooMany = host5.resolveMatch({ shape: "custom", customId: "small",
+    borderMode: "default", capMode: "4" }, 6);
+  ok(!!tooMany.error, "12 格的自定义棋盘放 6 人应当被拒绝: " + JSON.stringify(tooMany));
+  const fits = host5.resolveMatch({ shape: "custom", customId: "small",
+    borderMode: "default", capMode: "4" }, 5);
+  ok(!fits.error, "12 格放 5 人应当允许: " + JSON.stringify(fits));
+
+  /* ═══ 场景三：房内人机 ═══ */
+  resetNet();
+  const host6 = makeSandbox("host", null, 43215);
+  const cli6 = makeSandbox("client", 1);
+  const all6 = [host6, cli6];
+  await host6.lanCreateRoom();
+  await cli6.lanJoinRoom("192.168.1.5:43210");
+  await settle(all6);
+  cli6.lanToggleReady();
+  await settle(all6);
+
+  /* 18. 房主选 2 个 AI → 客户端收到同样的人数 */
+  host6.setRule("lanAiCount", "2");
+  host6.onRuleChange("ai");
+  host6.setRule("lanAiStrength", "alphabeta");
+  host6.onRuleChange("ai");
+  await settle(all6);
+  ok((cli6.remoteCfg || {}).aiCount === 2, "客户端没收到人机数量: " + JSON.stringify(cli6.remoteCfg));
+  ok((cli6.remoteCfg || {}).aiStrength === "alphabeta", "客户端没收到 AI 强度");
+
+  /* 19. 开局：2 真人 + 2 AI = 4 人，两端 AI 座位一致 */
+  host6.lanHostStart();
+  await settle(all6);
+  ok(host6.maxPlayers === 4, "房主端人数应为 4，实际 " + host6.maxPlayers);
+  ok(cli6.maxPlayers === 4, "客户端人数应为 4，实际 " + cli6.maxPlayers);
+  const hs = host6.aiSeats.join(","), cs = cli6.aiSeats.join(",");
+  ok(hs === "2,3", "房主端 AI 座位应为 2,3，实际 " + hs);
+  ok(hs === cs, "两端 AI 座位不一致: host=" + hs + " client=" + cs);
+  ok((cli6.aiCfg[2] || {}).algorithm === "alphabeta", "客户端没拿到 AI 算法配置");
+  ok((host6.aiCfg[2] || {}).algorithm === "alphabeta", "房主端 AI 算法配置不对");
+
+  /* 20. 客户端绝不能自己驱动 AI（否则两端算出不同着法，棋盘分叉） */
+  cli6.setAiPiece(2, 0, 0);
+  cli6.setCurPlayer(2);
+  await cli6.triggerAI();
+  await sleep(500);
+  ok(cli6.aiMoveCalls.length === 0, "客户端跑了 AI 计算（会与房主分叉）");
+  ok(cli6.curPlayer === 2, "客户端的 AI 回合被本地推进了");
+
+  /* 21. 房主驱动 AI 时必须把落子广播出去 */
+  host6.setAiPiece(2, 0, 0);
+  host6.setCurPlayer(2);
+  const beforeClicks = cli6.localClicks.length;
+  await host6.triggerAI();
+  await sleep(600);
+  await settle(all6);
+  ok(host6.aiMoveCalls.length === 1, "房主没跑 AI 计算");
+  ok(cli6.localClicks.length === beforeClicks + 1,
+     "AI 的落子没广播到客户端（客户端会停在原地）");
+
   if (errs.length) {
     console.error("❌ 局域网联机自检失败：");
     for (const e of errs) console.error("   - " + e);
     process.exit(1);
   }
-  console.log("✅ 局域网联机自检通过（建房 / 加入 / 准备 / 掉线 / 重编号开局 / 落子转发 / 动画排队 / 越界 / 名字清洗）");
+  console.log("✅ 局域网联机自检通过（建房 / 加入 / 准备 / 掉线 / 重编号开局 / 落子转发 / 动画排队 / 越界 / 名字清洗 / 房主规则同步 / 随机项解析 / 互斥纠正 / 房内人机）");
 }
 
 main().catch((e) => {
