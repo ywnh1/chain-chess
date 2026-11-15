@@ -168,14 +168,10 @@
             </select>
           </div>
 
-          <div class="form-row" id="lanAiStrengthRow" style="display:none"><label>AI 强度</label>
-            <select id="lanAiStrength">
-              <option value="strategy" selected>策略 · 快（手机推荐）</option>
-              <option value="alphabeta">A-B 剪枝 · 中</option>
-              <option value="pvs">PVS 深搜 · 强（耗电）</option>
-            </select>
-            <p class="lan-rule-desc">AI 由房主这一台设备计算，其他人只接收结果。</p>
-          </div>
+          <!-- 每个 AI 单独选算法，由 lanRenderAiRows() 生成 -->
+          <div id="lanAiRows" class="lan-ai-rows"></div>
+          <p id="lanAiHint" style="display:none" class="lan-rule-desc">
+            AI 由房主这一台设备计算，其他人只接收结果。</p>
         </div>
 
         <div id="lanConfigReadonly" style="display:none"></div>
@@ -1297,7 +1293,7 @@
           <li><strong>边界</strong>：默认 / 回环 / 反弹 / 降级 / 随机</li>
           <li><strong>阈值</strong>：3 级速爆 / 4 级标准 / 5 级重炮 / 随机</li>
           <li><strong>人机数量</strong>：0~9 个 AI，和真人一起坐一桌</li>
-          <li><strong>AI 强度</strong>：策略（快）/ A-B 剪枝 / PVS 深搜（强、耗电）</li>
+          <li><strong>每个 AI 单独选算法</strong>：策略（快）/ A-B 剪枝 / PVS 深搜（强、耗电）—— 想让一个稳一个凶都行，每个座位互不影响</li>
         </ul>
         <p>选了「随机边界」或「随机阈值」时，<strong>房主在点开始的那一瞬间抽一次</strong>，抽到什么就通知所有人，整局都按它打 —— 不会各端抽到不同的规则。</p>
         <p style="font-size:.78rem;color:var(--dim)">棋盘放不下这么多人时会直接拦下来（比如 5×5 最多 5 人），提示里会写清楚差多少。</p>

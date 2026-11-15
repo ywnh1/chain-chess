@@ -1212,7 +1212,19 @@ let lanSeats = null;       // 主机：peerId -> pid
 let lanRoomAddr = '';
 // 房主正在编辑的对局规则。客户端不用它，只存房主广播过来的 lanRemoteCfg。
 let lanCfg = {shape:'square', size:7, rows:7, cols:7, customId:null, customName:'',
-              borderMode:'default', capMode:'4', aiCount:0, aiStrength:'strategy'};
+              borderMode:'default', capMode:'4', aiList:[]};
+// 可选的 AI 算法。顺序即下拉里的顺序，第一项是默认。
+const LAN_AI_ALGOS = [
+  ['strategy', '策略 · 快'],
+  ['alphabeta', 'A-B 剪枝 · 中'],
+  ['pvs', 'PVS 深搜 · 强'],
+];
+// 算法 → 搜索深度。策略算法不用深度，其余给一个够用又不至于卡手机的默认值。
+function lanDepthForAlgo(alg){
+  if(alg === 'pvs') return 3;
+  if(alg === 'alphabeta') return 2;
+  return 2;
+}
 let lanRemoteCfg = null;
 let lanPollTimer = null;
 let lanDrainBusy = false;
@@ -1508,14 +1520,17 @@ function lanReadCfgFromDom(){
     size: 7, rows: 7, cols: 7, customId: null, customName: '',
     borderMode: lanSelStr('lanBorderGroup', 'default'),
     capMode: lanSelStr('lanCapGroup', '4'),
-    aiCount: 0,
-    aiStrength: 'strategy',
+    aiList: [],
   };
-  const aiEl = document.getElementById('lanAiCount');
-  const aiN = parseInt(aiEl && aiEl.value, 10);
-  cfg.aiCount = isFinite(aiN) ? Math.max(0, Math.min(9, aiN)) : 0;
-  const stEl = document.getElementById('lanAiStrength');
-  cfg.aiStrength = (stEl && stEl.value) || 'strategy';
+  // 每个 AI 各自的算法，从动态生成的那几行里读
+  const rows = document.getElementById('lanAiRows');
+  if(rows){
+    rows.querySelectorAll('.lan-ai-row').forEach(function(row){
+      const sel = row.querySelector('select');
+      const alg = (sel && sel.value) || 'strategy';
+      cfg.aiList.push({algorithm: alg, depth: lanDepthForAlgo(alg)});
+    });
+  }
   if(shape === 'square'){
     cfg.size = lanSelNum('lanSizeGrid', 7);
     cfg.rows = cfg.cols = cfg.size;
@@ -1543,8 +1558,9 @@ function lanCfgWire(){
     customName: c.customName || '',
     borderMode: c.borderMode || 'default',
     capMode: c.capMode || '4',
-    aiCount: c.aiCount | 0,
-    aiStrength: c.aiStrength || 'strategy',
+    aiList: Array.isArray(c.aiList) ? c.aiList.map(function(a){
+      return {algorithm: a.algorithm || 'strategy', depth: a.depth || 2};
+    }) : [],
   };
 }
 
@@ -1583,11 +1599,51 @@ function lanApplyShapeVisibility(){
   if(mode === 'custom') lanFillCustomBoards();
 }
 
-/// 人机数量为 0 时藏掉「AI 强度」，免得看着像能生效
-function lanSyncAiRow(){
+/// 按「人机数量」生成对应行数的算法选择器。
+/// 已经选过的算法要保留 —— 只是加减一个 AI，不该把前面几个的选择清掉。
+function lanRenderAiRows(){
+  const box = document.getElementById('lanAiRows');
+  const hint = document.getElementById('lanAiHint');
+  if(!box) return;
   const n = parseInt((document.getElementById('lanAiCount') || {}).value, 10) || 0;
-  const row = document.getElementById('lanAiStrengthRow');
-  if(row) row.style.display = n > 0 ? '' : 'none';
+  if(hint) hint.style.display = n > 0 ? '' : 'none';
+
+  // 先把现有选择读出来，重建后再填回去
+  const prev = [];
+  box.querySelectorAll('.lan-ai-row').forEach(function(row){
+    const sel = row.querySelector('select');
+    prev.push((sel && sel.value) || 'strategy');
+  });
+
+  box.innerHTML = '';
+  for(let k = 0; k < n; k++){
+    const row = document.createElement('div');
+    row.className = 'lan-ai-row';
+
+    const dot = document.createElement('span');
+    dot.className = 'color-dot';
+    dot.style.background = COLORS[k] || '#888';
+    row.appendChild(dot);
+
+    const label = document.createElement('span');
+    label.className = 'lan-ai-label';
+    label.textContent = 'AI ' + (k + 1);
+    row.appendChild(label);
+
+    const sel = document.createElement('select');
+    sel.setAttribute('aria-label', 'AI ' + (k + 1) + ' 的算法');
+    for(const [val, text] of LAN_AI_ALGOS){
+      const o = document.createElement('option');
+      o.value = val;
+      o.textContent = text;
+      sel.appendChild(o);
+    }
+    sel.value = prev[k] || 'strategy';
+    sel.onchange = function(){ lanOnRuleChange('ai'); };
+    row.appendChild(sel);
+
+    box.appendChild(row);
+  }
 }
 
 function lanSyncRuleDesc(){
@@ -1619,7 +1675,7 @@ function lanOnRuleChange(caller){
     }
   }
   if(caller === 'shape') lanApplyShapeVisibility();
-  lanSyncAiRow();
+  lanRenderAiRows();
   lanSyncRuleDesc();
   lanCfg = lanReadCfgFromDom();
   if(lanRole === 'host'){
@@ -1675,13 +1731,17 @@ function lanConfigSummary(cfg){
                        degrade:'降级边界', random:'随机（开局抽一个）'};
   const capLabel = {'3':'3 级速爆', '4':'4 级标准', '5':'5 级重炮', random:'随机（开局抽一个）'};
   const aiLabel = {strategy:'策略', alphabeta:'A-B 剪枝', pvs:'PVS 深搜'};
+  const aiList = Array.isArray(cfg.aiList) ? cfg.aiList : [];
+  const aiText = aiList.length
+    ? aiList.map(function(a, k){
+        return 'AI ' + (k + 1) + ' ' + (aiLabel[a.algorithm] || a.algorithm);
+      }).join('、')
+    : '无（只和真人打）';
   const rows = [
     ['棋盘', shapeLabel + (cfg.shape === 'random' ? '' : ' · ' + where)],
     ['边界', borderLabel[cfg.borderMode] || cfg.borderMode],
     ['阈值', capLabel[cfg.capMode] || cfg.capMode],
-    ['人机', (cfg.aiCount | 0) > 0
-      ? (cfg.aiCount + ' 个 · ' + (aiLabel[cfg.aiStrength] || cfg.aiStrength))
-      : '无（只和真人打）'],
+    ['人机', aiText],
   ];
   return '<div class="lan-cfg-summary">' + rows.map(function(r){
     return '<div class="lan-cfg-row"><span class="lan-cfg-k">' + htmlEsc(r[0]) +
@@ -1757,7 +1817,7 @@ function lanHostStart(){
   if(lanRole !== 'host') return;
   const others = lanPlayers.filter(Boolean).filter(function(p){ return !p.host; });
   if(!others.length){
-    showMsg((lanReadCfgFromDom().aiCount | 0) > 0
+    showMsg((lanReadCfgFromDom().aiList || []).length > 0
       ? '还需要至少一位真人加入（只想和 AI 打，用首页的「开始游戏」更快）'
       : '至少还需要一位玩家加入', 'error');
     return;
@@ -1776,16 +1836,22 @@ function lanHostStart(){
   // 人机座位接在真人后面。AI 由房主这一台设备计算，其他人只收结果 ——
   // 各端都跑一遍 AI 会各自算出不同的落子，棋盘当场分叉。
   const humanCount = alive.length;
-  const aiCount = Math.min(lanCfg.aiCount | 0, Math.max(0, 10 - humanCount));
+  const wanted = Array.isArray(lanCfg.aiList) ? lanCfg.aiList : [];
+  const aiCount = Math.min(wanted.length, Math.max(0, 10 - humanCount));
   const total = humanCount + aiCount;
-  const strength = lanCfg.aiStrength || 'strategy';
-  const aiDepth = strength === 'pvs' ? 3 : 2;
   const aiSeats = [];
   const aiConfigsOut = {};
   for(let k = 0; k < aiCount; k++){
     const pid = humanCount + k;
+    const alg = (wanted[k] && wanted[k].algorithm) || 'strategy';
     aiSeats.push(pid);
-    aiConfigsOut[pid] = {algorithm: strength, depth: aiDepth, randomScale: 10, useMlEval: true};
+    // 每个 AI 用各自的算法与深度；深度按算法取默认（策略算法不看深度）
+    aiConfigsOut[pid] = {
+      algorithm: alg,
+      depth: (wanted[k] && wanted[k].depth) || lanDepthForAlgo(alg),
+      randomScale: 10,
+      useMlEval: true,
+    };
     names[pid] = 'AI ' + (k + 1);
   }
 
@@ -1959,7 +2025,8 @@ function lanCapacityWarning(humanCount){
   if(lanRole !== 'host') return '';
   const raw = lanReadCfgFromDom();
   // AI 也占座位，人数上限要把它们算进去
-  const total = humanCount + (raw.aiCount | 0);
+  const aiN = Array.isArray(raw.aiList) ? raw.aiList.length : 0;
+  const total = humanCount + aiN;
   if(raw.shape === 'random') return '';
   let open, label;
   if(raw.shape === 'custom'){
@@ -1973,7 +2040,7 @@ function lanCapacityWarning(humanCount){
   }
   const maxP = getMaxPlayersByArea(open);
   if(total > maxP){
-    const aiNote = (raw.aiCount | 0) ? '（含 ' + raw.aiCount + ' 个 AI）' : '';
+    const aiNote = aiN ? '（含 ' + aiN + ' 个 AI）' : '';
     return '当前 ' + total + ' 人' + aiNote + '，' + label + ' 最多 ' + maxP + ' 人';
   }
   return '';
@@ -1984,10 +2051,10 @@ function lanRenderPlayerList(){
   box.innerHTML = '';
   // AI 座位不是真人，不占 lanPlayers；但房主选了人机数量就得让人看见会开几个 AI
   const cfgNow = (lanRole === 'host') ? (lanCfg || {}) : (lanRemoteCfg || {});
-  const aiCount = cfgNow.aiCount | 0;
+  const aiListNow = Array.isArray(cfgNow.aiList) ? cfgNow.aiList : [];
   const humans = lanPlayers.filter(Boolean).length;
-  if(aiCount > 0){
-    for(let k = 0; k < aiCount; k++){
+  if(aiListNow.length > 0){
+    for(let k = 0; k < aiListNow.length; k++){
       const pid = humans + k;
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;' +
@@ -2000,7 +2067,9 @@ function lanRenderPlayerList(){
       name.textContent = 'AI ' + (k + 1);
       const tag = document.createElement('span');
       tag.style.cssText = 'font-size:.72rem;color:var(--dim)';
-      tag.textContent = '电脑';
+      const algNow = (aiListNow[k] && aiListNow[k].algorithm) || 'strategy';
+      const algLabel = {strategy:'策略', alphabeta:'A-B', pvs:'PVS'};
+      tag.textContent = algLabel[algNow] || algNow;
       row.appendChild(dot); row.appendChild(name); row.appendChild(tag);
       box.appendChild(row);
     }
@@ -2115,12 +2184,13 @@ function lanInitRuleControls(){
 
   // 人机数量 / 强度
   const aiN = document.getElementById('lanAiCount');
-  if(aiN && !aiN.dataset.boundAi){ aiN.dataset.boundAi = '1'; aiN.onchange = function(){ lanOnRuleChange('ai'); }; }
-  const aiS = document.getElementById('lanAiStrength');
-  if(aiS && !aiS.dataset.boundAi){ aiS.dataset.boundAi = '1'; aiS.onchange = function(){ lanOnRuleChange('ai'); }; }
+  if(aiN && !aiN.dataset.boundAi){
+    aiN.dataset.boundAi = '1';
+    aiN.onchange = function(){ lanRenderAiRows(); lanOnRuleChange('ai'); };
+  }
 
   lanApplyShapeVisibility();
-  lanSyncAiRow();
+  lanRenderAiRows();
   lanSyncRuleDesc();
   lanCfg = lanReadCfgFromDom();
 }
@@ -5753,7 +5823,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-            {v:'v4.0.0 · 第 49 版',desc:'修复桌面与安卓版会因统计脚本跳转不良网站的问题（已彻底移除该 SDK）；新增局域网联机（直连对战，房主自选棋盘、边界、阈值与人机数量）；教学页合并联机教程、历史记录支持多选、开源许可补齐项目链接'},
+            {v:'v4.0.0 · 第 49 版',desc:'修复桌面与安卓版会因统计脚本跳转不良网站的问题（已彻底移除该 SDK）；新增局域网联机（直连对战，房主自选棋盘、边界、阈值，每个 AI 可单独选算法）；教学页合并联机教程、历史记录支持多选、开源许可补齐项目链接'},
             {v:'v3.4.3 · 第 48 版',desc:'新增自定义棋盘存档（可命名保存、随时切换与编辑）、棋盘编辑器支持按住滑动连续涂改、换用新图标；修复局中排名淘汰顺序错乱（一键终局时全部并列）'},
             {v:'v3.4.2 · 第 47 版',desc:'新增随机棋盘（按人数生成异形盘，每局不同）、异形棋盘支持全部边界、设置可关背景光球与背景跟随、补下载中心与联系作者入口；移除 MCTS；修正回环下 AI 评估失真；重写规则页'},
             {v:'v3.4.1 · 第 46 版',desc:'修复异型棋盘多处问题：AI 与点击不再落进空洞、仅保留默认边界、悔棋与回放不丢形状、重开不丢列数；修复更新说明中文乱码；AI 模型重训，不规则与长方形棋盘上更强'},

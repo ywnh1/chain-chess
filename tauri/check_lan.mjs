@@ -128,6 +128,8 @@ function makeEl(id, tag = "div", cls = "") {
         return this.tagName === p.toUpperCase();
       });
     },
+    setAttribute(k, v) { this._attrs = this._attrs || {}; this._attrs[k] = String(v); },
+    getAttribute(k) { return this._attrs ? this._attrs[k] : undefined; },
     addEventListener() {},
     querySelectorAll(sel) { return queryAll(this, sel); },
     querySelector(sel) { return queryAll(this, sel)[0] || null; },
@@ -231,7 +233,9 @@ function makeSandbox(role, peerId = null, port = 43210) {
       if (!els.has(id)) els.set(id, makeEl(id));
       return els.get(id);
     },
-    createElement(tag) { return makeEl(tag); },
+    // 注意 makeEl 的第一个参数是 id：这里必须把 tag 传进第二参，
+    // 否则 createElement('select') 会造出一个 DIV。
+    createElement(tag) { return makeEl("", tag); },
     createTextNode(t) { return { nodeValue: t }; },
     body: { style: {}, classList: { add() {}, remove() {} } },
   };
@@ -392,6 +396,17 @@ function makeSandbox(role, peerId = null, port = 43210) {
         });
       },
       onRuleChange:(caller)=>lanOnRuleChange(caller),
+      renderAiRows:()=>lanRenderAiRows(),
+      // 设定第 k 个 AI 的算法（等价于用户在下拉里选）
+      setAiAlgo:(k, alg)=>{
+        const _b=document.getElementById('lanAiRows');
+
+        const box=document.getElementById('lanAiRows');
+        const rows=box.querySelectorAll('.lan-ai-row');
+        const sel=rows[k] && rows[k].querySelector('select');
+        if(!sel) throw new Error('AI 行不存在: '+k);
+        sel.value=alg;
+      },
       resolveMatch:(raw, n)=>lanResolveMatch(raw, n),
       get customBoards(){ return __env.customBoards; },
       lanCreateRoom, lanJoinRoom, lanHostStart, lanToggleReady, lanDrainEvents,
@@ -658,14 +673,39 @@ async function main() {
   cli6.lanToggleReady();
   await settle(all6);
 
-  /* 18. 房主选 2 个 AI → 客户端收到同样的人数 */
+  /* 18. 房主开 2 个 AI，并且分别给不同的算法 */
   host6.setRule("lanAiCount", "2");
-  host6.onRuleChange("ai");
-  host6.setRule("lanAiStrength", "alphabeta");
+  host6.renderAiRows();
+  host6.setAiAlgo(0, "alphabeta");
+  host6.setAiAlgo(1, "pvs");
   host6.onRuleChange("ai");
   await settle(all6);
-  ok((cli6.remoteCfg || {}).aiCount === 2, "客户端没收到人机数量: " + JSON.stringify(cli6.remoteCfg));
-  ok((cli6.remoteCfg || {}).aiStrength === "alphabeta", "客户端没收到 AI 强度");
+  const rcAi = (cli6.remoteCfg || {}).aiList || [];
+  ok(rcAi.length === 2, "客户端没收到 2 个 AI: " + JSON.stringify(cli6.remoteCfg));
+  ok((rcAi[0] || {}).algorithm === "alphabeta",
+     "第 1 个 AI 的算法没同步，实际 " + (rcAi[0] || {}).algorithm);
+  ok((rcAi[1] || {}).algorithm === "pvs",
+     "第 2 个 AI 的算法没同步，实际 " + (rcAi[1] || {}).algorithm);
+
+  /* 18.5 增减 AI 数量时，已选好的算法要保留（不然调个数量全得重选） */
+  host6.setRule("lanAiCount", "3");
+  host6.renderAiRows();          // 2 → 3：前两个应保持 alphabeta / pvs
+  host6.onRuleChange("ai");
+  await settle(all6);
+  const grow = (cli6.remoteCfg || {}).aiList || [];
+  ok(grow.length === 3, "加到 3 个 AI 后长度不对: " + grow.length);
+  ok((grow[0] || {}).algorithm === "alphabeta", "加 AI 后第 1 个算法被重置了");
+  ok((grow[1] || {}).algorithm === "pvs", "加 AI 后第 2 个算法被重置了");
+  ok((grow[2] || {}).algorithm === "strategy", "新增的第 3 个 AI 应为默认策略");
+  // 减回去
+  host6.setRule("lanAiCount", "2");
+  host6.renderAiRows();
+  host6.onRuleChange("ai");
+  await settle(all6);
+  const shrink = (cli6.remoteCfg || {}).aiList || [];
+  ok(shrink.length === 2, "减到 2 个 AI 后长度不对: " + shrink.length);
+  ok((shrink[0] || {}).algorithm === "alphabeta" && (shrink[1] || {}).algorithm === "pvs",
+     "减 AI 后前两个算法变了");
 
   /* 19. 开局：2 真人 + 2 AI = 4 人，两端 AI 座位一致 */
   host6.lanHostStart();
@@ -675,8 +715,17 @@ async function main() {
   const hs = host6.aiSeats.join(","), cs = cli6.aiSeats.join(",");
   ok(hs === "2,3", "房主端 AI 座位应为 2,3，实际 " + hs);
   ok(hs === cs, "两端 AI 座位不一致: host=" + hs + " client=" + cs);
-  ok((cli6.aiCfg[2] || {}).algorithm === "alphabeta", "客户端没拿到 AI 算法配置");
-  ok((host6.aiCfg[2] || {}).algorithm === "alphabeta", "房主端 AI 算法配置不对");
+  /* 每个 AI 各用各的算法：座位 2 = alphabeta，座位 3 = pvs
+     （两端都要一致，否则客户端显示的和房主实际跑的对不上） */
+  ok((host6.aiCfg[2] || {}).algorithm === "alphabeta",
+     "房主端 AI 1 算法应为 alphabeta，实际 " + (host6.aiCfg[2] || {}).algorithm);
+  ok((host6.aiCfg[3] || {}).algorithm === "pvs",
+     "房主端 AI 2 算法应为 pvs，实际 " + (host6.aiCfg[3] || {}).algorithm);
+  ok((cli6.aiCfg[2] || {}).algorithm === "alphabeta", "客户端 AI 1 算法不一致");
+  ok((cli6.aiCfg[3] || {}).algorithm === "pvs", "客户端 AI 2 算法不一致");
+  // 深度按各自算法推：pvs → 3，alphabeta → 2
+  ok((host6.aiCfg[2] || {}).depth === 2, "AI 1 深度不对: " + (host6.aiCfg[2] || {}).depth);
+  ok((host6.aiCfg[3] || {}).depth === 3, "AI 2 深度不对: " + (host6.aiCfg[3] || {}).depth);
 
   /* 20. 客户端绝不能自己驱动 AI（否则两端算出不同着法，棋盘分叉） */
   cli6.setAiPiece(2, 0, 0);
