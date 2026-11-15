@@ -1,7 +1,7 @@
 {
-  "version": "4.0.0",
-  "notes": "Fixed desktop and Android being redirected to bad sites by the analytics script, now fully removed; added serverless LAN multiplayer where the host picks the board, border mode, explosion threshold and the algorithm for each AI player; the LAN guide moved into the teaching page; history records support batch selection; third-party libraries link to their pages",
-  "notes_zh": "修复桌面与安卓版会因统计脚本跳转不良网站的问题（已彻底移除该 SDK）；新增局域网联机（直连对战，房主自选棋盘、边界、阈值，每个 AI 可单独选算法）；教学页合并联机教程、历史记录支持多选、开源许可补齐项目链接",
+  "version": "4.0.1",
+  "notes": "LAN multiplayer polish: each AI now picks its own algorithm, host rule changes sync live to everyone, and fast-finish and undo are disabled online so the two sides cannot diverge; fixed AI moves being dropped on clients, and fixed the Linux desktop build",
+  "notes_zh": "局域网联机打磨：每个 AI 可单独选算法（策略 / A-B / PVS 自由混搭）、房主改规则实时同步给所有人、联机禁用一键终局与悔棋（避免两端棋盘分叉）；修复 AI 落子被客户端忽略导致卡住、修复 Linux 桌面版构建失败",
   "pub_date": "2026-11-15T00:00:00Z",
   "platforms": {
     "android": {

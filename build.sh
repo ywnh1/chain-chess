@@ -268,8 +268,13 @@ do_commit() {
 
   # 2) 主仓库：只提交本次实际同步过的版本号文件，不裹挟其他改动
   if [ -n "$SYNCED_FILES" ] && [ -d ".git" ]; then
+    # SYNCED_FILES 里可能混着被 .gitignore 忽略的路径
+    # （docs/pkg-node/package.json、gen/android/app/tauri.properties）。
+    # git add 遇到它们会以非零退出，而脚本开头是 `set -e` —— 整个
+    # do_commit 会被直接掐断，连 commit 都不执行（--sync-only -c 曾经
+    # 只 stage 不提交，就是这个原因）。加 || true 让其余路径照常入栈。
     # shellcheck disable=SC2086  # 这里就是要按空格分词传多个路径
-    git add -- $SYNCED_FILES
+    git add -- $SYNCED_FILES 2>/dev/null || true
     if ! git diff --cached --quiet; then
       if git commit -m "chore: 版本号对齐 v${VERSION}" >/dev/null 2>&1; then
         echo "  ✅ 主仓库已提交:$SYNCED_FILES"
