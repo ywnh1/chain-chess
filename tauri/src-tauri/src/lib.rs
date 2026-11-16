@@ -48,22 +48,20 @@ async fn process_move(
     max_players: usize,
     border_mode: BorderMode,
     cap_mode: Option<CapMode>,
+    cap_style: Option<CapStyle>,
+    win_condition: Option<WinCondition>,
     seed: Option<u64>,
 ) -> Result<ProcessMoveResult, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut b = board.clone();
         let cap_mode = cap_mode.unwrap_or_default();
-        let (eliminated, chain_count, killed_by, steps, exploded) = process_click_with_snapshots(&mut b, size, x, y, player, max_players, border_mode, cap_mode, seed);
-        let game_over = eliminated.len() >= max_players.saturating_sub(1);
-        let winner = if game_over {
-            // find the remaining player
-            let alive: Vec<usize> = (0..max_players)
-                .filter(|p| !eliminated.contains(p) && has_pieces(&b, *p))
-                .collect();
-            alive.first().copied()
-        } else {
-            None
-        };
+        let cap_style = cap_style.unwrap_or_default();
+        let win_condition = win_condition.unwrap_or_default();
+        let (eliminated, chain_count, killed_by, steps, exploded) =
+            process_click_with_snapshots(&mut b, size, x, y, player, max_players, border_mode, cap_mode, cap_style, seed);
+        // 胜负判定交给引擎：可能是「只剩一人」，也可能是棋子/点数碾压
+        let winner = check_win(&b, max_players, &eliminated, win_condition);
+        let game_over = winner.is_some();
         ProcessMoveResult {
             board: b,
             chain_count,
@@ -727,6 +725,29 @@ async fn open_external(url: String, app_handle: tauri::AppHandle) -> Result<(), 
     Ok(())
 }
 
+/// 给棋盘上每位玩家算一个 ML 场面分（越高越好）。
+///
+/// 只用于展示：结算页 / 暂停页的评分曲线，以及「最具价值的一步」。
+/// 和 AI 决策用的评估同源（ML + 手写混合），但 random_scale 固定 0，
+/// 否则同一局面每次算出来的分数会抖动，曲线看着像噪声。
+#[tauri::command]
+async fn rate_board(
+    board: GameBoard,
+    max_players: usize,
+    border_mode: BorderMode,
+    cap_mode: Option<CapMode>,
+) -> Result<Vec<i32>, String> {
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let cm = cap_mode.unwrap_or_default();
+        (0..max_players)
+            .map(|p| eval_board_ml(&board, p, 0, border_mode, cm, 0))
+            .collect::<Vec<i32>>()
+    })
+    .await
+    .map_err(|e| format!("Task failed: {}", e))?;
+    Ok(res)
+}
+
 /// 安装/打开已下载的更新文件（通用——所有平台）
 #[tauri::command]
 async fn install_update(path: String, app_handle: tauri::AppHandle) -> Result<(), String> {
@@ -772,6 +793,7 @@ pub fn run() {
             open_external,
             install_update,
             process_move,
+            rate_board,
             save_game_history,
             load_game_history,
             import_game_history,

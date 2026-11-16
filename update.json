@@ -1,8 +1,8 @@
 {
-  "version": "4.0.1",
-  "notes": "Added public IPv6 remote play with one-tap address copy and an automatic check of whether remote play is possible, falling back to a LAN-only notice otherwise; the LAN host now picks the board and rules, and each AI takes its own algorithm; fixed AI moves being dropped on clients and fixed the Linux desktop build",
-  "notes_zh": "新增公网 IPv6 远程联机（一键复制地址，自动判断能否跨网络，否则提示只能局域网）、局域网联机支持房主自选棋盘与规则、每个 AI 独立选算法；修复 AI 落子被客户端忽略导致卡住、修复 Linux 桌面版构建失败",
-  "pub_date": "2026-11-15T00:00:00Z",
+  "version": "4.1.0",
+  "notes": "Big multiplayer and setup update: public IPv6 remote play with one-tap address copy, savable reusable game configs, explosion thresholds from 3 to 6 with two double-blast styles, three victory conditions, an ML board-rating chart plus the most valuable move on the result and pause screens, and undo now jumps back to the previous human player",
+  "notes_zh": "联机与配置大改：新增公网 IPv6 远程联机（一键复制地址、自动判断能否跨网络）、游戏配置可存多套反复套用、爆炸阈值扩到 3~6 并可选双爆方式、新增三种胜负判定、结算与暂停页新增场面评分曲线与最具价值一步；悔棋自动跳到上一位真人",
+  "pub_date": "2026-11-16T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",

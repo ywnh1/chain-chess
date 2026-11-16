@@ -341,6 +341,8 @@
     let json;
     if (cmd === 'process_move') {
       json = m.process_move_cmd(JSON.stringify(args || {}));
+    } else if (cmd === 'rate_board') {
+      json = m.rate_board_cmd(JSON.stringify(args || {}));
     } else if (cmd === 'simulate_to_end') {
       json = m.simulate_to_end_cmd(JSON.stringify(args || {}));
     } else if (cmd === 'bench_ai_game') {
@@ -380,6 +382,7 @@
     switch (cmd) {
       // 引擎命令
       case 'process_move':
+      case 'rate_board':
       case 'ai_move':
       case 'ai_move_v2':
       case 'ai_move_strategy':

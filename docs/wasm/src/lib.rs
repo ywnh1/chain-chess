@@ -34,6 +34,10 @@ mod wasm_exports {
         #[serde(default)]
         cap_mode: Option<CapMode>,
         #[serde(default)]
+        cap_style: Option<CapStyle>,
+        #[serde(default)]
+        win_condition: Option<WinCondition>,
+        #[serde(default)]
         seed: Option<u64>,
     }
 
@@ -79,6 +83,29 @@ mod wasm_exports {
         serde_json::json!({"ok": false, "error": msg}).to_string()
     }
 
+    /// rate_board：给每位玩家算一个 ML 场面分（结算/暂停页的评分曲线用）
+    #[wasm_bindgen]
+    pub fn rate_board_cmd(json: &str) -> String {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct RateReq {
+            board: GameBoard,
+            max_players: usize,
+            border_mode: BorderMode,
+            #[serde(default)]
+            cap_mode: Option<CapMode>,
+        }
+        let r: RateReq = match serde_json::from_str(json) {
+            Ok(v) => v,
+            Err(e) => return err(&format!("参数解析失败: {}", e)),
+        };
+        let cm = r.cap_mode.unwrap_or_default();
+        let out: Vec<i32> = (0..r.max_players)
+            .map(|p| eval_board_ml(&r.board, p, 0, r.border_mode, cm, 0))
+            .collect();
+        ok(&out)
+    }
+
     /// process_move 命令
     #[wasm_bindgen]
     pub fn process_move_cmd(json: &str) -> String {
@@ -88,17 +115,13 @@ mod wasm_exports {
         };
         let mut b = r.board.clone();
         let cap_mode = r.cap_mode.unwrap_or_default();
+        let cap_style = r.cap_style.unwrap_or_default();
+        let win_condition = r.win_condition.unwrap_or_default();
         let (eliminated, chain_count, killed_by, steps, exploded) =
-            process_click_with_snapshots(&mut b, r.size, r.x, r.y, r.player, r.max_players, r.border_mode, cap_mode, r.seed);
-        let game_over = eliminated.len() >= r.max_players.saturating_sub(1);
-        let winner = if game_over {
-            let alive: Vec<usize> = (0..r.max_players)
-                .filter(|p| !eliminated.contains(p) && has_pieces(&b, *p))
-                .collect();
-            alive.first().copied()
-        } else {
-            None
-        };
+            process_click_with_snapshots(&mut b, r.size, r.x, r.y, r.player, r.max_players, r.border_mode, cap_mode, cap_style, r.seed);
+        // 与 Tauri 端一致：胜负判定交给引擎（含棋子/点数碾压）
+        let winner = check_win(&b, r.max_players, &eliminated, win_condition);
+        let game_over = winner.is_some();
         ok(&ProcessMoveResult { board: b, eliminated, killed_by, chain_count, game_over, winner, steps, exploded })
     }
 

@@ -51,6 +51,36 @@ pub enum BorderMode {
 
 
 /// 爆炸阈值模式（独立于边界模式）：3 级炸 / 4 级炸（默认）/ 5 级炸 / 随机（每步随机 3/4/5）
+/// 阈值 5/6 时，某个方向「多送的那一份能量」怎么分配。
+///
+/// - `OneTwo`：相邻那一格吃 2 点（把一格直接压到临界）
+/// - `TwoOne`：沿该方向连着两格各吃 1 点（推得更远）
+///
+/// 其它方向始终各 1 点，与标准玩法一致。
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
+pub enum CapStyle {
+    #[default]
+    #[serde(rename = "one-two")]
+    OneTwo,
+    #[serde(rename = "two-one")]
+    TwoOne,
+}
+
+/// 胜负判定方式。
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
+pub enum WinCondition {
+    /// 只剩一名有棋子的玩家（经典）
+    #[default]
+    #[serde(rename = "last")]
+    Last,
+    /// 某人棋子数 ≥ 其余所有在场玩家棋子数之和
+    #[serde(rename = "pieces")]
+    Pieces,
+    /// 某人点数 ≥ 其余所有在场玩家点数之和
+    #[serde(rename = "points")]
+    Points,
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 pub enum CapMode {
     #[serde(rename = "3")]
@@ -59,6 +89,9 @@ pub enum CapMode {
     Cap4,
     #[serde(rename = "5")]
     Cap5,
+    /// 6 级「超重炮」：6 点才炸，双爆方式由 CapStyle 决定
+    #[serde(rename = "6")]
+    Cap6,
     /// 随机：每步各自随机阈值 3/4/5（引擎层语义，供 AI 基准/工具直接调用；
     /// 产品层开局时由前端用时间戳种子解析为固定阈值，整局不再改变，不再传入本值）
     #[serde(rename = "random")]
@@ -874,6 +907,46 @@ pub fn nbrs_with_mode(board: &GameBoard, i: usize, j: usize, border_mode: Border
 
 
 #[inline]
+/// 按指定胜负判定检查是否终局。返回 `Some(winner)` 表示这局已结束。
+///
+/// 「只剩一人」直接看存活人数；「棋子/点数碾压」要求**唯一**最大者，
+/// 且最大者的量 ≥ 其余所有在场玩家之和，并且至少 3 人在场 ——
+/// 两人局里「其余人之和」就等于对手的量，碾压判定没有意义（用户也这么要求）。
+pub fn check_win(
+    board: &GameBoard,
+    max_players: usize,
+    eliminated: &[usize],
+    cond: WinCondition,
+) -> Option<usize> {
+    let alive: Vec<usize> = (0..max_players)
+        .filter(|p| !eliminated.contains(p) && has_pieces(board, *p))
+        .collect();
+    if alive.len() <= 1 {
+        return alive.first().copied();
+    }
+    if cond == WinCondition::Last || alive.len() < 3 {
+        return None;
+    }
+    let count_points = cond == WinCondition::Points;
+    let score = |p: usize| -> u64 {
+        let mut n = 0u64;
+        for row in board.iter() {
+            for c in row.iter() {
+                if c.owner == Some(p) {
+                    n += if count_points { c.count as u64 } else { 1 };
+                }
+            }
+        }
+        n
+    };
+    let vals: Vec<(usize, u64)> = alive.iter().map(|&p| (p, score(p))).collect();
+    let maxv = vals.iter().map(|x| x.1).max().unwrap_or(0);
+    let leaders: Vec<usize> = vals.iter().filter(|x| x.1 == maxv).map(|x| x.0).collect();
+    if leaders.len() != 1 { return None; }   // 并列最大不算赢
+    let others: u64 = vals.iter().filter(|x| x.1 != maxv).map(|x| x.1).sum();
+    if maxv >= others { Some(leaders[0]) } else { None }
+}
+
 pub fn has_pieces(board: &GameBoard, player: usize) -> bool {
     board.iter().flatten().any(|c| c.owner == Some(player))
 }
@@ -928,6 +1001,7 @@ pub fn cell_threshold(board: &GameBoard, x: usize, y: usize, border_mode: Border
     match cap_mode {
         CapMode::Cap3 => 3,
         CapMode::Cap5 => 5,
+        CapMode::Cap6 => 6,
         CapMode::Random => 4,
         CapMode::Cap4 => match border_mode {
             BorderMode::Degrade => match exposure_count(board, x, y) {
@@ -944,7 +1018,7 @@ pub fn cell_threshold(board: &GameBoard, x: usize, y: usize, border_mode: Border
 /// 实际爆炸时使用的阈值：random 模式每步随机 3/4/5，其余与 cell_threshold 一致。
 pub fn explosion_threshold(board: &GameBoard, x: usize, y: usize, border_mode: BorderMode, cap_mode: CapMode, rng: &mut Box<dyn rand::RngCore>) -> u32 {
     match cap_mode {
-        CapMode::Random => 3 + rng.gen_range(0..3),
+        CapMode::Random => 3 + rng.gen_range(0..4),
         _ => cell_threshold(board, x, y, border_mode, cap_mode),
     }
 }
@@ -967,6 +1041,7 @@ pub fn process_click_with_killer_inner(
     _max_players: usize,
     border_mode: BorderMode,
     cap_mode: CapMode,
+    cap_style: CapStyle,
     seed: Option<u64>,
     collect: bool,
 ) -> (Vec<usize>, u32, Vec<(usize, usize)>, Vec<GameBoard>, Vec<(usize, usize)>) {
@@ -1044,13 +1119,14 @@ pub fn process_click_with_killer_inner(
             // ── 按有效边界模式生成扩散目标；cap3/cap5 的随机特殊格对所有边界模式生效 ──
             // 异形棋盘：洞与界外一样算形状边界。回环绕过洞落到对侧第一个可用格，
             // 反弹把撞到洞的能量弹到正对方向的第一个可用格；默认边界仍然让棋子消失在洞里。
-            let (targets, bounce_extra): (Vec<(usize, usize)>, Vec<(usize, usize)>) = match eff_bm {
+            let (targets, bounce_extra, target_dirs): (Vec<(usize, usize)>, Vec<(usize, usize)>, Vec<(isize, isize)>) = match eff_bm {
                 BorderMode::Wrap => {
                     let mut t = Vec::with_capacity(4);
+                    let mut d = Vec::with_capacity(4);
                     for (dx, dy) in [(-1isize, 0isize), (1, 0), (0, -1), (0, 1)] {
-                        if let Some(p) = wrap_target(board, cx, cy, dx, dy) { t.push(p); }
+                        if let Some(p) = wrap_target(board, cx, cy, dx, dy) { t.push(p); d.push((dx, dy)); }
                     }
-                    (t, vec![])
+                    (t, vec![], d)
                 }
                 BorderMode::Bounce => {
                     // 反弹边界：撞到界外或空洞的方向，能量弹到正对方向的第一个可用格
@@ -1072,15 +1148,34 @@ pub fn process_click_with_killer_inner(
                             targets.push((nx as usize, ny as usize));
                         }
                     }
-                    if targets.is_empty() { (targets, vec![]) } else { (targets, extra) }
+                    // 反弹分支只保留「没撞墙」的方向，方向表跟着 targets 一一对应
+                    let mut d = Vec::with_capacity(targets.len());
+                    for (dx, dy) in dirs.iter() {
+                        let nx = cx as isize + dx;
+                        let ny = cy as isize + dy;
+                        let hit_wall = nx < 0 || ny < 0
+                            || nx as usize >= sz || ny as usize >= cols
+                            || board[nx as usize][ny as usize].blocked;
+                        if !hit_wall { d.push((*dx, *dy)); }
+                    }
+                    if targets.is_empty() { (targets, vec![], d) } else { (targets, extra, d) }
                 }
-                _ => (nbrs(cx, cy, sz, cols), vec![]),  // 默认/降级：标准邻居扩散
+                _ => {
+                    // 默认/降级：标准邻居扩散。方向由目标格减起源格推导。
+                    let t = nbrs(cx, cy, sz, cols);
+                    let d: Vec<(isize, isize)> = t.iter()
+                        .map(|&(tx, ty)| (tx as isize - cx as isize, ty as isize - cy as isize))
+                        .collect();
+                    (t, vec![], d)
+                }
             };
 
             // 速爆(cap3)：随机一个扩散格加 0（该方向完全不变，不产生棋子）
-            // 重炮(cap5)：随机一个扩散格加 2（空格变 2 级；有棋子则在原等级上加 2）
+            // 重炮/超重炮(cap5/cap6)：随机一个方向按 cap_style 多送能量
+            //   OneTwo：那一格 +2
+            //   TwoOne：那一格 +1，沿同方向再走一格 +1
             let special = match cap_mode {
-                CapMode::Cap3 | CapMode::Cap5 => {
+                CapMode::Cap3 | CapMode::Cap5 | CapMode::Cap6 => {
                     if targets.is_empty() {
                         None
                     } else {
@@ -1097,6 +1192,8 @@ pub fn process_click_with_killer_inner(
                             // 速爆(cap3)：随机一个方向"加 0"——该格完全不变（空格保持空，
                             // 有棋子保持原样），不产生棋子、不入连锁
                             return;
+                        } else if cap_style == CapStyle::TwoOne {
+                            // 两格各一：这一格走通用 +1，额外的 1 点在循环外补给下一格
                         } else {
                             // 重炮(cap5)：随机一个方向"加 2"——空格变 2 级，有棋子原等级 +2
                             if let Some(pv) = board[nx][ny].owner {
@@ -1120,6 +1217,24 @@ pub fn process_click_with_killer_inner(
 
             for (ti, &(nx, ny)) in targets.iter().enumerate() {
                 apply(&mut *board, nx, ny, ti, owner, &mut last_killer);
+            }
+
+            // TwoOne：沿特殊方向再走一格，补上第二点（空格长出 1 点，有子则 +1）
+            if cap_style == CapStyle::TwoOne && cap_mode != CapMode::Cap3 {
+                if let Some(sp) = special {
+                    if let (Some(&(tx, ty)), Some(&(ddx, ddy))) = (targets.get(sp), target_dirs.get(sp)) {
+                        if let Some((x2, y2)) = first_open_in_dir(board, tx, ty, ddx, ddy) {
+                            if !board[x2][y2].blocked {
+                                if let Some(pv) = board[x2][y2].owner {
+                                    if pv != owner { last_killer.insert(pv, owner); }
+                                }
+                                board[x2][y2].owner = Some(owner);
+                                board[x2][y2].count = board[x2][y2].count.saturating_add(1);
+                                chain.push_back((x2, y2));
+                            }
+                        }
+                    }
+                }
             }
             // 反弹能量（跳过特殊格：被清空/置 2 的格不再接收反弹能量）
             for &(nx, ny) in &bounce_extra {
@@ -1172,7 +1287,7 @@ pub fn process_click_with_killer(
     seed: Option<u64>,
 ) -> (Vec<usize>, u32, Vec<(usize, usize)>) {
     let (eliminated, chain_count, killed_by, _, _) =
-        process_click_with_killer_inner(board, sz, x, y, player, _max_players, border_mode, cap_mode, seed, false);
+        process_click_with_killer_inner(board, sz, x, y, player, _max_players, border_mode, cap_mode, CapStyle::OneTwo, seed, false);
     (eliminated, chain_count, killed_by)
 }
 
@@ -1188,9 +1303,10 @@ pub fn process_click_with_snapshots(
     max_players: usize,
     border_mode: BorderMode,
     cap_mode: CapMode,
+    cap_style: CapStyle,
     seed: Option<u64>,
 ) -> (Vec<usize>, u32, Vec<(usize, usize)>, Vec<GameBoard>, Vec<(usize, usize)>) {
-    process_click_with_killer_inner(board, sz, x, y, player, max_players, border_mode, cap_mode, seed, true)
+    process_click_with_killer_inner(board, sz, x, y, player, max_players, border_mode, cap_mode, cap_style, seed, true)
 }
 
 
@@ -1627,6 +1743,7 @@ impl PvsSearcher {
             let min_explosive = match self.cap_mode {
                 CapMode::Cap3 => 1,
                 CapMode::Cap5 => 3,
+                CapMode::Cap6 => 4,
                 CapMode::Random => 2,
                 CapMode::Cap4 => match self.border_mode {
                     // degrade：本格的临界等级已经按形状外沿算好（越靠边越低）
@@ -2458,6 +2575,93 @@ mod tests {
 
     fn put(b: &mut GameBoard, x: usize, y: usize, owner: usize, count: u8) {
         b[x][y] = Cell { owner: Some(owner), count, th: None, blocked: false };
+    }
+
+    /// 6 级阈值确实是 6，首子落在 5（临界）。
+    #[test]
+    fn cap6_threshold_and_crit() {
+        let b = empty(5, 5);
+        assert_eq!(cell_threshold(&b, 2, 2, BorderMode::Default, CapMode::Cap6), 6);
+        assert_eq!(crit_level(&b, 2, 2, BorderMode::Default, CapMode::Cap6), 5);
+        // 4 级不受影响
+        assert_eq!(cell_threshold(&b, 2, 2, BorderMode::Default, CapMode::Cap4), 4);
+    }
+
+    /// 阈值 5/6 的双爆方式：
+    /// OneTwo 某个方向 +2；TwoOne 某个方向 +1 且沿该方向下一格再 +1。
+    /// 用同一颗临界棋子反复触发，统计各方向实际送出的点数量。
+    #[test]
+    fn cap_style_sends_expected_amounts() {
+        // 每次爆炸的总送出量：4 个方向，每方向基线 1 点，
+        // OneTwo 在特殊方向额外 +1（总 5），TwoOne 也额外 +1（总 5），
+        // 区别在于落点：OneTwo 集中一格，TwoOne 分散两格。
+        for (style, expect_single_gain) in
+            [(CapStyle::OneTwo, 2u8), (CapStyle::TwoOne, 1u8)]
+        {
+            let mut b = empty(5, 5);
+            // 中心放一颗满级棋子，玩家 0
+            put(&mut b, 2, 2, 0, 5);
+            let (elim, _chain, _kb, _steps, _ex) = process_click_with_killer_inner(
+                &mut b, 5, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap5, style, Some(7), false,
+            );
+            assert!(elim.is_empty());
+            // 中心清空
+            assert_eq!(b[2][2].owner, None, "爆炸后中心应清空（style={:?}）", style);
+            // 四个邻居总共拿到 5 点（4 基线 + 特殊方向多的 1 点）
+            let mut total = 0u32;
+            let mut multi = 0;   // 单格 >=2 点的格子数
+            for &(nx, ny) in &[(1usize, 2usize), (3, 2), (2, 1), (2, 3)] {
+                let c = b[nx][ny].count as u32;
+                total += c;
+                if c >= 2 { multi += 1; }
+            }
+            if style == CapStyle::OneTwo {
+                // 特殊方向那一格吃 2 点，四邻合计 5
+                assert_eq!(total, 5, "OneTwo 四邻送出总量应为 5");
+                assert_eq!(multi, 1, "OneTwo 只应有一格拿到 2 点");
+                assert!(b.iter().flatten().any(|c| c.count == expect_single_gain));
+            } else {
+                // 第二点落在距中心 2 格处：四邻合计仍是 4
+                assert_eq!(total, 4, "TwoOne 四邻送出总量应为 4（第二点在更外面）");
+                let far: [(usize, usize); 4] = [(0, 2), (4, 2), (2, 0), (2, 4)];
+                let far_hits = far.iter().filter(|&&(x, y)| b[x][y].owner == Some(0)).count();
+                assert_eq!(far_hits, 1, "TwoOne 应恰好有一格在距中心 2 格处吃 1 点");
+            }
+        }
+    }
+
+    /// 胜负判定：
+    /// - Last 只看存活人数
+    /// - Pieces/Points 要求唯一最大者 ≥ 其余之和，且至少 3 人
+    #[test]
+    fn win_conditions() {
+        // 3 人：0 号 6 子，1/2 号各 1 子
+        let mut b = empty(7, 7);
+        for y in 0..6 { put(&mut b, 0, y, 0, 1); }
+        put(&mut b, 6, 0, 1, 1);
+        put(&mut b, 6, 1, 2, 1);
+        // Last：都还活着，没结束
+        assert_eq!(check_win(&b, 3, &[], WinCondition::Last), None);
+        // Pieces：6 >= 1+1，0 号赢
+        assert_eq!(check_win(&b, 3, &[], WinCondition::Pieces), Some(0));
+        // Points：点数 6 >= 1+1，也是 0 号
+        assert_eq!(check_win(&b, 3, &[], WinCondition::Points), Some(0));
+
+        // 碾压不成立时不该判赢：3 人各 2 子
+        let mut c = empty(7, 7);
+        for i in 0..6 { put(&mut c, 0, i, i / 2, 1); }
+        assert_eq!(check_win(&c, 3, &[], WinCondition::Pieces), None);
+
+        // 两人局：碾压判定不生效（用户要求剩下的人必须 >1）
+        let mut d = empty(5, 5);
+        for y in 0..4 { put(&mut d, 0, y, 0, 1); }
+        put(&mut d, 4, 0, 1, 1);
+        assert_eq!(check_win(&d, 2, &[], WinCondition::Pieces), None);
+
+        // 只剩一人：任何判定下都结束
+        let mut e = empty(5, 5);
+        put(&mut e, 0, 0, 0, 1);
+        assert_eq!(check_win(&e, 3, &[1, 2], WinCondition::Pieces), Some(0));
     }
 
     #[test]

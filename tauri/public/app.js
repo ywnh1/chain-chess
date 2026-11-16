@@ -104,7 +104,8 @@ const BORDER_MODE_DESC = {
 const CAP_MODE_DESC = {
   '3': '速爆：3 点就爆，爆炸时随机一个方向不送点；首子直接放成 2 点（与降级边界互斥）',
   '4': '标准玩法：4 点即爆，向上下左右各送 1 点；首子直接放成 3 点（差一点就爆）',
-  '5': '重炮：5 点才爆，但有一个方向会连送 2 点；首子直接放成 4 点（与降级边界互斥）',
+  '5': '重炮：5 点才爆，某个方向会多送点（具体方式见「双爆方式」）；首子直接放成 4 点（与降级边界互斥）',
+  '6': '超重炮：6 点才爆，某个方向会多送点（具体方式见「双爆方式」）；首子直接放成 5 点（与降级边界互斥）',
   'random': '随机阈值：开局随机抽 3 / 4 / 5 点之一，整局都按它来',
 };
 // 随机模式解析：开局瞬间用时间戳种子随机确定具体模式，整局不再改变。
@@ -114,7 +115,7 @@ const CAP_MODE_DESC = {
 function resolveRandomBorder(capOverride){
   const cap=capOverride||capMode;
   // 降级边界与 3/5 级爆炸互斥：阈值模式为 3/5（显式选择）时，随机边界排除降级
-  const opts=(cap==='3'||cap==='5')
+  const opts=(cap==='3'||cap==='5'||cap==='6')
     ?['default','wrap','bounce']
     :['default','wrap','bounce','degrade'];
   let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
@@ -123,7 +124,7 @@ function resolveRandomBorder(capOverride){
 function resolveRandomCap(borderOverride){
   const border=borderOverride||borderMode;
   // 降级边界与 3/5 级爆炸互斥：边界为降级时，随机阈值只取 4 级（degrade 仅与 4 级兼容）
-  const opts=border==='degrade'?['4']:['3','4','5'];
+  const opts=border==='degrade'?['4']:['3','4','5','6'];
   let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
   return opts[s%opts.length];
 }
@@ -875,8 +876,12 @@ let autoSkipChain=false;
  
 // 棋盘边界模式
 let borderMode='default';
-// 爆炸阈值模式（独立设置）：3=3级炸 / 4=默认4级 / 5=5级炸 / random=每步随机3/4/5
+// 爆炸阈值模式（独立设置）：3/4/5/6=对应级数 / random=每步随机3~6
 let capMode='4';
+// 双爆方式（只在阈值 5/6 时生效）：one-two=相邻一格送2点 / two-one=相邻两格各送1点
+let capStyle='one-two';
+// 胜负判定：last=只剩一人 / pieces=棋子数碾压 / points=点数碾压
+let winCondition='last';
 
 // 首子落位（用于限制其他玩家落子）
 let firstMovePos=null;
@@ -918,7 +923,7 @@ function updateModeConflictUI(caller){
   let bv=selB?selB.dataset.value:null;
   let cv=selC?selC.dataset.value:null;
   // 纠正已选冲突（degrade + 3/5 并存）
-  if(bv==='degrade'&&(cv==='3'||cv==='5')){
+  if(bv==='degrade'&&(cv==='3'||cv==='5'||cv==='6')){
     if(caller==='cap'){
       // 用户刚选 3/5：降级边界不可用，弹回默认边界
       const bd=borderGroup.querySelector('.gb[data-value="default"]');
@@ -970,7 +975,12 @@ document.addEventListener('click',function(e){
   }else if(container.id==='capModeGroup'){
     const descEl=document.getElementById('capModeDesc');
     if(descEl&&CAP_MODE_DESC[t.dataset.value]){descEl.textContent=CAP_MODE_DESC[t.dataset.value];}
+    syncCapStyleRow();
     updateModeConflictUI('cap');
+  }else if(container.id==='capStyleGroup'){
+    syncCapStyleDesc();
+  }else if(container.id==='winConditionGroup'){
+    syncWinConditionDesc();
   }else if(t.classList.contains('size-btn')||t.classList.contains('gb'))setTimeout(setupLobbySync,10);
 });
 
@@ -1086,6 +1096,8 @@ Router.register('gameSetup', {
   enter() {
     document.body.style.background='';
     restoreLastSetup();          // 先恢复上次选择，再由 setupLobbySync 校验兼容性
+    // 规则类设置有独立预设（game-config 页），进页面时同步到控件
+    setTimeout(function(){ applyGameConfigToDom(getActiveGameConfig()); }, 0);
     setTimeout(initShapeMode, 20);
     setTimeout(updateModeConflictUI, 20);
   },
@@ -2863,11 +2875,21 @@ function compactHistory(history, playerCount){
   const points=Array.from({length:playerCount},()=>new Array(n).fill(0));
   // 每步落子 (x,y,player)，无落子的初始状态为 null
   const mvList=new Array(n).fill(null);
+  // 场面评分也要存：结算页和历史详情的评分曲线靠它。
+  // 缺失时留 null，展开时该步就没有评分点。
+  let rating=null;
   for(let t=0;t<n;t++){
     const snap=history[t].snapshot||{};
     for(let p=0;p<playerCount;p++){
       const d=snap[String(p)];
       if(d){pieces[p][t]=d.pieces||0;points[p][t]=d.points||0}
+    }
+    if(Array.isArray(history[t].rating)){
+      if(!rating) rating=Array.from({length:playerCount},()=>new Array(n).fill(null));
+      for(let p=0;p<playerCount;p++){
+        const v=history[t].rating[p];
+        if(v!==undefined&&v!==null) rating[p][t]=v;
+      }
     }
     const mv=history[t].mv;
     if(mv&&(mv.x!==undefined||Array.isArray(mv))){
@@ -2875,7 +2897,9 @@ function compactHistory(history, playerCount){
       mvList[t]=Array.isArray(mv)?[mv[0],mv[1],mv[2],mv[3]||0]:[mv.x,mv.y,mv.player,mv.seed!==undefined?mv.seed:0];
     }
   }
-  return {c:true,t:n,p:pieces,pt:points,m:mvList};
+  const out={c:true,t:n,p:pieces,pt:points,m:mvList};
+  if(rating) out.r=rating;
+  return out;
 }
 // 将紧凑格式展开为逐回合快照格式（供图表渲染用）
 function expandHistory(compact, playerCount){
@@ -2892,7 +2916,16 @@ function expandHistory(compact, playerCount){
     }
     const m=compact.m&&compact.m[t];
     const mv=(m&&m.length>=3)?{x:m[0],y:m[1],player:m[2],seed:(m.length>=4?m[3]:0)}:null;
-    history.push({turn:t, snapshot, mv});
+    const rec={turn:t, snapshot, mv};
+    // 展开评分：任一人该步有值才建数组，避免全 null 的空数组干扰判断
+    if(compact.r&&compact.r.some(function(arr){return arr&&arr[t]!==null&&arr[t]!==undefined;})){
+      rec.rating=[];
+      for(let p=0;p<playerCount;p++){
+        const v=compact.r[p]?compact.r[p][t]:null;
+        rec.rating[p]=(v===null||v===undefined)?0:v;
+      }
+    }
+    history.push(rec);
   }
   return history;
 }
@@ -2941,6 +2974,8 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
         boardCells: boardCells,
         borderMode: borderMode || 'default',
         capMode: capMode || '4',
+        capStyle: capStyle || 'one-two',
+        winCondition: winCondition || 'last',
         winner: winner !== null && winner !== undefined ? winner : null,
         colorNames: toColorNamesArray(window._colorNames || COLOR_NAMES),
         chainStats: chainStats,
@@ -3020,6 +3055,8 @@ async function saveUnfinishedGameHistory(){
     maxChainOverall: _maxChainOverall,
     gameCount: _gameCount,
     capMode: capMode || '4',
+    capStyle: capStyle || 'one-two',
+    winCondition: winCondition || 'last',
     aiAlgorithm: _aiAlgorithm,
     aiDepth: _aiDepth,
     colorNames: toColorNamesArray(_colorNames),
@@ -3113,6 +3150,8 @@ function loadGameFromState(saved){
   aiDepth = saved.aiDepth || 0;
   borderMode = saved.borderMode || "default";
   capMode = saved.capMode || "4";
+  capStyle = saved.capStyle || "one-two";
+  winCondition = saved.winCondition || "last";
   // 降级边界与 3/5 级爆炸互斥：旧存档冲突时降级优先，阈值归 4
   if(borderMode==='degrade'&&(capMode==='3'||capMode==='5'))capMode='4';
 
@@ -3659,6 +3698,49 @@ function recordHistory(mv){
   }
   // 每步落子后保存游戏状态，确保异常退出时可继续
   saveCurrentGameState();
+  scheduleRating();
+}
+
+/* ═══ 场面评分（ML）═══
+ * 每落一手，异步给每位玩家算一个场面分并存进该步的历史记录。
+ * 异步是刻意的：评分只用于展示，绝不能让 XGBoost 推理挡住落子手感，
+ * 也不能因为它失败就影响对局。PWA 端若引擎没实现这个命令，静默跳过。
+ */
+let _ratingBusy = false;
+function scheduleRating(){
+  if(_ratingBusy) return;
+  _ratingBusy = true;
+  const idx = gameHistory.length - 1;
+  if(idx < 0){ _ratingBusy = false; return; }
+  const snapshot = board;             // 传引用即可，后端只读
+  tauriInvoke('rate_board', {
+    board: snapshot, maxPlayers: maxPlayers,
+    borderMode: borderMode, capMode: capMode,
+  }).then(function(list){
+    if(Array.isArray(list) && gameHistory[idx]) gameHistory[idx].rating = list;
+  }).catch(function(){
+    // 引擎不支持（PWA）/ 计算失败：不补评分，图表里自然跳过这一步
+  }).then(function(){
+    _ratingBusy = false;
+  });
+}
+
+/// 从历史里找每位玩家评分正变化最大的一步
+function findBestMoves(history, playerCount){
+  const best = {};
+  for(let i = 1; i < history.length; i++){
+    const a = history[i-1] && history[i-1].rating;
+    const b = history[i] && history[i].rating;
+    if(!Array.isArray(a) || !Array.isArray(b)) continue;
+    for(let p = 0; p < playerCount; p++){
+      const d = (b[p] || 0) - (a[p] || 0);
+      if(d <= 0) continue;
+      if(!best[p] || d > best[p].delta){
+        best[p] = {delta: d, turn: i, mv: (history[i] && history[i].mv) || null};
+      }
+    }
+  }
+  return best;
 }
 
 async function flushOverflowHistory(){
@@ -4494,6 +4576,8 @@ async function triggerAI(){
       player:curPlayer,maxPlayers:maxPlayers,
       borderMode:borderMode,
       capMode:capMode,
+      capStyle:capStyle,
+      winCondition:winCondition,
       seed:rndSeed
     });
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
@@ -4636,7 +4720,25 @@ function saveUndoState(){
 function undoLastMove(){
   if(gameMode==='lan'){showMsg('局域网对局不能悔棋','');return;}
   if(undoStack.length===0||gameOver||aiThinking||animating)return;
+
+  // 悔棋一步就退到「上一位真人落子之前」。
+  // 每项 undoStack 记录的是落子前的局面 + 该步的落子者（curPlayer）：
+  // 如果弹出那一步是 AI 走的，说明退回去之后还是 AI 在等它自己落子，
+  // 玩家会看到 AI 立刻又走一遍，等于没悔。所以继续往前退，直到轮到的
+  // 是真人。整局没有真人（AI 斗蛐蛐）时只退一步 —— 否则会一路退到开局。
+  let hasHuman=false;
+  for(let p=0;p<maxPlayers;p++){ if(!aiPlayers.has(p)){ hasHuman=true; break; } }
+
   let state=undoStack.pop();
+  let steps=1;
+  if(hasHuman){
+    while(state&&aiPlayers.has(state.curPlayer)&&undoStack.length>0){
+      state=undoStack.pop();
+      steps++;
+    }
+  }
+  if(!state)return;
+
   board=state.board;
   curPlayer=state.curPlayer;
   firstMovePos=state.firstMovePos;
@@ -4652,7 +4754,7 @@ function undoLastMove(){
   setBg(curPlayer);
   updateFastFinishBtn();
   updateUndoBtn();
-  showMsg('已撤销上一步','');
+  showMsg(steps>1?('已撤销 '+steps+' 步（退回到你的回合）'):'已撤销上一步','');
   // 如果当前轮到 AI 且有缓存走法，直接重放无需重算
   if(aiPlayers.has(curPlayer)&&!gameOver&&state.aiMove){
     replayAiMove(state.aiMove);
@@ -4679,6 +4781,8 @@ async function replayAiMove(move){
       player:curPlayer,maxPlayers:maxPlayers,
       borderMode:borderMode,
       capMode:capMode,
+      capStyle:capStyle,
+      winCondition:winCondition,
       seed:rndSeed
     });
     elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer],result);
@@ -4824,6 +4928,8 @@ async function localClick(x,y,seedOverride){
         player:curPlayer,maxPlayers:maxPlayers,
         borderMode:borderMode,
         capMode:capMode,
+        capStyle:capStyle,
+        winCondition:winCondition,
         seed:rndSeed
       });
       elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
@@ -4881,6 +4987,8 @@ async function localClick(x,y,seedOverride){
       player:curPlayer,maxPlayers:maxPlayers,
       borderMode:borderMode,
       capMode:capMode,
+      capStyle:capStyle,
+      winCondition:winCondition,
       seed:rndSeed
     });
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer],result);
@@ -5370,6 +5478,79 @@ function drawLineChart(canvas,history,colorNames,colors,valueKey){
   }
 }
 
+/// 场面评分折线：每人不一条线，y 轴可正可负（评分是相对值）。
+/// 不和 drawLineChart 合并 —— 那个按「非负累加量」画，负分会被截到 0。
+function drawRatingChart(canvas, history, colorNames, colors){
+  if(!canvas) return;
+  const pts = [];
+  for(let i=0;i<history.length;i++){
+    const r = history[i] && history[i].rating;
+    pts.push(Array.isArray(r) ? r : null);
+  }
+  const valid = pts.filter(Boolean);
+  if(valid.length < 2) return;
+
+  let minV = 0, maxV = 0;
+  for(const arr of valid) for(const v of arr){
+    if(v < minV) minV = v;
+    if(v > maxV) maxV = v;
+  }
+  if(maxV === minV) maxV = minV + 1;
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const w = rect.width, h = rect.height;
+  const pad = {top:16,right:8,bottom:20,left:40};
+  const cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom;
+
+  const yOf = function(v){ return pad.top + ch * (1 - (v - minV) / (maxV - minV)); };
+  const xOf = function(i){ return pad.left + (cw * i) / Math.max(1, history.length - 1); };
+
+  // 网格 + y 轴刻度
+  ctx.strokeStyle = 'rgba(128,128,128,.22)';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = 'rgba(128,128,128,.55)';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'right';
+  for(let i=0;i<=4;i++){
+    const v = maxV - (maxV - minV) * i / 4;
+    const y = yOf(v);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+    ctx.fillText(Math.round(v), pad.left - 4, y + 3);
+  }
+  // 零线加重：正负分界线，一眼能看出谁在被压制
+  if(minV < 0 && maxV > 0){
+    ctx.strokeStyle = 'rgba(160,160,160,.5)';
+    ctx.beginPath(); ctx.moveTo(pad.left, yOf(0)); ctx.lineTo(w - pad.right, yOf(0)); ctx.stroke();
+  }
+
+  const playerCount = Math.max.apply(null, valid.map(function(a){ return a.length; }));
+  for(let p = 0; p < playerCount; p++){
+    ctx.strokeStyle = colors[p] || '#888';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let started = false;
+    for(let i = 0; i < pts.length; i++){
+      const arr = pts[i];
+      if(!arr || arr[p] === undefined) continue;
+      const x = xOf(i), y = yOf(arr[p]);
+      if(!started){ ctx.moveTo(x, y); started = true; }
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // x 轴首尾
+  ctx.fillStyle = 'rgba(128,128,128,.55)';
+  ctx.textAlign = 'center';
+  ctx.fillText('0', xOf(0), h - 6);
+  ctx.fillText(String(history.length - 1), xOf(history.length - 1), h - 6);
+}
+
 // ─── 统一图表渲染（暂停/结算/checkout 共用） ───
 function renderGameCharts(container, history, opts){
   const {winner,colorNames,colors,eliminated,chainStats,maxChain,showTitle,onReplay,_noBack}=opts||{};
@@ -5452,6 +5633,49 @@ function renderGameCharts(container, history, opts){
     }
     drawWhenReady(id1,history,cNames,colors,'pieces');
     drawWhenReady(id2,history,cNames,colors,'points');
+
+    /* ─── 场面评分（ML）+ 最具价值的一步 ───
+     * 评分是每步落子后异步算出来的；早期步可能缺数据，曲线从有数据处开始。
+     * 没有评分（PWA 引擎未实现 rate_board）时整块不显示，不留空图。 */
+    if(history.some(function(h){ return Array.isArray(h && h.rating); })){
+      const id3 = 'cR_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      const b3 = document.createElement('div');
+      b3.className = 'chart-box';
+      // 评分图暂不支持全屏（负值坐标系与全屏重绘逻辑不同），所以不给点击态，
+      // 免得用户点了没反应。
+      b3.innerHTML = '<h4>场面评分（ML，越高越好）</h4><canvas id="' + id3 + '"></canvas>';
+      container.appendChild(b3);
+      (function poll(){
+        const el = document.getElementById(id3);
+        if(!el) return;
+        const r = el.getBoundingClientRect();
+        if(r.width > 0 && r.height > 0) drawRatingChart(el, history, cNames, colors);
+        else requestAnimationFrame(poll);
+      })();
+
+      // 最具价值的一步：每人评分正增长最大的那一步
+      const best = findBestMoves(history, maxPlayers);
+      const pids = Object.keys(best).map(Number).sort(function(a, b){ return a - b; });
+      if(pids.length){
+        const box = document.createElement('div');
+        box.className = 'about-card mv-card';
+        let html = '<h3 style="margin:0 0 6px">最具价值的一步</h3>';
+        for(const pid of pids){
+          const b = best[pid];
+          const mv = b.mv || {};
+          const where = (mv.x !== undefined && mv.y !== undefined)
+            ? '（第 ' + (mv.x + 1) + ' 行第 ' + (mv.y + 1) + ' 列）' : '';
+          html += '<div class="mv-row" style="border-left-color:' + (colors[pid] || '#888') + '">' +
+            '<span class="mv-who" style="color:' + (colors[pid] || '#888') + '">' +
+            htmlEsc(cNames[pid] || getPlayerLabel(pid)) + '</span>' +
+            '<span class="mv-delta">+' + b.delta + '</span>' +
+            '<span class="mv-where">第 ' + b.turn + ' 步' + where + '</span>' +
+            '</div>';
+        }
+        box.innerHTML = html;
+        container.appendChild(box);
+      }
+    }
   }
   if(onReplay){let btn=document.createElement('button');btn.className='glass-btn primary';btn.textContent='再来一局';btn.onclick=onReplay;container.appendChild(btn)}
   if(!_noBack){
@@ -5465,6 +5689,8 @@ function replayGame(){
   if(!c)return;
   if(c.capMode)capMode=c.capMode;
   if(c.borderMode)borderMode=c.borderMode;
+  if(c.capStyle)capStyle=c.capStyle;
+  if(c.winCondition)winCondition=c.winCondition;
   // 随机模式：再来一局同样在开局瞬间重新随机确定，整局不再改变
   if(capMode==='random')capMode=resolveRandomCap();
   if(borderMode==='random')borderMode=resolveRandomBorder();
@@ -5629,6 +5855,8 @@ async function showSettlement(winner,colorNames,history){
         maxPlayers: maxPlayers,
         borderMode: borderMode || 'default',
         capMode: capMode || '4',
+        capStyle: capStyle || 'one-two',
+        winCondition: winCondition || 'last',
         gameCount: gameCount || 0,
         colorNames: _colorNames || colorNames || COLOR_NAMES,
         history: fullHistory,
@@ -5936,7 +6164,8 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-            {v:'v4.0.1 · 第 50 版',desc:'新增公网 IPv6 远程联机（一键复制地址，自动判断能否跨网络，否则提示只能局域网）、局域网联机支持房主自选棋盘与规则、每个 AI 独立选算法；修复 AI 落子被客户端忽略导致卡住、修复 Linux 桌面版构建失败'},
+            {v:'v4.1.0 · 第 51 版',desc:'联机与配置大改：新增公网 IPv6 远程联机（一键复制地址、自动判断能否跨网络）、游戏配置可存多套反复套用、爆炸阈值扩到 3~6 并可选双爆方式、新增三种胜负判定、结算与暂停页新增场面评分曲线与最具价值一步；悔棋自动跳到上一位真人'},
+            {v:'v4.0.1 · 第 50 版',desc:'局域网联机打磨：每个 AI 可单独选算法（策略 / A-B / PVS 自由混搭）、房主改规则实时同步给所有人、联机禁用一键终局与悔棋（避免两端棋盘分叉）；修复 AI 落子被客户端忽略导致卡住、修复 Linux 桌面版构建失败'},
             {v:'v4.0.0 · 第 49 版',desc:'修复桌面与安卓版会因统计脚本跳转不良网站的问题（已彻底移除该 SDK）；新增局域网联机（直连对战，房主自选棋盘、边界、阈值，每个 AI 可单独选算法）；教学页合并联机教程、历史记录支持多选、开源许可补齐项目链接'},
             {v:'v3.4.3 · 第 48 版',desc:'新增自定义棋盘存档（可命名保存、随时切换与编辑）、棋盘编辑器支持按住滑动连续涂改、换用新图标；修复局中排名淘汰顺序错乱（一键终局时全部并列）'},
             {v:'v3.4.2 · 第 47 版',desc:'新增随机棋盘（按人数生成异形盘，每局不同）、异形棋盘支持全部边界、设置可关背景光球与背景跟随、补下载中心与联系作者入口；移除 MCTS；修正回环下 AI 评估失真；重写规则页'},
@@ -6047,6 +6276,200 @@ function ensureModalKeyboard(){
 ensureModalKeyboard();
 
 /* ═══════ 界面帮助：界面各处「!」按钮共用同一个说明弹窗 ═══════ */
+/* ═══════════════ 游戏配置（预设） ═══════════════
+ * 开局页只留「棋盘形状 / 大小 / 人数」，其余规则（边界、阈值、双爆方式、
+ * 胜负判定）收进 game-config 二级页，并且可以存多套反复套用 ——
+ * 和自定义棋盘同一个思路，但作用在规则而不是形状上。
+ * 棋盘形状/大小/人数不进预设：它们和人数上限强耦合，每次开局重置更合理。
+ */
+const GAME_CONFIG_DEFAULT = {
+  id: 'default', name: '标准',
+  borderMode: 'default', capMode: '4', capStyle: 'one-two', winCondition: 'last',
+};
+
+function getGameConfigs(){
+  let list = appSettings.gameConfigs;
+  if(!Array.isArray(list) || list.length === 0) list = [];
+  // default 必须存在且不可删：用户误删之后还得有东西可用
+  if(!list.some(function(c){ return c && c.id === 'default'; })){
+    list.unshift(Object.assign({}, GAME_CONFIG_DEFAULT));
+  }
+  // 补齐老数据缺失的字段，避免读到 undefined
+  list = list.filter(Boolean).map(function(c){
+    return Object.assign({}, GAME_CONFIG_DEFAULT, c,
+      c.id === 'default' ? {name: c.name || '标准'} : {});
+  });
+  return list;
+}
+
+function saveGameConfigs(list){
+  appSettings.gameConfigs = list;
+  saveSettings();
+}
+
+function getActiveGameConfig(){
+  const list = getGameConfigs();
+  const id = appSettings.activeGameConfig;
+  return list.find(function(c){ return c.id === id; }) || list[0];
+}
+
+/// 把某个组的选中态设成 value（找不到就保持原样）
+function setGroupValue(id, value){
+  const box = document.getElementById(id);
+  if(!box) return;
+  const btns = box.querySelectorAll('.gb,.tg-btn');
+  let hit = null;
+  btns.forEach(function(b){ if(b.dataset.value === String(value)) hit = b; });
+  if(hit) setSelected(box, hit);
+}
+
+/// 双爆方式只在 5/6 级时有意义
+function syncCapStyleRow(){
+  const cap = getSelStr('capModeGroup') || '4';
+  const row = document.getElementById('capStyleRow');
+  if(row) row.style.display = (cap === '5' || cap === '6') ? '' : 'none';
+  syncCapStyleDesc();
+}
+
+function syncCapStyleDesc(){
+  const el = document.getElementById('capStyleDesc');
+  if(!el) return;
+  const v = getSelStr('capStyleGroup') || 'one-two';
+  el.textContent = v === 'two-one'
+    ? '某个方向相邻的「两格」各送 1 点，多推一格出去'
+    : '某个方向相邻的「一格」送 2 点，把那一格直接压到临界';
+}
+
+function syncWinConditionDesc(){
+  const el = document.getElementById('winConditionDesc');
+  if(!el) return;
+  const v = getSelStr('winConditionGroup') || 'last';
+  const map = {
+    last: '其他玩家的棋子被全部同化即出局，最后剩下的人赢。最直观。',
+    pieces: '某人棋子数 ≥ 其余所有在场玩家棋子数之和时，他立刻获胜（至少 3 人参与才生效）。',
+    points: '某人点数 ≥ 其余所有在场玩家点数之和时，他立刻获胜（至少 3 人参与才生效）。',
+  };
+  el.textContent = map[v] || map.last;
+}
+
+function readGameConfigFromDom(){
+  return {
+    borderMode: getSelStr('borderModeGroup') || 'default',
+    capMode: getSelStr('capModeGroup') || '4',
+    capStyle: getSelStr('capStyleGroup') || 'one-two',
+    winCondition: getSelStr('winConditionGroup') || 'last',
+  };
+}
+
+function applyGameConfigToDom(cfg){
+  const c = Object.assign({}, GAME_CONFIG_DEFAULT, cfg || {});
+  setGroupValue('borderModeGroup', c.borderMode);
+  setGroupValue('capModeGroup', c.capMode);
+  setGroupValue('capStyleGroup', c.capStyle);
+  setGroupValue('winConditionGroup', c.winCondition);
+  // 描述文字跟着选中态走
+  const bd = document.getElementById('borderModeDesc');
+  if(bd && BORDER_MODE_DESC[c.borderMode]) bd.textContent = BORDER_MODE_DESC[c.borderMode];
+  const cd = document.getElementById('capModeDesc');
+  if(cd && CAP_MODE_DESC[c.capMode]) cd.textContent = CAP_MODE_DESC[c.capMode];
+  syncCapStyleRow();
+  syncWinConditionDesc();
+  updateModeConflictUI('cfg');
+  updateGameConfigSummary();
+}
+
+/// 开局页那一行显示当前预设的摘要
+function updateGameConfigSummary(){
+  const el = document.getElementById('gameConfigSummary');
+  if(!el) return;
+  const act = getActiveGameConfig();
+  const cap = (act && act.capMode) || '4';
+  const border = (act && act.borderMode) || 'default';
+  const bl = {default:'默认边界', wrap:'回环', bounce:'反弹', degrade:'降级', random:'随机边界'};
+  const capLabel = cap === 'random' ? '随机阈值' : (cap + ' 级');
+  el.textContent = (act && act.name ? act.name + ' · ' : '') + (bl[border] || border) + ' · ' + capLabel;
+}
+
+function renderGameConfigSelect(){
+  const sel = document.getElementById('gameConfigSelect');
+  if(!sel) return;
+  const list = getGameConfigs();
+  const act = getActiveGameConfig();
+  sel.innerHTML = '';
+  for(const c of list){
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = c.name + (c.id === 'default' ? '（内置）' : '');
+    sel.appendChild(o);
+  }
+  if(act) sel.value = act.id;
+}
+
+function initGameConfigPage(){
+  renderGameConfigSelect();
+  applyGameConfigToDom(getActiveGameConfig());
+
+  const sel = document.getElementById('gameConfigSelect');
+  if(sel) sel.onchange = function(){
+    appSettings.activeGameConfig = this.value;
+    saveSettings();
+    applyGameConfigToDom(getActiveGameConfig());
+    showMsg('已切换到「' + (getActiveGameConfig().name || '') + '」', '');
+  };
+
+  const saveBtn = document.getElementById('gcSaveBtn');
+  if(saveBtn) saveBtn.onclick = function(){
+    const list = getGameConfigs();
+    const act = getActiveGameConfig();
+    const v = readGameConfigFromDom();
+    const i = list.findIndex(function(c){ return c.id === act.id; });
+    if(i < 0) return;
+    list[i] = Object.assign({}, list[i], v);
+    saveGameConfigs(list);
+    applyGameConfigToDom(list[i]);
+    renderGameConfigSelect();
+    showMsg('已保存到「' + list[i].name + '」', '');
+  };
+
+  const saveAsBtn = document.getElementById('gcSaveAsBtn');
+  if(saveAsBtn) saveAsBtn.onclick = function(){
+    const name = (prompt('给这套配置起个名字', '配置 ' + (getGameConfigs().length + 1)) || '').trim().slice(0, 12);
+    if(!name) return;
+    const list = getGameConfigs();
+    if(list.length >= 20){ showMsg('最多存 20 套配置', 'error'); return; }
+    const rec = Object.assign({}, readGameConfigFromDom(), {
+      id: 'g' + Date.now().toString(36),
+      name: name,
+    });
+    list.push(rec);
+    appSettings.activeGameConfig = rec.id;
+    saveGameConfigs(list);
+    applyGameConfigToDom(rec);
+    renderGameConfigSelect();
+    showMsg('已另存为「' + name + '」', '');
+  };
+
+  const delBtn = document.getElementById('gcDelBtn');
+  if(delBtn) delBtn.onclick = function(){
+    const list = getGameConfigs();
+    const act = getActiveGameConfig();
+    if(act.id === 'default'){ showMsg('内置配置不能删除', 'error'); return; }
+    if(!confirm('删除配置「' + act.name + '」？')) return;
+    const next = list.filter(function(c){ return c.id !== act.id; });
+    appSettings.activeGameConfig = 'default';
+    saveGameConfigs(next);
+    applyGameConfigToDom(getActiveGameConfig());
+    renderGameConfigSelect();
+    showMsg('已删除', '');
+  };
+}
+
+Router.register('game-config', {
+  back: 'gameSetup',
+  enter() { document.body.style.background = ''; initGameConfigPage(); },
+  leave() {},
+});
+
 const HINTS = {
   'howto': {
     title: '怎么玩连锁棋',
@@ -6100,6 +6523,27 @@ const HINTS = {
       '</ul>'+
       '<p class="hint-tip">「降级边界」不能和「3 级 / 5 级」阈值一起用，选了会自动改回 4 级。</p>'+
       '<p class="hint-tip">不规则棋盘上的「洞」算形状边界：回环绕过去、反弹弹回来、降级按轮廓判定。</p>'
+  },
+  'cap-style': {
+    title: '双爆方式是什么',
+    body:
+      '<p>只有把阈值选成 <strong>5 级或 6 级</strong> 时才会出现这一项。阈值高了，光靠「每个方向各送 1 点」不容易炸开，所以高阈值会让某个方向多送一份能量，这里选的就是「怎么多送」。</p>'+
+      '<ul>'+
+      '<li><strong>相邻一格爆两个</strong>：某个方向相邻的那一格直接吃 2 点。把那一格一口气压到临界，下一步很容易连锁</li>'+
+      '<li><strong>相邻两格各爆一个</strong>：某个方向连着推两格，每格各 1 点。推得更远，适合隔着空格切进去</li>'+
+      '</ul>'+
+      '<p>具体是哪个方向，每一炸都会重新随机。</p>'
+  },
+  'win-condition': {
+    title: '胜负判定怎么选',
+    body:
+      '<p>默认是「只剩一人」，也就是把别人的棋子全部同化掉才算赢。另外两种是<strong>提前结束</strong>的条件，用来防止大优局面还要磨很久。</p>'+
+      '<ul>'+
+      '<li><strong>只剩一人</strong>：最经典的玩法，棋子被清空即出局</li>'+
+      '<li><strong>棋子数碾压</strong>：某人的棋子数 ≥ 其余所有人棋子数之和，当场判他赢</li>'+
+      '<li><strong>点数碾压</strong>：某人的点数 ≥ 其余所有人点数之和，当场判他赢</li>'+
+      '</ul>'+
+      '<p>两种「碾压」判定都需要<strong>至少 3 人在场</strong>才有意义 —— 两个人时「其余人之和」就是对方的量，容易误解，所以 2 人局只提供「只剩一人」。</p>'
   },
   'cap-mode': {
     title: '爆炸阈值是什么',
@@ -6647,10 +7091,15 @@ function startLocalFromSetup(sz,cnt){
   resetRoundHistory();
   undoStack=[];
   size=sz;maxPlayers=cnt;
-  const userBorderMode=getSelStr('borderModeGroup')||'default';
-  const userCapMode=getSelStr('capModeGroup')||'4';
+  const _gc=readGameConfigFromDom();
+  const userBorderMode=_gc.borderMode;
+  const userCapMode=_gc.capMode;
   borderMode=userBorderMode;
   capMode=userCapMode;
+  capStyle=_gc.capStyle;
+  winCondition=_gc.winCondition;
+  // 2 人局只允许「只剩一人」：其余判定在两人时没有意义
+  if(maxPlayers<3)winCondition='last';
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
   if(borderMode==='random')borderMode=resolveRandomBorder();
   if(capMode==='random')capMode=resolveRandomCap();
@@ -6671,7 +7120,7 @@ function startLocalFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
-  _lastGameConfig={mode:'local',size,cols,maxPlayers,colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode};
+  _lastGameConfig={mode:'local',size,cols,maxPlayers,colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode,capStyle:capStyle,winCondition:winCondition};
 }
 function startAIFromSetup(sz,cnt){
   const bdCells=boardCells;   // 本局棋盘形状（随机/自定义时非 null），存进 _lastGameConfig 供「再来一局」
@@ -6680,10 +7129,15 @@ function startAIFromSetup(sz,cnt){
   resetRoundHistory();
   undoStack=[];
   size=sz;maxPlayers=cnt;
-  const userBorderMode=getSelStr('borderModeGroup')||'default';
-  const userCapMode=getSelStr('capModeGroup')||'4';
+  const _gc=readGameConfigFromDom();
+  const userBorderMode=_gc.borderMode;
+  const userCapMode=_gc.capMode;
   borderMode=userBorderMode;
   capMode=userCapMode;
+  capStyle=_gc.capStyle;
+  winCondition=_gc.winCondition;
+  // 2 人局只允许「只剩一人」：其余判定在两人时没有意义
+  if(maxPlayers<3)winCondition='last';
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
   if(borderMode==='random')borderMode=resolveRandomBorder();
   if(capMode==='random')capMode=resolveRandomCap();
@@ -6714,7 +7168,7 @@ function startAIFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'ai',size,cols,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode};
+  _lastGameConfig={mode:'ai',size,cols,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode,capStyle:capStyle,winCondition:winCondition};
 }
 function startEveFromSetup(sz,cnt){
   const bdCells=boardCells;   // 本局棋盘形状（随机/自定义时非 null），存进 _lastGameConfig 供「再来一局」
@@ -6723,10 +7177,15 @@ function startEveFromSetup(sz,cnt){
   resetRoundHistory();
   undoStack=[];
   size=sz;maxPlayers=cnt;
-  const userBorderMode=getSelStr('borderModeGroup')||'default';
-  const userCapMode=getSelStr('capModeGroup')||'4';
+  const _gc=readGameConfigFromDom();
+  const userBorderMode=_gc.borderMode;
+  const userCapMode=_gc.capMode;
   borderMode=userBorderMode;
   capMode=userCapMode;
+  capStyle=_gc.capStyle;
+  winCondition=_gc.winCondition;
+  // 2 人局只允许「只剩一人」：其余判定在两人时没有意义
+  if(maxPlayers<3)winCondition='last';
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
   if(borderMode==='random')borderMode=resolveRandomBorder();
   if(capMode==='random')capMode=resolveRandomCap();
@@ -6751,7 +7210,7 @@ function startEveFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'eve',size,cols,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode};
+  _lastGameConfig={mode:'eve',size,cols,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode,capStyle:capStyle,winCondition:winCondition};
 }
 window.addEventListener('popstate',()=>{
   const cur = Router._current;
@@ -6824,6 +7283,7 @@ window.addEventListener('popstate',()=>{
       'about-benchmark': () => Router.switchPage('about'),            // 12 => 6
       'about-license': () => Router.switchPage('about'),            // 11 => 6
       'about-thirdparty': () => Router.switchPage('about'),         // SDK 页 => 6
+      'game-config':   () => Router.switchPage('gameSetup'),        // 游戏配置 => 开局页
       'device-bench':  () => Router.switchPage('settings'),         // device-bench => settings
       'checkout':      () => {                                      // 7 => 5, 8 => 2/3/4
         const prev = Router._checkoutPrev;
@@ -6879,6 +7339,8 @@ function openReplay(cfg){
     shapeCells: cfg.cells || null,   // 不规则形状的空洞位图，回放靠它还原
     maxPlayers,
     borderMode:cfg.borderMode||'default',
+    capStyle:cfg.capStyle||'one-two',
+    winCondition:cfg.winCondition||'last',
     capMode:cfg.capMode||'4',
     gameCount:cfg.gameCount||0,
     colorNames:cfg.colorNames||null,
@@ -7061,6 +7523,8 @@ async function rpGoTo(target, animate){
         player:mv.player,maxPlayers:_rp.maxPlayers,
         borderMode:_rp.borderMode,
         capMode:_rp.capMode,
+        capStyle:_rp.capStyle,
+        winCondition:_rp.winCondition,
         seed:(mv.seed!==undefined&&mv.seed!==null)?mv.seed:undefined
       });
       if(token!==_rp.token)return;

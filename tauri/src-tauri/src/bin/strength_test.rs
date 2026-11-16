@@ -135,6 +135,7 @@ fn run_game(
     let th: u32 = match cm {
         CapMode::Cap3 => 3,
         CapMode::Cap5 => 5,
+        CapMode::Cap6 => 6,
         CapMode::Random => 3,
         CapMode::Cap4 => 4,
     };
@@ -164,7 +165,7 @@ struct PairStat {
 }
 
 fn cap_label(cm: &CapMode) -> &'static str {
-    match cm { CapMode::Cap3 => "cap3", CapMode::Cap4 => "cap4", CapMode::Cap5 => "cap5", CapMode::Random => "rand" }
+    match cm { CapMode::Cap3 => "cap3", CapMode::Cap4 => "cap4", CapMode::Cap5 => "cap5", CapMode::Cap6 => "cap6", CapMode::Random => "rand" }
 }
 
 fn border_label(bm: &BorderMode) -> &'static str {

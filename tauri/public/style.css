@@ -1200,6 +1200,18 @@ body.orbs-on .orb-container{display:block}
   padding:6px 10px;border-radius:8px;background:var(--glass-w-04)}
 .lan-cfg-k{color:var(--dim);flex-shrink:0}
 .lan-cfg-v{color:var(--text);text-align:right;word-break:break-word}
+/* 最具价值的一步 */
+.mv-card h3{font-size:.95rem}
+.mv-row{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  padding:6px 10px;margin:6px 0;border-radius:8px;
+  background:var(--glass-w-04);border-left:3px solid var(--accent);
+  font-size:.8rem;
+}
+.mv-who{font-weight:600;min-width:56px}
+.mv-delta{color:#2ecc71;font-weight:700;font-family:var(--font-mono)}
+.mv-where{color:var(--dim);font-size:.74rem}
+
 /* 联机范围卡片：能不能跨网络远程连 */
 .lan-net-card h3{font-size:.95rem}
 .lan-net-good{font-size:.88rem;margin:0 0 4px;color:#2ecc71;font-weight:600}

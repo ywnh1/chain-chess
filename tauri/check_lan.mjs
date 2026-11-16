@@ -331,6 +331,8 @@ function makeSandbox(role, peerId = null, port = 43210) {
     let aiPlayers=new Set(), aiConfigs={}, eliminatedPlayers=new Set();
     let eliminationRounds=[], eliminationInfo={}, gameHistory=[], chainStats={};
     let maxChainOverall={player:null,length:0}, undoStack=[];
+    // 4.1.0 起 localClick 会带上这两项；沙箱里给默认值即可
+    let capStyle='one-two', winCondition='last';
     let cells = [];
     const mkBoard=(s,c)=>Array.from({length:s},()=>Array.from({length:c},()=>({owner:null,count:0})));
     const resetRoundHistory=()=>{gameHistory=[]};

@@ -134,32 +134,13 @@
     </div>
 
     <!-- 棋盘边界模式 -->
-    <div class="form-row"><label>棋盘边界<button type="button" class="hint-btn" onclick="openHint('border-mode')"
-          aria-label="棋盘边界说明">!</button></label>
-      <div id="borderModeGroup" class="btn-group border-mode-group">
-        <button class="gb selected" data-value="default">默认边界</button>
-        <button class="gb" data-value="wrap">回环边界</button>
-        <button class="gb" data-value="bounce">反弹边界</button>
-        <button class="gb" data-value="degrade">降级边界</button>
-        <button class="gb" data-value="random">随机边界</button>
+    <!-- 游戏配置 → 二级页（边界 / 阈值 / 胜负判定 / 预设） -->
+    <div class="about-card" style="cursor:pointer" onclick="Router.navigate('game-config')">
+      <div class="form-row" style="flex-direction:row;align-items:center;gap:8px;margin:0">
+        <label style="flex:1">游戏配置</label>
+        <span id="gameConfigSummary" style="color:var(--dim);font-size:.76rem;text-align:right">标准 · 4 级</span>
+        <span style="color:var(--dim)">→</span>
       </div>
-      <p id="borderModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
-        默认边界：4 颗即爆，飞到棋盘外的棋子直接消失（最直观，新手推荐）
-      </p>
-    </div>
-
-    <!-- 爆炸阈值模式（独立于边界模式） -->
-    <div class="form-row"><label>爆炸阈值<button type="button" class="hint-btn" onclick="openHint('cap-mode')"
-          aria-label="爆炸阈值说明">!</button></label>
-      <div id="capModeGroup" class="btn-group">
-        <button class="gb" data-value="3">3级</button>
-        <button class="gb selected" data-value="4">4级</button>
-        <button class="gb" data-value="5">5级</button>
-        <button class="gb" data-value="random">随机</button>
-      </div>
-      <p id="capModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
-        标准玩法：一个格子攒够 4 颗棋子就爆炸，向上下左右各弹出 1 颗
-      </p>
     </div>
 
     <!-- 玩家人数 -->
@@ -1307,6 +1288,78 @@
         <h3>不想被统计怎么办</h3>
         <p>网页版可以用浏览器的隐私扩展或广告拦截规则屏蔽 sdk.51.la 域名，屏蔽后所有游戏功能照常可用；彻底断开网络也能正常游玩（只有「检查更新」会失败）。</p>
         <p>开源库的许可证清单见「关于 → 许可证」页，完整源码以 MIT 协议公开在 GitHub。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Config page (二级：开局页 → 游戏配置) -->
+  <div id="game-config" class="screen">
+    <button class="back glass-btn" onclick="Router.back()">← 返回</button>
+    <div class="about-scroll">
+      <h2>游戏配置</h2>
+
+      <div class="about-card">
+        <h3>配置预设</h3>
+        <div class="form-row" style="flex-direction:row;align-items:center;gap:8px">
+          <select id="gameConfigSelect" style="flex:1"></select>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="glass-btn primary" id="gcSaveBtn" style="flex:1;padding:8px 4px;font-size:.78rem">保存</button>
+          <button class="glass-btn" id="gcSaveAsBtn" style="flex:1;padding:8px 4px;font-size:.78rem">另存为</button>
+          <button class="glass-btn danger" id="gcDelBtn" style="flex:1;padding:8px 4px;font-size:.78rem">删除</button>
+        </div>
+        <p style="font-size:.72rem;color:var(--dim);margin:6px 0 0;line-height:1.5">
+          棋盘形状、大小、人数在开局页单独选，不存进预设。改完点「保存」存进当前预设，下次开局直接套用。</p>
+      </div>
+
+    <div class="form-row"><label>棋盘边界<button type="button" class="hint-btn" onclick="openHint('border-mode')"
+          aria-label="棋盘边界说明">!</button></label>
+      <div id="borderModeGroup" class="btn-group border-mode-group">
+        <button class="gb selected" data-value="default">默认边界</button>
+        <button class="gb" data-value="wrap">回环边界</button>
+        <button class="gb" data-value="bounce">反弹边界</button>
+        <button class="gb" data-value="degrade">降级边界</button>
+        <button class="gb" data-value="random">随机边界</button>
+      </div>
+      <p id="borderModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
+        默认边界：4 颗即爆，飞到棋盘外的棋子直接消失（最直观，新手推荐）
+      </p>
+    </div>
+
+    <!-- 爆炸阈值模式（独立于边界模式） -->
+    <div class="form-row"><label>爆炸阈值<button type="button" class="hint-btn" onclick="openHint('cap-mode')"
+          aria-label="爆炸阈值说明">!</button></label>
+      <div id="capModeGroup" class="btn-group">
+        <button class="gb" data-value="3">3级</button>
+        <button class="gb selected" data-value="4">4级</button>
+        <button class="gb" data-value="5">5级</button>
+        <button class="gb" data-value="6">6级</button>
+        <button class="gb" data-value="random">随机</button>
+      </div>
+      <p id="capModeDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4">
+        标准玩法：一个格子攒够 4 颗棋子就爆炸，向上下左右各弹出 1 颗
+      </p>
+    </div>
+
+      <div class="form-row" id="capStyleRow" style="display:none">
+        <label>双爆方式<button type="button" class="hint-btn" onclick="openHint('cap-style')"
+            aria-label="双爆方式说明">!</button></label>
+        <div id="capStyleGroup" class="btn-group">
+          <button class="gb selected" data-value="one-two">相邻一格爆两个</button>
+          <button class="gb" data-value="two-one">相邻两格各爆一个</button>
+        </div>
+        <p id="capStyleDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4"></p>
+      </div>
+
+      <div class="form-row">
+        <label>胜负判定<button type="button" class="hint-btn" onclick="openHint('win-condition')"
+            aria-label="胜负判定说明">!</button></label>
+        <div id="winConditionGroup" class="btn-group" style="flex-direction:column;align-items:stretch">
+          <button class="gb selected" data-value="last">只剩一人：棋子被清空即出局</button>
+          <button class="gb" data-value="pieces">棋子数最多者 ≥ 其余人棋子之和</button>
+          <button class="gb" data-value="points">点数最多者 ≥ 其余人点数之和</button>
+        </div>
+        <p id="winConditionDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4"></p>
       </div>
     </div>
   </div>

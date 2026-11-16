@@ -148,6 +148,90 @@ function grab(startMarker, endMarker) {
     errs.push("轮次里含 null 时应跳过");
 }
 
+/* ═══════ 4.1.0：最具价值的一步（ML 评分曲线上的最大正增长） ═══════ */
+{
+  const fn = grab("function findBestMoves(", "async function flushOverflowHistory(");
+  const best = new Function(fn + "; return findBestMoves;")();
+
+  // 构造 3 步历史：0 号在第 2 步评分大涨，1 号全程下降
+  const hist = [
+    { rating: [10, 10] },
+    { rating: [12, 9] },
+    { rating: [25, 8], mv: { x: 1, y: 2 } },
+  ];
+  const b = best(hist, 2);
+  // 「一步」= 相邻两步之差：第 2 步 25-12=13 才是单步最大
+  if (!b[0] || b[0].delta !== 13) errs.push("MVP：0 号应取 +13 那一步，实际 " + JSON.stringify(b[0]));
+  if (b[0] && b[0].turn !== 2) errs.push("MVP：应记录第 2 步为最佳");
+  if (b[0] && (!b[0].mv || b[0].mv.x !== 1)) errs.push("MVP：应带上那一步的落子坐标");
+  if (b[1]) errs.push("MVP：1 号全程下跌，不该有「最具价值的一步」");
+
+  // 缺 rating 的步骤要跳过，不能当成 0 算（否则会出现 +999 的假峰值）
+  const partial = [{ }, { rating: [5, 5] }, { rating: [6, 6] }];
+  const pb = best(partial, 2);
+  if (!pb[0] || pb[0].delta !== 1) errs.push("MVP：缺失评分的步应跳过，实际 " + JSON.stringify(pb[0]));
+}
+
+/* ═══════ 4.1.0：评分随历史压缩/展开往返不丢 ═══════ */
+{
+  const comp = grab("function compactHistory(", "function expandHistory(");
+  const exp = grab("function expandHistory(", "// Save game history");
+  const api = new Function(comp + exp + "; return {compactHistory, expandHistory};")();
+
+  const hist = [
+    { snapshot: { "0": { pieces: 1, points: 1 }, "1": { pieces: 1, points: 1 } },
+      mv: { x: 0, y: 0, player: 0, seed: 7 }, rating: [5, 3] },
+    { snapshot: { "0": { pieces: 2, points: 2 }, "1": { pieces: 1, points: 1 } },
+      mv: { x: 1, y: 0, player: 1, seed: 8 }, rating: [7, -1] },
+  ];
+  const c = api.compactHistory(hist, 2);
+  if (!c.r) errs.push("评分：压缩后应保留评分数组");
+  const e = api.expandHistory(c, 2);
+  if (!e[0].rating || e[0].rating[0] !== 5) errs.push("评分：展开后第 0 步 0 号应为 5，实际 " + JSON.stringify(e[0].rating));
+  if (!e[1].rating || e[1].rating[1] !== -1) errs.push("评分：负数评分不应丢失");
+
+  // 没有评分的旧记录：不能凭空造出评分（否则曲线会出现假 0 值平台）
+  const noRate = [{ snapshot: { "0": { pieces: 1, points: 1 } }, mv: null }];
+  const c2 = api.compactHistory(noRate, 2);
+  if (c2.r) errs.push("评分：无评分时不该写入 r 字段");
+  const e2 = api.expandHistory(c2, 2);
+  if (e2[0].rating) errs.push("评分：无评分的历史不该被展开出 rating");
+}
+
+/* ═══════ 4.1.0：游戏配置预设 ═══════ */
+{
+  const def = grab("const GAME_CONFIG_DEFAULT", "function getGameConfigs(");
+  const getFn = grab("function getGameConfigs(", "function saveGameConfigs(");
+  const activeFn = grab("function getActiveGameConfig(", "/// 把某个组的选中态设成 value");
+  const code =
+    "let appSettings = holder.obj;\n" +
+    "const saveSettings = () => { holder.saved++; };\n" +
+    def + getFn + activeFn +
+    "return {getGameConfigs, getActiveGameConfig, setApp:(o)=>{appSettings=o;holder.obj=o;}};";
+  const holder = { obj: {}, saved: 0 };
+  const api = new Function("holder", code)(holder);
+
+  // 空数据：必须自动补一个内置「标准」配置
+  api.setApp({});
+  const list0 = api.getGameConfigs();
+  if (list0.length !== 1) errs.push("预设：空数据应自动补 1 个内置配置");
+  if (list0[0].id !== "default") errs.push("预设：内置配置 id 必须是 default");
+  if (list0[0].capMode !== "4" || list0[0].capStyle !== "one-two" || list0[0].winCondition !== "last")
+    errs.push("预设：内置配置默认值不对 " + JSON.stringify(list0[0]));
+
+  // 用户删掉 default 之后，读取时仍要能拿到内置配置（不能崩）
+  api.setApp({ gameConfigs: [{ id: "x", name: "我的", capMode: "6" }] });
+  const list1 = api.getGameConfigs();
+  if (!list1.some((c) => c.id === "default")) errs.push("预设：default 缺失时应补回来");
+  if (!list1.some((c) => c.id === "x")) errs.push("预设：用户配置不该被丢掉");
+
+  // 老配置缺字段：要补齐成默认值，而不是读到 undefined
+  api.setApp({ gameConfigs: [{ id: "y", name: "老配置" }], activeGameConfig: "y" });
+  const act = api.getActiveGameConfig();
+  if (act.capStyle !== "one-two") errs.push("预设：缺失字段应补默认值，实际 " + act.capStyle);
+  if (act.winCondition !== "last") errs.push("预设：缺失胜负判定应补 last");
+}
+
   if (errs.length > before) {
     // 把这一文件新增的错误标注来源，避免两份报错混在一起分不清
     for (let k = before; k < errs.length; k++) errs[k] = "[" + label + "] " + errs[k];
@@ -163,4 +247,4 @@ if (errs.length) {
   errs.forEach((e) => console.log(" - " + e));
   process.exit(1);
 }
-console.log("ALL GOOD（自定义棋盘库 + 淘汰顺序，两份前端）");
+console.log("ALL GOOD（自定义棋盘库 + 淘汰顺序 + 配置预设 + MVP，两份前端）");
