@@ -213,6 +213,10 @@ function buildRuleControls() {
   aiStrengthSel.value = "strategy";
 
   return {
+    lanNetBody: mk("lanNetBody"), lanRoomRemoteRow: mk("lanRoomRemoteRow"),
+    lanRoomV6: mk("lanRoomV6"), lanCopyLan: mk("lanCopyLan"),
+    lanCopyV6: mk("lanCopyV6"), lanRoomAddr: mk("lanRoomAddr"),
+    lanNetCard: mk("lanNetCard"),
     lanAiCount: aiCountSel, lanAiStrength: aiStrengthSel,
     lanAiStrengthRow: mk("lanAiStrengthRow"),
     lanShapeGroup: shape, lanSizeGrid: sizes, lanBorderGroup: border, lanCapGroup: cap,
@@ -253,6 +257,11 @@ function makeSandbox(role, peerId = null, port = 43210) {
         return port;
       case "lan_local_ip":
         return "192.168.1.5";
+      case "lan_ipv6":
+        return env.ipv6 || {
+          available: false, addr: null, raw: null,
+          reason: "没有可用的 IPv6 出口（未连到支持 IPv6 的网络）",
+        };
       case "lan_join":
         if (!/^.+:\d+$/.test(args.addr)) throw new Error("bad addr");
         return null;
@@ -307,12 +316,15 @@ function makeSandbox(role, peerId = null, port = 43210) {
     localClicks,
     aiMoveCalls,
     customBoards: [],
+    vibrate: () => {},
+    ipv6: null,
   };
 
   const prelude = `
     const { document, window, localStorage, tauriInvoke, showMsg, Router, COLORS, COLORS_LIGHT,
             setInterval: mockSetInterval, clearInterval: mockClearInterval } = __env;
     const setInterval = mockSetInterval, clearInterval = mockClearInterval;
+    const vibrate = __env.vibrate;
     let gameMode=null, curPlayer=0, gameOver=false, isPaused=false, animating=false, aiThinking=false;
     let board=[], size=7, cols=7, maxPlayers=2, boardCells=null, borderMode='default', capMode='4', firstMovePos=null;
     let _colorNames={}, _originPage=null;
@@ -408,6 +420,14 @@ function makeSandbox(role, peerId = null, port = 43210) {
         sel.value=alg;
       },
       resolveMatch:(raw, n)=>lanResolveMatch(raw, n),
+      checkIpv6:()=>lanCheckIpv6(),
+      setIpv6:(v)=>{ __env.ipv6 = v; },
+      // innerHTML 在 mock 里只是字符串，直接读出来做断言
+      get netBodyHtml(){ return (document.getElementById('lanNetBody')||{}).innerHTML || ''; },
+      get roomRowShown(){ return (document.getElementById('lanRoomRemoteRow')||{}).style.display !== 'none'; },
+      get roomV6Text(){ return (document.getElementById('lanRoomV6')||{}).textContent || ''; },
+      renderRoomAddr:()=>lanRenderRoomAddr(),
+      v6Endpoint:(a,p)=>lanV6Endpoint(a,p),
       get customBoards(){ return __env.customBoards; },
       lanCreateRoom, lanJoinRoom, lanHostStart, lanToggleReady, lanDrainEvents,
       lanSendMove, lanLeaveRoom, lanApplyRemote,
@@ -746,12 +766,54 @@ async function main() {
   ok(cli6.localClicks.length === beforeClicks + 1,
      "AI 的落子没广播到客户端（客户端会停在原地）");
 
+  /* ═══ 场景四：公网 IPv6 与联机范围提示 ═══ */
+
+  /* 22. 没有 IPv6 → 必须告诉用户「只能局域网联机」 */
+  resetNet();
+  const hostV6a = makeSandbox("host", null, 43220);
+  hostV6a.setIpv6({ available: false, addr: null, raw: null,
+    reason: "没有可用的 IPv6 出口（未连到支持 IPv6 的网络）" });
+  await hostV6a.checkIpv6();
+  ok(/只能/.test(hostV6a.netBodyHtml || ""), "无 IPv6 时没提示只能局域网联机");
+
+  /* 23. 有 IPv6 → 显示地址、一键复制、说明可远程联机 */
+  resetNet();
+  const hostV6 = makeSandbox("host", null, 43221);
+  const V6 = "2409:8a02:c22:99a0:3c62:c2ff:fefb:d93f";
+  hostV6.setIpv6({ available: true, addr: V6, raw: V6, reason: null });
+  await hostV6.checkIpv6();
+  const html = hostV6.netBodyHtml || "";
+  ok(/远程联机/.test(html), "有 IPv6 时没提示可以远程联机");
+  ok(html.includes(V6), "有 IPv6 时没把地址显示出来");
+  ok(/复制 IPv6/.test(html), "有 IPv6 时没有一键复制按钮");
+  ok(/防火墙/.test(html), "没提醒入站可能被路由器防火墙拦（否则用户会误判）");
+
+  /* 24. 建房后房间页给出可直连的 [v6]:port */
+  await hostV6.lanCreateRoom();
+  await settle([hostV6]);
+  ok(hostV6.roomRowShown === true, "有 IPv6 建房后没显示公网地址行");
+  ok(hostV6.roomV6Text === "[" + V6 + "]:43221",
+     "公网地址格式不对（应为 [v6]:port）: " + hostV6.roomV6Text);
+
+  /* 25. 无 IPv6 时房间页不显示公网地址行 */
+  resetNet();
+  const hostNoV6 = makeSandbox("host", null, 43222);
+  hostNoV6.setIpv6({ available: false, addr: null, raw: null, reason: "无" });
+  await hostNoV6.checkIpv6();
+  await hostNoV6.lanCreateRoom();
+  await settle([hostNoV6]);
+  ok(hostNoV6.roomRowShown === false, "无 IPv6 时不该显示公网地址行");
+
+  /* 26. 端口拼接：无端口时不能拼出垃圾 */
+  ok(hostV6.v6Endpoint("2409::1", "") === "", "无端口时应返回空串");
+  ok(hostV6.v6Endpoint("2409::1", "1234") === "[2409::1]:1234", "端点拼接不对");
+
   if (errs.length) {
     console.error("❌ 局域网联机自检失败：");
     for (const e of errs) console.error("   - " + e);
     process.exit(1);
   }
-  console.log("✅ 局域网联机自检通过（建房 / 加入 / 准备 / 掉线 / 重编号开局 / 落子转发 / 动画排队 / 越界 / 名字清洗 / 房主规则同步 / 随机项解析 / 互斥纠正 / 房内人机）");
+  console.log("✅ 局域网联机自检通过（建房 / 加入 / 准备 / 掉线 / 重编号开局 / 落子转发 / 动画排队 / 越界 / 名字清洗 / 房主规则同步 / 随机项解析 / 互斥纠正 / 房内人机 / 公网 IPv6 判定与复制）");
 }
 
 main().catch((e) => {

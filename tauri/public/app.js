@@ -1226,6 +1226,8 @@ function lanDepthForAlgo(alg){
   return 2;
 }
 let lanRemoteCfg = null;
+// 本机 IPv6 情况：{available, addr, raw, reason}。进页面时探测一次。
+let lanV6 = null;
 let lanPollTimer = null;
 let lanDrainBusy = false;
 
@@ -1762,6 +1764,111 @@ function lanRenderRules(){
   if(!isHost) roBox.innerHTML = lanConfigSummary(lanRemoteCfg);
 }
 
+/* ─── 公网 IPv6 与复制 ─── */
+
+/// 复制到剪贴板。WebView 里 navigator.clipboard 通常可用；
+/// 老 WebView / 非安全上下文下回退到 execCommand，再不行就让用户长按选中。
+function lanCopyText(text, okMsg){
+  const done = function(){
+    showMsg(okMsg || '已复制', '');
+    try{ vibrate(8); }catch(e){}
+  };
+  const fallback = function(){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if(ok){ done(); return; }
+    }catch(e){}
+    // 都失败：把文字塞进提示里，让用户手动选中（地址本身可 user-select:all）
+    showMsg('复制失败，请长按地址手动选择', 'error');
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
+  }else{
+    fallback();
+  }
+}
+
+/// IPv6 地址拼成可连的 `[addr]:port`。缺任一半都返回空串 ——
+/// 拼出 `[2409::1]:` 这种半成品粘给对方只会白折腾。
+function lanV6Endpoint(addr, port){
+  if(!addr || !port) return '';
+  return '[' + addr + ']:' + port;
+}
+
+/// 探测本机 IPv6 并渲染「联机范围」卡片
+async function lanCheckIpv6(){
+  const body = document.getElementById('lanNetBody');
+  if(!body) return;
+  if(!lanSupported()){
+    body.innerHTML = '<p style="font-size:.8rem;color:var(--dim);margin:0">' +
+      '网页版不支持局域网 / 远程联机，请用桌面或 Android 应用。</p>';
+    return;
+  }
+  let info = null;
+  try{ info = await tauriInvoke('lan_ipv6'); }catch(e){}
+  lanV6 = info || {available:false, addr:null, reason:'检测失败'};
+  lanRenderNetCard();
+}
+
+function lanRenderNetCard(){
+  const body = document.getElementById('lanNetBody');
+  if(!body) return;
+  const v6 = lanV6 || {available:false};
+  if(!v6.available){
+    body.innerHTML =
+      '<p class="lan-net-bad">🛜 只能<strong>局域网联机</strong></p>' +
+      '<p class="lan-net-why">' + htmlEsc(v6.reason || '没有可用的公网 IPv6') + '</p>' +
+      '<p class="lan-net-why">其他人需要在同一个 Wi-Fi / 热点下才能加入。' +
+      '想跨网络玩，把手机和电脑都接到支持 IPv6 的网络上再回来看这里。</p>';
+    return;
+  }
+  body.innerHTML =
+    '<p class="lan-net-good">🌐 可以<strong>远程联机</strong></p>' +
+    '<p class="lan-net-addr" id="lanNetV6">' + htmlEsc(v6.addr) + '</p>' +
+    '<div style="display:flex;gap:6px;margin-top:6px">' +
+      '<button class="glass-btn primary" id="lanCopyNetV6" style="flex:1">复制 IPv6</button>' +
+    '</div>' +
+    '<p class="lan-net-why">不同网络下的设备输入这个地址即可加入（建房后端口会附在后面）。' +
+    '<strong>如果对方连不上</strong>，多半是路由器/光猫的 IPv6 防火墙拦了入站，' +
+    '需要在路由器里放行，或者改用同一 Wi-Fi。</p>';
+  const btn = document.getElementById('lanCopyNetV6');
+  if(btn) btn.onclick = function(){ lanCopyText(v6.addr, 'IPv6 已复制'); };
+}
+
+/// 房间页显示公网地址（房主）/ 隐藏（客户端）
+function lanRenderRoomAddr(){
+  const row = document.getElementById('lanRoomRemoteRow');
+  const v6El = document.getElementById('lanRoomV6');
+  const copyV6 = document.getElementById('lanCopyV6');
+  const copyLan = document.getElementById('lanCopyLan');
+  if(!row) return;
+
+  if(copyLan){
+    copyLan.onclick = function(){ lanCopyText(lanRoomAddr, '局域网地址已复制'); };
+  }
+  const portMatch = /:(\d+)$/.exec(lanRoomAddr || '');
+  const port = portMatch ? portMatch[1] : '';
+  const hostMode = (lanRole === 'host');
+  const v6 = lanV6 || {};
+
+  if(hostMode && v6.available && v6.addr && port){
+    if(v6El) v6El.textContent = lanV6Endpoint(v6.addr, port);
+    row.style.display = '';
+    if(copyV6) copyV6.onclick = function(){
+      lanCopyText(lanV6Endpoint(v6.addr, port), '公网地址已复制');
+    };
+  }else{
+    row.style.display = 'none';
+    if(copyV6) copyV6.onclick = null;
+  }
+}
+
 /* ─── 入口与房间 ─── */
 async function lanCreateRoom(){
   if(!lanSupported()){ showMsg('局域网联机需要桌面 / Android 应用', 'error'); return; }
@@ -1783,12 +1890,16 @@ async function lanCreateRoom(){
   lanRoomAddr = ip + ':' + port;
   lanPlayers = [{pid:0, name:name, ready:true, host:true}];
   lanStartPolling();
+  lanRenderRoomAddr();
   lanRenderRoom();
 }
 async function lanJoinRoom(addr){
   if(!lanSupported()){ showMsg('局域网联机需要桌面 / Android 应用', 'error'); return; }
   addr = String(addr || '').trim();
-  if(!/^.+:\d+$/.test(addr)){ showMsg('地址要写成 IP:端口，例如 192.168.1.23:41234', 'error'); return; }
+  if(!/^.+:\d+$/.test(addr)){
+    showMsg('地址要写成 IP:端口，例如 192.168.1.23:41234 或 [2409:8a02:...:d93f]:41234', 'error');
+    return;
+  }
   const name = lanNickValue();
   lanStopNet();
   try{
@@ -2016,6 +2127,7 @@ function lanRenderRoom(){
     }
   }
   lanRenderRules();
+  lanRenderRoomAddr();
   lanRenderPlayerList();
 }
 
@@ -2191,6 +2303,7 @@ function lanInitRuleControls(){
 
   lanApplyShapeVisibility();
   lanRenderAiRows();
+  lanCheckIpv6();
   lanSyncRuleDesc();
   lanCfg = lanReadCfgFromDom();
 }
@@ -5823,7 +5936,7 @@ function renderChangelogCards(){
   var container=document.getElementById('changelogContainer');
   if(!container)return;
   var versions=[
-            {v:'v4.0.1 · 第 50 版',desc:'局域网联机打磨：每个 AI 可单独选算法（策略 / A-B / PVS 自由混搭）、房主改规则实时同步给所有人、联机禁用一键终局与悔棋（避免两端棋盘分叉）；修复 AI 落子被客户端忽略导致卡住、修复 Linux 桌面版构建失败'},
+            {v:'v4.0.1 · 第 50 版',desc:'新增公网 IPv6 远程联机（一键复制地址，自动判断能否跨网络，否则提示只能局域网）、局域网联机支持房主自选棋盘与规则、每个 AI 独立选算法；修复 AI 落子被客户端忽略导致卡住、修复 Linux 桌面版构建失败'},
             {v:'v4.0.0 · 第 49 版',desc:'修复桌面与安卓版会因统计脚本跳转不良网站的问题（已彻底移除该 SDK）；新增局域网联机（直连对战，房主自选棋盘、边界、阈值，每个 AI 可单独选算法）；教学页合并联机教程、历史记录支持多选、开源许可补齐项目链接'},
             {v:'v3.4.3 · 第 48 版',desc:'新增自定义棋盘存档（可命名保存、随时切换与编辑）、棋盘编辑器支持按住滑动连续涂改、换用新图标；修复局中排名淘汰顺序错乱（一键终局时全部并列）'},
             {v:'v3.4.2 · 第 47 版',desc:'新增随机棋盘（按人数生成异形盘，每局不同）、异形棋盘支持全部边界、设置可关背景光球与背景跟随、补下载中心与联系作者入口；移除 MCTS；修正回环下 AI 评估失真；重写规则页'},

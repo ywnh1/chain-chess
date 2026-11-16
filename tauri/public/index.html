@@ -66,6 +66,14 @@
       <button class="glass-btn primary" id="lanHostBtn" style="width:100%;margin-top:6px">创建房间</button>
       <p style="font-size:.72rem;color:var(--dim);margin:6px 0 0">建房后由房主选棋盘与规则，其他人加入即可看到。</p>
 
+      <!-- 网络状态：能不能跨网络远程联机 -->
+      <div id="lanNetCard" class="about-card lan-net-card">
+        <h3 style="margin:0 0 6px">联机范围</h3>
+        <div id="lanNetBody">
+          <p style="font-size:.8rem;color:var(--dim);margin:0">正在检测网络…</p>
+        </div>
+      </div>
+
       <div class="form-row" style="margin-top:14px"><label>加入房间</label>
         <div style="display:flex;gap:8px;flex:1">
           <input id="lanAddrInput" placeholder="192.168.1.23:端口" style="flex:1">
@@ -78,7 +86,13 @@
 
     <div id="lanRoomView" style="display:none">
       <div class="about-card">
-        <p style="margin:0">房间地址：<strong id="lanRoomAddr" style="user-select:all">—</strong></p>
+        <p style="margin:0">局域网地址：<strong id="lanRoomAddr" style="user-select:all">—</strong>
+          <button class="glass-btn lan-copy-btn" id="lanCopyLan" title="复制局域网地址">复制</button>
+        </p>
+        <p id="lanRoomRemoteRow" style="margin:8px 0 0;display:none">
+          公网地址：<strong id="lanRoomV6" style="user-select:all;word-break:break-all">—</strong>
+          <button class="glass-btn lan-copy-btn" id="lanCopyV6" title="复制公网地址">复制</button>
+        </p>
         <p id="lanRoomTip" style="font-size:.75rem;color:var(--dim);margin:6px 0 0"></p>
       </div>
       <div id="lanPlayerList" style="display:flex;flex-direction:column;gap:6px;margin:10px 0"></div>
@@ -1283,6 +1297,19 @@
           <li><strong>搜索附近房间</strong>：点「搜索附近房间」，等一两秒，列表里出现房间后点一下就连上</li>
         </ul>
         <p>搜不到就先手输地址——有些路由器会拦局域网广播，但直连一般不受影响。</p>
+      </div>
+
+      <div class="about-card">
+        <h3>跨网络：公网 IPv6 远程联机</h3>
+        <p>联机页顶部会显示<strong>「联机范围」</strong>。如果它写着「可以远程联机」，说明你的网络有公网 IPv6，不用连同一个 Wi-Fi 也能一起玩。</p>
+        <ol>
+          <li>房主建房后，房间页会多出一行<strong>公网地址</strong>，形如 <code>[2409:8a02:...:d93f]:41234</code></li>
+          <li>点旁边的<strong>「复制」</strong>，把整串发给对方</li>
+          <li>对方在「加入房间」里粘贴，点加入即可</li>
+        </ol>
+        <p>粘贴时<strong>带不带方括号都行</strong>，程序会自动补。</p>
+        <p style="font-size:.8rem;color:var(--dim)"><strong>连不上多半是防火墙。</strong>多数光猫和路由器默认放行 IPv6 出站、拦截入站，所以你能上网不代表别人能连你。遇到这种情况：在路由器里放行该端口的 IPv6 入站，或者干脆两个人连同一个 Wi-Fi 用局域网方式。移动网络（4G/5G）通常没有这个问题。</p>
+        <p style="font-size:.78rem;color:var(--dim)">如果「联机范围」显示只能局域网，通常是当前 Wi-Fi 没下发 IPv6（很多宽带默认只有 IPv4）。换成手机热点或移动数据再试试。</p>
       </div>
 
       <div class="about-card">

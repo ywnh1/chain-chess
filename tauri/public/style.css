@@ -1200,6 +1200,20 @@ body.orbs-on .orb-container{display:block}
   padding:6px 10px;border-radius:8px;background:var(--glass-w-04)}
 .lan-cfg-k{color:var(--dim);flex-shrink:0}
 .lan-cfg-v{color:var(--text);text-align:right;word-break:break-word}
+/* 联机范围卡片：能不能跨网络远程连 */
+.lan-net-card h3{font-size:.95rem}
+.lan-net-good{font-size:.88rem;margin:0 0 4px;color:#2ecc71;font-weight:600}
+.lan-net-bad{font-size:.88rem;margin:0 0 4px;color:var(--accent);font-weight:600}
+.lan-net-why{font-size:.72rem;color:var(--dim);line-height:1.55;margin:4px 0 0}
+.lan-net-addr{
+  font-family:var(--font-mono);font-size:.76rem;line-height:1.5;
+  margin:6px 0 0;padding:8px 10px;border-radius:8px;
+  background:var(--glass-w-06);border:1px solid var(--glass-border);
+  word-break:break-all;user-select:all;
+}
+/* 房间地址旁的小复制按钮 */
+.lan-copy-btn{padding:3px 10px;font-size:.7rem;min-height:0;margin-left:6px;border-radius:6px}
+
 /* 每个 AI 一行算法选择（房主端），沿用 eve 配置行的观感 */
 .lan-ai-rows{display:flex;flex-direction:column;gap:6px;width:100%;margin:2px 0 4px}
 .lan-ai-row{

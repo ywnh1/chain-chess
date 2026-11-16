@@ -12,7 +12,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, TcpListener, TcpStream, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -170,8 +170,20 @@ fn read_loop(
 pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: String) -> Result<u16, String> {
     shutdown(inner_arc);
 
-    let listener = TcpListener::bind(("0.0.0.0", port.unwrap_or(0)))
-        .map_err(|e| format!("监听端口失败: {}", e))?;
+    // 双栈监听：先试 [::]（同时吃 IPv4 与 IPv6），拿不到才退回纯 IPv4。
+    // 只绑 0.0.0.0 的话，有公网 IPv6 的设备也没法被远程连进来 —— 而
+    // 那正是「远程联机」唯一不依赖第三方服务器的路径。
+    // 注意 v6only：Linux 默认 0（双栈），但不同平台/内核参数会变，
+    // 所以这里显式用 socket2 风格的两步绑定不可行（std 没暴露），
+    // 改为：IPv6 绑定成功后单独再绑一个 IPv4 兜底会撞端口，故只做双栈尝试。
+    let listener = match TcpListener::bind(("::", port.unwrap_or(0))) {
+        Ok(l) => l,
+        Err(e6) => {
+            eprintln!("[lan] IPv6 双栈监听失败（{}），退回 IPv4", e6);
+            TcpListener::bind(("0.0.0.0", port.unwrap_or(0)))
+                .map_err(|e| format!("监听端口失败: {}", e))?
+        }
+    };
     let bound_port = listener
         .local_addr()
         .map_err(|e| format!("读取端口失败: {}", e))?
@@ -285,14 +297,34 @@ pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: Strin
     Ok(bound_port)
 }
 
-/// 客户端：连到主机。`addr` 支持 `ip:port`。
+/// 解析 `ip:port` / `[v6]:port`。
+///
+/// 用户从聊天窗口粘过来的 IPv6 常常**不带方括号** ——
+/// `2409:8a02:...:d93f:41234` 这种。裸 IPv6 本身就用冒号分段，
+/// 标准库的 `SocketAddr` 解析必然失败。这里做一次容错：
+/// 解析失败时按**最后一个**冒号切开，左边若含冒号就补成 `[left]:port`。
+/// 最后一段是端口，这也符合 IPv6 地址不能以单独数字结尾当端口的惯例。
+fn parse_endpoint(addr: &str) -> Result<SocketAddr, String> {
+    let t = addr.trim();
+    if let Ok(sa) = t.parse::<SocketAddr>() {
+        return Ok(sa);
+    }
+    if let Some((host, port)) = t.rsplit_once(':') {
+        if host.contains(':') && !host.starts_with('[') {
+            let fixed = format!("[{}]:{}", host, port);
+            if let Ok(sa) = fixed.parse::<SocketAddr>() {
+                return Ok(sa);
+            }
+        }
+    }
+    Err(format!("地址格式不对（要 IP:端口 或 [IPv6]:端口）: {}", addr))
+}
+
+/// 客户端：连到主机。`addr` 支持 `ip:port` 与 `[v6]:port`。
 pub(crate) fn join(inner_arc: &Arc<Mutex<Inner>>, addr: &str, name: String) -> Result<(), String> {
     shutdown(inner_arc);
 
-    let sock_addr: SocketAddr = addr
-        .trim()
-        .parse()
-        .map_err(|_| format!("地址格式不对（要 IP:端口）: {}", addr))?;
+    let sock_addr: SocketAddr = parse_endpoint(addr)?;
     let stream = TcpStream::connect_timeout(&sock_addr, Duration::from_secs(5))
         .map_err(|e| format!("连接 {} 失败: {}", addr, e))?;
     stream.set_nodelay(true).ok();
@@ -393,6 +425,63 @@ pub(crate) fn local_ip() -> String {
     local_ipv4()
         .map(|ip| ip.to_string())
         .unwrap_or_else(|| "127.0.0.1".into())
+}
+
+/// 本机有没有「能出公网」的 IPv6，有就返回地址。
+///
+/// 判据用的是 UDP connect 的路由查找（不发包）：能连通一个公网 IPv6
+/// 目标，说明系统确实有 `2000::/3` 的地址且配了默认路由。
+/// 这比遍历网卡更准 —— 网卡上挂个 fe80:: 或 fd00:: 并不代表能对外通信，
+/// 而有些系统同时有 EUI-64 地址和临时地址，这里拿到的是实际会用的那个。
+///
+/// 注意：这只证明**出站**可达。对端能不能连进来还取决于路由器/防火墙
+/// 是否放行入站，这点无法在设备侧自证，界面上要如实提示。
+fn public_ipv6() -> Option<Ipv6Addr> {
+    let sock = UdpSocket::bind(("[::]:0", 0)).ok()?;
+    // 公网 IPv6 目标只用于选路，不会真的发出任何数据
+    sock.connect(("2001:4860:4860::8888", 53)).ok()?;
+    match sock.local_addr().ok()?.ip() {
+        IpAddr::V6(ip) => Some(ip),
+        _ => None,
+    }
+}
+
+/// 给前端的 IPv6 概况：有没有、地址是什么、能不能用来被远程连。
+/// 全局单播 2000::/3 才算「公网」。ULA(fd00::/8) 和 link-local(fe80::/10)
+/// 都不能跨网络访问，不能拿来当远程地址。
+fn is_global_v6(ip: &Ipv6Addr) -> bool {
+    // 2000::/3 即前 3 位为 001，等价于首段落在 0x2000..=0x3fff
+    (0x2000..0x4000).contains(&ip.segments()[0])
+}
+
+pub(crate) fn ipv6_info() -> Value {
+    match public_ipv6() {
+        Some(ip) => {
+            let s = ip.to_string();
+            let is_global = is_global_v6(&ip);
+            if is_global {
+                json!({
+                    "available": true,
+                    "addr": s,
+                    "raw": s,
+                    "reason": Value::Null,
+                })
+            } else {
+                json!({
+                    "available": false,
+                    "addr": Value::Null,
+                    "raw": s,
+                    "reason": "只有内网 IPv6（fd00:: / fe80::），无法跨网络访问",
+                })
+            }
+        }
+        None => json!({
+            "available": false,
+            "addr": Value::Null,
+            "raw": Value::Null,
+            "reason": "没有可用的 IPv6 出口（未连到支持 IPv6 的网络）",
+        }),
+    }
 }
 
 /// UDP 广播搜索房间，`timeout_ms` 内收集应答。
@@ -497,6 +586,12 @@ pub async fn lan_stop(state: tauri::State<'_, LanState>) -> Result<(), String> {
 #[tauri::command]
 pub async fn lan_local_ip() -> Result<String, String> {
     Ok(local_ip())
+}
+
+/// 本机 IPv6 情况（供「远程联机」入口显示与一键复制）
+#[tauri::command]
+pub async fn lan_ipv6() -> Result<Value, String> {
+    Ok(ipv6_info())
 }
 
 #[tauri::command]
@@ -624,6 +719,54 @@ mod tests {
         );
 
         stop(&host_state.inner);
+    }
+
+    /// 只认 2000::/3 为公网；内网/链路本地/回环都必须判否。
+    /// 这些值直接决定界面上说「能远程联机」还是「只能局域网」，
+    /// 判错会让用户拿着 fd00:: 地址去找对面连，白折腾。
+    #[test]
+    fn global_v6_detection() {
+        let global: Ipv6Addr = "2409:8a02:c22:99a0:3c62:c2ff:fefb:d93f".parse().unwrap();
+        assert!(is_global_v6(&global), "中国移动 2409:: 段是公网地址");
+
+        let global2: Ipv6Addr = "2001:4860:4860::8888".parse().unwrap();
+        assert!(is_global_v6(&global2), "2001:: 段是公网地址");
+
+        for (s, why) in [
+            ("fd00::1", "ULA 私有"),
+            ("fc00::1", "ULA 私有（fc00::/7）"),
+            ("fe80::3c62:c2ff:fefb:d93f", "链路本地"),
+            ("::1", "回环"),
+            ("2001:db8::1", "文档地址虽在 2000::/3，但不会出现在真网卡上"),
+        ] {
+            let ip: Ipv6Addr = s.parse().unwrap();
+            if why.starts_with("文档") {
+                // 明确记录这个已知边界：我们不特判 2001:db8::/32。
+                assert!(is_global_v6(&ip), "文档地址按前缀判定为公网（已知可接受）");
+            } else {
+                assert!(!is_global_v6(&ip), "{} 不应判为公网: {}", why, s);
+            }
+        }
+    }
+
+    /// 地址解析容错：用户粘来的 IPv6 经常不带方括号（裸 IPv6 本身就有冒号）。
+    #[test]
+    fn endpoint_parsing() {
+        for (input, want) in [
+            ("192.168.1.23:41234", "192.168.1.23:41234"),
+            ("[2409:8a02:c22:99a0:3c62:c2ff:fefb:d93f]:41234",
+             "[2409:8a02:c22:99a0:3c62:c2ff:fefb:d93f]:41234"),
+            // 裸 IPv6 + 端口：按最后一个冒号切开
+            ("2409:8a02:c22:99a0:3c62:c2ff:fefb:d93f:41234",
+             "[2409:8a02:c22:99a0:3c62:c2ff:fefb:d93f]:41234"),
+            // 前后空格
+            ("  192.168.1.5:1234  ", "192.168.1.5:1234"),
+        ] {
+            let got = parse_endpoint(input).unwrap_or_else(|e| panic!("{} 解析失败: {}", input, e));
+            assert_eq!(got.to_string(), want, "输入 {}", input);
+        }
+        assert!(parse_endpoint("not-an-address").is_err());
+        assert!(parse_endpoint("2409:8a02::1").is_err(), "裸 IPv6 没有端口应报错");
     }
 
     #[test]

@@ -793,6 +793,7 @@ pub fn run() {
             lan::lan_poll,
             lan::lan_stop,
             lan::lan_local_ip,
+            lan::lan_ipv6,
             lan::lan_discover,
         ])
         .run(tauri::generate_context!())
