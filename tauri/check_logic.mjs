@@ -172,6 +172,71 @@ function grab(startMarker, endMarker) {
   if (!pb[0] || pb[0].delta !== 1) errs.push("MVP：缺失评分的步应跳过，实际 " + JSON.stringify(pb[0]));
 }
 
+/* ═══════ 4.1.0：页面返回逻辑（侧滑与 ← 按钮都要原路返回） ═══════ */
+{
+  // ① 二级页必须用函数式 back，而不是写死目标。
+  //    about-ai / about-benchmark 从「更多」进入，写死 'about' 会回错页。
+  const mustBeDynamic = [
+    "about-ai", "about-benchmark", "about-license", "about-thirdparty",
+    "about-rules", "game-config", "about-changelog", "about",
+  ];
+  for (const page of mustBeDynamic) {
+    const i = appJs.indexOf("Router.register('" + page + "'");
+    if (i < 0) { errs.push("返回逻辑：找不到页面注册 " + page); continue; }
+    const seg = appJs.slice(i, appJs.indexOf("});", i));
+    if (!/back\(\)\s*\{/.test(seg)) {
+      errs.push("返回逻辑：" + page + " 的 back 必须写成函数（原路返回），不能写死");
+    }
+    if (!/Router\.getPrev\(\)/.test(seg)) {
+      errs.push("返回逻辑：" + page + " 的 back 应基于 Router.getPrev()");
+    }
+  }
+
+  // ② 侧滑表不能再硬编码二级页目标（曾经把 about-ai 钉成 'about'）
+  if (/SWIPE_TABLE/.test(appJs)) {
+    errs.push("返回逻辑：侧滑表应改为 SWIPE_SPECIAL + _resolveBack，不能保留写死的 SWIPE_TABLE");
+  }
+  for (const page of ["about-ai", "about-benchmark", "about-license", "about-thirdparty"]) {
+    const re = new RegExp("'" + page + "'\\s*:\\s*\\(\\)\\s*=>\\s*Router\\.switchPage");
+    if (re.test(appJs)) errs.push("返回逻辑：侧滑仍把 " + page + " 硬编码到别的页面");
+  }
+
+  // ③ _resolveBack 的语义：有 getPrev 用它，没有就退回 fallback
+  const routerSrc = grab("const Router = {", "// ─── 页面注册 ───");
+  const Router = new Function(
+    "history", "document", "location",
+    routerSrc + "; return Router;"
+  )(
+    { pushState() {} },
+    { querySelectorAll: () => [], getElementById: () => null, activeElement: null },
+    { hash: "" }
+  );
+
+  Router.register("settings", { back: "welcome" });
+  Router.register("about-ai", { back() { return Router.getPrev() || "about"; } });
+  Router.register("orphan", {});
+
+  // 从 settings 进 about-ai → 返回 settings
+  Router._prev = "settings";
+  if (Router._resolveBack("about-ai") !== "settings")
+    errs.push("返回逻辑：从 settings 进 about-ai，返回应回 settings，实际 " +
+      Router._resolveBack("about-ai"));
+
+  // 没有上一页（深链进来）→ 退回 fallback
+  Router._prev = null;
+  if (Router._resolveBack("about-ai") !== "about")
+    errs.push("返回逻辑：无上一页时应退回 about，实际 " + Router._resolveBack("about-ai"));
+
+  // 静态字符串 back 照常可用
+  Router._prev = "whatever";
+  if (Router._resolveBack("settings") !== "welcome")
+    errs.push("返回逻辑：静态 back 应生效");
+
+  // 没有 back 声明的页面 → welcome
+  if (Router._resolveBack("orphan") !== "welcome")
+    errs.push("返回逻辑：无 back 声明应退回 welcome");
+}
+
 /* ═══════ 4.1.0：评分随历史压缩/展开往返不丢 ═══════ */
 {
   const comp = grab("function compactHistory(", "function expandHistory(");

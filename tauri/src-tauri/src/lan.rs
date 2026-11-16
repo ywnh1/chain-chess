@@ -167,7 +167,18 @@ fn read_loop(
 }
 
 /// 主机：监听 TCP（port=None 时由系统分配），并启动 UDP 应答线程。
-pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: String) -> Result<u16, String> {
+/// 建房结果：端口 + 实际监听能力。
+///
+/// `ipv6` 一定要如实返回：如果系统绑 [::] 失败退回 IPv4，界面却仍然
+/// 显示公网 IPv6 地址，用户复制出去发给别人只会连不上，而且完全看不出
+/// 原因（地址本身是合法的）。这是实际踩过的坑。
+pub(crate) struct HostInfo {
+    pub port: u16,
+    /// 监听是否覆盖 IPv6（双栈或 v6only+补 v4 都算 true）
+    pub ipv6: bool,
+}
+
+pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: String) -> Result<HostInfo, String> {
     shutdown(inner_arc);
 
     // 监听要同时吃 IPv4 与 IPv6：
@@ -182,7 +193,7 @@ pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: Strin
     let want_port = port.unwrap_or(0);
     // match 直接返回 (监听列表, 端口)：两个分支各自构造完整结果，
     // 避免先声明一个从未被读取的初值（那样会触发 unused_assignments）。
-    let (listeners, bound_port): (Vec<TcpListener>, u16) =
+    let (listeners, bound_port, ipv6_ok): (Vec<TcpListener>, u16, bool) =
         match TcpListener::bind(("::", want_port)) {
             Ok(l) => {
                 let p = l.local_addr().map_err(|e| format!("读取端口失败: {}", e))?.port();
@@ -192,14 +203,14 @@ pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: Strin
                     eprintln!("[lan] 系统为 v6only，额外启用 IPv4 监听（端口 {}）", p);
                     v.push(v4);
                 }
-                (v, p)
+                (v, p, true)
             }
             Err(e6) => {
-                eprintln!("[lan] IPv6 监听失败（{}），退回 IPv4", e6);
+                eprintln!("[lan] IPv6 监听失败（{}），退回 IPv4 —— 公网 IPv6 地址将不可用", e6);
                 let l = TcpListener::bind(("0.0.0.0", want_port))
                     .map_err(|e| format!("监听端口失败: {}", e))?;
                 let p = l.local_addr().map_err(|e| format!("读取端口失败: {}", e))?.port();
-                (vec![l], p)
+                (vec![l], p, false)
             }
         };
     for l in &listeners {
@@ -218,7 +229,7 @@ pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: Strin
     };
     push(
         inner_arc,
-        json!({"type": "hosting", "port": bound_port, "name": name}),
+        json!({"type": "hosting", "port": bound_port, "name": name, "ipv6": ipv6_ok}),
     );
 
     // accept 线程：每个监听一个。peer id 用共享计数器，避免两个监听撞号。
@@ -309,7 +320,7 @@ pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: Strin
         });
     }
 
-    Ok(bound_port)
+    Ok(HostInfo { port: bound_port, ipv6: ipv6_ok })
 }
 
 /// 解析 `ip:port` / `[v6]:port`。
@@ -605,9 +616,10 @@ pub async fn lan_host(
     state: tauri::State<'_, LanState>,
     port: Option<u16>,
     name: String,
-) -> Result<u16, String> {
+) -> Result<Value, String> {
     let inner = state.inner.clone();
-    host(&inner, port, name)
+    let info = host(&inner, port, name)?;
+    Ok(json!({ "port": info.port, "ipv6": info.ipv6 }))
 }
 
 #[tauri::command]
@@ -700,7 +712,7 @@ mod tests {
     fn host_and_client_exchange_messages() {
         let _guard = serial();
         let host_state = LanState::new();
-        let port = host(&host_state.inner, None, "host".into()).expect("起主机失败");
+        let port = host(&host_state.inner, None, "host".into()).expect("起主机失败").port;
 
         let client_state = LanState::new();
         join(&client_state.inner, &format!("127.0.0.1:{}", port), "client".into())
@@ -748,7 +760,7 @@ mod tests {
             return;
         }
         let host_state = LanState::new();
-        let port = host(&host_state.inner, None, "测试房间".into()).expect("起主机失败");
+        let port = host(&host_state.inner, None, "测试房间".into()).expect("起主机失败").port;
         // UDP 应答线程是刚 spawn 的，给它一点时间完成 bind
         thread::sleep(Duration::from_millis(150));
         let found = discover(1200);
@@ -762,7 +774,7 @@ mod tests {
     fn stale_session_does_not_leak_events() {
         let _guard = serial();
         let host_state = LanState::new();
-        let port = host(&host_state.inner, None, "h1".into()).expect("起主机失败");
+        let port = host(&host_state.inner, None, "h1".into()).expect("起主机失败").port;
         let client_state = LanState::new();
         join(&client_state.inner, &format!("127.0.0.1:{}", port), "c1".into())
             .expect("连主机失败");
@@ -774,7 +786,7 @@ mod tests {
         // 旧会话直接拆掉，立刻在同一实例上重建（模拟 lanStopNet → lan_host）
         stop(&client_state.inner);
         stop(&host_state.inner);
-        let port2 = host(&host_state.inner, None, "h2".into()).expect("重建主机失败");
+        let port2 = host(&host_state.inner, None, "h2".into()).expect("重建主机失败").port;
         // 给旧读线程足够时间醒来并尝试写事件
         thread::sleep(Duration::from_millis(300));
         let stale: Vec<Value> = poll(&host_state.inner);
@@ -917,7 +929,7 @@ mod tests {
         };
 
         let host_state = LanState::new();
-        let port = host(&host_state.inner, None, "h".into()).expect("起主机失败");
+        let port = host(&host_state.inner, None, "h".into()).expect("起主机失败").port;
         let joined = wait_event(&host_state.inner, 3000, |ev| {
             ev["type"] == "peer" && ev["event"] == "join"
         });
@@ -953,7 +965,7 @@ mod tests {
     fn host_accepts_both_ipv4_and_ipv6_clients() {
         let _guard = serial();
         let host_state = LanState::new();
-        let port = host(&host_state.inner, None, "h".into()).expect("起主机失败");
+        let port = host(&host_state.inner, None, "h".into()).expect("起主机失败").port;
 
         // IPv4 回环
         let c4 = LanState::new();
@@ -983,6 +995,50 @@ mod tests {
         }
 
         stop(&c4.inner);
+        stop(&host_state.inner);
+    }
+
+    /// host() 必须如实报告监听是否覆盖 IPv6。
+    /// 如果它谎报 true，前端就会给出一个「地址合法但没人监听」的端点，
+    /// 用户复制出去永远连不上且看不出原因。
+    #[test]
+    fn host_reports_ipv6_listening_truthfully() {
+        let _guard = serial();
+        let host_state = LanState::new();
+        let info = host(&host_state.inner, None, "h".into()).expect("起主机失败");
+
+        // 行为验证比「比对布尔值」可靠得多：
+        //   报告 ipv6=true  → 必须真能用 IPv6 回环连上
+        //   报告 ipv6=false → 不该谎报（只能确认没 IPv6 栈时它是 false）
+        let v6_usable = {
+            let probe = LanState::new();
+            let ok = UdpSocket::bind(SocketAddr::from((Ipv6Addr::UNSPECIFIED, 0)))
+                .map(|_| join(&probe.inner, &format!("[::1]:{}", info.port), "p".into()).is_ok())
+                .unwrap_or(false);
+            stop(&probe.inner);
+            ok
+        };
+        if info.ipv6 {
+            assert!(
+                v6_usable,
+                "报告 ipv6=true，但用 [::1]:{} 连不上 —— 前端会因此给出一个没人监听的公网地址",
+                info.port
+            );
+        } else {
+            // 没有 IPv6 栈时不能报 true；有栈却报 false 属于保守，可接受
+            let has_stack = UdpSocket::bind(SocketAddr::from((Ipv6Addr::UNSPECIFIED, 0))).is_ok();
+            assert!(
+                !has_stack || !v6_usable,
+                "报告 ipv6=false 却实际能连（{}），与事实不符",
+                info.port
+            );
+        }
+
+        // 不论哪种模式，IPv4 回环都必须能连（否则局域网被弄坏）
+        let c = LanState::new();
+        join(&c.inner, &format!("127.0.0.1:{}", info.port), "c".into())
+            .expect("IPv4 回环连不上");
+        stop(&c.inner);
         stop(&host_state.inner);
     }
 

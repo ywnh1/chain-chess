@@ -1079,6 +1079,19 @@ const Router = {
     }
   },
 
+  /// 解析某个页面的返回目标。
+  ///
+  /// 优先用注册表里声明的 back —— 它可以是函数，从而做到「从哪进就回哪」。
+  /// 二级页（AI 介绍、AI 评测、许可证…）能从多个入口进来，写死一个
+  /// 目标必然有一边回错地方。返回 null 表示无处可回。
+  _resolveBack(id, fallback) {
+    const p = this._registry[id];
+    const fb = (fallback === undefined) ? 'welcome' : fallback;
+    if (!p || !p.back) return fb;
+    const t = (typeof p.back === 'function') ? p.back() : p.back;
+    return t || fb;
+  },
+
   getPrev() { return this._prev; }
 };
 
@@ -1126,12 +1139,13 @@ Router.register('game', {
 });
 
 Router.register('about', {
-  back: 'settings',
+  back() { return Router.getPrev() || 'settings'; },   // 首页图标 / 更多 都能进
   enter() { document.body.style.background=''; },
   leave() {}
 });
 Router.register('about-ai', {
-  back: 'about',
+  back() { return Router.getPrev() || 'about'; },   // 更多 / 关于都能进得来
+
   enter() { document.body.style.background=''; },
   leave() {}
 });
@@ -1161,7 +1175,8 @@ function initRulesCollapse(){
 }
 
 Router.register('about-rules', {
-  back: 'settings',
+  back() { return Router.getPrev() || 'settings'; },   // 更多 / 更新弹窗都能进
+
   enter() { document.body.style.background=''; initRulesCollapse(); },
   leave() {}
 });
@@ -1171,17 +1186,19 @@ Router.register('about-changelog', {
   leave() { var cc=document.getElementById('changelogContainer');if(cc)cc.querySelectorAll('.cl-card').forEach(function(e){e.remove()}); }
 });
 Router.register('about-license', {
-  back: 'about',
+  back() { return Router.getPrev() || 'about'; },
+
   enter() { document.body.style.background=''; },
   leave() {}
 });
 Router.register('about-thirdparty', {
-  back: 'about',
+  back() { return Router.getPrev() || 'about'; },
+
   enter() { document.body.style.background=''; },
   leave() {}
 });
 Router.register('about-benchmark', {
-  back: 'about',
+  back() { return Router.getPrev() || 'about'; },
   enter() { document.body.style.background='' },
   leave() {}
 });
@@ -1240,6 +1257,8 @@ function lanDepthForAlgo(alg){
 let lanRemoteCfg = null;
 // 本机 IPv6 情况：{available, addr, raw, reason}。进页面时探测一次。
 let lanV6 = null;
+// 本机房主监听是否真的覆盖 IPv6（由 lan_host 返回，不是靠探测猜）
+let lanHostIpv6 = false;
 let lanPollTimer = null;
 let lanDrainBusy = false;
 
@@ -1289,6 +1308,7 @@ function lanStopNet(){
   try{ tauriInvoke('lan_stop').catch(function(){}); }catch(e){}
   lanRole = null; lanSeats = null; lanPlayers = []; lanMyPid = 0; lanRoomAddr = '';
   lanInbox = [];
+  lanHostIpv6 = false;
 }
 async function lanDrainEvents(){
   if(lanDrainBusy) return;
@@ -1919,7 +1939,7 @@ function lanRenderRoomAddr(){
   const hostMode = (lanRole === 'host');
   const v6 = lanV6 || {};
 
-  if(hostMode && v6.available && v6.addr && port){
+  if(hostMode && v6.available && v6.addr && port && lanHostIpv6){
     if(v6El) v6El.textContent = lanV6Endpoint(v6.addr, port);
     row.style.display = '';
     if(copyV6) copyV6.onclick = function(){
@@ -1928,6 +1948,12 @@ function lanRenderRoomAddr(){
   }else{
     row.style.display = 'none';
     if(copyV6) copyV6.onclick = null;
+    // 有公网 IPv6 但监听没覆盖＝最容易被误解的情况，必须在房间页说清楚
+    if(hostMode && v6.available && v6.addr && port && !lanHostIpv6){
+      row.style.display = '';
+      if(v6El) v6El.textContent = '本机未在 IPv6 上监听，暂时只能用局域网地址';
+      if(copyV6) copyV6.onclick = null;
+    }
   }
 }
 
@@ -1937,13 +1963,18 @@ async function lanCreateRoom(){
   const name = lanNickValue();
   lanStopNet();
   lanCfg = lanReadCfgFromDom();   // 建房时把页面上的默认规则记下来
-  let port = 0;
+  let hostInfo = null;
   try{
-    port = await tauriInvoke('lan_host', {port:null, name:name});
+    hostInfo = await tauriInvoke('lan_host', {port:null, name:name});
   }catch(e){
     showMsg('创建房间失败：' + ((e && e.message) || e), 'error');
     return;
   }
+  // 兼容旧返回（裸 u16）与新返回（{port, ipv6}）
+  const port = (hostInfo && typeof hostInfo === 'object') ? (hostInfo.port | 0) : (hostInfo | 0);
+  // 实际监听是否覆盖 IPv6。为 false 时下面不会给公网地址 ——
+  // 否则用户复制出去一个「地址合法但没人监听」的端点，永远连不上。
+  lanHostIpv6 = !!(hostInfo && typeof hostInfo === 'object' && hostInfo.ipv6);
   let ip = '127.0.0.1';
   try{ ip = await tauriInvoke('lan_local_ip'); }catch(e){}
   lanRole = 'host';
@@ -6515,7 +6546,7 @@ function initGameConfigPage(){
 }
 
 Router.register('game-config', {
-  back: 'gameSetup',
+  back() { return Router.getPrev() || 'gameSetup'; },
   enter() { document.body.style.background = ''; initGameConfigPage(); },
   leave() {},
 });
@@ -7321,34 +7352,33 @@ window.addEventListener('popstate',()=>{
 
   // ── 页面导航（查表跳转） ──
   if(!handled){
-    const SWIPE_TABLE = {
-      'welcome':       () => showExitConfirm(),                     // 1 => 14
-      'gameSetup':     () => Router.switchPage('welcome'),          // new => welcome
-      'history':       () => Router.switchPage('welcome'),          // 5 => 1
-      'lan':           () => Router.switchPage('welcome'),          // 局域网联机 => 1（离开会断网）
-      'settings':      () => Router.switchPage('welcome'),          // settings => 1
-      'about':         () => Router.switchPage('settings'),         // 6 => settings
-      'about-ai':      () => Router.switchPage('about'),            // 10 => 6
-      'about-changelog': () => Router.switchPage('about'),          // 11 => 6
-      'about-benchmark': () => Router.switchPage('about'),            // 12 => 6
-      'about-license': () => Router.switchPage('about'),            // 11 => 6
-      'about-thirdparty': () => Router.switchPage('about'),         // SDK 页 => 6
-      'game-config':   () => Router.switchPage('gameSetup'),        // 游戏配置 => 开局页
-      'device-bench':  () => Router.switchPage('settings'),         // device-bench => settings
-      'checkout':      () => {                                      // 7 => 5, 8 => 2/3/4
+    // 侧滑返回：只有「需要做动作而不只是换页」的场景才单列，
+    // 其余一律走 Router 的 back 声明（支持函数，能原路返回）。
+    //
+    // 以前这里是一张写死的表，把 about-ai / about-benchmark 目标钉成
+    // 'about'。这两个页面后来挪到了「更多」下，从那里进去再侧滑，
+    // 就莫名其妙回到「关于」——正是这张表造成的。
+    const SWIPE_SPECIAL = {
+      'welcome':  () => showExitConfirm(),                          // 首页 => 退出确认
+      'lan':      () => Router.switchPage('welcome'),               // 联机页 => 首页（离开会断网）
+      'checkout': () => {                                           // 结算 => 来的大厅
         const prev = Router._checkoutPrev;
-        if(prev === 'history') Router.switchPage('history');        // EachHistoryPage => history
-        else Router.switchPage(prev || 'welcome');                  // CheckoutPage => 对应大厅
+        Router.switchPage(prev || 'welcome');
       },
-      'game':          () => {                                      // 13 => 9
-        if(gameMode === 'lan') { openModal('lanExitConfirm'); return; }   // 联机不能暂停，只能退出
+      'game':     () => {                                           // 对局 => 暂停/退出
+        if(gameMode === 'lan') { openModal('lanExitConfirm'); return; }
         if(gameOver) exitGame(true);
         else if(isPaused) resumeGame();
         else togglePause();
       },
     };
-    const action = SWIPE_TABLE[cur];
-    if(action) action();
+    const special = SWIPE_SPECIAL[cur];
+    if(special){
+      special();
+    }else{
+      const target = Router._resolveBack(cur, 'welcome');
+      if(target && target !== cur) Router.switchPage(target);
+    }
   }
 
   // ── 历史栈永不枯竭 ──

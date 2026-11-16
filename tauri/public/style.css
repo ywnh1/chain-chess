@@ -1180,6 +1180,32 @@ body.orbs-on .orb-container{display:block}
 }
 .about-foot-btn{flex:0 0 auto;min-width:64px;max-width:80px;flex:1}
 .history-foot-btn{flex:2;min-width:0}
+/* ═══════ 游戏配置入口按钮（开局页） ═══════ */
+.game-config-btn{
+  display:flex;align-items:center;gap:12px;width:100%;
+  padding:16px 18px;margin:10px 0 4px;
+  border:1px solid var(--glass-border);border-radius:var(--radius);
+  background-image:linear-gradient(135deg,rgba(240,179,75,.16) 0%,rgba(200,140,240,.08) 55%,rgba(95,195,195,.12) 100%),var(--glass-w-06);
+  background-origin:padding-box;
+  color:var(--text);font-family:var(--font);text-align:left;cursor:pointer;
+  -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
+  box-shadow:0 4px 22px rgba(240,179,75,.12),inset 0 1px 0 rgba(255,255,255,.06);
+  transition:all .3s cubic-bezier(.22,1,.36,1);
+}
+.game-config-btn:hover,.game-config-btn:active{
+  transform:translateY(-1px);
+  border-color:rgba(240,179,75,.42);
+  box-shadow:0 6px 28px rgba(240,179,75,.2),inset 0 1px 0 rgba(255,255,255,.1);
+}
+.game-config-btn:active{transform:scale(.985)}
+.gc-btn-main{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.gc-btn-title{font-size:1rem;font-weight:700;letter-spacing:2px;color:var(--accent)}
+.gc-btn-sub{
+  font-size:.74rem;color:var(--dim);line-height:1.4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.gc-btn-arrow{color:var(--accent);font-size:1.1rem;flex-shrink:0;opacity:.85}
+
 /* ═══════ 局域网联机页 ═══════ */
 /* 与其他长页面（#about / #settings）同一模式：外层锁死视口高度，
    内部各视图自己滚。房间页内容（规则区 + 玩家列表）比加入页长得多，

@@ -134,14 +134,16 @@
     </div>
 
     <!-- 棋盘边界模式 -->
-    <!-- 游戏配置 → 二级页（边界 / 阈值 / 胜负判定 / 预设） -->
-    <div class="about-card" style="cursor:pointer" onclick="Router.navigate('game-config')">
-      <div class="form-row" style="flex-direction:row;align-items:center;gap:8px;margin:0">
-        <label style="flex:1">游戏配置</label>
-        <span id="gameConfigSummary" style="color:var(--dim);font-size:.76rem;text-align:right">标准 · 4 级</span>
-        <span style="color:var(--dim)">→</span>
-      </div>
-    </div>
+    <!-- 游戏配置 → 二级页（边界 / 阈值 / 胜负判定 / 预设）
+         做成醒目的大按钮而不是一行文字：它是开局前必看的一项，
+         之前用 about-card 包一行 label，太容易被当成说明文字划过去。 -->
+    <button type="button" class="game-config-btn" onclick="Router.navigate('game-config')">
+      <span class="gc-btn-main">
+        <span class="gc-btn-title">游戏配置</span>
+        <span class="gc-btn-sub" id="gameConfigSummary">标准 · 4 级</span>
+      </span>
+      <span class="gc-btn-arrow" aria-hidden="true">→</span>
+    </button>
 
     <!-- 玩家人数 -->
     <div class="form-row"><label>玩家人数<button type="button" class="hint-btn" onclick="openHint('players')"

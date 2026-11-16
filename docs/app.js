@@ -1055,6 +1055,19 @@ const Router = {
     }
   },
 
+  /// 解析某个页面的返回目标。
+  ///
+  /// 优先用注册表里声明的 back —— 它可以是函数，从而做到「从哪进就回哪」。
+  /// 二级页（AI 介绍、AI 评测、许可证…）能从多个入口进来，写死一个
+  /// 目标必然有一边回错地方。返回 null 表示无处可回。
+  _resolveBack(id, fallback) {
+    const p = this._registry[id];
+    const fb = (fallback === undefined) ? 'welcome' : fallback;
+    if (!p || !p.back) return fb;
+    const t = (typeof p.back === 'function') ? p.back() : p.back;
+    return t || fb;
+  },
+
   getPrev() { return this._prev; }
 };
 
@@ -1100,12 +1113,12 @@ Router.register('game', {
 });
 
 Router.register('about', {
-  back: 'settings',
+  back() { return Router.getPrev() || 'settings'; },   // 首页图标 / 更多 都能进
   enter() { document.body.style.background=''; },
   leave() {}
 });
 Router.register('about-ai', {
-  back: 'about',
+  back() { return Router.getPrev() || 'about'; },   // 更多 / 关于都能进得来
   enter() { document.body.style.background=''; },
   leave() {}
 });
@@ -1135,7 +1148,7 @@ function initRulesCollapse(){
 }
 
 Router.register('about-rules', {
-  back: 'settings',
+  back() { return Router.getPrev() || 'settings'; },   // 更多 / 更新弹窗都能进
   enter() { document.body.style.background=''; initRulesCollapse(); },
   leave() {}
 });
@@ -1145,17 +1158,17 @@ Router.register('about-changelog', {
   leave() { var cc=document.getElementById('changelogContainer');if(cc)cc.querySelectorAll('.cl-card').forEach(function(e){e.remove()}); }
 });
 Router.register('about-license', {
-  back: 'about',
+  back() { return Router.getPrev() || 'about'; },
   enter() { document.body.style.background=''; },
   leave() {}
 });
 Router.register('about-thirdparty', {
-  back: 'about',
+  back() { return Router.getPrev() || 'about'; },
   enter() { document.body.style.background=''; },
   leave() {}
 });
 Router.register('about-benchmark', {
-  back: 'about',
+  back() { return Router.getPrev() || 'about'; },
   enter() { document.body.style.background='' },
   leave() {}
 });
@@ -5228,7 +5241,7 @@ function initGameConfigPage(){
 }
 
 Router.register('game-config', {
-  back: 'gameSetup',
+  back() { return Router.getPrev() || 'gameSetup'; },
   enter() { document.body.style.background = ''; initGameConfigPage(); },
   leave() {},
 });
@@ -5998,31 +6011,33 @@ window.addEventListener('popstate',()=>{
 
   // ── 页面导航（查表跳转） ──
   if(!handled){
-    const SWIPE_TABLE = {
-      'welcome':       () => showExitConfirm(),                     // 1 => 14
-      'gameSetup':     () => Router.switchPage('welcome'),          // new => welcome
-      'history':       () => Router.switchPage('welcome'),          // 5 => 1
-      'settings':      () => Router.switchPage('welcome'),          // settings => 1
-      'about':         () => Router.switchPage('settings'),         // 6 => settings
-      'about-ai':      () => Router.switchPage('about'),            // 10 => 6
-      'about-changelog': () => Router.switchPage('about'),          // 11 => 6
-      'about-benchmark': () => Router.switchPage('about'),            // 12 => 6
-      'device-bench':  () => Router.switchPage('settings'),         // device-bench => settings
-      'about-license': () => Router.switchPage('about'),            // 11 => 6
-      'about-thirdparty': () => Router.switchPage('about'),         // SDK 页 => 6
-      'checkout':      () => {                                      // 7 => 5, 8 => 2/3/4
+    // 侧滑返回：只有「需要做动作而不只是换页」的场景才单列，
+    // 其余一律走 Router 的 back 声明（支持函数，能原路返回）。
+    //
+    // 以前这里是一张写死的表，把 about-ai / about-benchmark 目标钉成
+    // 'about'。这两个页面后来挪到了「更多」下，从那里进去再侧滑，
+    // 就莫名其妙回到「关于」——正是这张表造成的。
+    const SWIPE_SPECIAL = {
+      'welcome':  () => showExitConfirm(),                          // 首页 => 退出确认
+      'lan':      () => Router.switchPage('welcome'),               // 联机页 => 首页（离开会断网）
+      'checkout': () => {                                           // 结算 => 来的大厅
         const prev = Router._checkoutPrev;
-        if(prev === 'history') Router.switchPage('history');        // EachHistoryPage => history
-        else Router.switchPage(prev || 'welcome');                  // CheckoutPage => 对应大厅
+        Router.switchPage(prev || 'welcome');
       },
-      'game':          () => {                                      // 13 => 9
+      'game':     () => {                                           // 对局 => 暂停/退出
+        if(gameMode === 'lan') { openModal('lanExitConfirm'); return; }
         if(gameOver) exitGame(true);
         else if(isPaused) resumeGame();
         else togglePause();
       },
     };
-    const action = SWIPE_TABLE[cur];
-    if(action) action();
+    const special = SWIPE_SPECIAL[cur];
+    if(special){
+      special();
+    }else{
+      const target = Router._resolveBack(cur, 'welcome');
+      if(target && target !== cur) Router.switchPage(target);
+    }
   }
 
   // ── 历史栈永不枯竭 ──

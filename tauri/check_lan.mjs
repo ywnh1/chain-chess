@@ -254,7 +254,8 @@ function makeSandbox(role, peerId = null, port = 43210) {
   const invoke = async (cmd, args = {}) => {
     switch (cmd) {
       case "lan_host":
-        return port;
+        // 4.1.0 起返回 {port, ipv6}；env.hostIpv6=false 可模拟「系统绑不上 IPv6」
+        return { port: port, ipv6: env.hostIpv6 !== false };
       case "lan_local_ip":
         return "192.168.1.5";
       case "lan_ipv6":
@@ -320,6 +321,7 @@ function makeSandbox(role, peerId = null, port = 43210) {
     customBoards: [],
     vibrate: () => {},
     ipv6: null,
+    hostIpv6: true,
   };
 
   const prelude = `
@@ -427,6 +429,7 @@ function makeSandbox(role, peerId = null, port = 43210) {
       checkIpv6:()=>lanCheckIpv6(),
       setIpv6:(v)=>{ __env.ipv6 = v; },
       setIpv6Missing:(v)=>{ __env.ipv6Missing = v; },
+      setHostIpv6:(v)=>{ __env.hostIpv6 = v; },
       // innerHTML 在 mock 里只是字符串，直接读出来做断言
       get netBodyHtml(){ return (document.getElementById('lanNetBody')||{}).innerHTML || ''; },
       get roomRowShown(){ return (document.getElementById('lanRoomRemoteRow')||{}).style.display !== 'none'; },
@@ -831,6 +834,20 @@ async function main() {
   ok(/只能/.test(privHtml), "内网 IPv6 应提示只能局域网");
   ok(privHtml.includes("fd00::1"), "内网地址应显示出来，便于用户判断");
   ok(/内网段/.test(privHtml), "应说明该地址属于内网段");
+
+  /* 25.7 有公网 IPv6 但监听没覆盖（系统绑不上 ::）→ 绝不能给出地址，
+     否则用户复制出去一个「合法但没人监听」的端点，永远连不上 */
+  resetNet();
+  const hostNoListen = makeSandbox("host", null, 43225);
+  hostNoListen.setHostIpv6(false);
+  const V6X = "2409:8a02:c22:99a0:e13b:2795:2e46:70c0";
+  hostNoListen.setIpv6({ available: true, addr: V6X, raw: V6X, code: "ok" });
+  await hostNoListen.checkIpv6();
+  await hostNoListen.lanCreateRoom();
+  await settle([hostNoListen]);
+  const msg = hostNoListen.roomV6Text || "";
+  ok(msg.indexOf(V6X) === -1, "监听不含 IPv6 时不该显示公网地址: " + msg);
+  ok(/未在 IPv6 上监听/.test(msg), "监听不含 IPv6 时应明确说明，实际: " + msg);
 
   /* 26. 端口拼接：无端口时不能拼出垃圾 */
   ok(hostV6.v6Endpoint("2409::1", "") === "", "无端口时应返回空串");

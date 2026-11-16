@@ -268,11 +268,16 @@ fn test_rect_full_game_runs_to_end() {
 }
 
 /// 回环边界在长方形上要按各自的边长回绕
+///
+/// 原来调用的 `nbrs_wrap(i, j, rows, cols)` 已经不存在了（引擎改为
+/// `nbrs_with_mode(board, i, j, BorderMode::Wrap)`，因为异形棋盘的洞
+/// 也影响回绕落点）。这里改成构造一块 7 行 × 5 列的空棋盘，语义不变。
 #[test]
 fn test_rect_wrap_uses_cols_for_columns() {
-    let ns = nbrs_wrap(0, 0, 7, 5);
-    assert!(ns.contains(&(6, 0)), "上行回绕到最后一行(6)");
-    assert!(ns.contains(&(0, 4)), "左列回绕到最后一列(4)");
+    let board: GameBoard = vec![vec![Cell::empty(); 5]; 7];
+    let ns = nbrs_with_mode(&board, 0, 0, BorderMode::Wrap);
+    assert!(ns.contains(&(6, 0)), "上行回绕到最后一行(6): {:?}", ns);
+    assert!(ns.contains(&(0, 4)), "左列回绕到最后一列(4): {:?}", ns);
     assert!(ns.iter().all(|&(i, j)| i < 7 && j < 5), "回绕结果必须仍在棋盘内: {:?}", ns);
 }
 
