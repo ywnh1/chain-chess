@@ -1823,8 +1823,27 @@ async function lanCheckIpv6(){
     return;
   }
   let info = null;
-  try{ info = await tauriInvoke('lan_ipv6'); }catch(e){}
-  lanV6 = info || {available:false, addr:null, reason:'检测失败'};
+  let failure = null;
+  try{
+    info = await tauriInvoke('lan_ipv6');
+  }catch(e){
+    failure = String((e && (e.message || e)) || e || '');
+  }
+  if(info && typeof info === 'object'){
+    lanV6 = info;
+  }else{
+    // 区分「这个版本还没有该功能」和「检测出错」。
+    // 前者只能升级解决，后者可以重试 —— 混成一句「检测失败」会让
+    // 用户明明有 IPv6 却无从下手（旧包里就是这种情况）。
+    const missing = /not found|unknown command|not allowed|not registered/i.test(failure || '');
+    lanV6 = {
+      available: false, addr: null, raw: null,
+      code: missing ? 'too_old' : 'error',
+      reason: missing
+        ? '当前版本还没有 IPv6 检测功能，升级到 4.1.0 或更新的版本后再看这里'
+        : ('检测 IPv6 时出错：' + (failure || '未知原因')),
+    };
+  }
   lanRenderNetCard();
 }
 
@@ -1832,12 +1851,43 @@ function lanRenderNetCard(){
   const body = document.getElementById('lanNetBody');
   if(!body) return;
   const v6 = lanV6 || {available:false};
+
+  // 版本太旧：不能写「只能局域网」，那是在替一个根本没跑的检测下结论
+  if(v6.code === 'too_old'){
+    body.innerHTML =
+      '<p class="lan-net-bad">⚠️ 版本过旧</p>' +
+      '<p class="lan-net-why">' + htmlEsc(v6.reason) + '</p>' +
+      '<p class="lan-net-why">在此之前请先用同一 Wi-Fi 局域网联机。</p>';
+    return;
+  }
+  // 检测出错：不武断下结论，给重试
+  if(v6.code === 'error'){
+    body.innerHTML =
+      '<p class="lan-net-bad">⚠️ 检测失败</p>' +
+      '<p class="lan-net-why">' + htmlEsc(v6.reason) + '</p>' +
+      '<div style="display:flex;gap:6px;margin-top:6px">' +
+        '<button class="glass-btn primary" id="lanRetryV6" style="flex:1">重新检测</button>' +
+      '</div>';
+    const btn = document.getElementById('lanRetryV6');
+    if(btn) btn.onclick = function(){ lanCheckIpv6(); };
+    return;
+  }
+
   if(!v6.available){
     body.innerHTML =
       '<p class="lan-net-bad">🛜 只能<strong>局域网联机</strong></p>' +
       '<p class="lan-net-why">' + htmlEsc(v6.reason || '没有可用的公网 IPv6') + '</p>' +
       '<p class="lan-net-why">其他人需要在同一个 Wi-Fi / 热点下才能加入。' +
-      '想跨网络玩，把手机和电脑都接到支持 IPv6 的网络上再回来看这里。</p>';
+      '想跨网络玩，把手机和电脑都接到支持 IPv6 的网络上再回来看这里。</p>' +
+      (v6.raw
+        ? '<p class="lan-net-why">检测到的地址是 ' + htmlEsc(v6.raw) +
+          '，属于内网段，外部连不进来。</p>'
+        : '') +
+      '<div style="display:flex;gap:6px;margin-top:6px">' +
+        '<button class="glass-btn" id="lanRetryV6b" style="flex:1">重新检测</button>' +
+      '</div>';
+    const btn = document.getElementById('lanRetryV6b');
+    if(btn) btn.onclick = function(){ lanCheckIpv6(); };
     return;
   }
   body.innerHTML =

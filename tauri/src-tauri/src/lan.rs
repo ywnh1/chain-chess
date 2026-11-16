@@ -436,14 +436,51 @@ pub(crate) fn local_ip() -> String {
 ///
 /// 注意：这只证明**出站**可达。对端能不能连进来还取决于路由器/防火墙
 /// 是否放行入站，这点无法在设备侧自证，界面上要如实提示。
-fn public_ipv6() -> Option<Ipv6Addr> {
-    let sock = UdpSocket::bind(("[::]:0", 0)).ok()?;
-    // 公网 IPv6 目标只用于选路，不会真的发出任何数据
-    sock.connect(("2001:4860:4860::8888", 53)).ok()?;
-    match sock.local_addr().ok()?.ip() {
-        IpAddr::V6(ip) => Some(ip),
-        _ => None,
+/// 探测结果：成功拿到地址，或失败原因（分开报告，便于用户判断是
+/// 「系统不支持 IPv6」还是「网络没下发地址」，两种情况处理方式完全不同）。
+enum V6Probe {
+    Found(Ipv6Addr),
+    /// 连 [::] 都绑不上 —— 系统层面就没有 IPv6 栈
+    NoStack,
+    /// socket 能创建，但没有到公网 IPv6 的路由 —— 网络没给地址
+    NoRoute,
+}
+
+/// 候选目标只用国内可达的 IPv6 DNS。
+/// 之前用的是 Google DNS(2001:4860::8888)，国内网络下它的路由经常
+/// 被黑洞掉，UDP connect 会直接返回 ENETUNREACH —— 明明有公网 IPv6
+/// 却被判成「没有」，这是真实踩到的坑。
+const V6_PROBES: &[&str] = &[
+    "2400:3200::1",        // 阿里 DNS
+    "2402:4e00::",         // 腾讯 DNS
+    "240c::6666",          // 下一代互联网国家工程中心
+    "2001:4860:4860::8888",// Google，仅作最后兜底
+];
+
+fn probe_ipv6() -> V6Probe {
+    // 先把「系统有没有 IPv6 栈」和「网络有没有路由」分开，
+    // 否则两种失败都变成一句「没有」，用户没法自查。
+    let any_bind = UdpSocket::bind(("[::]:0", 0));
+    if any_bind.is_err() {
+        return V6Probe::NoStack;
     }
+    drop(any_bind);
+
+    for target in V6_PROBES {
+        let Ok(sock) = UdpSocket::bind(("[::]:0", 0)) else { continue };
+        // UDP connect 只做路由查找，不会真的发包
+        if sock.connect((*target, 53)).is_err() {
+            continue;
+        }
+        if let Ok(addr) = sock.local_addr() {
+            if let IpAddr::V6(ip) = addr.ip() {
+                // ::1 / fe80:: 这种也算「有栈有路由但不该拿来联机」，
+                // 交给上层按 2000::/3 判定，这里先如实返回。
+                return V6Probe::Found(ip);
+            }
+        }
+    }
+    V6Probe::NoRoute
 }
 
 /// 给前端的 IPv6 概况：有没有、地址是什么、能不能用来被远程连。
@@ -455,16 +492,30 @@ fn is_global_v6(ip: &Ipv6Addr) -> bool {
 }
 
 pub(crate) fn ipv6_info() -> Value {
-    match public_ipv6() {
-        Some(ip) => {
+    match probe_ipv6() {
+        V6Probe::NoStack => json!({
+            "available": false,
+            "addr": Value::Null,
+            "raw": Value::Null,
+            "reason": "系统没有可用的 IPv6 协议栈（无法创建 IPv6 套接字）",
+            "code": "no_stack",
+        }),
+        V6Probe::NoRoute => json!({
+            "available": false,
+            "addr": Value::Null,
+            "raw": Value::Null,
+            "reason": "网络没有下发 IPv6 地址（当前 Wi-Fi/移动数据未启用 IPv6）",
+            "code": "no_route",
+        }),
+        V6Probe::Found(ip) => {
             let s = ip.to_string();
-            let is_global = is_global_v6(&ip);
-            if is_global {
+            if is_global_v6(&ip) {
                 json!({
                     "available": true,
                     "addr": s,
                     "raw": s,
                     "reason": Value::Null,
+                    "code": "ok",
                 })
             } else {
                 json!({
@@ -472,15 +523,10 @@ pub(crate) fn ipv6_info() -> Value {
                     "addr": Value::Null,
                     "raw": s,
                     "reason": "只有内网 IPv6（fd00:: / fe80::），无法跨网络访问",
+                    "code": "private_only",
                 })
             }
         }
-        None => json!({
-            "available": false,
-            "addr": Value::Null,
-            "raw": Value::Null,
-            "reason": "没有可用的 IPv6 出口（未连到支持 IPv6 的网络）",
-        }),
     }
 }
 
@@ -767,6 +813,40 @@ mod tests {
         }
         assert!(parse_endpoint("not-an-address").is_err());
         assert!(parse_endpoint("2409:8a02::1").is_err(), "裸 IPv6 没有端口应报错");
+    }
+
+    /// 探测目标必须是国内可达的 IPv6 地址。
+    /// Google DNS 在国内常被黑洞，UDP connect 直接 ENETUNREACH，
+    /// 会把「有公网 IPv6」误判成「没有」。这条盯住别把它改回去。
+    #[test]
+    fn v6_probe_targets_are_reachable_in_cn() {
+        assert!(!V6_PROBES.is_empty());
+        assert!(
+            !V6_PROBES[0].starts_with("2001:4860"),
+            "首选探测目标不应是 Google DNS（国内路由常被黑洞）: {}",
+            V6_PROBES[0]
+        );
+        // 每项都要能被解析，否则循环里会静默 continue 掉
+        for t in V6_PROBES {
+            assert!(t.parse::<Ipv6Addr>().is_ok(), "探测目标不是合法 IPv6: {}", t);
+        }
+        // 至少留一个国内运营商的 DNS
+        assert!(
+            V6_PROBES.iter().any(|t| t.starts_with("2400:") || t.starts_with("2402:") || t.starts_with("240c:")),
+            "应包含国内可达的探测目标"
+        );
+    }
+
+    /// 用户实际报过的地址，必须能正确判定为公网。
+    #[test]
+    fn real_world_cn_mobile_v6_is_global() {
+        for a in [
+            "2409:8903:f85:20d5:98b2:42ff:fea7:3f02",
+            "2409:8a02:c22:99a0:3c62:c2ff:fefb:d93f",
+        ] {
+            let ip: Ipv6Addr = a.parse().unwrap();
+            assert!(is_global_v6(&ip), "中国移动公网地址被判成非公网: {}", a);
+        }
     }
 
     #[test]

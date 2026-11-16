@@ -258,9 +258,11 @@ function makeSandbox(role, peerId = null, port = 43210) {
       case "lan_local_ip":
         return "192.168.1.5";
       case "lan_ipv6":
+        // env.ipv6Missing = true 模拟旧版本包里根本没有这条命令
+        if (env.ipv6Missing) throw new Error("Command lan_ipv6 not found");
         return env.ipv6 || {
-          available: false, addr: null, raw: null,
-          reason: "没有可用的 IPv6 出口（未连到支持 IPv6 的网络）",
+          available: false, addr: null, raw: null, code: "no_route",
+          reason: "网络没有下发 IPv6 地址（当前 Wi-Fi/移动数据未启用 IPv6）",
         };
       case "lan_join":
         if (!/^.+:\d+$/.test(args.addr)) throw new Error("bad addr");
@@ -424,6 +426,7 @@ function makeSandbox(role, peerId = null, port = 43210) {
       resolveMatch:(raw, n)=>lanResolveMatch(raw, n),
       checkIpv6:()=>lanCheckIpv6(),
       setIpv6:(v)=>{ __env.ipv6 = v; },
+      setIpv6Missing:(v)=>{ __env.ipv6Missing = v; },
       // innerHTML 在 mock 里只是字符串，直接读出来做断言
       get netBodyHtml(){ return (document.getElementById('lanNetBody')||{}).innerHTML || ''; },
       get roomRowShown(){ return (document.getElementById('lanRoomRemoteRow')||{}).style.display !== 'none'; },
@@ -805,6 +808,29 @@ async function main() {
   await hostNoV6.lanCreateRoom();
   await settle([hostNoV6]);
   ok(hostNoV6.roomRowShown === false, "无 IPv6 时不该显示公网地址行");
+
+  /* 25.5 旧版本：调用 lan_ipv6 会失败 → 必须说「版本过旧」，
+     不能替一个根本没跑的检测下「只能局域网」的结论 */
+  resetNet();
+  const hostOld = makeSandbox("host", null, 43223);
+  hostOld.setIpv6Missing(true);
+  await hostOld.checkIpv6();
+  const oldHtml = hostOld.netBodyHtml || "";
+  ok(/版本过旧/.test(oldHtml), "旧版本应提示版本过旧，实际: " + oldHtml.slice(0, 120));
+  ok(/4\.1\.0/.test(oldHtml), "旧版本提示里应写明需要哪个版本");
+
+  /* 25.6 只有内网 IPv6（fd00::）→ 判否，且要把地址显出来便于自查 */
+  resetNet();
+  const hostPriv = makeSandbox("host", null, 43224);
+  hostPriv.setIpv6({
+    available: false, addr: null, raw: "fd00::1", code: "private_only",
+    reason: "只有内网 IPv6（fd00:: / fe80::），无法跨网络访问",
+  });
+  await hostPriv.checkIpv6();
+  const privHtml = hostPriv.netBodyHtml || "";
+  ok(/只能/.test(privHtml), "内网 IPv6 应提示只能局域网");
+  ok(privHtml.includes("fd00::1"), "内网地址应显示出来，便于用户判断");
+  ok(/内网段/.test(privHtml), "应说明该地址属于内网段");
 
   /* 26. 端口拼接：无端口时不能拼出垃圾 */
   ok(hostV6.v6Endpoint("2409::1", "") === "", "无端口时应返回空串");
