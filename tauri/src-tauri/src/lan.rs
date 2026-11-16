@@ -180,25 +180,28 @@ pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: Strin
     //   成功   → v6only=1，IPv4 没被覆盖，这个 socket 留下当第二个监听
     //   EADDRINUSE → 双栈已经覆盖 IPv4，丢弃即可
     let want_port = port.unwrap_or(0);
-    let mut listeners: Vec<TcpListener> = Vec::new();
-    let mut bound_port = 0u16;
-    match TcpListener::bind(("::", want_port)) {
-        Ok(l) => {
-            bound_port = l.local_addr().map_err(|e| format!("读取端口失败: {}", e))?.port();
-            listeners.push(l);
-            if let Ok(v4) = TcpListener::bind(("0.0.0.0", bound_port)) {
-                eprintln!("[lan] 系统为 v6only，额外启用 IPv4 监听（端口 {}）", bound_port);
-                listeners.push(v4);
+    // match 直接返回 (监听列表, 端口)：两个分支各自构造完整结果，
+    // 避免先声明一个从未被读取的初值（那样会触发 unused_assignments）。
+    let (listeners, bound_port): (Vec<TcpListener>, u16) =
+        match TcpListener::bind(("::", want_port)) {
+            Ok(l) => {
+                let p = l.local_addr().map_err(|e| format!("读取端口失败: {}", e))?.port();
+                let mut v = vec![l];
+                // 同端口再绑一次 IPv4：能绑上说明系统是 v6only，得补第二个监听
+                if let Ok(v4) = TcpListener::bind(("0.0.0.0", p)) {
+                    eprintln!("[lan] 系统为 v6only，额外启用 IPv4 监听（端口 {}）", p);
+                    v.push(v4);
+                }
+                (v, p)
             }
-        }
-        Err(e6) => {
-            eprintln!("[lan] IPv6 监听失败（{}），退回 IPv4", e6);
-            let l = TcpListener::bind(("0.0.0.0", want_port))
-                .map_err(|e| format!("监听端口失败: {}", e))?;
-            bound_port = l.local_addr().map_err(|e| format!("读取端口失败: {}", e))?.port();
-            listeners.push(l);
-        }
-    }
+            Err(e6) => {
+                eprintln!("[lan] IPv6 监听失败（{}），退回 IPv4", e6);
+                let l = TcpListener::bind(("0.0.0.0", want_port))
+                    .map_err(|e| format!("监听端口失败: {}", e))?;
+                let p = l.local_addr().map_err(|e| format!("读取端口失败: {}", e))?.port();
+                (vec![l], p)
+            }
+        };
     for l in &listeners {
         l.set_nonblocking(true)
             .map_err(|e| format!("设置非阻塞失败: {}", e))?;

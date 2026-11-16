@@ -8,10 +8,18 @@
 // Tauri 专用代码（存储、更新、对话框）不在此 crate，由 pwa/engine.js 负责。
 #![allow(clippy::too_many_arguments)]
 
+// 这些 import 只有 wasm 导出层和测试用得到。
+// 本机 `cargo build`（既非 wasm32 也非 test）会把两个模块都 cfg 掉，
+// 于是全部变成 unused import —— 加上 cfg 让三种构建都干净：
+//   wasm32  → 编译 wasm_exports，三项都要
+//   test    → 编译 mod tests，只要 chain_chess_core（HashMap 在测试里
+//             写的是全路径 std::collections::HashMap，serde 用不到）
+//   其它    → 都不需要
+#[cfg(target_arch = "wasm32")]
 use std::collections::HashMap;
-#[cfg(not(target_arch = "wasm32"))]
-use std::fs;
+#[cfg(target_arch = "wasm32")]
 use serde::{Deserialize, Serialize};
+#[cfg(any(target_arch = "wasm32", test))]
 use chain_chess_core::*;
 
 
@@ -210,11 +218,12 @@ mod wasm_exports {
         }
         let mut board: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; sz]; sz];
         let starts = spread_starts(sz, max_players);
-        // 首子等级 = 阈值 n-1（cap3→2、cap4→3、cap5→4；随机模式取中间等级 3）
+        // 首子等级 = 阈值 n-1（cap3→2、cap4→3、cap5→4、cap6→5；随机模式取中间等级 3）
         let th: u32 = match r.cap_mode {
             CapMode::Cap3 => 3,
             CapMode::Cap4 => 4,
             CapMode::Cap5 => 5,
+            CapMode::Cap6 => 6,
             CapMode::Random => 3,
         };
         for (p, &(x, y)) in starts.iter().enumerate() {

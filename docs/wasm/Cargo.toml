@@ -8,12 +8,22 @@ description = "连锁棋 PWA 游戏引擎（WASM）— 由 tauri 核心逻辑提
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rand = "0.8"
 getrandom = { version = "0.2", features = ["js"] }
 chain_chess_core = { path = "../../engine" }
+
+# 只有 wasm 导出层用得到；放在 target 下，本机（非 wasm32）构建就不会
+# 报 unused dependency。
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+
+# 本机（非 wasm32）构建时，wasm 导出层与测试都不编译，
+# chain_chess_core 于是变成「未被使用的依赖」。它确实是核心依赖
+# （wasm32 与 test 都要用），不能删，所以在这里关掉这条 lint。
+[lints.cargo]
+unused_dependencies = "allow"
 
 [profile.release]
 opt-level = 3
