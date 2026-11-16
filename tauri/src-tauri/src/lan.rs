@@ -170,27 +170,39 @@ fn read_loop(
 pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: String) -> Result<u16, String> {
     shutdown(inner_arc);
 
-    // 双栈监听：先试 [::]（同时吃 IPv4 与 IPv6），拿不到才退回纯 IPv4。
-    // 只绑 0.0.0.0 的话，有公网 IPv6 的设备也没法被远程连进来 —— 而
-    // 那正是「远程联机」唯一不依赖第三方服务器的路径。
-    // 注意 v6only：Linux 默认 0（双栈），但不同平台/内核参数会变，
-    // 所以这里显式用 socket2 风格的两步绑定不可行（std 没暴露），
-    // 改为：IPv6 绑定成功后单独再绑一个 IPv4 兜底会撞端口，故只做双栈尝试。
-    let listener = match TcpListener::bind(("::", port.unwrap_or(0))) {
-        Ok(l) => l,
-        Err(e6) => {
-            eprintln!("[lan] IPv6 双栈监听失败（{}），退回 IPv4", e6);
-            TcpListener::bind(("0.0.0.0", port.unwrap_or(0)))
-                .map_err(|e| format!("监听端口失败: {}", e))?
+    // 监听要同时吃 IPv4 与 IPv6：
+    //   只绑 0.0.0.0  → 有公网 IPv6 的设备也接不了远程连接
+    //   只绑 [::]     → Windows 的 IPV6_V6ONLY 默认是 1，会**只收 IPv6**，
+    //                   把局域网 IPv4 联机弄坏（Linux/Android 默认是双栈）
+    // 所以先绑 [::]，再探一下 IPv4 是否已被覆盖；没覆盖就补一个 IPv4 监听。
+    //
+    // 探测办法：在同一个端口上再绑一次 0.0.0.0。
+    //   成功   → v6only=1，IPv4 没被覆盖，这个 socket 留下当第二个监听
+    //   EADDRINUSE → 双栈已经覆盖 IPv4，丢弃即可
+    let want_port = port.unwrap_or(0);
+    let mut listeners: Vec<TcpListener> = Vec::new();
+    let mut bound_port = 0u16;
+    match TcpListener::bind(("::", want_port)) {
+        Ok(l) => {
+            bound_port = l.local_addr().map_err(|e| format!("读取端口失败: {}", e))?.port();
+            listeners.push(l);
+            if let Ok(v4) = TcpListener::bind(("0.0.0.0", bound_port)) {
+                eprintln!("[lan] 系统为 v6only，额外启用 IPv4 监听（端口 {}）", bound_port);
+                listeners.push(v4);
+            }
         }
-    };
-    let bound_port = listener
-        .local_addr()
-        .map_err(|e| format!("读取端口失败: {}", e))?
-        .port();
-    listener
-        .set_nonblocking(true)
-        .map_err(|e| format!("设置非阻塞失败: {}", e))?;
+        Err(e6) => {
+            eprintln!("[lan] IPv6 监听失败（{}），退回 IPv4", e6);
+            let l = TcpListener::bind(("0.0.0.0", want_port))
+                .map_err(|e| format!("监听端口失败: {}", e))?;
+            bound_port = l.local_addr().map_err(|e| format!("读取端口失败: {}", e))?.port();
+            listeners.push(l);
+        }
+    }
+    for l in &listeners {
+        l.set_nonblocking(true)
+            .map_err(|e| format!("设置非阻塞失败: {}", e))?;
+    }
 
     let stop = Arc::new(AtomicBool::new(false));
     let gen = {
@@ -206,12 +218,13 @@ pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: Strin
         json!({"type": "hosting", "port": bound_port, "name": name}),
     );
 
-    // accept 线程：非阻塞 + 短暂休眠，lan_stop 时能及时退出
-    {
+    // accept 线程：每个监听一个。peer id 用共享计数器，避免两个监听撞号。
+    let next_id = Arc::new(std::sync::atomic::AtomicU32::new(1));
+    for listener in listeners {
         let inner = inner_arc.clone();
         let stop = stop.clone();
+        let next_id = next_id.clone();
         thread::spawn(move || {
-            let mut next_id: u32 = 1;
             while !stop.load(Ordering::Relaxed) {
                 match listener.accept() {
                     Ok((stream, addr)) => {
@@ -232,8 +245,7 @@ pub(crate) fn host(inner_arc: &Arc<Mutex<Inner>>, port: Option<u16>, name: Strin
                         }
                         stream.set_nodelay(true).ok();
                         let write_half = stream.try_clone().ok();
-                        let id = next_id;
-                        next_id = next_id.wrapping_add(1).max(1);
+                        let id = next_id.fetch_add(1, Ordering::Relaxed).max(1);
                         if let Some(w) = write_half {
                             if let Ok(mut g) = inner.lock() {
                                 g.peers.insert(id, w);
@@ -460,14 +472,19 @@ const V6_PROBES: &[&str] = &[
 fn probe_ipv6() -> V6Probe {
     // 先把「系统有没有 IPv6 栈」和「网络有没有路由」分开，
     // 否则两种失败都变成一句「没有」，用户没法自查。
-    let any_bind = UdpSocket::bind(("[::]:0", 0));
+    // 必须用 SocketAddr 构造，不能写 ("[::]:0", 0)。
+    // ("[::]:0", 0) 会被当成「主机名 [::]:0 + 端口 0」去做 DNS 查询，
+    // 带方括号的字面量既不是合法 IPv6 也不是合法主机名 → 直接
+    // "failed to lookup address information" 失败，于是每次都被判成
+    // 「没有 IPv6 协议栈」。这是真实踩到的坑。
+    let any_bind = UdpSocket::bind(SocketAddr::from((Ipv6Addr::UNSPECIFIED, 0)));
     if any_bind.is_err() {
         return V6Probe::NoStack;
     }
     drop(any_bind);
 
     for target in V6_PROBES {
-        let Ok(sock) = UdpSocket::bind(("[::]:0", 0)) else { continue };
+        let Ok(sock) = UdpSocket::bind(SocketAddr::from((Ipv6Addr::UNSPECIFIED, 0))) else { continue };
         // UDP connect 只做路由查找，不会真的发包
         if sock.connect((*target, 53)).is_err() {
             continue;
@@ -847,6 +864,123 @@ mod tests {
             let ip: Ipv6Addr = a.parse().unwrap();
             assert!(is_global_v6(&ip), "中国移动公网地址被判成非公网: {}", a);
         }
+    }
+
+    /// 真实探测：本机若有公网 IPv6，`ipv6_info` 必须报 available 并给出
+    /// 2000::/3 地址。没有 IPv6 的环境（CI 容器）跳过。
+    ///
+    /// 这条是回归重点：曾经把 bind 写成 `("[::]:0", 0)`，探测第一步就
+    /// 失败，明明有公网 IPv6 也报「没有协议栈」。用 SocketAddr 构造才对。
+    #[test]
+    fn ipv6_probe_reports_available_when_hosted() {
+        let _guard = serial();
+        // 用一个纯 SocketAddr 绑定判断本机有没有 IPv6 栈
+        let has_v6 = UdpSocket::bind(SocketAddr::from((Ipv6Addr::UNSPECIFIED, 0))).is_ok();
+        if !has_v6 {
+            eprintln!("跳过：本机没有 IPv6 套接字支持");
+            return;
+        }
+        // 有栈不代表有路由，两者都要才谈得上「可用」
+        let has_route = {
+            let s = UdpSocket::bind(SocketAddr::from((Ipv6Addr::UNSPECIFIED, 0))).unwrap();
+            V6_PROBES.iter().any(|t| s.connect((*t, 53)).is_ok())
+        };
+        if !has_route {
+            eprintln!("跳过：本机有 IPv6 栈但没有公网 IPv6 路由");
+            return;
+        }
+
+        let info = ipv6_info();
+        assert_eq!(info["available"], true, "有 IPv6 路由时应报可用: {}", info);
+        let addr = info["addr"].as_str().expect("available 时必须给出地址");
+        let ip: Ipv6Addr = addr.parse().expect("地址应可解析");
+        assert!(is_global_v6(&ip), "给出的地址必须是 2000::/3: {}", addr);
+        eprintln!("探测到的公网 IPv6: {}", addr);
+    }
+
+    /// 端到端：房主双栈监听 → 客户端用「公网 IPv6 地址」连进来 → 收发一条消息。
+    ///
+    /// 这是「远程联机」的核心链路。本机有公网 IPv6 时才会真正跑；
+    /// 没有 IPv6 的环境跳过（本机若能连自己的公网地址，说明绑定与
+    /// 地址格式都对）。
+    #[test]
+    fn remote_join_over_public_ipv6() {
+        let _guard = serial();
+        // 没有公网 IPv6 就跳过（CI 容器）
+        let info = ipv6_info();
+        let Some(v6) = info["addr"].as_str().map(|s| s.to_string()) else {
+            eprintln!("跳过：本机没有公网 IPv6（{}）", info["reason"]);
+            return;
+        };
+
+        let host_state = LanState::new();
+        let port = host(&host_state.inner, None, "h".into()).expect("起主机失败");
+        let joined = wait_event(&host_state.inner, 3000, |ev| {
+            ev["type"] == "peer" && ev["event"] == "join"
+        });
+
+        // 关键：用公网 IPv6 拼接的端点去连（前端复制出去的就是这个格式）
+        let endpoint = format!("[{}]:{}", v6, port);
+        let client_state = LanState::new();
+        join(&client_state.inner, &endpoint, "c".into())
+            .unwrap_or_else(|e| panic!("用公网 IPv6 连接失败 ({}) — {}", endpoint, e));
+
+        let joined = joined.or_else(|| {
+            wait_event(&host_state.inner, 3000, |ev| {
+                ev["type"] == "peer" && ev["event"] == "join"
+            })
+        });
+        assert!(joined.is_some(), "主机没收到来自公网 IPv6 的连接: {}", endpoint);
+
+        // 消息能通
+        send(&client_state.inner, json!({"t":"hello","name":"v6"})).expect("发送失败");
+        let got = wait_event(&host_state.inner, 3000, |ev| {
+            ev["type"] == "msg" && ev["data"]["t"] == "hello"
+        });
+        assert!(got.is_some(), "公网 IPv6 连接上消息没通");
+
+        stop(&host_state.inner);
+        stop(&client_state.inner);
+    }
+
+    /// 双栈监听必须同时吃 IPv4 与 IPv6。
+    /// 只绑 [::] 在 v6only=1 的系统（Windows 默认）上会丢掉 IPv4，
+    /// 等于把局域网联机弄坏；这条确认两条路都通。
+    #[test]
+    fn host_accepts_both_ipv4_and_ipv6_clients() {
+        let _guard = serial();
+        let host_state = LanState::new();
+        let port = host(&host_state.inner, None, "h".into()).expect("起主机失败");
+
+        // IPv4 回环
+        let c4 = LanState::new();
+        join(&c4.inner, &format!("127.0.0.1:{}", port), "c4".into())
+            .expect("IPv4 客户端连不上（双栈覆盖失败）");
+        assert!(
+            wait_event(&host_state.inner, 3000, |ev| ev["type"] == "peer").is_some(),
+            "主机没收到 IPv4 连接"
+        );
+
+        // IPv6 回环（本机没 IPv6 栈时跳过）
+        if UdpSocket::bind(SocketAddr::from((Ipv6Addr::UNSPECIFIED, 0))).is_ok() {
+            let c6 = LanState::new();
+            match join(&c6.inner, &format!("[::1]:{}", port), "c6".into()) {
+                Ok(()) => {
+                    assert!(
+                        wait_event(&host_state.inner, 3000, |ev| {
+                            ev["type"] == "peer" && ev["addr"].as_str().map_or(false, |a| a.contains("::1") || a.starts_with("::"))
+                        })
+                        .is_some(),
+                        "主机没收到 IPv6 连接"
+                    );
+                    stop(&c6.inner);
+                }
+                Err(e) => eprintln!("跳过 IPv6 回环（{}）", e),
+            }
+        }
+
+        stop(&c4.inner);
+        stop(&host_state.inner);
     }
 
     #[test]
