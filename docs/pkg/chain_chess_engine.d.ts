@@ -19,6 +19,11 @@ export function engine_version(): string;
 export function process_move_cmd(json: string): string;
 
 /**
+ * rate_board：给每位玩家算一个 ML 场面分（结算/暂停页的评分曲线用）
+ */
+export function rate_board_cmd(json: string): string;
+
+/**
  * 一键终局命令
  */
 export function simulate_to_end_cmd(json: string): string;
@@ -31,6 +36,7 @@ export interface InitOutput {
     readonly bench_ai_game_cmd: (a: number, b: number, c: number) => void;
     readonly engine_version: (a: number) => void;
     readonly process_move_cmd: (a: number, b: number, c: number) => void;
+    readonly rate_board_cmd: (a: number, b: number, c: number) => void;
     readonly simulate_to_end_cmd: (a: number, b: number, c: number) => void;
     readonly __wbindgen_export: (a: number) => void;
     readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
