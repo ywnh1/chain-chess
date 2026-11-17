@@ -1,8 +1,8 @@
 {
   "version": "4.1.0",
-  "notes": "Big multiplayer and setup update: public IPv6 remote play with one-tap address copy, savable reusable game configs, explosion thresholds from 3 to 6 with two double-blast styles, three victory conditions, an ML board-rating chart plus the most valuable move on the result and pause screens, and undo now jumps back to the previous human player",
-  "notes_zh": "联机与配置大改：新增公网 IPv6 远程联机（一键复制地址、自动判断能否跨网络）、游戏配置可存多套反复套用、爆炸阈值扩到 3~6 并可选双爆方式、新增三种胜负判定、结算与暂停页新增场面评分曲线与最具价值一步；悔棋自动跳到上一位真人",
-  "pub_date": "2026-11-16T00:00:00Z",
+  "notes": "LAN matches now let the host pick the board, border mode, blast threshold, win condition and the algorithm for each AI, savable as presets; new IPv6 cross-network play; the in-game ranking defaults to ML score, with a rating chart and most valuable move on the result screen; undo now jumps back to the previous human player; fixed wrong back navigation on sub-pages and a missing ML rating chart at settlement",
+  "notes_zh": "新增局域网联机规则自定义（房主选棋盘、边界、阈值、胜负判定、每个 AI 的算法，可存多套预设）与 IPv6 跨网络联机；局内排名默认按 ML 评分，结算新增评分曲线和最具价值一步；悔棋自动退回上一位真人；修复二级页返回错乱与结算评分缺失",
+  "pub_date": "2026-11-17T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",
