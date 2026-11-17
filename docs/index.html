@@ -1354,6 +1354,17 @@
       </div>
 
       <div class="form-row">
+        <label>局内排名依据<button type="button" class="hint-btn" onclick="openHint('rank-metric')"
+            aria-label="局内排名依据说明">!</button></label>
+        <div id="rankMetricGroup" class="btn-group">
+          <button class="gb selected" data-value="ml">ML 评分</button>
+          <button class="gb" data-value="pieces">棋子数</button>
+          <button class="gb" data-value="points">点数</button>
+        </div>
+        <p id="rankMetricDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4"></p>
+      </div>
+
+      <div class="form-row">
         <label>胜负判定<button type="button" class="hint-btn" onclick="openHint('win-condition')"
             aria-label="胜负判定说明">!</button></label>
         <div id="winConditionGroup" class="btn-group" style="flex-direction:column;align-items:stretch">

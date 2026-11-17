@@ -172,6 +172,61 @@ function grab(startMarker, endMarker) {
   if (!pb[0] || pb[0].delta !== 1) errs.push("MVP：缺失评分的步应跳过，实际 " + JSON.stringify(pb[0]));
 }
 
+/* ═══════ 局内排名：玩家条按所选指标动态排序 ═══════ */
+{
+  const fn = grab("function playerBarRanking(", "function renderPlayerBar(");
+  const mk = (board, maxPlayers, metric, liveRating) => {
+    const code =
+      "let playerBarMetric = " + JSON.stringify(metric) + ";\n" +
+      "let _liveRating = " + JSON.stringify(liveRating) + ";\n" +
+      "let board = " + JSON.stringify(board) + ";\n" +
+      "let maxPlayers = " + maxPlayers + ";\n" +
+      fn + "\nreturn playerBarRanking();";
+    return new Function(code)();
+  };
+
+  // 3 人：0 号 2 子 5 点，1 号 4 子 4 点，2 号 1 子 6 点
+  const cell = (owner, count) => ({ owner: owner, count: count });
+  const board = [
+    [cell(0, 3), cell(0, 2), cell(1, 1), cell(1, 1)],
+    [cell(1, 1), cell(1, 1), cell(2, 6), { owner: null, count: 0 }],
+  ];
+
+  // 棋子数：1 号(4) > 0 号(2) > 2 号(1)
+  const byPieces = mk(board, 3, "pieces", null).order;
+  if (JSON.stringify(byPieces) !== JSON.stringify([1, 0, 2]))
+    errs.push("排名/棋子数：应为 [1,0,2]，实际 " + JSON.stringify(byPieces));
+
+  // 点数：2 号(6) > 0 号(5) > 1 号(4)
+  const byPoints = mk(board, 3, "points", null).order;
+  if (JSON.stringify(byPoints) !== JSON.stringify([2, 0, 1]))
+    errs.push("排名/点数：应为 [2,0,1]，实际 " + JSON.stringify(byPoints));
+
+  // ML：按给的分排
+  const byMl = mk(board, 3, "ml", [-5, 30, 12]).order;
+  if (JSON.stringify(byMl) !== JSON.stringify([1, 2, 0]))
+    errs.push("排名/ML：应为 [1,2,0]，实际 " + JSON.stringify(byMl));
+
+  // 默认就是 ML（用户明确要求默认走 ML，而不是棋子数）
+  const defaultOrder = mk(board, 3, "ml", [-5, 30, 12]).order;
+  if (JSON.stringify(defaultOrder) !== JSON.stringify([1, 2, 0]))
+    errs.push("排名：默认应为 ML 排序");
+
+  // ML 评分还没算出来（null）→ 退回棋子数，不能崩也不能乱排
+  const fallback = mk(board, 3, "ml", null).order;
+  if (JSON.stringify(fallback) !== JSON.stringify([1, 0, 2]))
+    errs.push("排名：评分缺失时应退回棋子数，实际 " + JSON.stringify(fallback));
+
+  // 已淘汰的人沉底，即使他的 ML 分更高。
+  // 构造：0 号在棋盘上没有任何棋子（已被清空），1 号有。
+  const withElim = [
+    [{ owner: null, count: 0 }, cell(1, 1)],
+  ];
+  const elimOrder = mk(withElim, 2, "ml", [999, -999]).order;
+  if (elimOrder[0] !== 1)
+    errs.push("排名：已淘汰者（0 号无棋子）应沉底，实际 " + JSON.stringify(elimOrder));
+}
+
 /* ═══════ 4.1.0：页面返回逻辑（侧滑与 ← 按钮都要原路返回） ═══════ */
 {
   // ① 二级页必须用函数式 back，而不是写死目标。

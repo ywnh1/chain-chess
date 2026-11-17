@@ -66,13 +66,6 @@
       <button class="glass-btn primary" id="lanHostBtn" style="width:100%;margin-top:6px">创建房间</button>
       <p style="font-size:.72rem;color:var(--dim);margin:6px 0 0">建房后由房主选棋盘与规则，其他人加入即可看到。</p>
 
-      <!-- 网络状态：能不能跨网络远程联机 -->
-      <div id="lanNetCard" class="about-card lan-net-card">
-        <h3 style="margin:0 0 6px">联机范围</h3>
-        <div id="lanNetBody">
-          <p style="font-size:.8rem;color:var(--dim);margin:0">正在检测网络…</p>
-        </div>
-      </div>
 
       <div class="form-row" style="margin-top:14px"><label>加入房间</label>
         <div style="display:flex;gap:8px;flex:1">
@@ -85,13 +78,9 @@
     </div>
 
     <div id="lanRoomView" style="display:none">
-      <div class="about-card">
+      <div class="about-card" id="lanAddrBox">
         <p style="margin:0">局域网地址：<strong id="lanRoomAddr" style="user-select:all">—</strong>
           <button class="glass-btn lan-copy-btn" id="lanCopyLan" title="复制局域网地址">复制</button>
-        </p>
-        <p id="lanRoomRemoteRow" style="margin:8px 0 0;display:none">
-          公网地址：<strong id="lanRoomV6" style="user-select:all;word-break:break-all">—</strong>
-          <button class="glass-btn lan-copy-btn" id="lanCopyV6" title="复制公网地址">复制</button>
         </p>
         <p id="lanRoomTip" style="font-size:.75rem;color:var(--dim);margin:6px 0 0"></p>
       </div>
@@ -487,6 +476,21 @@
           <label style="flex:1">自定义音效</label>
           <span style="color:var(--dim)">→</span>
         </div>
+      </div>
+
+      <div class="about-card">
+        <h3>联机</h3>
+        <div class="form-row">
+          <label style="flex:1">启用 IPv6 远程联机</label>
+          <div class="toggle-group" id="ipv6ToggleGroup">
+            <button class="tg-btn" data-value="true">开</button>
+            <button class="tg-btn selected" data-value="false">关</button>
+          </div>
+        </div>
+        <p class="ipv6-note" id="ipv6Note">
+          开启后会显示本机的 IPv6 地址，用于跨网络联机。<strong>能否真正连上还取决于</strong>对方所在网络、路由器/光猫是否放行 IPv6 入站，以及运营商策略 —— 移动数据通常拦截入站，多数情况下需要在路由器里关闭 IPv6 防火墙才能全网联机。
+        </p>
+        <p class="ipv6-note" id="ipv6Status" style="display:none"></p>
       </div>
 
       <div class="about-card">
@@ -1283,16 +1287,15 @@
       </div>
 
       <div class="about-card">
-        <h3>跨网络：公网 IPv6 远程联机</h3>
-        <p>联机页顶部会显示<strong>「联机范围」</strong>。如果它写着「可以远程联机」，说明你的网络有公网 IPv6，不用连同一个 Wi-Fi 也能一起玩。</p>
-        <ol>
-          <li>房主建房后，房间页会多出一行<strong>公网地址</strong>，形如 <code>[2409:8a02:...:d93f]:41234</code></li>
-          <li>点旁边的<strong>「复制」</strong>，把整串发给对方</li>
-          <li>对方在「加入房间」里粘贴，点加入即可</li>
-        </ol>
-        <p>粘贴时<strong>带不带方括号都行</strong>，程序会自动补。</p>
-        <p style="font-size:.8rem;color:var(--dim)"><strong>连不上多半是防火墙。</strong>多数光猫和路由器默认放行 IPv6 出站、拦截入站，所以你能上网不代表别人能连你。遇到这种情况：在路由器里放行该端口的 IPv6 入站，或者干脆两个人连同一个 Wi-Fi 用局域网方式。移动网络（4G/5G）通常没有这个问题。</p>
-        <p style="font-size:.78rem;color:var(--dim)">如果「联机范围」显示只能局域网，通常是当前 Wi-Fi 没下发 IPv6（很多宽带默认只有 IPv4）。换成手机热点或移动数据再试试。</p>
+        <h3>跨网络联机（IPv6，需手动开启）</h3>
+        <p>默认是关的。想让不同网络的设备也能一起玩，去<strong>更多 → 联机 → 启用 IPv6 远程联机</strong>打开。</p>
+        <p><strong>开了之后也不一定通。</strong>IPv6 地址只是「你能被找到」，能不能连进来还取决于：</p>
+        <ul>
+          <li>路由器 / 光猫是否放行 IPv6 <strong>入站</strong>（多数默认拦截，需要在路由器里关掉 IPv6 防火墙）</li>
+          <li>运营商策略 —— 移动数据（4G/5G）通常直接拦截入站，基本用不了</li>
+          <li>对方所在网络是否支持 IPv6</li>
+        </ul>
+        <p>开着的时候，房主的房间页会多出一行公网地址，复制发给对方即可；对方粘贴时不带方括号也行。连不上就退回同一 Wi-Fi 用局域网联机，那个不需要任何配置。</p>
       </div>
 
       <div class="about-card">
@@ -1598,6 +1601,17 @@
           <button class="gb" data-value="two-one">相邻两格各爆一个</button>
         </div>
         <p id="capStyleDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4"></p>
+      </div>
+
+      <div class="form-row">
+        <label>局内排名依据<button type="button" class="hint-btn" onclick="openHint('rank-metric')"
+            aria-label="局内排名依据说明">!</button></label>
+        <div id="rankMetricGroup" class="btn-group">
+          <button class="gb selected" data-value="ml">ML 评分</button>
+          <button class="gb" data-value="pieces">棋子数</button>
+          <button class="gb" data-value="points">点数</button>
+        </div>
+        <p id="rankMetricDesc" style="font-size:.72rem;color:var(--dim);margin:2px 0 0 0;line-height:1.4"></p>
       </div>
 
       <div class="form-row">

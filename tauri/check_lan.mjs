@@ -115,6 +115,7 @@ function makeEl(id, tag = "div", cls = "") {
       String(v || "").split(/\s+/).filter(Boolean).forEach((c) => classes.add(c));
     },
     appendChild(c) {
+      if (c) c._parent = this;
       this.children.push(c);
       if (this.tagName === "SELECT") this.options.push(c);
       return c;
@@ -127,6 +128,15 @@ function makeEl(id, tag = "div", cls = "") {
         if (p[0] === ".") return classes.has(p.slice(1));
         return this.tagName === p.toUpperCase();
       });
+    },
+    // 移除自己：从父节点的 children 里摘掉（真实 DOM 的行为）。
+    // makeEl 是模块级函数、看不到 els，所以靠 appendChild 记录 _parent。
+    remove() {
+      const parent = this._parent;
+      if (!parent || !parent.children) return;
+      const i = parent.children.indexOf(this);
+      if (i >= 0) parent.children.splice(i, 1);
+      this._parent = null;
     },
     setAttribute(k, v) { this._attrs = this._attrs || {}; this._attrs[k] = String(v); },
     getAttribute(k) { return this._attrs ? this._attrs[k] : undefined; },
@@ -213,10 +223,8 @@ function buildRuleControls() {
   aiStrengthSel.value = "strategy";
 
   return {
-    lanNetBody: mk("lanNetBody"), lanRoomRemoteRow: mk("lanRoomRemoteRow"),
-    lanRoomV6: mk("lanRoomV6"), lanCopyLan: mk("lanCopyLan"),
-    lanCopyV6: mk("lanCopyV6"), lanRoomAddr: mk("lanRoomAddr"),
-    lanNetCard: mk("lanNetCard"),
+    lanAddrBox: mk("lanAddrBox"), lanCopyLan: mk("lanCopyLan"),
+    lanRoomAddr: mk("lanRoomAddr"), lanRoomTip: mk("lanRoomTip"),
     lanAiCount: aiCountSel, lanAiStrength: aiStrengthSel,
     lanAiStrengthRow: mk("lanAiStrengthRow"),
     lanShapeGroup: shape, lanSizeGrid: sizes, lanBorderGroup: border, lanCapGroup: cap,
@@ -240,7 +248,16 @@ function makeSandbox(role, peerId = null, port = 43210) {
     // 注意 makeEl 的第一个参数是 id：这里必须把 tag 传进第二参，
     // 否则 createElement('select') 会造出一个 DIV。
     createElement(tag) { return makeEl("", tag); },
-    createTextNode(t) { return { nodeValue: t }; },
+    // 文本节点也要有足够的形状：真实代码会把它当 appendChild 的参数，
+    // queryAll 遍历时还会访问 classList。
+    createTextNode(t) {
+      return {
+        nodeValue: t,
+        textContent: t,
+        children: [],
+        classList: { add() {}, remove() {}, contains: () => false, toggle() {} },
+      };
+    },
     body: { style: {}, classList: { add() {}, remove() {} } },
   };
   const messages = [];
@@ -335,6 +352,9 @@ function makeSandbox(role, peerId = null, port = 43210) {
     let aiPlayers=new Set(), aiConfigs={}, eliminatedPlayers=new Set();
     let eliminationRounds=[], eliminationInfo={}, gameHistory=[], chainStats={};
     let maxChainOverall={player:null,length:0}, undoStack=[];
+    // IPv6 开关：默认关。测试通过 __env 控制。
+    let appSettings={ipv6Lan:false};
+    const saveSettings=()=>{};
     // 4.1.0 起 localClick 会带上这两项；沙箱里给默认值即可
     let capStyle='one-two', winCondition='last';
     let cells = [];
@@ -428,12 +448,27 @@ function makeSandbox(role, peerId = null, port = 43210) {
       resolveMatch:(raw, n)=>lanResolveMatch(raw, n),
       checkIpv6:()=>lanCheckIpv6(),
       setIpv6:(v)=>{ __env.ipv6 = v; },
+      setIpv6Enabled:(v)=>{ appSettings.ipv6Lan = !!v; },
+      // 直接塞探测结果：用来验证「开关判断」独立于「是否探测过」
+      setV6Result:(v)=>{ lanV6 = v; },
       setIpv6Missing:(v)=>{ __env.ipv6Missing = v; },
       setHostIpv6:(v)=>{ __env.hostIpv6 = v; },
       // innerHTML 在 mock 里只是字符串，直接读出来做断言
       get netBodyHtml(){ return (document.getElementById('lanNetBody')||{}).innerHTML || ''; },
       get roomRowShown(){ return (document.getElementById('lanRoomRemoteRow')||{}).style.display !== 'none'; },
-      get roomV6Text(){ return (document.getElementById('lanRoomV6')||{}).textContent || ''; },
+      // 房间地址区里 .lan-v6-row 的条数与文本
+      get v6RowCount(){
+        const box=document.getElementById('lanAddrBox');
+        return box ? box.querySelectorAll('.lan-v6-row').length : 0;
+      },
+      get roomV6Text(){
+        const box=document.getElementById('lanAddrBox');
+        if(!box) return '';
+        return box.querySelectorAll('.lan-v6-row').map(function(n){
+          function text(e){ return (e.textContent||'') + (e.children||[]).map(text).join(''); }
+          return text(n);
+        }).join(' | ');
+      },
       renderRoomAddr:()=>lanRenderRoomAddr(),
       v6Endpoint:(a,p)=>lanV6Endpoint(a,p),
       get customBoards(){ return __env.customBoards; },
@@ -774,84 +809,86 @@ async function main() {
   ok(cli6.localClicks.length === beforeClicks + 1,
      "AI 的落子没广播到客户端（客户端会停在原地）");
 
-  /* ═══ 场景四：公网 IPv6 与联机范围提示 ═══ */
+  /* ═══ 场景四：IPv6 远程联机（由「更多」页开关控制） ═══
+   *
+   * 设计变更：以前是进联机页自动探测并显示「可以远程联机」。
+   * 那句结论是错的 —— 探测只能证明本机能出公网，证明不了别人能进来。
+   * 现在改成：默认关闭，在「更多 → 启用 IPv6 远程联机」显式打开后，
+   * 才在房间页追加公网地址；开关关着时页面不出现任何 IPv6 痕迹。
+   */
 
-  /* 22. 没有 IPv6 → 必须告诉用户「只能局域网联机」 */
+  /* 22. 开关关着（默认）→ 房间页不出现公网地址，即使本机有公网 IPv6 */
   resetNet();
-  const hostV6a = makeSandbox("host", null, 43220);
-  hostV6a.setIpv6({ available: false, addr: null, raw: null,
-    reason: "没有可用的 IPv6 出口（未连到支持 IPv6 的网络）" });
-  await hostV6a.checkIpv6();
-  ok(/只能/.test(hostV6a.netBodyHtml || ""), "无 IPv6 时没提示只能局域网联机");
-
-  /* 23. 有 IPv6 → 显示地址、一键复制、说明可远程联机 */
-  resetNet();
-  const hostV6 = makeSandbox("host", null, 43221);
+  const hostOff = makeSandbox("host", null, 43220);
   const V6 = "2409:8a02:c22:99a0:3c62:c2ff:fefb:d93f";
-  hostV6.setIpv6({ available: true, addr: V6, raw: V6, reason: null });
-  await hostV6.checkIpv6();
-  const html = hostV6.netBodyHtml || "";
-  ok(/远程联机/.test(html), "有 IPv6 时没提示可以远程联机");
-  ok(html.includes(V6), "有 IPv6 时没把地址显示出来");
-  ok(/复制 IPv6/.test(html), "有 IPv6 时没有一键复制按钮");
-  ok(/防火墙/.test(html), "没提醒入站可能被路由器防火墙拦（否则用户会误判）");
+  hostOff.setIpv6({ available: true, addr: V6, raw: V6, code: "ok" });
+  hostOff.setIpv6Enabled(false);          // 默认关
+  await hostOff.checkIpv6();
+  await hostOff.lanCreateRoom();
+  await settle([hostOff]);
+  ok(hostOff.v6RowCount === 0, "开关关着时房间页不该出现公网地址行");
 
-  /* 24. 建房后房间页给出可直连的 [v6]:port */
-  await hostV6.lanCreateRoom();
-  await settle([hostV6]);
-  ok(hostV6.roomRowShown === true, "有 IPv6 建房后没显示公网地址行");
-  ok(hostV6.roomV6Text === "[" + V6 + "]:43221",
-     "公网地址格式不对（应为 [v6]:port）: " + hostV6.roomV6Text);
+  /* 22.5 纵深防御：即使探测结果已经存在，开关关着也必须拒绝显示。
+     （lanCheckIpv6 在关闭时不会探测，但 lanRenderRoomAddr 自己也要挡住 ——
+       否则将来有人改了探测时机，开关就形同虚设。） */
+  resetNet();
+  const hostForce = makeSandbox("host", null, 43219);
+  hostForce.setIpv6Enabled(false);
+  hostForce.setV6Result({ available: true, addr: V6, raw: V6, code: "ok" });
+  await hostForce.lanCreateRoom();
+  await settle([hostForce]);
+  ok(hostForce.v6RowCount === 0,
+     "开关关着时哪怕已有探测结果，也不该显示公网地址");
 
-  /* 25. 无 IPv6 时房间页不显示公网地址行 */
+  /* 23. 开关打开 + 有公网 IPv6 + 监听覆盖 → 追加公网地址行 */
+  resetNet();
+  const hostOn = makeSandbox("host", null, 43221);
+  hostOn.setIpv6({ available: true, addr: V6, raw: V6, code: "ok" });
+  hostOn.setIpv6Enabled(true);
+  await hostOn.checkIpv6();
+  await hostOn.lanCreateRoom();
+  await settle([hostOn]);
+  ok(hostOn.v6RowCount === 1, "开关开着且有公网地址时应显示一行，实际 " + hostOn.v6RowCount);
+  ok(hostOn.roomV6Text.indexOf("[" + V6 + "]:43221") >= 0,
+     "公网地址格式不对（应为 [v6]:port）: " + hostOn.roomV6Text);
+
+  /* 24. 开关开着但没有公网 IPv6 → 不显示 */
   resetNet();
   const hostNoV6 = makeSandbox("host", null, 43222);
-  hostNoV6.setIpv6({ available: false, addr: null, raw: null, reason: "无" });
+  hostNoV6.setIpv6({ available: false, addr: null, raw: null, code: "no_route", reason: "无" });
+  hostNoV6.setIpv6Enabled(true);
   await hostNoV6.checkIpv6();
   await hostNoV6.lanCreateRoom();
   await settle([hostNoV6]);
-  ok(hostNoV6.roomRowShown === false, "无 IPv6 时不该显示公网地址行");
+  ok(hostNoV6.v6RowCount === 0, "没有公网 IPv6 时不该显示地址行");
 
-  /* 25.5 旧版本：调用 lan_ipv6 会失败 → 必须说「版本过旧」，
-     不能替一个根本没跑的检测下「只能局域网」的结论 */
-  resetNet();
-  const hostOld = makeSandbox("host", null, 43223);
-  hostOld.setIpv6Missing(true);
-  await hostOld.checkIpv6();
-  const oldHtml = hostOld.netBodyHtml || "";
-  ok(/版本过旧/.test(oldHtml), "旧版本应提示版本过旧，实际: " + oldHtml.slice(0, 120));
-  ok(/4\.1\.0/.test(oldHtml), "旧版本提示里应写明需要哪个版本");
-
-  /* 25.6 只有内网 IPv6（fd00::）→ 判否，且要把地址显出来便于自查 */
-  resetNet();
-  const hostPriv = makeSandbox("host", null, 43224);
-  hostPriv.setIpv6({
-    available: false, addr: null, raw: "fd00::1", code: "private_only",
-    reason: "只有内网 IPv6（fd00:: / fe80::），无法跨网络访问",
-  });
-  await hostPriv.checkIpv6();
-  const privHtml = hostPriv.netBodyHtml || "";
-  ok(/只能/.test(privHtml), "内网 IPv6 应提示只能局域网");
-  ok(privHtml.includes("fd00::1"), "内网地址应显示出来，便于用户判断");
-  ok(/内网段/.test(privHtml), "应说明该地址属于内网段");
-
-  /* 25.7 有公网 IPv6 但监听没覆盖（系统绑不上 ::）→ 绝不能给出地址，
-     否则用户复制出去一个「合法但没人监听」的端点，永远连不上 */
+  /* 25. 开关开着、有地址，但监听没覆盖 IPv6（系统绑不上 ::）→ 仍然不显示。
+     否则用户会复制一个「地址合法但没人监听」的端点出去。 */
   resetNet();
   const hostNoListen = makeSandbox("host", null, 43225);
+  hostNoListen.setIpv6({ available: true, addr: V6, raw: V6, code: "ok" });
+  hostNoListen.setIpv6Enabled(true);
   hostNoListen.setHostIpv6(false);
-  const V6X = "2409:8a02:c22:99a0:e13b:2795:2e46:70c0";
-  hostNoListen.setIpv6({ available: true, addr: V6X, raw: V6X, code: "ok" });
   await hostNoListen.checkIpv6();
   await hostNoListen.lanCreateRoom();
   await settle([hostNoListen]);
-  const msg = hostNoListen.roomV6Text || "";
-  ok(msg.indexOf(V6X) === -1, "监听不含 IPv6 时不该显示公网地址: " + msg);
-  ok(/未在 IPv6 上监听/.test(msg), "监听不含 IPv6 时应明确说明，实际: " + msg);
+  ok(hostNoListen.v6RowCount === 0,
+     "监听不含 IPv6 时不该显示公网地址（否则复制出去永远连不上）");
 
-  /* 26. 端口拼接：无端口时不能拼出垃圾 */
-  ok(hostV6.v6Endpoint("2409::1", "") === "", "无端口时应返回空串");
-  ok(hostV6.v6Endpoint("2409::1", "1234") === "[2409::1]:1234", "端点拼接不对");
+  /* 26. 客户端（非房主）不显示公网地址行 */
+  resetNet();
+  const hostC = makeSandbox("host", null, 43226);
+  const cliC = makeSandbox("client", 1);
+  hostC.setIpv6({ available: true, addr: V6, raw: V6, code: "ok" });
+  hostC.setIpv6Enabled(true);
+  await hostC.lanCreateRoom();
+  await cliC.lanJoinRoom("192.168.1.5:43210");
+  await settle([hostC, cliC]);
+  ok(cliC.v6RowCount === 0, "客户端不该显示公网地址行（那是房主的地址）");
+
+  /* 27. 端口拼接：无端口时不能拼出垃圾 */
+  ok(hostOn.v6Endpoint("2409::1", "") === "", "无端口时应返回空串");
+  ok(hostOn.v6Endpoint("2409::1", "1234") === "[2409::1]:1234", "端点拼接不对");
 
   if (errs.length) {
     console.error("❌ 局域网联机自检失败：");

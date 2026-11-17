@@ -141,7 +141,7 @@ function getMaxPlayersBySize(boardSize){
 // 双向联动：棋盘大小 ↔ 人数/AI数量，互相扣掉不合法的按钮
 
 /* ═══════ 设置系统（主题 / 震动 / 音效主题） ═══════ */
-let appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',orbs:true,bgFollow:true,customSounds:[]};
+let appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',orbs:true,bgFollow:true,customSounds:[],ipv6Lan:false};
 let settingsLoaded=false;
 
 // 主题切换：system 跟随系统；light/dark 手动覆盖
@@ -171,7 +171,7 @@ function applyTheme(theme){
 async function loadSettings(){
   try{
     const s=await tauriInvoke('load_settings');
-    if(s)appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',orbs:true,bgFollow:true,customSounds:[],...s};
+    if(s)appSettings={theme:'system',vibrate:true,soundTheme:'classic',dogBarkMode:'long',orbs:true,bgFollow:true,customSounds:[],ipv6Lan:false,...s};
   }catch(e){}
   settingsLoaded=true;
   applyTheme(appSettings.theme);
@@ -319,6 +319,23 @@ function renderSettingsPage(){
     });
   }
   updateDogBarkRow();
+  // IPv6 远程联机开关
+  const v6g=document.getElementById('ipv6ToggleGroup');
+  if(v6g){
+    v6g.querySelectorAll('.tg-btn').forEach(function(b){
+      b.classList.toggle('selected',(b.dataset.value==='true')===!!appSettings.ipv6Lan);
+      b.onclick=function(){
+        v6g.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+        this.classList.add('selected');
+        appSettings.ipv6Lan=(this.dataset.value==='true');
+        saveSettings();
+        syncIpv6Toggle();
+        if(appSettings.ipv6Lan) refreshIpv6Status();
+      };
+    });
+  }
+  syncIpv6Toggle();
+  if(appSettings.ipv6Lan) refreshIpv6Status();
   // 试听按钮
   const pl=document.getElementById('soundPreviewBtn');
   if(pl){
@@ -882,6 +899,11 @@ let capMode='4';
 let capStyle='one-two';
 // 胜负判定：last=只剩一人 / pieces=棋子数碾压 / points=点数碾压
 let winCondition='last';
+// 玩家条（局内排名）用什么指标排序：ml=ML 场面分（默认）/ pieces=棋子数 / points=点数
+let playerBarMetric='ml';
+// 最近一次 ML 评分缓存。renderPlayerBar 是同步的，而评分要异步算，
+// 所以算完先存这里再重绘；没有缓存时排序退回棋子数。
+let _liveRating=null;
 
 // 首子落位（用于限制其他玩家落子）
 let firstMovePos=null;
@@ -979,6 +1001,8 @@ document.addEventListener('click',function(e){
     updateModeConflictUI('cap');
   }else if(container.id==='capStyleGroup'){
     syncCapStyleDesc();
+  }else if(container.id==='rankMetricGroup'){
+    syncRankMetricDesc();
   }else if(container.id==='winConditionGroup'){
     syncWinConditionDesc();
   }else if(t.classList.contains('size-btn')||t.classList.contains('gb'))setTimeout(setupLobbySync,10);
@@ -1776,6 +1800,7 @@ function lanConfigSummary(cfg){
     ['边界', borderLabel[cfg.borderMode] || cfg.borderMode],
     ['阈值', capLabel[cfg.capMode] || cfg.capMode],
     ['人机', aiText],
+    ['排名', {ml:'ML 评分', pieces:'棋子数', points:'点数'}[cfg.rankMetric] || 'ML 评分'],
   ];
   return '<div class="lan-cfg-summary">' + rows.map(function(r){
     return '<div class="lan-cfg-row"><span class="lan-cfg-k">' + htmlEsc(r[0]) +
@@ -1833,13 +1858,15 @@ function lanV6Endpoint(addr, port){
   return '[' + addr + ']:' + port;
 }
 
-/// 探测本机 IPv6 并渲染「联机范围」卡片
+/// 探测本机 IPv6。只在「更多 → 启用 IPv6 远程联机」打开时才会被调用；
+/// 关着的时候整个功能不出现，也不对外暗示任何东西。
 async function lanCheckIpv6(){
-  const body = document.getElementById('lanNetBody');
-  if(!body) return;
+  if(!appSettings.ipv6Lan){
+    lanV6 = null;
+    return;
+  }
   if(!lanSupported()){
-    body.innerHTML = '<p style="font-size:.8rem;color:var(--dim);margin:0">' +
-      '网页版不支持局域网 / 远程联机，请用桌面或 Android 应用。</p>';
+    lanV6 = { available:false, code:'unsupported', reason:'网页版不支持局域网 / 远程联机，请用桌面或 Android 应用。' };
     return;
   }
   let info = null;
@@ -1852,109 +1879,103 @@ async function lanCheckIpv6(){
   if(info && typeof info === 'object'){
     lanV6 = info;
   }else{
-    // 区分「这个版本还没有该功能」和「检测出错」。
-    // 前者只能升级解决，后者可以重试 —— 混成一句「检测失败」会让
-    // 用户明明有 IPv6 却无从下手（旧包里就是这种情况）。
     const missing = /not found|unknown command|not allowed|not registered/i.test(failure || '');
     lanV6 = {
       available: false, addr: null, raw: null,
       code: missing ? 'too_old' : 'error',
       reason: missing
-        ? '当前版本还没有 IPv6 检测功能，升级到 4.1.0 或更新的版本后再看这里'
+        ? '当前版本还没有 IPv6 检测功能，升级到 4.1.0 或更新的版本后再试'
         : ('检测 IPv6 时出错：' + (failure || '未知原因')),
     };
   }
-  lanRenderNetCard();
 }
 
-function lanRenderNetCard(){
-  const body = document.getElementById('lanNetBody');
-  if(!body) return;
-  const v6 = lanV6 || {available:false};
-
-  // 版本太旧：不能写「只能局域网」，那是在替一个根本没跑的检测下结论
-  if(v6.code === 'too_old'){
-    body.innerHTML =
-      '<p class="lan-net-bad">⚠️ 版本过旧</p>' +
-      '<p class="lan-net-why">' + htmlEsc(v6.reason) + '</p>' +
-      '<p class="lan-net-why">在此之前请先用同一 Wi-Fi 局域网联机。</p>';
-    return;
+/// 「更多」页里的开关状态回显
+function syncIpv6Toggle(){
+  const g = document.getElementById('ipv6ToggleGroup');
+  if(g){
+    g.querySelectorAll('.tg-btn').forEach(function(b){
+      b.classList.toggle('selected', (b.dataset.value === 'true') === !!appSettings.ipv6Lan);
+    });
   }
-  // 检测出错：不武断下结论，给重试
-  if(v6.code === 'error'){
-    body.innerHTML =
-      '<p class="lan-net-bad">⚠️ 检测失败</p>' +
-      '<p class="lan-net-why">' + htmlEsc(v6.reason) + '</p>' +
-      '<div style="display:flex;gap:6px;margin-top:6px">' +
-        '<button class="glass-btn primary" id="lanRetryV6" style="flex:1">重新检测</button>' +
-      '</div>';
-    const btn = document.getElementById('lanRetryV6');
-    if(btn) btn.onclick = function(){ lanCheckIpv6(); };
-    return;
+  const note = document.getElementById('ipv6Note');
+  if(note) note.style.display = appSettings.ipv6Lan ? '' : 'none';
+  const st = document.getElementById('ipv6Status');
+  if(st){
+    if(!appSettings.ipv6Lan){ st.style.display = 'none'; st.textContent = ''; }
   }
-
-  if(!v6.available){
-    body.innerHTML =
-      '<p class="lan-net-bad">🛜 只能<strong>局域网联机</strong></p>' +
-      '<p class="lan-net-why">' + htmlEsc(v6.reason || '没有可用的公网 IPv6') + '</p>' +
-      '<p class="lan-net-why">其他人需要在同一个 Wi-Fi / 热点下才能加入。' +
-      '想跨网络玩，把手机和电脑都接到支持 IPv6 的网络上再回来看这里。</p>' +
-      (v6.raw
-        ? '<p class="lan-net-why">检测到的地址是 ' + htmlEsc(v6.raw) +
-          '，属于内网段，外部连不进来。</p>'
-        : '') +
-      '<div style="display:flex;gap:6px;margin-top:6px">' +
-        '<button class="glass-btn" id="lanRetryV6b" style="flex:1">重新检测</button>' +
-      '</div>';
-    const btn = document.getElementById('lanRetryV6b');
-    if(btn) btn.onclick = function(){ lanCheckIpv6(); };
-    return;
+  if(appSettings.ipv6Lan && !lanSupported() && st){
+    st.style.display = '';
+    st.textContent = '当前环境不支持：网页版无法监听端口，请用桌面或 Android 应用。';
   }
-  body.innerHTML =
-    '<p class="lan-net-good">🌐 可以<strong>远程联机</strong></p>' +
-    '<p class="lan-net-addr" id="lanNetV6">' + htmlEsc(v6.addr) + '</p>' +
-    '<div style="display:flex;gap:6px;margin-top:6px">' +
-      '<button class="glass-btn primary" id="lanCopyNetV6" style="flex:1">复制 IPv6</button>' +
-    '</div>' +
-    '<p class="lan-net-why">不同网络下的设备输入这个地址即可加入（建房后端口会附在后面）。' +
-    '<strong>如果对方连不上</strong>，多半是路由器/光猫的 IPv6 防火墙拦了入站，' +
-    '需要在路由器里放行，或者改用同一 Wi-Fi。</p>';
-  const btn = document.getElementById('lanCopyNetV6');
-  if(btn) btn.onclick = function(){ lanCopyText(v6.addr, 'IPv6 已复制'); };
 }
 
-/// 房间页显示公网地址（房主）/ 隐藏（客户端）
+/// 探测一次并把结果写进「更多」页的状态行（只在开关打开时调用）
+async function refreshIpv6Status(){
+  const st = document.getElementById('ipv6Status');
+  if(!st) return;
+  if(!appSettings.ipv6Lan){ st.style.display = 'none'; return; }
+  if(!lanSupported()){
+    st.style.display = '';
+    st.textContent = '当前环境不支持：网页版无法监听端口，请用桌面或 Android 应用。';
+    return;
+  }
+  st.style.display = '';
+  st.textContent = '正在检测…';
+  await lanCheckIpv6();
+  const v6 = lanV6 || { available:false };
+  if(v6.available){
+    // 只说事实：地址是什么。不下「可以远程联机」这种没验证过的结论。
+    st.innerHTML = '本机 IPv6 地址：<code style="user-select:all;word-break:break-all">' +
+      htmlEsc(v6.addr) + '</code>';
+  }else{
+    st.textContent = '当前网络没有可用的公网 IPv6：' + (v6.reason || '未知原因');
+  }
+}
+
+/// 房间地址区：局域网地址总是显示；公网 IPv6 地址只在
+/// 「更多 → 启用 IPv6 远程联机」打开、且本机确实有可用地址、且监听覆盖 IPv6 时
+/// 才追加一行。开关关着的时候这里不出现任何 IPv6 痕迹 —— 用户要求
+/// 「其他处不要暗示或者明示」，所以不做「未启用」之类的说明。
 function lanRenderRoomAddr(){
-  const row = document.getElementById('lanRoomRemoteRow');
-  const v6El = document.getElementById('lanRoomV6');
-  const copyV6 = document.getElementById('lanCopyV6');
-  const copyLan = document.getElementById('lanCopyLan');
-  if(!row) return;
+  const box = document.getElementById('lanAddrBox');
+  if(!box) return;
+  box.querySelectorAll('.lan-v6-row').forEach(function(n){ n.remove(); });
 
-  if(copyLan){
-    copyLan.onclick = function(){ lanCopyText(lanRoomAddr, '局域网地址已复制'); };
+  const lanRow = document.getElementById('lanCopyLan');
+  if(lanRow){
+    lanRow.onclick = function(){ lanCopyText(lanRoomAddr, '局域网地址已复制'); };
   }
+
+  if(lanRole !== 'host') return;
+  if(!appSettings.ipv6Lan) return;
+  const v6 = lanV6 || {};
+  if(!v6.available || !v6.addr || !lanHostIpv6) return;
+
   const portMatch = /:(\d+)$/.exec(lanRoomAddr || '');
   const port = portMatch ? portMatch[1] : '';
-  const hostMode = (lanRole === 'host');
-  const v6 = lanV6 || {};
+  if(!port) return;
+  const endpoint = lanV6Endpoint(v6.addr, port);
 
-  if(hostMode && v6.available && v6.addr && port && lanHostIpv6){
-    if(v6El) v6El.textContent = lanV6Endpoint(v6.addr, port);
-    row.style.display = '';
-    if(copyV6) copyV6.onclick = function(){
-      lanCopyText(lanV6Endpoint(v6.addr, port), '公网地址已复制');
-    };
-  }else{
-    row.style.display = 'none';
-    if(copyV6) copyV6.onclick = null;
-    // 有公网 IPv6 但监听没覆盖＝最容易被误解的情况，必须在房间页说清楚
-    if(hostMode && v6.available && v6.addr && port && !lanHostIpv6){
-      row.style.display = '';
-      if(v6El) v6El.textContent = '本机未在 IPv6 上监听，暂时只能用局域网地址';
-      if(copyV6) copyV6.onclick = null;
-    }
-  }
+  const row = document.createElement('p');
+  row.className = 'lan-v6-row';
+  row.style.margin = '8px 0 0';
+
+  const label = document.createTextNode('公网地址：');
+  row.appendChild(label);
+
+  const strong = document.createElement('strong');
+  strong.style.cssText = 'user-select:all;word-break:break-all';
+  strong.textContent = endpoint;
+  row.appendChild(strong);
+
+  const btn = document.createElement('button');
+  btn.className = 'glass-btn lan-copy-btn';
+  btn.textContent = '复制';
+  btn.onclick = function(){ lanCopyText(endpoint, '公网地址已复制'); };
+  row.appendChild(btn);
+
+  box.appendChild(row);
 }
 
 /* ─── 入口与房间 ─── */
@@ -2396,7 +2417,8 @@ function lanInitRuleControls(){
 
   lanApplyShapeVisibility();
   lanRenderAiRows();
-  lanCheckIpv6();
+  // 开关关着就完全不探测，页面上也不出现任何 IPv6 内容
+  if(appSettings.ipv6Lan) lanCheckIpv6().then(lanRenderRoomAddr);
   lanSyncRuleDesc();
   lanCfg = lanReadCfgFromDom();
 }
@@ -3057,6 +3079,7 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
         capMode: capMode || '4',
         capStyle: capStyle || 'one-two',
         winCondition: winCondition || 'last',
+        rankMetric: playerBarMetric || 'ml',
         winner: winner !== null && winner !== undefined ? winner : null,
         colorNames: toColorNamesArray(window._colorNames || COLOR_NAMES),
         chainStats: chainStats,
@@ -3138,6 +3161,7 @@ async function saveUnfinishedGameHistory(){
     capMode: capMode || '4',
     capStyle: capStyle || 'one-two',
     winCondition: winCondition || 'last',
+    rankMetric: playerBarMetric || 'ml',
     aiAlgorithm: _aiAlgorithm,
     aiDepth: _aiDepth,
     colorNames: toColorNamesArray(_colorNames),
@@ -3233,6 +3257,7 @@ function loadGameFromState(saved){
   capMode = saved.capMode || "4";
   capStyle = saved.capStyle || "one-two";
   winCondition = saved.winCondition || "last";
+  playerBarMetric = saved.rankMetric || "ml";
   // 降级边界与 3/5 级爆炸互斥：旧存档冲突时降级优先，阈值归 4
   if(borderMode==='degrade'&&(capMode==='3'||capMode==='5'))capMode='4';
 
@@ -4338,12 +4363,46 @@ function setBg(pl){
     document.body.style.background=`radial-gradient(ellipse 80% 50% at 50% -20%, rgba(240,179,75,.04) 0%, transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%, rgba(95,195,195,.03) 0%, transparent 70%),rgb(${r},${g},${b})`;
   }
 }
+/// 玩家条上每位玩家当前的显示值，以及据此排序后的玩家顺序。
+///
+/// 指标可选 ML 评分 / 棋子数 / 点数（游戏配置里选，默认 ML）。
+/// 排序是「每轮都按当前值重排」的 —— 局面变了名次就该跟着变，
+/// 固定按玩家编号排看不出谁在领先。
+function playerBarRanking(){
+  const pieces={}, points={}, pointsFor={};
+  for(let p=0;p<maxPlayers;p++){ pieces[p]=0; points[p]=0; }
+  for(let row of board)for(let c of row){
+    if(c.owner!==null){ pieces[c.owner]++; points[c.owner]+=c.count; }
+  }
+  const hasAny=board.some(r=>r.some(c=>c.owner!==null));
+  const metric=playerBarMetric||'ml';
+  // ML 评分可能是异步算的、也可能还没到 —— 缺就退回棋子数，不留空
+  const ml=Array.isArray(_liveRating)?_liveRating:null;
+  const useMl=(metric==='ml'&&ml);
+  const valueOf=(p)=>{
+    if(useMl) return (typeof ml[p]==='number')?ml[p]:(pieces[p]*100);
+    if(metric==='points') return points[p];
+    return pieces[p];
+  };
+  const order=[];
+  for(let p=0;p<maxPlayers;p++)order.push(p);
+  order.sort(function(a,b){
+    const ea=hasAny&&pieces[a]===0, eb=hasAny&&pieces[b]===0;
+    // 已淘汰的沉底，且彼此之间保持原编号顺序
+    if(ea!==eb) return ea?1:-1;
+    if(ea&&eb) return a-b;
+    const va=valueOf(a), vb=valueOf(b);
+    if(va!==vb) return vb-va;
+    return a-b;
+  });
+  return {order, pieces, points, valueOf, useMl, metric};
+}
+
 function renderPlayerBar(){
   let el=document.getElementById('playerBar');el.innerHTML='';
-  let cnt={};
-  for(let p=0;p<maxPlayers;p++)cnt[p]=0;
-  for(let row of board)for(let c of row)if(c.owner!==null)cnt[c.owner]++;
-  for(let p=0;p<maxPlayers;p++){
+  const rk=playerBarRanking();
+  const cnt=rk.pieces;
+  for(const p of rk.order){
     let t=document.createElement('span');t.className='player-tag';
     if(p===curPlayer)t.classList.add('active');
     let alive=cnt[p]>0;
@@ -4355,8 +4414,12 @@ function renderPlayerBar(){
     t.textContent=label+' ';
     let cntEl=document.createElement('span');
     cntEl.className='cnt';
-    cntEl.textContent=String(cnt[p]);
+    const v=rk.valueOf(p);
+    // ML 评分带正负，直接显示原值；棋子/点数本来就是非负计数
+    cntEl.textContent=(rk.metric==='ml'&&rk.useMl&&v>0)?('+'+v):String(v);
     t.appendChild(cntEl);
+    t.title=rk.metric==='ml'?(rk.useMl?'ML 场面分':'棋子数（评分未就绪）')
+      :(rk.metric==='points'?'点数':'棋子数');
     t.style.cursor=gameMode==='lan'?'default':'pointer';
     if(gameMode!=='lan')t.onclick=function(e){e.stopPropagation();openInGamePlayerConfig(p)};
     el.appendChild(t);
@@ -5772,6 +5835,7 @@ function replayGame(){
   if(c.borderMode)borderMode=c.borderMode;
   if(c.capStyle)capStyle=c.capStyle;
   if(c.winCondition)winCondition=c.winCondition;
+  if(c.rankMetric)playerBarMetric=c.rankMetric;
   // 随机模式：再来一局同样在开局瞬间重新随机确定，整局不再改变
   if(capMode==='random')capMode=resolveRandomCap();
   if(borderMode==='random')borderMode=resolveRandomBorder();
@@ -5798,6 +5862,7 @@ function replayGame(){
     gameHistory=[];
     chainStats={};
     maxChainOverall={player:null,length:0};
+    _liveRating=null;
     gameCount=(gameCount||0)+1;
     recordHistory();
     renderBoard(true);
@@ -5821,6 +5886,7 @@ function replayGame(){
     gameHistory=[];
     chainStats={};
     maxChainOverall={player:null,length:0};
+    _liveRating=null;
     recordHistory();
     renderBoard(true);
     show('game');
@@ -5847,6 +5913,7 @@ function replayGame(){
     gameHistory=[];
     chainStats={};
     maxChainOverall={player:null,length:0};
+    _liveRating=null;
     gameCount=(gameCount||0)+1;
     recordHistory();
     renderBoard(true);
@@ -6219,7 +6286,7 @@ function exitGame(){
   if(gameHistory.length>0){flushAndGetFullHistory();tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history on exit failed:', e))}
   gameMode=null;gameOver=false;isPaused=false;firstMovePos=null;curPlayer=0;aiThinking=false;fastFinishing=false;
   aiPlayers=new Set();eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
-  maxChainOverall={player:null,length:0};turnCount=0;gameCount=0;undoStack=[];
+  maxChainOverall={player:null,length:0};_liveRating=null;turnCount=0;gameCount=0;undoStack=[];
     clearAiHint();
   cells=[];board=[];
   try{document.getElementById('board').innerHTML='';}catch(e){}
@@ -6366,6 +6433,7 @@ ensureModalKeyboard();
 const GAME_CONFIG_DEFAULT = {
   id: 'default', name: '标准',
   borderMode: 'default', capMode: '4', capStyle: 'one-two', winCondition: 'last',
+  rankMetric: 'ml',
 };
 
 function getGameConfigs(){
@@ -6421,6 +6489,18 @@ function syncCapStyleDesc(){
     : '某个方向相邻的「一格」送 2 点，把那一格直接压到临界';
 }
 
+function syncRankMetricDesc(){
+  const el = document.getElementById('rankMetricDesc');
+  if(!el) return;
+  const v = getSelStr('rankMetricGroup') || 'ml';
+  const map = {
+    ml: '按 ML 评估出的场面分排名，能看出谁在领先，而不只是谁占的格多（默认）',
+    pieces: '按棋盘上的棋子数排名，最直观',
+    points: '按棋子点数总和排名，堆得厚的排前面',
+  };
+  el.textContent = map[v] || map.ml;
+}
+
 function syncWinConditionDesc(){
   const el = document.getElementById('winConditionDesc');
   if(!el) return;
@@ -6439,6 +6519,7 @@ function readGameConfigFromDom(){
     capMode: getSelStr('capModeGroup') || '4',
     capStyle: getSelStr('capStyleGroup') || 'one-two',
     winCondition: getSelStr('winConditionGroup') || 'last',
+    rankMetric: getSelStr('rankMetricGroup') || 'ml',
   };
 }
 
@@ -6448,6 +6529,7 @@ function applyGameConfigToDom(cfg){
   setGroupValue('capModeGroup', c.capMode);
   setGroupValue('capStyleGroup', c.capStyle);
   setGroupValue('winConditionGroup', c.winCondition);
+  setGroupValue('rankMetricGroup', c.rankMetric || 'ml');
   // 描述文字跟着选中态走
   const bd = document.getElementById('borderModeDesc');
   if(bd && BORDER_MODE_DESC[c.borderMode]) bd.textContent = BORDER_MODE_DESC[c.borderMode];
@@ -6455,6 +6537,7 @@ function applyGameConfigToDom(cfg){
   if(cd && CAP_MODE_DESC[c.capMode]) cd.textContent = CAP_MODE_DESC[c.capMode];
   syncCapStyleRow();
   syncWinConditionDesc();
+  syncRankMetricDesc();
   updateModeConflictUI('cfg');
   updateGameConfigSummary();
 }
@@ -6614,6 +6697,17 @@ const HINTS = {
       '<li><strong>相邻两格各爆一个</strong>：某个方向连着推两格，每格各 1 点。推得更远，适合隔着空格切进去</li>'+
       '</ul>'+
       '<p>具体是哪个方向，每一炸都会重新随机。</p>'
+  },
+  'rank-metric': {
+    title: '局内排名依据',
+    body:
+      '<p>棋盘上方那一排玩家标签，按什么排序。</p>'+
+      '<ul>'+
+      '<li><strong>ML 评分</strong>（默认）：用 AI 的评估模型给每个局面打分，能反映「谁形势好」，而不只是占格多少。分数带正负，正数表示占优</li>'+
+      '<li><strong>棋子数</strong>：谁占的格子多谁排前面，最直观</li>'+
+      '<li><strong>点数</strong>：按棋子点数总和排，堆得厚的在前</li>'+
+      '</ul>'+
+      '<p>不管选哪个，已淘汰的玩家都会沉到末尾。ML 评分是异步算的，刚开局那几步可能还没算出来，此时会先按棋子数排。</p>'
   },
   'win-condition': {
     title: '胜负判定怎么选',
@@ -7179,6 +7273,8 @@ function startLocalFromSetup(sz,cnt){
   capMode=userCapMode;
   capStyle=_gc.capStyle;
   winCondition=_gc.winCondition;
+  playerBarMetric=_gc.rankMetric || 'ml';
+  _liveRating=null;   // 上一局的评分不能带进新局
   // 2 人局只允许「只剩一人」：其余判定在两人时没有意义
   if(maxPlayers<3)winCondition='last';
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
@@ -7190,6 +7286,7 @@ function startLocalFromSetup(sz,cnt){
   aiPlayers=new Set();aiThinking=false;
   eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
+  _liveRating=null;
   let colorNames={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
@@ -7201,7 +7298,7 @@ function startLocalFromSetup(sz,cnt){
   show('game');
   document.body.style.background='';
   renderPlayerBar();
-  _lastGameConfig={mode:'local',size,cols,maxPlayers,colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode,capStyle:capStyle,winCondition:winCondition};
+  _lastGameConfig={mode:'local',size,cols,maxPlayers,colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode,capStyle:capStyle,winCondition:winCondition,rankMetric:playerBarMetric};
 }
 function startAIFromSetup(sz,cnt){
   const bdCells=boardCells;   // 本局棋盘形状（随机/自定义时非 null），存进 _lastGameConfig 供「再来一局」
@@ -7217,6 +7314,8 @@ function startAIFromSetup(sz,cnt){
   capMode=userCapMode;
   capStyle=_gc.capStyle;
   winCondition=_gc.winCondition;
+  playerBarMetric=_gc.rankMetric || 'ml';
+  _liveRating=null;   // 上一局的评分不能带进新局
   // 2 人局只允许「只剩一人」：其余判定在两人时没有意义
   if(maxPlayers<3)winCondition='last';
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
@@ -7228,6 +7327,7 @@ function startAIFromSetup(sz,cnt){
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
   eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
+  _liveRating=null;
   let colorNames={},humanIdx=-1;
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
@@ -7249,7 +7349,7 @@ function startAIFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'ai',size,cols,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode,capStyle:capStyle,winCondition:winCondition};
+  _lastGameConfig={mode:'ai',size,cols,aiCount:cnt-1,humanIdx,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode,capStyle:capStyle,winCondition:winCondition,rankMetric:playerBarMetric};
 }
 function startEveFromSetup(sz,cnt){
   const bdCells=boardCells;   // 本局棋盘形状（随机/自定义时非 null），存进 _lastGameConfig 供「再来一局」
@@ -7265,6 +7365,8 @@ function startEveFromSetup(sz,cnt){
   capMode=userCapMode;
   capStyle=_gc.capStyle;
   winCondition=_gc.winCondition;
+  playerBarMetric=_gc.rankMetric || 'ml';
+  _liveRating=null;   // 上一局的评分不能带进新局
   // 2 人局只允许「只剩一人」：其余判定在两人时没有意义
   if(maxPlayers<3)winCondition='last';
   // 随机模式：开局瞬间用时间戳种子确定具体模式，整局不再改变
@@ -7276,6 +7378,7 @@ function startEveFromSetup(sz,cnt){
   aiPlayers=new Set();aiConfigs={};aiThinking=false;
   eliminatedPlayers=new Set();eliminationRounds=[];eliminationInfo={};gameHistory=[];chainStats={};
   maxChainOverall={player:null,length:0};
+  _liveRating=null;
   let colorNames={};
   for(let i=0;i<cnt;i++){
     const cfg=playerConfigs[i];
@@ -7291,7 +7394,7 @@ function startEveFromSetup(sz,cnt){
   renderPlayerBar();
   updateFastFinishBtn();
   if(aiPlayers.has(0))setTimeout(()=>triggerAI(),400);
-  _lastGameConfig={mode:'eve',size,cols,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode,capStyle:capStyle,winCondition:winCondition};
+  _lastGameConfig={mode:'eve',size,cols,maxPlayers:cnt,aiConfigs:JSON.parse(JSON.stringify(aiConfigs)),colorNames,cells:bdCells,borderMode:userBorderMode,capMode:userCapMode,capStyle:capStyle,winCondition:winCondition,rankMetric:playerBarMetric};
 }
 window.addEventListener('popstate',()=>{
   const cur = Router._current;

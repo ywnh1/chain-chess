@@ -163,6 +163,14 @@ pub struct TurnHistory {
     /// 本步落子 (x, y, player, rng_seed)，初始状态为 None
     #[serde(default)]
     pub mv: Option<[u64; 4]>,
+    /// 各玩家的 ML 场面分（按玩家下标）。
+    ///
+    /// 这个字段必须留在结构里：结算时历史会走一遍
+    /// `save_round_history` → `load_round_history`（JSON 往返），
+    /// serde 默认丢弃结构里没有的字段，评分就会在往返中静默消失，
+    /// 导致结算页的评分曲线永远画不出来。
+    #[serde(default)]
+    pub rating: Option<Vec<i32>>,
 }
 
 
@@ -188,9 +196,18 @@ pub struct HistoryRecord {
     /// 边界模式（默认/回环/反弹/降级/随机）
     #[serde(default)]
     pub border_mode: Option<String>,
-    /// 爆炸阈值模式（3/4/5/random）
+    /// 爆炸阈值模式（3/4/5/6/random）
     #[serde(default)]
     pub cap_mode: Option<String>,
+    /// 双爆方式（one-two / two-one），阈值 5/6 时才有意义
+    #[serde(default)]
+    pub cap_style: Option<String>,
+    /// 胜负判定（last / pieces / points）
+    #[serde(default)]
+    pub win_condition: Option<String>,
+    /// 局内排名依据（ml / pieces / points）
+    #[serde(default)]
+    pub rank_metric: Option<String>,
     #[serde(default)]
     pub winner: Option<usize>,
     #[serde(default)]
@@ -383,7 +400,13 @@ pub fn simulate_to_end(
                 }
                 sn.insert(p.to_string(), PlayerSnapshot { pieces, points });
             }
-            history.push(TurnHistory { turn: history.len() as u32, snapshot: sn, mv: Some([x as u64, y as u64, cur as u64, step_seed]) });
+            history.push(TurnHistory {
+                turn: history.len() as u32,
+                snapshot: sn,
+                mv: Some([x as u64, y as u64, cur as u64, step_seed]),
+                // 模拟对局不产评分（那是前端逐步算的），保持 None
+                rating: None,
+            });
 
             gc += 1;
             let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
@@ -2578,6 +2601,32 @@ mod tests {
     }
 
     /// 6 级阈值确实是 6，首子落在 5（临界）。
+    /// 结算页的 ML 评分曲线依赖 TurnHistory 往返保留 rating。
+    /// 历史会走 save_round_history → load_round_history（JSON 序列化/反序列化），
+    /// 结构里少一个字段，评分就会在这趟往返里静默消失，图永远画不出来。
+    #[test]
+    fn turn_history_keeps_rating_across_json_roundtrip() {
+        let mut snap = std::collections::HashMap::new();
+        snap.insert("0".to_string(), PlayerSnapshot { pieces: 3, points: 7 });
+        snap.insert("1".to_string(), PlayerSnapshot { pieces: 2, points: 4 });
+        let h = TurnHistory {
+            turn: 5,
+            snapshot: snap,
+            mv: Some([1, 2, 0, 42]),
+            rating: Some(vec![19, -13]),
+        };
+        let json = serde_json::to_string(&h).expect("序列化失败");
+        assert!(json.contains("rating"), "JSON 里应包含 rating: {}", json);
+        let back: TurnHistory = serde_json::from_str(&json).expect("反序列化失败");
+        assert_eq!(back.rating, Some(vec![19, -13]), "评分在往返中丢失");
+        assert_eq!(back.mv, Some([1, 2, 0, 42]));
+
+        // 老记录没有 rating 字段：必须能正常读，且视为 None（不能报错）
+        let legacy = r#"{"turn":6,"snapshot":{},"mv":null}"#;
+        let old: TurnHistory = serde_json::from_str(legacy).expect("老记录应可读");
+        assert_eq!(old.rating, None, "缺失评分应为 None");
+    }
+
     #[test]
     fn cap6_threshold_and_crit() {
         let b = empty(5, 5);
@@ -2875,5 +2924,28 @@ mod eval_tests {
         let mv = first_move_center(&b, 7).expect("口字棋盘上应当能找到首步");
         assert!(!b[mv.0][mv.1].blocked, "首步不能落在洞里");
         assert!(b[mv.0][mv.1].owner.is_none());
+    }
+}
+
+#[cfg(test)]
+mod rate_tests {
+    use super::*;
+
+    /// 场面评分要能区分双方优劣 —— 局内排名和结算页的评分曲线都靠它。
+    /// 如果两边永远相等，图上就是两条重合的线，看不出谁在领先。
+    #[test]
+    fn ml_rating_distinguishes_sides() {
+        let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 7]; 7];
+        let rate = |b: &GameBoard| -> Vec<i32> {
+            (0..2).map(|p| eval_board_ml(b, p, 0, BorderMode::Default, CapMode::Cap4, 0)).collect()
+        };
+        // 空盘：双方条件对等
+        let empty = rate(&b);
+        assert_eq!(empty[0], empty[1], "空盘双方评分应相同: {:?}", empty);
+        // 0 号占优
+        for i in 0..4 { b[0][i] = Cell { owner: Some(0), count: 2, th: None, blocked: false }; }
+        for i in 0..2 { b[6][i] = Cell { owner: Some(1), count: 1, th: None, blocked: false }; }
+        let mid = rate(&b);
+        assert!(mid[0] > mid[1], "占优方评分应更高，实际 {:?}", mid);
     }
 }

@@ -29,6 +29,21 @@ for(const m of appJs.matchAll(/Router\.register\('([a-z-]+)'/g))if(!screenIds.ha
 //（「关于 → 联系作者」曾经因此完全点不动，必须走 openExternal）。
 if(/window\.open\(/.test(h))e.push('index.html 还在用 window.open：WebView 里打不开，改用 openExternal()');
 if(/<a[^>]+target="_blank"/.test(h))e.push('index.html 还有 target="_blank" 链接：WebView 里点了没反应，改用 openExternal()');
+// PWA（docs/）是独立维护的副本，hint 定义最容易在同步时漏掉
+// （cap-style / rank-metric / win-condition 就漏过一次，界面上点「!」没反应）。
+{
+  const docsHtmlPath = resolve(import.meta.dirname, "..", "docs", "index.html");
+  const docsJsPath = resolve(import.meta.dirname, "..", "docs", "app.js");
+  if (existsSync(docsHtmlPath) && existsSync(docsJsPath)) {
+    const dh = readFileSync(docsHtmlPath, "utf-8");
+    const dj = readFileSync(docsJsPath, "utf-8");
+    const used = new Set([...dh.matchAll(/openHint\('([a-z-]+)'\)/g)].map((m) => m[1]));
+    const block = dj.slice(dj.indexOf("const HINTS = {"), dj.indexOf("/** 打开说明弹窗"));
+    const defined = new Set([...block.matchAll(/^\s*'([a-z-]+)':\s*\{/gm)].map((m) => m[1]));
+    for (const k of used) if (!defined.has(k)) e.push("docs/app.js 缺 HINT: " + k);
+  }
+}
+
 // 取值辅助别用错：getSel 是数字版（parseInt），字符串容器必须用 getSelStr。
 // 这个错犯过一次：currentShapeMode 用了 getSel，点「长方形/自定义」永远退回 square。
 const strContainers=["shapeModeGroup","borderModeGroup","capModeGroup","soundThemeGroup","dogBarkGroup"];
