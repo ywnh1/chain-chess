@@ -1400,6 +1400,7 @@ async function lanHandleMessage(peerId, msg){
         maxPlayers: msg.maxPlayers | 0, names: safeNames,
         borderMode: msg.borderMode || 'default', capMode: msg.capMode || '4',
         cells: msg.cells || null,
+        rankMetric: msg.rankMetric || 'ml',
         aiSeats: Array.isArray(msg.aiSeats) ? msg.aiSeats : [],
         aiConfigs: (msg.aiConfigs && typeof msg.aiConfigs === 'object') ? msg.aiConfigs : {}
       });
@@ -1578,6 +1579,9 @@ function lanReadCfgFromDom(){
     size: 7, rows: 7, cols: 7, customId: null, customName: '',
     borderMode: lanSelStr('lanBorderGroup', 'default'),
     capMode: lanSelStr('lanCapGroup', '4'),
+    // 排名依据来自「游戏配置」页（联机房间页没有这个控件），
+    // 所以整局沿用配置预设里的选择，而不是另起一套。
+    rankMetric: lanSelStr('rankMetricGroup', 'ml'),
     aiList: [],
   };
   // 每个 AI 各自的算法，从动态生成的那几行里读
@@ -1616,6 +1620,7 @@ function lanCfgWire(){
     customName: c.customName || '',
     borderMode: c.borderMode || 'default',
     capMode: c.capMode || '4',
+    rankMetric: c.rankMetric || 'ml',
     aiList: Array.isArray(c.aiList) ? c.aiList.map(function(a){
       return {algorithm: a.algorithm || 'strategy', depth: a.depth || 2};
     }) : [],
@@ -2085,6 +2090,7 @@ function lanHostStart(){
   const cfg = {
     size: m.rows, cols: m.cols, maxPlayers: total,
     names: names, borderMode: m.borderMode, capMode: m.capMode, cells: m.cells,
+    rankMetric: lanCfg.rankMetric || 'ml',
     aiSeats: aiSeats, aiConfigs: aiConfigsOut
   };
   // 每个客户端单独发，带上它自己的新座位号。
@@ -2098,7 +2104,7 @@ function lanHostStart(){
       reseat.set(peerId, newPid);
       lanSendTo(peerId, {t:'start', you:newPid, size:cfg.size, cols:cfg.cols,
         maxPlayers:cfg.maxPlayers, names:cfg.names, borderMode:cfg.borderMode,
-        capMode:cfg.capMode, cells:cfg.cells,
+        capMode:cfg.capMode, cells:cfg.cells, rankMetric:cfg.rankMetric,
         aiSeats:cfg.aiSeats, aiConfigs:cfg.aiConfigs}).catch(function(){});
     });
     lanSeats = reseat;
@@ -2122,6 +2128,9 @@ function lanBeginGame(cfg){
   capMode = cfg.capMode || '4';
   board = mkBoard(size, cols, boardCells);
   curPlayer = 0; gameOver = false; isPaused = false; firstMovePos = null;
+  // 排名依据由房主决定，随 start 消息同步过来（两端必须一致）
+  playerBarMetric = cfg.rankMetric || 'ml';
+  _liveRating = null;
   const pauseBtn = document.getElementById('pauseBtn');
   if(pauseBtn) pauseBtn.textContent = '退出';   // 联机不能暂停，这个按钮只用于离开对局
   gameMode = 'lan';
@@ -3824,6 +3833,13 @@ function scheduleRating(){
     borderMode: borderMode, capMode: capMode,
   }).then(function(list){
     if(Array.isArray(list) && gameHistory[idx]) gameHistory[idx].rating = list;
+    // 局内排名要按 ML 分排序：算完存进缓存再重绘一次玩家条。
+    // 少了这一步，「局内排名依据 = ML 评分」永远不会生效 ——
+    // renderPlayerBar 读到 null 就退回棋子数，用户看到的一直是棋子数。
+    if(Array.isArray(list)){
+      _liveRating = list;
+      try{ renderPlayerBar(); }catch(e){}
+    }
   }).catch(function(){
     // 引擎不支持（PWA）/ 计算失败：不补评分，图表里自然跳过这一步
   }).then(function(){
@@ -4376,11 +4392,15 @@ function playerBarRanking(){
   }
   const hasAny=board.some(r=>r.some(c=>c.owner!==null));
   const metric=playerBarMetric||'ml';
-  // ML 评分可能是异步算的、也可能还没到 —— 缺就退回棋子数，不留空
+  // ML 评分可能是异步算的、也可能还没到 —— 缺就整体退回棋子数。
+  // 不能只对个别玩家退回：评分量级（±几十）和棋子数（0~361）混在一起排，
+  // 会让「评分缺失的那个人」被判成遥遥领先。
   const ml=Array.isArray(_liveRating)?_liveRating:null;
-  const useMl=(metric==='ml'&&ml);
+  const mlReady=!!(ml&&ml.length>=maxPlayers&&
+    Array.prototype.every.call(ml.slice(0,maxPlayers),v=>typeof v==='number'&&isFinite(v)));
+  const useMl=(metric==='ml'&&mlReady);
   const valueOf=(p)=>{
-    if(useMl) return (typeof ml[p]==='number')?ml[p]:(pieces[p]*100);
+    if(useMl) return ml[p];
     if(metric==='points') return points[p];
     return pieces[p];
   };

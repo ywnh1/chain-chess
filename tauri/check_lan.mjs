@@ -216,6 +216,14 @@ function buildRuleControls() {
   colsSel.value = "7";
   const customSel = mk("lanCustomBoard", "select");
 
+  // 局内排名依据在 game-config 页，联机时读它的选中态
+  const rankGroup = mk("rankMetricGroup", "div", "btn-group");
+  for (const v of ["ml", "pieces", "points"]) {
+    const b = mk("", "button", "gb" + (v === "ml" ? " selected" : ""));
+    b.dataset.value = v;
+    rankGroup.appendChild(b);
+  }
+
   // 人机数量 / 强度：都是 <select>，测试里直接改 value
   const aiCountSel = mk("lanAiCount", "select");
   aiCountSel.value = "0";
@@ -225,6 +233,7 @@ function buildRuleControls() {
   return {
     lanAddrBox: mk("lanAddrBox"), lanCopyLan: mk("lanCopyLan"),
     lanRoomAddr: mk("lanRoomAddr"), lanRoomTip: mk("lanRoomTip"),
+    rankMetricGroup: rankGroup,
     lanAiCount: aiCountSel, lanAiStrength: aiStrengthSel,
     lanAiStrengthRow: mk("lanAiStrengthRow"),
     lanShapeGroup: shape, lanSizeGrid: sizes, lanBorderGroup: border, lanCapGroup: cap,
@@ -354,6 +363,7 @@ function makeSandbox(role, peerId = null, port = 43210) {
     let maxChainOverall={player:null,length:0}, undoStack=[];
     // IPv6 开关：默认关。测试通过 __env 控制。
     let appSettings={ipv6Lan:false};
+    let playerBarMetric='ml';
     const saveSettings=()=>{};
     // 4.1.0 起 localClick 会带上这两项；沙箱里给默认值即可
     let capStyle='one-two', winCondition='last';
@@ -415,6 +425,7 @@ function makeSandbox(role, peerId = null, port = 43210) {
       get seats(){return lanSeats?Array.from(lanSeats.entries()):null},
       get remoteCfg(){return lanRemoteCfg},
       get aiSeats(){return [...aiPlayers]},
+      get playerBarMetric(){return playerBarMetric},
       get aiCfg(){return aiConfigs},
       get aiThinking(){return aiThinking},
       get aiMoveCalls(){return __env.aiMoveCalls},
@@ -770,6 +781,9 @@ async function main() {
   ok((shrink[0] || {}).algorithm === "alphabeta" && (shrink[1] || {}).algorithm === "pvs",
      "减 AI 后前两个算法变了");
 
+  /* 18.7 排名依据由房主决定：在 game-config 里选的点数要随开局同步到客户端 */
+  host6.setRule("rankMetricGroup", "points");
+
   /* 19. 开局：2 真人 + 2 AI = 4 人，两端 AI 座位一致 */
   host6.lanHostStart();
   await settle(all6);
@@ -778,6 +792,10 @@ async function main() {
   const hs = host6.aiSeats.join(","), cs = cli6.aiSeats.join(",");
   ok(hs === "2,3", "房主端 AI 座位应为 2,3，实际 " + hs);
   ok(hs === cs, "两端 AI 座位不一致: host=" + hs + " client=" + cs);
+  ok(host6.playerBarMetric === "points",
+     "房主端排名依据应为 points，实际 " + host6.playerBarMetric);
+  ok(cli6.playerBarMetric === "points",
+     "客户端排名依据应同步为 points，实际 " + cli6.playerBarMetric);
   /* 每个 AI 各用各的算法：座位 2 = alphabeta，座位 3 = pvs
      （两端都要一致，否则客户端显示的和房主实际跑的对不上） */
   ok((host6.aiCfg[2] || {}).algorithm === "alphabeta",

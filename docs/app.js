@@ -2552,6 +2552,13 @@ function scheduleRating(){
     borderMode: borderMode, capMode: capMode,
   }).then(function(list){
     if(Array.isArray(list) && gameHistory[idx]) gameHistory[idx].rating = list;
+    // 局内排名要按 ML 分排序：算完存进缓存再重绘一次玩家条。
+    // 少了这一步，「局内排名依据 = ML 评分」永远不会生效 ——
+    // renderPlayerBar 读到 null 就退回棋子数，用户看到的一直是棋子数。
+    if(Array.isArray(list)){
+      _liveRating = list;
+      try{ renderPlayerBar(); }catch(e){}
+    }
   }).catch(function(){
     // 引擎不支持（PWA）/ 计算失败：不补评分，图表里自然跳过这一步
   }).then(function(){
@@ -3095,11 +3102,15 @@ function playerBarRanking(){
   }
   const hasAny=board.some(r=>r.some(c=>c.owner!==null));
   const metric=playerBarMetric||'ml';
-  // ML 评分可能是异步算的、也可能还没到 —— 缺就退回棋子数，不留空
+  // ML 评分可能是异步算的、也可能还没到 —— 缺就整体退回棋子数。
+  // 不能只对个别玩家退回：评分量级（±几十）和棋子数（0~361）混在一起排，
+  // 会让「评分缺失的那个人」被判成遥遥领先。
   const ml=Array.isArray(_liveRating)?_liveRating:null;
-  const useMl=(metric==='ml'&&ml);
+  const mlReady=!!(ml&&ml.length>=maxPlayers&&
+    Array.prototype.every.call(ml.slice(0,maxPlayers),v=>typeof v==='number'&&isFinite(v)));
+  const useMl=(metric==='ml'&&mlReady);
   const valueOf=(p)=>{
-    if(useMl) return (typeof ml[p]==='number')?ml[p]:(pieces[p]*100);
+    if(useMl) return ml[p];
     if(metric==='points') return points[p];
     return pieces[p];
   };

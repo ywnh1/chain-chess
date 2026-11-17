@@ -14,7 +14,7 @@ const SOURCES = [
 ];
 const errs = [];
 
-function checkFile(appJs, label) {
+async function checkFile(appJs, label) {
   const before = errs.length;
 
 function grab(startMarker, endMarker) {
@@ -170,6 +170,60 @@ function grab(startMarker, endMarker) {
   const partial = [{ }, { rating: [5, 5] }, { rating: [6, 6] }];
   const pb = best(partial, 2);
   if (!pb[0] || pb[0].delta !== 1) errs.push("MVP：缺失评分的步应跳过，实际 " + JSON.stringify(pb[0]));
+}
+
+/* ═══════ 局内排名：ML 评分必须真的回填到玩家条 ═══════
+ *
+ * 用户报过：选了「局内排名依据 = ML 评分」，玩家条上显示的却一直是棋子数。
+ * 根因是 scheduleRating 算完评分后忘了写回 _liveRating —— 排序函数读到
+ * null 就降级成棋子数，功能等于没接上。这条测试盯住那次回填。
+ */
+{
+  const schFn = grab("function scheduleRating(", "/// 从历史里找每位玩家评分正变化最大的一步");
+  const code = [
+    "let _ratingBusy = false;",
+    "let _liveRating = null;",
+    "let gameHistory = [{ turn: 0 }, { turn: 1 }];",
+    "const board = []; const maxPlayers = 2;",
+    "const borderMode = 'default'; const capMode = '4';",
+    "let rendered = 0;",
+    "const renderPlayerBar = () => { rendered++; };",
+    "const holder = { invoke: null };",
+    "const tauriInvoke = (cmd, args) => holder.invoke(cmd, args);",
+    schFn,
+    "return {",
+    "  scheduleRating,",
+    "  get live() { return _liveRating; },",
+    "  get rendered() { return rendered; },",
+    "  setInvoke(f) { holder.invoke = f; },",
+    "};",
+  ].join("\n");
+
+  const api = new Function(code)();
+  let called = 0;
+  api.setInvoke((cmd, args) => {
+    if (cmd !== "rate_board") throw new Error("调用了意外命令: " + cmd);
+    called++;
+    if (args.maxPlayers !== 2) errs.push("评分：maxPlayers 没传对");
+    return Promise.resolve([42, -7]);
+  });
+
+  api.scheduleRating();
+  // 等微任务跑完
+  await new Promise((r) => setTimeout(r, 10));
+
+  if (called !== 1) errs.push("评分：应调用一次 rate_board，实际 " + called);
+  if (!api.live) errs.push("评分：算完必须写回 _liveRating（否则排名退回棋子数）");
+  if (api.live && (api.live[0] !== 42 || api.live[1] !== -7))
+    errs.push("评分：_liveRating 内容不对 " + JSON.stringify(api.live));
+  if (api.rendered < 1) errs.push("评分：算完应重绘玩家条，实际重绘 " + api.rendered + " 次");
+
+  // 评分失败时必须静默降级，不能把上一次的分留着误导用户，也不能抛
+  const api2 = new Function(code)();
+  api2.setInvoke(() => Promise.reject(new Error("命令不存在")));
+  api2.scheduleRating();
+  await new Promise((r) => setTimeout(r, 10));
+  if (api2.live) errs.push("评分：失败时不该写入 _liveRating");
 }
 
 /* ═══════ 局内排名：玩家条按所选指标动态排序 ═══════ */
@@ -359,7 +413,7 @@ function grab(startMarker, endMarker) {
 }
 
 for (const file of SOURCES) {
-  checkFile(readFileSync(file, "utf-8"), file.includes("docs") ? "docs" : "tauri");
+  await checkFile(readFileSync(file, "utf-8"), file.includes("docs") ? "docs" : "tauri");
 }
 
 if (errs.length) {
