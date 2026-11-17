@@ -133,7 +133,50 @@ Bug 修复 = 根因，而不是症状：报告命名的是症状。Grep 你改�
 3. 删除文件/目录一律使用 del，软链接用 rm
 4. 使用 mlfs 进行历史记录保存
 # 仓库说明
-> 说明这个仓库是干什么的，但是我很懒，所以有的时候不会写，这是空着的
+
+**连锁棋** —— 基于 Chain Reaction 玩法的多人棋盘策略游戏，一套代码出四种形态：
+Windows / Linux（Tauri）、Android（Tauri）、浏览器 PWA（WASM）。
+
+## 目录结构
+
+| 路径 | 作用 |
+|---|---|
+| `engine/` | **唯一的规则与 AI 实现**（crate `chain_chess_core`），两个宿主共用 |
+| `tauri/src-tauri/` | Tauri v2 宿主：命令、存储、局域网联机（`lan.rs`） |
+| `tauri/public/` | 桌面 / Android 的前端（原生 JS + CSS，零框架） |
+| `docs/` | PWA 版：前端独立副本 + `docs/wasm/` 导出层 + `docs/pkg/` WASM 产物 |
+| `download.html` | 下载中心页面 |
+| `release/` | 构建产物（gitignore，不进仓库） |
+
+## 三份前端副本，注意同步
+
+- `tauri/public/` → 桌面 / Android（权威版本）
+- `docs/` → PWA（独立副本，**不自动同步**）
+- `download.html` → 下载页
+
+改 `tauri/public/app.js` 后，`docs/app.js` 里对应改动要手动搬：CHANGELOG 数组、
+HINTS 定义、各页面的 `back` 声明。`tauri/check_html.mjs` 会校验两份 hint key 一致。
+
+## 自带检查（改完必跑）
+
+```bash
+node tauri/check_html.mjs      # HTML 结构、hint key、screen 与路由对应
+node tauri/check_logic.mjs     # 从两份 app.js 抽真实函数跑断言
+node tauri/check_lan.mjs       # 局域网联机协议（多沙箱模拟收发）
+node tauri/check_nav.mjs       # 页面返回逻辑（逐条验证「从哪进就回哪」）
+cd engine && cargo test                                  # 规则 / AI / 评分
+cd tauri/src-tauri && cargo test --lib                   # 宿主与联机
+cd docs/wasm && cargo check --target wasm32-unknown-unknown   # PWA 引擎
+```
+
+> `docs/wasm` 的导出层带 `#[cfg(target_arch = "wasm32")]`，本机 `cargo check`
+> **不会编译它** —— 加新枚举分支时容易漏（`Cap6` 就漏过一次，导致 PWA 构建失败）。
+> 改引擎枚举后务必单独跑一次 wasm32 检查。
+
+## 发版
+
+版本号唯一来源是 `tauri/src-tauri/tauri.conf.json`。流程见 `README.md` 的「快速开始 → 发版」，
+或完整清单在 `.codewhale/skills/next-version`（不在仓库里）。
 
  
  
