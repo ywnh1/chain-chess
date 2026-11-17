@@ -24,6 +24,12 @@
 
 ---
 
+## 快速开始
+
+[下载中心](https://ywnh1.free.leoi.org)
+
+---
+
 ## 🎮 游戏规则
 
 - **落子**：点空位长出一颗 1 点的棋子，点自己的棋子加 1 点。首步要避开已有棋子周围 12 格
@@ -121,48 +127,6 @@ npx tauri dev          # 开发模式
 npx tauri build        # 构建可执行文件
 ```
 
-### 发版
-
-日常发版走 GitHub Actions 出包（`.github/workflows/`），本机只负责 PWA 与版本号：
-
-```bash
-# 1. 改 tauri/src-tauri/tauri.conf.json 的 version，再同步到全部落点并提交
-./build.sh -s -c
-
-# 2. 触发三个 CI（或打 v* tag 自动触发）
-gh workflow run android-apk.yml
-gh workflow run windows-exe.yml
-gh workflow run linux-amd64.yml
-
-# 3. PWA zip 必须本机出（要 wasm-pack 编 WASM）
-./build.sh -z
-
-# 4. CI 产物下载进 release/ 后，做发布同步（-r 不构建）
-./build.sh -r -c
-```
-
-CI 产物：
-
-- `android-apk.yml` → `chainchess-<version>.apk`（arm64，`release.keystore` 签名）
-- `windows-exe.yml` → `chainchess-<version>.exe`
-- `linux-amd64.yml` → `chainchess-<version>.deb` / `.AppImage`（amd64）
-
-> **为什么不在本机出**：本机是 aarch64 + termux proot，出 exe 要靠 cargo-xwin 交叉编译；
-> 出 Linux 包又要链 amd64 的 `libwebkit2gtk-4.1-dev`，而它没有 `Multi-Arch: same`，
-> 装了 amd64 版会顶掉本机的 arm64 版。APK 则要维护整套 SDK/NDK 并绕开 aapt2 的平台问题。
-> 都放到 GitHub runner 上原生编。
-
-本机也保留了离线构建路径（需要自备 Android SDK/NDK）：
-
-```bash
-./build.sh --apk chainchess        # 构建签名 APK
-./build.sh --exe                   # 构建 Windows exe（cargo-xwin 交叉编译）
-./build.sh --linux                 # 构建 Linux deb + AppImage（本机原生编译）
-./build.sh --zip                   # 重新编译 WASM 并打包 PWA zip
-./build.sh --native chainchess     # APK 加 target-cpu=native 极致优化
-./build.sh --help                  # 全部选项
-```
-
 ### 浏览器 PWA（本地预览）
 
 ```bash
@@ -224,20 +188,20 @@ Alpha-Beta 和 PVS 可以换用两种评估函数：
 ## 🔧 技术架构
 
 ```
-┌──────────────────┐     ┌──────────────────┐
-│  Web 前端（JS）   │     │  Rust 引擎        │
-│                  │     │                  │
-│  ┌─ UI 渲染 ──┐  │     │  ┌─ AI 搜索 ──┐  │
-│  │ 棋盘/弹窗/   │  │     │  │  A-B/PVS   │  │
-│  │ 图表/路由    │  │     │  └───────────┘  │
-│  └────────────┘  │     │  ┌─ 评估函数 ─┐   │
-│  ┌─ 音效 ────┐  │◄────►│  │ML/手写     │   │
-│  │Web Audio   │  │invoke│  └───────────┘  │
-│  └────────────┘  │     │  ┌─ 游戏逻辑 ─┐  │
-│  ┌─ 存储 ────┐  │     │  │落子/连锁/   │  │
-│  │Tauri FS    │  │     │  │胜负判定     │  │
-│  └────────────┘  │     │  └───────────┘  │
-└──────────────────┘     └──────────────────┘
+┌──────────────────┐       ┌─────────────────┐
+│   Web 前端（JS） │       │    Rust 引擎    │
+│                  │       │                 │
+│  ┌─ UI 渲染 ──┐  │       │  ┌─ AI 搜索 ──┐ │
+│  │ 棋盘/弹窗/ │  │       │  │  A-B/PVS   │ │
+│  │ 图表/路由  │  │       │  └────────────┘ │
+│  └────────────┘  │       │  ┌─ 评估函数 ─┐ │
+│  ┌─── 音效 ───┐  │◄─────►│  │  ML/手写   │ │
+│  │ Web Audio  │  │invoke │  └────────────┘ │
+│  └────────────┘  │       │  ┌─ 游戏逻辑 ─┐ │
+│  ┌── 存储 ────┐  │       │  │ 落子/连锁/ │ │
+│  │  Tauri FS  │  │       │  │  胜负判定  │ │
+│  └────────────┘  │       │  └────────────┘ │
+└──────────────────┘       └─────────────────┘
 ```
 
 - **前端**：原生 JavaScript + CSS，零框架依赖（`tauri/public/`，桌面与移动端共用）
