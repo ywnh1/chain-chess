@@ -248,6 +248,129 @@ function grab(startMarker, endMarker) {
     const seg = src.slice(iGuard, iLoop > iGuard ? iLoop : iGuard + 800);
     if (!/return/.test(seg)) errs.push("闪回防护：该分支内没有 return，仍会落到 JS 模拟");
   }
+
+  /* ─── 反向保护：短路分支不能吞掉该有的动画 ───
+   * 短路只在「引擎说没爆」时生效。只要有爆炸，引擎一定返回 steps
+   * （engine 那条 explosion_always_emits_snapshot 测试盯着），
+   * 前端就必须走上面的快照动画分支。这里做结构断言，防止有人
+   * 把短路挪到快照分支之前 —— 那会让所有爆炸动画消失。
+   */
+  const iSnap = src.indexOf("if(snapSteps){");
+  if (iSnap < 0) {
+    errs.push("动画：找不到快照动画分支（if(snapSteps)）");
+  } else if (iGuard >= 0 && iSnap > iGuard) {
+    errs.push("动画：快照分支必须在短路分支之前，否则爆炸动画会全部消失");
+  }
+  // 快照分支内必须真的有播特效的调用
+  if (iSnap >= 0) {
+    const seg = src.slice(iSnap, iGuard > iSnap ? iGuard : iSnap + 3000);
+    if (!/playExplosion\(\)/.test(seg)) {
+      errs.push("动画：快照分支内没有 playExplosion()，爆炸会变成静默跳变");
+    }
+    if (!/addShockwave|addParticles/.test(seg)) {
+      errs.push("动画：快照分支内缺冲击波/粒子效果");
+    }
+  }
+}
+
+/* ═══════ 动画行为：有快照就必须播特效，没快照就不播 ═══════
+ *
+ * 这条不是结构断言，是真的把 processClick 跑起来数调用次数。
+ * 用户问过「加了短路之后动画会不会消失」—— 这里用实际行为回答。
+ */
+{
+  // 只取 processClick 本体：grab 到 localClick 会把中间十几个函数一起
+  // 拖进来，重复声明会直接语法报错。这里按花括号配平精确截取。
+  const fnStart = appJs.indexOf("async function processClick(");
+  let fnEnd = -1, depth = 0, started = false;
+  for (let k = fnStart; k < appJs.length; k++) {
+    const ch = appJs[k];
+    if (ch === "{") { depth++; started = true; }
+    else if (ch === "}") {
+      depth--;
+      if (started && depth === 0) { fnEnd = k + 1; break; }
+    }
+  }
+  if (fnStart < 0 || fnEnd < 0) throw new Error("找不到 processClick");
+  const fn = appJs.slice(fnStart, fnEnd);
+  const mkSandbox = (rustResult) => {
+    const calls = { explosion: 0, shockwave: 0, particles: 0, render: 0 };
+    const code = [
+      "let animating = false;",
+      "let chainSkipAll = false, autoSkipChain = false;",
+      "let borderMode = 'default', capMode = '4', capStyle = 'one-two';",
+      "let size = 5, cols = 5, curPlayer = 0;",
+      "let cells = [];",
+      "let chainStats = {};",
+      "let maxChainOverall = { player: null, length: 0 };",
+      "let firstMovePos = null;",
+      "const COLOR_NAMES = ['红色','黄色'];",
+      "const showSkipBtn = () => {};",
+      "const renderBoard = () => { env.calls.render++; };",
+      "const playExplosion = () => { env.calls.explosion++; };",
+      "const addShockwave = () => { env.calls.shockwave++; };",
+      "const addParticles = () => { env.calls.particles++; };",
+      "const sleep = () => Promise.resolve();",
+      "const hasPieces = (p, b) => b.some(r => r.some(c => c.owner === p));",
+      "const capForMode = () => 4;",
+      "const nbrsForMode = () => [];",
+      fn,
+      "return processClick;",
+    ].join("\n");
+    const env = { calls };
+    return { fn: new Function("env", code)(env), calls };
+  };
+
+  // 构造 3x3 棋盘，中心一颗 4 点棋子（必炸）
+  const board = () => {
+    const b = [];
+    for (let i = 0; i < 5; i++) {
+      const row = [];
+      for (let j = 0; j < 5; j++) row.push({ owner: null, count: 0, blocked: false });
+      b.push(row);
+    }
+    b[2][2].owner = 0; b[2][2].count = 4;
+    return b;
+  };
+
+  // ① 引擎给了 2 步快照 → 必须播 2 次爆炸特效
+  {
+    const snapBoard = board(); snapBoard[2][2] = { owner: null, count: 0, blocked: false };
+    const snapBoard2 = JSON.parse(JSON.stringify(snapBoard));
+    const { fn: pc, calls } = mkSandbox(null);
+    await pc(board(), 5, 2, 2, 0, "explode", "#f00", {
+      board: snapBoard2,
+      steps: [snapBoard, snapBoard2],
+      exploded: [[2, 2], [1, 2]],
+      eliminated: [],
+      chainCount: 2,
+    });
+    // playExplosion 是「这一格炸了」的核心信号；冲击波/粒子依赖真实 DOM
+    // 元素（cells[x][y]），无 DOM 环境下拿不到 el，所以只验证前者。
+    if (calls.explosion !== 2) {
+      errs.push("动画：引擎给了 2 步快照，实际播了 " + calls.explosion + " 次爆炸（应为 2）");
+    }
+  }
+
+  // ② 引擎说没爆（steps 为空）→ 不该播任何特效
+  {
+    const after = board(); after[2][2].count = 1;   // 点击后只是 +1，不炸
+    const { fn: pc, calls } = mkSandbox(null);
+    await pc(board(), 5, 2, 2, 0, "explode", "#f00", {
+      board: after, steps: [], exploded: [], eliminated: [], chainCount: 0,
+    });
+    if (calls.explosion !== 0) {
+      errs.push("动画：引擎说没爆炸，却播了 " + calls.explosion + " 次特效");
+    }
+  }
+
+  // ③ 引擎不可用（无 rustResult）→ 走 JS 模拟，仍应能播动画
+  {
+    const { fn: pc, calls } = mkSandbox(null);
+    // 空 targets 的模拟：只验证它不会崩、且走了模拟路径
+    await pc(board(), 5, 2, 2, 0, "explode", "#f00", null);
+    if (calls.render < 1) errs.push("动画：无引擎结果时也应渲染棋盘");
+  }
 }
 
 /* ═══════ 爆炸阈值：前端模拟必须与引擎逐条对齐 ═══════

@@ -2928,6 +2928,64 @@ mod eval_tests {
 }
 
 #[cfg(test)]
+mod anim_probe {
+    use super::*;
+
+    /// 前端动画完全依赖 steps：只要有爆炸，steps 就必须非空。
+    /// 如果引擎某条路径「炸了但没给快照」，前端那段「引擎有结果就短路」
+    /// 的逻辑会静默吞掉动画 —— 这条盯住这个前提。
+    #[test]
+    fn explosion_always_emits_snapshot() {
+        // 4 级阈值：中心一颗 4 点必然炸
+        let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 5]; 5];
+        b[2][2] = Cell { owner: Some(0), count: 4, th: None, blocked: false };
+        let (_elim, chain, _kb, steps, exploded) = process_click_with_snapshots(
+            &mut b, 5, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap4, CapStyle::OneTwo, Some(1),
+        );
+        assert!(chain > 0, "这颗棋子应当爆炸");
+        assert!(!steps.is_empty(), "爆炸了却没有快照，前端将无法播动画");
+        assert_eq!(steps.len(), chain as usize, "快照数应与连锁步数一致");
+        assert_eq!(exploded.len(), steps.len(), "爆炸坐标应与快照一一对应");
+    }
+
+    /// 不爆炸时 steps 必须为空 —— 这正是前端短路分支的判据。
+    #[test]
+    fn no_explosion_emits_no_snapshot() {
+        let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 5]; 5];
+        b[2][2] = Cell { owner: Some(0), count: 1, th: None, blocked: false };
+        let (_elim, chain, _kb, steps, _ex) = process_click_with_snapshots(
+            &mut b, 5, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap4, CapStyle::OneTwo, Some(1),
+        );
+        assert_eq!(chain, 0, "2 点棋子不该炸");
+        assert!(steps.is_empty(), "没爆炸却给了快照，前端会播多余动画");
+    }
+
+    /// 6 级阈值同样要满足上面两条（这是用户实际踩到的模式）。
+    #[test]
+    fn cap6_snapshots_consistent() {
+        // 注意：process_click 的语义是「点击某格」，点自己的棋子会 +1 点。
+        // 所以要测「5 点不炸」，得点别处，而不是点这颗 5 点棋子本身。
+        let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 7]; 7];
+        b[3][3] = Cell { owner: Some(0), count: 5, th: None, blocked: false };   // 6 级阈值的临界
+        let (_e, chain, _k, steps, _x) = process_click_with_snapshots(
+            &mut b, 7, 0, 0, 0, 2, BorderMode::Default, CapMode::Cap6, CapStyle::OneTwo, Some(1),
+        );
+        assert_eq!(chain, 0, "6 级阈值下 5 点（未被点击）不该炸");
+        assert!(steps.is_empty(), "6 级：没炸不该有快照");
+        assert_eq!(b[3][3].count, 5, "未被点击的棋子点数不应变化");
+
+        // 加到 6 点必炸
+        let mut c: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 7]; 7];
+        c[3][3] = Cell { owner: Some(0), count: 6, th: None, blocked: false };
+        let (_e, chain2, _k2, steps2, _x2) = process_click_with_snapshots(
+            &mut c, 7, 3, 3, 0, 2, BorderMode::Default, CapMode::Cap6, CapStyle::OneTwo, Some(1),
+        );
+        assert!(chain2 > 0, "6 级阈值下 6 点必炸");
+        assert!(!steps2.is_empty(), "6 级：炸了必须有快照");
+    }
+}
+
+#[cfg(test)]
 mod rate_tests {
     use super::*;
 
