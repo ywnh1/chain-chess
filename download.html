@@ -1723,7 +1723,7 @@
     </section>
 
     <footer>
-      <span>v4.1.0 · 第 51 版</span>
+      <span>v4.1.1 · 第 52 版</span>
       <span>© 2026 连锁棋 · Chain Chess</span>
     </footer>
   </main>
@@ -1772,6 +1772,11 @@
     // 更新日志数据（中英文对照，与应用内 changelog 同步）
     (function () {
       var CHANGELOG = [
+        {
+          v: 'v4.1.1 · 第 52 版',
+          zh: '修复非 4 级阈值下爆炸动画闪回（引擎结果不再被前端重复判一遍）、移除视觉上无法区分的 6 级阈值、游戏配置改动立即生效无需先保存；优化评分图表标题与最具价值一步的显示，修复网页版页面结构与缓存导致的样式失效',
+          en: 'Fixed explosion animation flicker at non-default blast thresholds by trusting the engine result instead of re-simulating it in the UI, removed the 6-level threshold which looked identical to 5 on the board, game config changes now apply immediately without saving first, and fixed the web build page structure and a caching issue that broke styling'
+        },
         {
           v: 'v4.1.0 · 第 51 版',
           zh: '新增局域网联机规则自定义（房主选棋盘、边界、阈值、胜负判定、每个 AI 的算法，可存多套预设）与 IPv6 跨网络联机；局内排名默认按 ML 评分，结算新增评分曲线和最具价值一步；悔棋自动退回上一位真人；修复二级页返回错乱与结算评分缺失',

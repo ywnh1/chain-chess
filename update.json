@@ -1,8 +1,8 @@
 {
-  "version": "4.1.0",
-  "notes": "LAN matches now let the host pick the board, border mode, blast threshold, win condition and the algorithm for each AI, savable as presets; new IPv6 cross-network play; the in-game ranking defaults to ML score, with a rating chart and most valuable move on the result screen; undo now jumps back to the previous human player; fixed wrong back navigation on sub-pages and a missing ML rating chart at settlement",
-  "notes_zh": "新增局域网联机规则自定义（房主选棋盘、边界、阈值、胜负判定、每个 AI 的算法，可存多套预设）与 IPv6 跨网络联机；局内排名默认按 ML 评分，结算新增评分曲线和最具价值一步；悔棋自动退回上一位真人；修复二级页返回错乱与结算评分缺失",
-  "pub_date": "2026-11-17T00:00:00Z",
+  "version": "4.1.1",
+  "notes": "Fixed explosion animation flicker at non-default blast thresholds by trusting the engine result instead of re-simulating it in the UI, removed the 6-level threshold which looked identical to 5 on the board, game config changes now apply immediately without saving first, and fixed the web build page structure and a caching issue that broke styling",
+  "notes_zh": "修复非 4 级阈值下爆炸动画闪回（引擎结果不再被前端重复判一遍）、移除视觉上无法区分的 6 级阈值、游戏配置改动立即生效无需先保存；优化评分图表标题与最具价值一步的显示，修复网页版页面结构与缓存导致的样式失效",
+  "pub_date": "2026-11-18T00:00:00Z",
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",
