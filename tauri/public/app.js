@@ -1400,6 +1400,8 @@ async function lanHandleMessage(peerId, msg){
         maxPlayers: msg.maxPlayers | 0, names: safeNames,
         borderMode: msg.borderMode || 'default', capMode: msg.capMode || '4',
         cells: msg.cells || null,
+        capStyle: msg.capStyle || 'one-two',
+        winCondition: msg.winCondition || 'last',
         rankMetric: msg.rankMetric || 'ml',
         aiSeats: Array.isArray(msg.aiSeats) ? msg.aiSeats : [],
         aiConfigs: (msg.aiConfigs && typeof msg.aiConfigs === 'object') ? msg.aiConfigs : {}
@@ -1579,9 +1581,11 @@ function lanReadCfgFromDom(){
     size: 7, rows: 7, cols: 7, customId: null, customName: '',
     borderMode: lanSelStr('lanBorderGroup', 'default'),
     capMode: lanSelStr('lanCapGroup', '4'),
-    // 排名依据来自「游戏配置」页（联机房间页没有这个控件），
-    // 所以整局沿用配置预设里的选择，而不是另起一套。
-    rankMetric: lanSelStr('rankMetricGroup', 'ml'),
+    // 与单机开局页同一套规则项，控件也一一对应（bug：之前只读了
+    // 边界和阈值，双爆方式/胜负判定根本没读，一直用全局默认值）
+    capStyle: lanSelStr('lanCapStyleGroup', 'one-two'),
+    winCondition: lanSelStr('lanWinConditionGroup', 'last'),
+    rankMetric: lanSelStr('lanRankMetricGroup', 'ml'),
     aiList: [],
   };
   // 每个 AI 各自的算法，从动态生成的那几行里读
@@ -1620,6 +1624,8 @@ function lanCfgWire(){
     customName: c.customName || '',
     borderMode: c.borderMode || 'default',
     capMode: c.capMode || '4',
+    capStyle: c.capStyle || 'one-two',
+    winCondition: c.winCondition || 'last',
     rankMetric: c.rankMetric || 'ml',
     aiList: Array.isArray(c.aiList) ? c.aiList.map(function(a){
       return {algorithm: a.algorithm || 'strategy', depth: a.depth || 2};
@@ -1716,6 +1722,34 @@ function lanSyncRuleDesc(){
   const c = lanSelStr('lanCapGroup', '4');
   if(bd && BORDER_MODE_DESC[b]) bd.textContent = BORDER_MODE_DESC[b];
   if(cd && CAP_MODE_DESC[c]) cd.textContent = CAP_MODE_DESC[c];
+
+  // 双爆方式只在阈值 5/6 时有意义，其余时候藏起来（与单机一致）
+  const csRow = document.getElementById('lanCapStyleRow');
+  if(csRow) csRow.style.display = (c === '5' || c === '6') ? '' : 'none';
+  const csd = document.getElementById('lanCapStyleDesc');
+  if(csd){
+    csd.textContent = (lanSelStr('lanCapStyleGroup', 'one-two') === 'two-one')
+      ? '某个方向相邻的「两格」各送 1 点，多推一格出去'
+      : '某个方向相邻的「一格」送 2 点，把那一格直接压到临界';
+  }
+  const wcd = document.getElementById('lanWinConditionDesc');
+  if(wcd){
+    const wv = lanSelStr('lanWinConditionGroup', 'last');
+    wcd.textContent = {
+      last: '其他玩家的棋子被全部同化即出局，最后剩下的人赢',
+      pieces: '某人棋子数 ≥ 其余所有在场玩家棋子数之和时立刻获胜',
+      points: '某人点数 ≥ 其余所有在场玩家点数之和时立刻获胜',
+    }[wv] || '';
+  }
+  const rmd = document.getElementById('lanRankMetricDesc');
+  if(rmd){
+    const rv = lanSelStr('lanRankMetricGroup', 'ml');
+    rmd.textContent = {
+      ml: '按 ML 评估出的场面分排名（默认）',
+      pieces: '按棋盘上的棋子数排名',
+      points: '按棋子点数总和排名',
+    }[rv] || '';
+  }
 }
 
 /// 房主改了规则：互斥纠正 → 刷新描述 → 广播
@@ -1727,7 +1761,8 @@ function lanOnRuleChange(caller){
   if(bg && cg){
     const b = bg.querySelector('.selected');
     const c = cg.querySelector('.selected');
-    if(b && c && b.dataset.value === 'degrade' && (c.dataset.value === '3' || c.dataset.value === '5')){
+    if(b && c && b.dataset.value === 'degrade' &&
+       (c.dataset.value === '3' || c.dataset.value === '5' || c.dataset.value === '6')){
       if(caller === 'cap'){
         const d = bg.querySelector('.gb[data-value="default"]');
         if(d) setSelected(bg, d);
@@ -1755,7 +1790,12 @@ function lanResolveMatch(raw, playerCount){
   // 随机项只在这里抽一次；抽到的值原样发给所有客户端
   if(border === 'random') border = resolveRandomBorder(cap);
   if(cap === 'random') cap = resolveRandomCap(border);
-  if(border === 'degrade' && (cap === '3' || cap === '5')) cap = '4';
+  // 降级边界与 3/5/6 级阈值互斥（与单机 updateModeConflictUI 同一规则）
+  if(border === 'degrade' && (cap === '3' || cap === '5' || cap === '6')) cap = '4';
+  const capStyle = raw.capStyle || 'one-two';
+  let winCondition = raw.winCondition || 'last';
+  // 两人局不提供碾压判定（「其余人之和」在两人时没有意义）
+  if(playerCount < 3) winCondition = 'last';
 
   let rows = 7, cols = 7, cells = null;
   if(raw.shape === 'random'){
@@ -1778,7 +1818,8 @@ function lanResolveMatch(raw, playerCount){
   if(playerCount > maxP){
     return {error:'现在是 ' + playerCount + ' 人，这块棋盘最多 ' + maxP + ' 人；换个更大的棋盘或减少玩家'};
   }
-  return {rows:rows, cols:cols, cells:cells, borderMode:border, capMode:cap, open:open, maxP:maxP};
+  return {rows:rows, cols:cols, cells:cells, borderMode:border, capMode:cap,
+          capStyle:capStyle, winCondition:winCondition, open:open, maxP:maxP};
 }
 
 /// 只读摘要（客户端看的）
@@ -1792,7 +1833,7 @@ function lanConfigSummary(cfg){
   else where = (cfg.size||7) + '×' + (cfg.size||7);
   const borderLabel = {default:'默认边界', wrap:'回环边界', bounce:'反弹边界',
                        degrade:'降级边界', random:'随机（开局抽一个）'};
-  const capLabel = {'3':'3 级速爆', '4':'4 级标准', '5':'5 级重炮', random:'随机（开局抽一个）'};
+  const capLabel = {'3':'3 级速爆', '4':'4 级标准', '5':'5 级重炮', '6':'6 级超重炮', random:'随机（开局抽一个）'};
   const aiLabel = {strategy:'策略', alphabeta:'A-B 剪枝', pvs:'PVS 深搜'};
   const aiList = Array.isArray(cfg.aiList) ? cfg.aiList : [];
   const aiText = aiList.length
@@ -1805,6 +1846,7 @@ function lanConfigSummary(cfg){
     ['边界', borderLabel[cfg.borderMode] || cfg.borderMode],
     ['阈值', capLabel[cfg.capMode] || cfg.capMode],
     ['人机', aiText],
+    ['胜负', {last:'只剩一人', pieces:'棋子数碾压', points:'点数碾压'}[cfg.winCondition] || '只剩一人'],
     ['排名', {ml:'ML 评分', pieces:'棋子数', points:'点数'}[cfg.rankMetric] || 'ML 评分'],
   ];
   return '<div class="lan-cfg-summary">' + rows.map(function(r){
@@ -2090,6 +2132,7 @@ function lanHostStart(){
   const cfg = {
     size: m.rows, cols: m.cols, maxPlayers: total,
     names: names, borderMode: m.borderMode, capMode: m.capMode, cells: m.cells,
+    capStyle: m.capStyle, winCondition: m.winCondition,
     rankMetric: lanCfg.rankMetric || 'ml',
     aiSeats: aiSeats, aiConfigs: aiConfigsOut
   };
@@ -2104,7 +2147,8 @@ function lanHostStart(){
       reseat.set(peerId, newPid);
       lanSendTo(peerId, {t:'start', you:newPid, size:cfg.size, cols:cfg.cols,
         maxPlayers:cfg.maxPlayers, names:cfg.names, borderMode:cfg.borderMode,
-        capMode:cfg.capMode, cells:cfg.cells, rankMetric:cfg.rankMetric,
+        capMode:cfg.capMode, cells:cfg.cells,
+        capStyle:cfg.capStyle, winCondition:cfg.winCondition, rankMetric:cfg.rankMetric,
         aiSeats:cfg.aiSeats, aiConfigs:cfg.aiConfigs}).catch(function(){});
     });
     lanSeats = reseat;
@@ -2126,6 +2170,8 @@ function lanBeginGame(cfg){
   boardCells = cfg.cells || null;
   borderMode = cfg.borderMode || 'default';
   capMode = cfg.capMode || '4';
+  capStyle = cfg.capStyle || 'one-two';
+  winCondition = cfg.winCondition || 'last';
   board = mkBoard(size, cols, boardCells);
   curPlayer = 0; gameOver = false; isPaused = false; firstMovePos = null;
   // 排名依据由房主决定，随 start 消息同步过来（两端必须一致）
@@ -2396,7 +2442,8 @@ function lanInitRuleControls(){
 
   // 尺寸/边界/阈值走文档级委托（自动 setSelected），这里只补后续动作。
   // 用 capture 不行 —— 委托在冒泡阶段改的 selected，所以等一拍再读。
-  [['lanSizeGrid','size'], ['lanBorderGroup','border'], ['lanCapGroup','cap']].forEach(function(pair){
+  [['lanSizeGrid','size'], ['lanBorderGroup','border'], ['lanCapGroup','cap'],
+   ['lanCapStyleGroup','capStyle'], ['lanWinConditionGroup','win'], ['lanRankMetricGroup','rank']].forEach(function(pair){
     const box = document.getElementById(pair[0]);
     if(!box || box.dataset.bound) return;
     box.dataset.bound = '1';
@@ -3905,9 +3952,16 @@ function resetRoundHistory(){
 // 边界模式感知的爆炸阈值
 function capForMode(i,j,sz,bm,cell){
   void cell;
-  if(capMode==='random')return 3+Math.floor(Math.random()*3);  // 随机模式：每步随机 3/4/5
+  // 必须与引擎的 cell_threshold / explosion_threshold 逐条对齐：
+  //   3/4/5/6 是固定阈值，**只有 4 级 + 降级边界**才按暴露度降级
+  //   random 每步在 3~6 里随机
+  // 之前这里漏了 6 级、random 也只到 5，导致 JS 侧模拟和引擎各算各的 ——
+  // 选了 6 级时前端仍按 4 点判炸，于是「不该炸的时候闪一下爆炸效果，
+  // 该炸的时候反而没动画」（引擎结果覆盖回来看着像恢复正常）。
+  if(capMode==='random')return 3+Math.floor(Math.random()*4);  // 3/4/5/6
   if(capMode==='3')return 3;
   if(capMode==='5')return 5;
+  if(capMode==='6')return 6;
   // 默认(4)：保留降级边界的位置修正
   if(bm==='degrade'){
     let onCorner=(i===0||i===sz-1)&&(j===0||j===sz-1);
@@ -4075,10 +4129,26 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
       const skipNow=wantSkip();
       // 爆炸扩散到邻居（按边界模式）
       let targets=[...nbrsForMode(cx,cy,s,effBm)];
-      // 速爆(cap3)：随机一个方向"加 0"（该格完全不变）；重炮(cap5)：随机一个方向"加 2"
+      // 速爆(cap3)：随机一个方向「加 0」（该格完全不变）
+      // 重炮/超重炮(cap5/cap6)：随机一个方向按 capStyle 多送能量
+      //   one-two：那一格 +2
+      //   two-one：那一格 +1，沿同方向再走一格 +1
       let special=-1;
-      if((capMode==='3'||capMode==='5')&&targets.length>0){
+      const isHeavy=(capMode==='5'||capMode==='6');
+      if((capMode==='3'||isHeavy)&&targets.length>0){
         special=Math.floor(Math.random()*targets.length);
+      }
+      // two-one 的第二格：沿特殊方向从目标格再走一格。
+      // 注意这是「兜底模拟」路径（引擎结果不可用时才走），
+      // 引擎侧同一逻辑在 process_click_with_killer_inner 里。
+      let special2=null;
+      if(isHeavy&&capStyle==='two-one'&&special>=0){
+        const t=targets[special];
+        const dx=Math.sign(t[0]-cx), dy=Math.sign(t[1]-cy);
+        const x2=t[0]+dx, y2=t[1]+dy;
+        if(x2>=0&&x2<s&&y2>=0&&y2<cols&&!(b[x2]&&b[x2][y2]&&b[x2][y2].blocked)){
+          special2=[x2,y2];
+        }
       }
       for(let ti=0;ti<targets.length;ti++){
         let[nx,ny]=targets[ti];
@@ -4087,8 +4157,13 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
           if(capMode==='3'){
             // 加 0：该格完全不变（空格保持空、有棋子保持原样），不入连锁
             continue;
+          }else if(capStyle==='two-one'){
+            // 只 +1，第二点由下面的 special2 补
+            nc.owner=pl;nc.count=(nc.count||0)+1;
+            chain.push([nx,ny]);
+            continue;
           }else{
-            // 加 2：空格变 2 级，有棋子原等级 +2
+            // one-two：加 2（空格变 2 级，有棋子原等级 +2）
             nc.owner=pl;nc.count=(nc.count||0)+2;
             chain.push([nx,ny]);
             continue;
@@ -4096,6 +4171,11 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
         }
         nc.owner=pl;nc.count++;
         chain.push([nx,ny]);
+      }
+      if(special2){
+        const nc2=b[special2[0]][special2[1]];
+        nc2.owner=pl;nc2.count=(nc2.count||0)+1;
+        chain.push(special2);
       }
       if(anim&&skipNow){
         // 跳过模式：不播特效、不逐帧渲染、不等待，连锁瞬间完成（末尾统一渲染一次）
@@ -5807,7 +5887,8 @@ function renderGameCharts(container, history, opts){
       b3.className = 'chart-box';
       // 评分图暂不支持全屏（负值坐标系与全屏重绘逻辑不同），所以不给点击态，
       // 免得用户点了没反应。
-      b3.innerHTML = '<h4>场面评分（ML，越高越好）</h4><canvas id="' + id3 + '"></canvas>';
+      // 用户要求：图表标题不加解释，直接叫「局面评分」
+      b3.innerHTML = '<h4>局面评分</h4><canvas id="' + id3 + '"></canvas>';
       container.appendChild(b3);
       (function poll(){
         const el = document.getElementById(id3);
@@ -5817,25 +5898,32 @@ function renderGameCharts(container, history, opts){
         else requestAnimationFrame(poll);
       })();
 
-      // 最具价值的一步：每人评分正增长最大的那一步
+      // 最具价值的一步：每人评分正增长最大的那一步。
+      // 按涨幅降序排 —— 用户最想看的是「全场最关键的那一手」，
+      // 按玩家编号排会让最有价值的埋在中间。
       const best = findBestMoves(history, maxPlayers);
-      const pids = Object.keys(best).map(Number).sort(function(a, b){ return a - b; });
-      if(pids.length){
+      const items = Object.keys(best).map(Number)
+        .map(function(pid){ return { pid: pid, d: best[pid] }; })
+        .sort(function(a, b){ return b.d.delta - a.d.delta; });
+      if(items.length){
         const box = document.createElement('div');
         box.className = 'about-card mv-card';
-        let html = '<h3 style="margin:0 0 6px">最具价值的一步</h3>';
-        for(const pid of pids){
-          const b = best[pid];
-          const mv = b.mv || {};
+        let html = '<h3 class="mv-title">最具价值的一步</h3>' +
+          '<p class="mv-lead">每位玩家评分涨得最多的那一手，按涨幅排序</p>';
+        items.forEach(function(it, i){
+          const pid = it.pid, b = it.d, mv = b.mv || {};
+          const color = colors[pid] || '#888';
+          // 落子位置用 (行, 列) 从 1 开始的坐标，和棋盘左下角的编号习惯一致
           const where = (mv.x !== undefined && mv.y !== undefined)
-            ? '（第 ' + (mv.x + 1) + ' 行第 ' + (mv.y + 1) + ' 列）' : '';
-          html += '<div class="mv-row" style="border-left-color:' + (colors[pid] || '#888') + '">' +
-            '<span class="mv-who" style="color:' + (colors[pid] || '#888') + '">' +
-            htmlEsc(cNames[pid] || getPlayerLabel(pid)) + '</span>' +
+            ? '落子 (' + (mv.x + 1) + ', ' + (mv.y + 1) + ')' : '落子位置未知';
+          html += '<div class="mv-row" style="border-left-color:' + color + '">' +
+            '<span class="mv-rank">' + (i + 1) + '</span>' +
+            '<span class="mv-who" style="color:' + color + '">' +
+              htmlEsc(cNames[pid] || getPlayerLabel(pid)) + '</span>' +
+            '<span class="mv-where">第 ' + b.turn + ' 步 · ' + where + '</span>' +
             '<span class="mv-delta">+' + b.delta + '</span>' +
-            '<span class="mv-where">第 ' + b.turn + ' 步' + where + '</span>' +
             '</div>';
-        }
+        });
         box.innerHTML = html;
         container.appendChild(box);
       }

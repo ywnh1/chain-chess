@@ -226,6 +226,58 @@ function grab(startMarker, endMarker) {
   if (api2.live) errs.push("评分：失败时不该写入 _liveRating");
 }
 
+/* ═══════ 爆炸阈值：前端模拟必须与引擎逐条对齐 ═══════
+ *
+ * 用户报过：选 4 以外的阈值时，不该炸的时候 UI 闪一下爆炸效果、
+ * 很快又恢复正常；该炸的时候反而没动画。根因是 capForMode 漏了 6 级，
+ * random 也只到 5 —— JS 侧按 4 点判炸，与引擎各算各的。
+ */
+{
+  const fn = grab("function capForMode(", "function nbrsForMode(");
+  const mk = (capMode, borderMode) => new Function(
+    "let capMode = " + JSON.stringify(capMode) + ";\n" +
+    "let borderMode = " + JSON.stringify(borderMode) + ";\n" +
+    fn + "\nreturn capForMode;"
+  )();
+
+  const cases = [
+    ["3", "default", 3], ["4", "default", 4],
+    ["5", "default", 5], ["6", "default", 6],
+  ];
+  for (const [cap, bm, want] of cases) {
+    const got = mk(cap, bm)(2, 2, 7, bm, null);
+    if (got !== want) errs.push("阈值：" + cap + " 级应返回 " + want + "，实际 " + got);
+  }
+
+  // random 必须能抽到 3~6 全部四种（旧实现只到 5）
+  {
+    const f = mk("random", "default");
+    const seen = new Set();
+    for (let i = 0; i < 400; i++) seen.add(f(2, 2, 7, "default", null));
+    for (const v of [3, 4, 5, 6]) {
+      if (!seen.has(v)) errs.push("阈值：random 抽不到 " + v + "，实际见过 " + [...seen].sort());
+    }
+    if (seen.has(7) || seen.has(2)) errs.push("阈值：random 越界 " + [...seen].sort());
+  }
+
+  // 只有 4 级 + 降级边界才按位置降级（引擎语义）
+  {
+    const f = mk("4", "degrade");
+    const corner = f(0, 0, 7, "degrade", null);
+    const edge = f(0, 3, 7, "degrade", null);
+    const inner = f(3, 3, 7, "degrade", null);
+    if (corner !== 2) errs.push("阈值：4 级 + 降级，角落应为 2，实际 " + corner);
+    if (edge !== 3) errs.push("阈值：4 级 + 降级，边缘应为 3，实际 " + edge);
+    if (inner !== 4) errs.push("阈值：4 级 + 降级，内部应为 4，实际 " + inner);
+  }
+  // 6 级不受降级边界影响（引擎里只有 Cap4 才降到 3/2）
+  {
+    const f = mk("6", "degrade");
+    if (f(0, 0, 7, "degrade", null) !== 6)
+      errs.push("阈值：6 级 + 降级不应被降级，实际 " + f(0, 0, 7, "degrade", null));
+  }
+}
+
 /* ═══════ 局内排名：玩家条按所选指标动态排序 ═══════ */
 {
   const fn = grab("function playerBarRanking(", "function renderPlayerBar(");
@@ -270,6 +322,24 @@ function grab(startMarker, endMarker) {
   const fallback = mk(board, 3, "ml", null).order;
   if (JSON.stringify(fallback) !== JSON.stringify([1, 0, 2]))
     errs.push("排名：评分缺失时应退回棋子数，实际 " + JSON.stringify(fallback));
+
+  // 每轮都要重排：同一份代码，局面变了顺序就得跟着变。
+  // 用户报过「选了 ML/点数却一直按棋子数排」—— 除了评分没回填，
+  // 也可能出现「只排一次就不动了」，所以这里用连续两个局面验证。
+  {
+    const posA = [[cell(0, 1), cell(0, 1), cell(1, 1)]];
+    const posB = [[cell(0, 1), cell(1, 1), cell(1, 1)]];
+    for (const metric of ["pieces", "points", "ml"]) {
+      const ratingA = metric === "ml" ? [30, -5] : null;
+      const ratingB = metric === "ml" ? [-5, 30] : null;
+      const a = mk(posA, 2, metric, ratingA).order;
+      const b = mk(posB, 2, metric, ratingB).order;
+      if (JSON.stringify(a) === JSON.stringify(b)) {
+        errs.push("排名：局面变化后 " + metric + " 的顺序没跟着变（" +
+          JSON.stringify(a) + " → " + JSON.stringify(b) + "）");
+      }
+    }
+  }
 
   // 已淘汰的人沉底，即使他的 ML 分更高。
   // 构造：0 号在棋盘上没有任何棋子（已被清空），1 号有。

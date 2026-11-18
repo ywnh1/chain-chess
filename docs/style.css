@@ -608,6 +608,10 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 #about-license .tp-name,#about-thirdparty .tp-name{font-weight:var(--weight-semibold)}
 #about-license .tp-lic,#about-thirdparty .tp-lic{font-size:.72em;color:var(--accent);border:1px solid var(--glass-border);border-radius:999px;padding:2px 8px;background:var(--glass-w-06);flex-shrink:0}
 #about-license .tp-desc,#about-thirdparty .tp-desc{flex-basis:100%;font-size:.85em;color:var(--dim);line-height:var(--leading-relaxed)}
+/* 第三方库的可点链接：与正文同尺寸，下划线只在悬停时出现，避免整段看着像链接堆 */
+.tp-link{color:var(--accent2);text-decoration:none;border-bottom:1px dashed rgba(95,195,195,.45)}
+.tp-link:hover,.tp-link:focus-visible{border-bottom-style:solid;color:var(--accent)}
+.tp-desc code{font-size:.9em;padding:1px 4px;border-radius:4px;background:var(--glass-w-08)}
 
 /* 导航条目（指向二级页面，统一为 mode-card 风格） */
 #about .about-nav{background-image:var(--liquid-iris),var(--surface);background-origin:padding-box;border:1px solid var(--glass-border);border-radius:var(--radius);padding:20px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(var(--liquid-blur));-webkit-backdrop-filter:blur(var(--liquid-blur));box-shadow:var(--glass-shadow);transition:.35s cubic-bezier(.22,1,.36,1);touch-action:manipulation;min-height:56px}
@@ -712,7 +716,8 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 .hint-body{max-height:60vh;overflow-y:auto;text-align:left;font-size:.85rem;line-height:1.75;color:var(--text)}
 .hint-body p{margin:0 0 10px}
 .hint-body p:last-child{margin-bottom:0}
-.hint-body ul{margin:0 0 10px;padding-left:18px}
+.hint-body ul,.hint-body ol{margin:0 0 10px;padding-left:18px}
+.hint-body code{font-family:var(--font-mono,monospace);font-size:.86em;padding:1px 5px;border-radius:4px;background:var(--glass-w-08)}
 .hint-body li{margin:5px 0}
 .hint-body strong{color:var(--accent)}
 .hint-body .hint-tip{margin:10px 0 0;padding:8px 10px;border-radius:8px;background:rgba(240,179,75,.1);color:var(--dim);font-size:.8rem;line-height:1.6}
@@ -809,6 +814,9 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 }
 .history-tools input[type="search"]:focus{border-color:var(--accent);outline:none}
 .hf-chips{display:flex;gap:6px;flex-wrap:wrap}
+/* 历史页操作条：四个按钮等宽一排，与上面的搜索/筛选区分开 */
+.history-actions{display:flex;gap:6px;width:100%;margin:0 0 8px}
+.history-actions .glass-btn{flex:1;min-width:0;padding:8px 4px;font-size:.8rem;white-space:nowrap}
 .hf-chip{
   padding:5px 12px;border-radius:999px;
   border:1px solid var(--glass-w-08);background:var(--glass-w-04);
@@ -818,6 +826,13 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 .hf-chip.selected{background:var(--glass-w-12);border-color:var(--accent);color:var(--accent)}
 /* 首次进入引导 */
 .intro-foot{font-size:.74rem;color:var(--dim);margin:8px 0 0;line-height:1.5;text-align:center}
+/* 教学页（规则 + 联机教程）的分组标题：不在 .about-card 内，因此不参与折叠 */
+.teach-lead{font-size:.8rem;color:var(--dim);line-height:1.6;margin:0 0 4px;text-align:center}
+.teach-group{
+  align-self:flex-start;font-size:.95rem;font-weight:700;color:var(--accent);
+  letter-spacing:1px;margin:14px 0 2px;padding-left:2px;
+}
+.teach-group:first-of-type{margin-top:6px}
 .intro-sec{font-size:.9rem;font-weight:700;color:var(--accent);margin:14px 0 6px}
 .intro-sec:first-child{margin-top:0}
 .intro-desc{font-size:.84rem;line-height:1.7;color:var(--text);margin:0}
@@ -1147,6 +1162,16 @@ body.orbs-on .orb-container{display:block}
   transform:scale(1.03);box-shadow:0 6px 40px rgba(240,179,75,.25),0 2px 12px rgba(0,0,0,.25);
   border-color:rgba(240,179,75,.35);
 }
+/* 局域联机：与「开始游戏」同宽同高，视觉上次一级。
+   min-height 统一钉死，否则两按钮字号不同会导致高度差几个像素。 */
+.start-btn,.lan-btn{min-height:52px;box-sizing:border-box}
+.lan-btn{
+  width:100%;max-width:260px;padding:12px 0;font-size:var(--text-base);font-weight:var(--weight-medium);
+  border-radius:var(--radius);letter-spacing:2px;
+  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  transition:all .4s cubic-bezier(.22,1,.36,1);
+}
+.lan-btn:hover,.lan-btn:active{transform:scale(1.02)}
 .welcome-footer{display:flex;gap:8px;width:100%;max-width:260px;justify-content:center}
 .welcome-footer .glass-btn{
   padding:12px 0;border-radius:var(--radius-sm);font-size:.85rem;letter-spacing:1px;
@@ -1155,6 +1180,112 @@ body.orbs-on .orb-container{display:block}
 }
 .about-foot-btn{flex:0 0 auto;min-width:64px;max-width:80px;flex:1}
 .history-foot-btn{flex:2;min-width:0}
+/* ═══════ 游戏配置入口按钮（开局页） ═══════ */
+.game-config-btn{
+  display:flex;align-items:center;gap:12px;width:100%;
+  padding:16px 18px;margin:10px 0 4px;
+  border:1px solid var(--glass-border);border-radius:var(--radius);
+  background-image:linear-gradient(135deg,rgba(240,179,75,.16) 0%,rgba(200,140,240,.08) 55%,rgba(95,195,195,.12) 100%),var(--glass-w-06);
+  background-origin:padding-box;
+  color:var(--text);font-family:var(--font);text-align:left;cursor:pointer;
+  -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
+  box-shadow:0 4px 22px rgba(240,179,75,.12),inset 0 1px 0 rgba(255,255,255,.06);
+  transition:all .3s cubic-bezier(.22,1,.36,1);
+}
+.game-config-btn:hover,.game-config-btn:active{
+  transform:translateY(-1px);
+  border-color:rgba(240,179,75,.42);
+  box-shadow:0 6px 28px rgba(240,179,75,.2),inset 0 1px 0 rgba(255,255,255,.1);
+}
+.game-config-btn:active{transform:scale(.985)}
+.gc-btn-main{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.gc-btn-title{font-size:1rem;font-weight:700;letter-spacing:2px;color:var(--accent)}
+.gc-btn-sub{
+  font-size:.74rem;color:var(--dim);line-height:1.4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.gc-btn-arrow{color:var(--accent);font-size:1.1rem;flex-shrink:0;opacity:.85}
+
+/* ═══════ 局域网联机页 ═══════ */
+/* 与其他长页面（#about / #settings）同一模式：外层锁死视口高度，
+   内部各视图自己滚。房间页内容（规则区 + 玩家列表）比加入页长得多，
+   不锁高度的话底部「开始游戏」会被挤出屏幕。 */
+#lan.screen{
+  width:100%;max-width:480px;gap:8px;
+  height:100dvh;overflow:hidden;
+  padding:calc(8px + env(safe-area-inset-top,0px)) 8px calc(12px + env(safe-area-inset-bottom,0px));
+}
+#lanIntroView,#lanRoomView{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
+.lan-rules .form-row{margin:8px 0}
+.lan-rules h3{display:flex;align-items:baseline;gap:6px;font-size:1rem}
+.lan-rules-owner{font-size:.72rem;font-weight:400;color:var(--dim);letter-spacing:0}
+.lan-rule-desc{font-size:.72rem;color:var(--dim);line-height:1.5;margin:2px 0 0}
+/* 客户端只读摘要 */
+.lan-cfg-summary{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.lan-cfg-row{display:flex;justify-content:space-between;gap:10px;font-size:.82rem;
+  padding:6px 10px;border-radius:8px;background:var(--glass-w-04)}
+.lan-cfg-k{color:var(--dim);flex-shrink:0}
+.lan-cfg-v{color:var(--text);text-align:right;word-break:break-word}
+/* 最具价值的一步 */
+.mv-card h3.mv-title{font-size:.95rem;margin:0 0 2px}
+.mv-lead{font-size:.72rem;color:var(--dim);margin:0 0 8px;line-height:1.4}
+.mv-row{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:8px 10px;margin:6px 0;border-radius:8px;
+  background:var(--glass-w-04);border-left:3px solid var(--accent);
+  font-size:.8rem;
+}
+/* 名次数字：一眼看出这是全局第几关键的一手 */
+.mv-rank{
+  flex-shrink:0;width:18px;height:18px;line-height:18px;text-align:center;
+  border-radius:50%;font-size:.68rem;font-weight:700;
+  background:var(--glass-w-10);color:var(--dim);
+}
+.mv-row:first-of-type .mv-rank{background:var(--accent);color:#1a1a1a}
+.mv-who{font-weight:600;min-width:52px;flex-shrink:0}
+.mv-where{color:var(--dim);font-size:.74rem;flex:1;min-width:0}
+/* 涨幅放最右且加粗：这是这张卡片的重点 */
+.mv-delta{
+  color:#2ecc71;font-weight:700;font-family:var(--font-mono);font-size:.9rem;
+  flex-shrink:0;margin-left:auto;
+}
+
+/* 联机范围卡片：能不能跨网络远程连 */
+.lan-net-card h3{font-size:.95rem}
+.lan-net-good{font-size:.88rem;margin:0 0 4px;color:#2ecc71;font-weight:600}
+.lan-net-bad{font-size:.88rem;margin:0 0 4px;color:var(--accent);font-weight:600}
+.lan-net-why{font-size:.72rem;color:var(--dim);line-height:1.55;margin:4px 0 0}
+.lan-net-addr{
+  font-family:var(--font-mono);font-size:.76rem;line-height:1.5;
+  margin:6px 0 0;padding:8px 10px;border-radius:8px;
+  background:var(--glass-w-06);border:1px solid var(--glass-border);
+  word-break:break-all;user-select:all;
+}
+/* 房间地址旁的小复制按钮 */
+.lan-copy-btn{padding:3px 10px;font-size:.7rem;min-height:0;margin-left:6px;border-radius:6px}
+
+/* 每个 AI 一行算法选择（房主端），沿用 eve 配置行的观感 */
+.lan-ai-rows{display:flex;flex-direction:column;gap:6px;width:100%;margin:2px 0 4px}
+.lan-ai-row{
+  display:flex;align-items:center;gap:8px;
+  background:var(--glass-w-04);border:1px solid var(--glass-border);
+  border-radius:var(--radius-sm);padding:6px 10px;
+  -webkit-backdrop-filter:blur(var(--liquid-blur));backdrop-filter:blur(var(--liquid-blur));
+}
+.lan-ai-row .color-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;
+  border:1px solid var(--glass-w-10)}
+.lan-ai-row .lan-ai-label{font-size:.78rem;font-weight:600;min-width:40px;color:var(--text);flex-shrink:0}
+.lan-ai-row select{
+  flex:1;min-width:0;padding:5px 8px;font-size:.76rem;
+  border:1px solid var(--border);border-radius:6px;
+  background:var(--glass-w-04);color:var(--text);
+  -webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%237a7885' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;padding-right:26px;
+}
+.lan-ai-row select:focus{border-color:var(--accent);outline:none}
+.lan-ai-row select option{background:var(--surface);color:var(--text)}
+
 /* ═══════ 统一游戏设置页 ═══════ */
 #gameSetup{gap:.6rem;width:100%;max-width:480px}
 #gameSetup h2{font-size:1.2rem;font-weight:600;margin-bottom:4px;align-self:flex-start}
@@ -1628,6 +1759,7 @@ html:not([data-theme]){color-scheme:light dark}
 #device-bench.screen.active{display:flex;flex-direction:column;align-items:center}
 #device-bench .about-scroll{width:100%;flex:1;min-height:0;overflow-y:auto;padding-right:4px}
 #device-bench .about-scroll > * + *{margin-top:10px}
+#device-bench .about-card + .about-card{margin-top:10px}
 #device-bench .about-scroll::-webkit-scrollbar{width:4px}
 #device-bench .about-scroll::-webkit-scrollbar-track{background:var(--glass-w-04);border-radius:2px}
 #device-bench .about-scroll::-webkit-scrollbar-thumb{background:var(--glass-w-10);border-radius:3px}

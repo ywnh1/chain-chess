@@ -204,7 +204,8 @@ function buildRuleControls() {
   }
 
   const cap = mk("lanCapGroup", "div", "btn-group");
-  for (const v of ["3", "4", "5", "random"]) {
+  // 与真实页面一致：3/4/5/6/random（6 级曾经在联机页漏掉过）
+  for (const v of ["3", "4", "5", "6", "random"]) {
     const b = mk("", "button", "gb" + (v === "4" ? " selected" : ""));
     b.dataset.value = v;
     cap.appendChild(b);
@@ -216,12 +217,24 @@ function buildRuleControls() {
   colsSel.value = "7";
   const customSel = mk("lanCustomBoard", "select");
 
-  // 局内排名依据在 game-config 页，联机时读它的选中态
-  const rankGroup = mk("rankMetricGroup", "div", "btn-group");
+  // 联机房间页自己的规则控件（与单机开局页一一对应）
+  const lanCapStyle = mk("lanCapStyleGroup", "div", "btn-group");
+  for (const v of ["one-two", "two-one"]) {
+    const b = mk("", "button", "gb" + (v === "one-two" ? " selected" : ""));
+    b.dataset.value = v;
+    lanCapStyle.appendChild(b);
+  }
+  const lanWin = mk("lanWinConditionGroup", "div", "btn-group");
+  for (const v of ["last", "pieces", "points"]) {
+    const b = mk("", "button", "gb" + (v === "last" ? " selected" : ""));
+    b.dataset.value = v;
+    lanWin.appendChild(b);
+  }
+  const lanRank = mk("lanRankMetricGroup", "div", "btn-group");
   for (const v of ["ml", "pieces", "points"]) {
     const b = mk("", "button", "gb" + (v === "ml" ? " selected" : ""));
     b.dataset.value = v;
-    rankGroup.appendChild(b);
+    lanRank.appendChild(b);
   }
 
   // 人机数量 / 强度：都是 <select>，测试里直接改 value
@@ -233,7 +246,10 @@ function buildRuleControls() {
   return {
     lanAddrBox: mk("lanAddrBox"), lanCopyLan: mk("lanCopyLan"),
     lanRoomAddr: mk("lanRoomAddr"), lanRoomTip: mk("lanRoomTip"),
-    rankMetricGroup: rankGroup,
+    lanCapStyleGroup: lanCapStyle, lanWinConditionGroup: lanWin,
+    lanRankMetricGroup: lanRank,
+    lanCapStyleRow: mk("lanCapStyleRow"), lanCapStyleDesc: mk("lanCapStyleDesc"),
+    lanWinConditionDesc: mk("lanWinConditionDesc"), lanRankMetricDesc: mk("lanRankMetricDesc"),
     lanAiCount: aiCountSel, lanAiStrength: aiStrengthSel,
     lanAiStrengthRow: mk("lanAiStrengthRow"),
     lanShapeGroup: shape, lanSizeGrid: sizes, lanBorderGroup: border, lanCapGroup: cap,
@@ -426,6 +442,9 @@ function makeSandbox(role, peerId = null, port = 43210) {
       get remoteCfg(){return lanRemoteCfg},
       get aiSeats(){return [...aiPlayers]},
       get playerBarMetric(){return playerBarMetric},
+      get capStyle(){return capStyle},
+      get winCondition(){return winCondition},
+      get capMode(){return capMode},
       get aiCfg(){return aiConfigs},
       get aiThinking(){return aiThinking},
       get aiMoveCalls(){return __env.aiMoveCalls},
@@ -781,8 +800,11 @@ async function main() {
   ok((shrink[0] || {}).algorithm === "alphabeta" && (shrink[1] || {}).algorithm === "pvs",
      "减 AI 后前两个算法变了");
 
-  /* 18.7 排名依据由房主决定：在 game-config 里选的点数要随开局同步到客户端 */
-  host6.setRule("rankMetricGroup", "points");
+  /* 18.7 其余规则也要随开局同步：双爆方式、胜负判定、排名依据、6 级阈值 */
+  host6.setRule("lanRankMetricGroup", "points");
+  host6.setRule("lanCapStyleGroup", "two-one");
+  host6.setRule("lanWinConditionGroup", "pieces");
+  host6.setRule("lanCapGroup", "6");
 
   /* 19. 开局：2 真人 + 2 AI = 4 人，两端 AI 座位一致 */
   host6.lanHostStart();
@@ -796,6 +818,10 @@ async function main() {
      "房主端排名依据应为 points，实际 " + host6.playerBarMetric);
   ok(cli6.playerBarMetric === "points",
      "客户端排名依据应同步为 points，实际 " + cli6.playerBarMetric);
+  ok(host6.capStyle === "two-one" && cli6.capStyle === "two-one",
+     "双爆方式应两端一致，实际 host=" + host6.capStyle + " client=" + cli6.capStyle);
+  ok(host6.capMode === "6" && cli6.capMode === "6",
+     "6 级阈值应两端一致，实际 host=" + host6.capMode + " client=" + cli6.capMode);
   /* 每个 AI 各用各的算法：座位 2 = alphabeta，座位 3 = pvs
      （两端都要一致，否则客户端显示的和房主实际跑的对不上） */
   ok((host6.aiCfg[2] || {}).algorithm === "alphabeta",

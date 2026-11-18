@@ -2620,9 +2620,16 @@ function resetRoundHistory(){
 // 边界模式感知的爆炸阈值
 function capForMode(i,j,sz,bm,cell){
   void cell;
-  if(capMode==='random')return 3+Math.floor(Math.random()*3);  // 随机模式：每步随机 3/4/5
+  // 必须与引擎的 cell_threshold / explosion_threshold 逐条对齐：
+  //   3/4/5/6 是固定阈值，**只有 4 级 + 降级边界**才按暴露度降级
+  //   random 每步在 3~6 里随机
+  // 之前这里漏了 6 级、random 也只到 5，导致 JS 侧模拟和引擎各算各的 ——
+  // 选了 6 级时前端仍按 4 点判炸，于是「不该炸的时候闪一下爆炸效果，
+  // 该炸的时候反而没动画」（引擎结果覆盖回来看着像恢复正常）。
+  if(capMode==='random')return 3+Math.floor(Math.random()*4);  // 3/4/5/6
   if(capMode==='3')return 3;
   if(capMode==='5')return 5;
+  if(capMode==='6')return 6;
   // 默认(4)：保留降级边界的位置修正
   if(bm==='degrade'){
     let onCorner=(i===0||i===sz-1)&&(j===0||j===sz-1);
@@ -2790,10 +2797,26 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
       const skipNow=wantSkip();
       // 爆炸扩散到邻居（按边界模式）
       let targets=[...nbrsForMode(cx,cy,s,effBm)];
-      // 速爆(cap3)：随机一个方向"加 0"（该格完全不变）；重炮(cap5)：随机一个方向"加 2"
+      // 速爆(cap3)：随机一个方向「加 0」（该格完全不变）
+      // 重炮/超重炮(cap5/cap6)：随机一个方向按 capStyle 多送能量
+      //   one-two：那一格 +2
+      //   two-one：那一格 +1，沿同方向再走一格 +1
       let special=-1;
-      if((capMode==='3'||capMode==='5')&&targets.length>0){
+      const isHeavy=(capMode==='5'||capMode==='6');
+      if((capMode==='3'||isHeavy)&&targets.length>0){
         special=Math.floor(Math.random()*targets.length);
+      }
+      // two-one 的第二格：沿特殊方向从目标格再走一格。
+      // 注意这是「兜底模拟」路径（引擎结果不可用时才走），
+      // 引擎侧同一逻辑在 process_click_with_killer_inner 里。
+      let special2=null;
+      if(isHeavy&&capStyle==='two-one'&&special>=0){
+        const t=targets[special];
+        const dx=Math.sign(t[0]-cx), dy=Math.sign(t[1]-cy);
+        const x2=t[0]+dx, y2=t[1]+dy;
+        if(x2>=0&&x2<s&&y2>=0&&y2<cols&&!(b[x2]&&b[x2][y2]&&b[x2][y2].blocked)){
+          special2=[x2,y2];
+        }
       }
       for(let ti=0;ti<targets.length;ti++){
         let[nx,ny]=targets[ti];
@@ -2802,8 +2825,13 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
           if(capMode==='3'){
             // 加 0：该格完全不变（空格保持空、有棋子保持原样），不入连锁
             continue;
+          }else if(capStyle==='two-one'){
+            // 只 +1，第二点由下面的 special2 补
+            nc.owner=pl;nc.count=(nc.count||0)+1;
+            chain.push([nx,ny]);
+            continue;
           }else{
-            // 加 2：空格变 2 级，有棋子原等级 +2
+            // one-two：加 2（空格变 2 级，有棋子原等级 +2）
             nc.owner=pl;nc.count=(nc.count||0)+2;
             chain.push([nx,ny]);
             continue;
@@ -2811,6 +2839,11 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
         }
         nc.owner=pl;nc.count++;
         chain.push([nx,ny]);
+      }
+      if(special2){
+        const nc2=b[special2[0]][special2[1]];
+        nc2.owner=pl;nc2.count=(nc2.count||0)+1;
+        chain.push(special2);
       }
       if(anim&&skipNow){
         // 跳过模式：不播特效、不逐帧渲染、不等待，连锁瞬间完成（末尾统一渲染一次）
@@ -4483,7 +4516,8 @@ function renderGameCharts(container, history, opts){
       b3.className = 'chart-box';
       // 评分图暂不支持全屏（负值坐标系与全屏重绘逻辑不同），所以不给点击态，
       // 免得用户点了没反应。
-      b3.innerHTML = '<h4>场面评分（ML，越高越好）</h4><canvas id="' + id3 + '"></canvas>';
+      // 用户要求：图表标题不加解释，直接叫「局面评分」
+      b3.innerHTML = '<h4>局面评分</h4><canvas id="' + id3 + '"></canvas>';
       container.appendChild(b3);
       (function poll(){
         const el = document.getElementById(id3);
@@ -4493,25 +4527,32 @@ function renderGameCharts(container, history, opts){
         else requestAnimationFrame(poll);
       })();
 
-      // 最具价值的一步：每人评分正增长最大的那一步
+      // 最具价值的一步：每人评分正增长最大的那一步。
+      // 按涨幅降序排 —— 用户最想看的是「全场最关键的那一手」，
+      // 按玩家编号排会让最有价值的埋在中间。
       const best = findBestMoves(history, maxPlayers);
-      const pids = Object.keys(best).map(Number).sort(function(a, b){ return a - b; });
-      if(pids.length){
+      const items = Object.keys(best).map(Number)
+        .map(function(pid){ return { pid: pid, d: best[pid] }; })
+        .sort(function(a, b){ return b.d.delta - a.d.delta; });
+      if(items.length){
         const box = document.createElement('div');
         box.className = 'about-card mv-card';
-        let html = '<h3 style="margin:0 0 6px">最具价值的一步</h3>';
-        for(const pid of pids){
-          const b = best[pid];
-          const mv = b.mv || {};
+        let html = '<h3 class="mv-title">最具价值的一步</h3>' +
+          '<p class="mv-lead">每位玩家评分涨得最多的那一手，按涨幅排序</p>';
+        items.forEach(function(it, i){
+          const pid = it.pid, b = it.d, mv = b.mv || {};
+          const color = colors[pid] || '#888';
+          // 落子位置用 (行, 列) 从 1 开始的坐标，和棋盘左下角的编号习惯一致
           const where = (mv.x !== undefined && mv.y !== undefined)
-            ? '（第 ' + (mv.x + 1) + ' 行第 ' + (mv.y + 1) + ' 列）' : '';
-          html += '<div class="mv-row" style="border-left-color:' + (colors[pid] || '#888') + '">' +
-            '<span class="mv-who" style="color:' + (colors[pid] || '#888') + '">' +
-            htmlEsc(cNames[pid] || getPlayerLabel(pid)) + '</span>' +
+            ? '落子 (' + (mv.x + 1) + ', ' + (mv.y + 1) + ')' : '落子位置未知';
+          html += '<div class="mv-row" style="border-left-color:' + color + '">' +
+            '<span class="mv-rank">' + (i + 1) + '</span>' +
+            '<span class="mv-who" style="color:' + color + '">' +
+              htmlEsc(cNames[pid] || getPlayerLabel(pid)) + '</span>' +
+            '<span class="mv-where">第 ' + b.turn + ' 步 · ' + where + '</span>' +
             '<span class="mv-delta">+' + b.delta + '</span>' +
-            '<span class="mv-where">第 ' + b.turn + ' 步' + where + '</span>' +
             '</div>';
-        }
+        });
         box.innerHTML = html;
         container.appendChild(box);
       }

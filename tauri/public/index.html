@@ -151,9 +151,38 @@
               <button class="gb" data-value="3">3 级</button>
               <button class="gb selected" data-value="4">4 级</button>
               <button class="gb" data-value="5">5 级</button>
+              <button class="gb" data-value="6">6 级</button>
               <button class="gb" data-value="random">随机阈值</button>
             </div>
             <p id="lanCapDesc" class="lan-rule-desc"></p>
+          </div>
+
+          <!-- 双爆方式：阈值 5/6 时才有意义，与单机开局页同一套选项 -->
+          <div class="form-row" id="lanCapStyleRow" style="display:none">
+            <label>双爆方式</label>
+            <div id="lanCapStyleGroup" class="btn-group">
+              <button class="gb selected" data-value="one-two">相邻一格爆两个</button>
+              <button class="gb" data-value="two-one">相邻两格各爆一个</button>
+            </div>
+            <p id="lanCapStyleDesc" class="lan-rule-desc"></p>
+          </div>
+
+          <div class="form-row"><label>胜负判定</label>
+            <div id="lanWinConditionGroup" class="btn-group" style="flex-direction:column;align-items:stretch">
+              <button class="gb selected" data-value="last">只剩一人</button>
+              <button class="gb" data-value="pieces">棋子数碾压（需 3 人以上）</button>
+              <button class="gb" data-value="points">点数碾压（需 3 人以上）</button>
+            </div>
+            <p id="lanWinConditionDesc" class="lan-rule-desc"></p>
+          </div>
+
+          <div class="form-row"><label>局内排名依据</label>
+            <div id="lanRankMetricGroup" class="btn-group">
+              <button class="gb selected" data-value="ml">ML 评分</button>
+              <button class="gb" data-value="pieces">棋子数</button>
+              <button class="gb" data-value="points">点数</button>
+            </div>
+            <p id="lanRankMetricDesc" class="lan-rule-desc"></p>
           </div>
 
           <div class="form-row"><label>人机数量</label>

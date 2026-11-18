@@ -1227,16 +1227,28 @@ body.orbs-on .orb-container{display:block}
 .lan-cfg-k{color:var(--dim);flex-shrink:0}
 .lan-cfg-v{color:var(--text);text-align:right;word-break:break-word}
 /* 最具价值的一步 */
-.mv-card h3{font-size:.95rem}
+.mv-card h3.mv-title{font-size:.95rem;margin:0 0 2px}
+.mv-lead{font-size:.72rem;color:var(--dim);margin:0 0 8px;line-height:1.4}
 .mv-row{
-  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
-  padding:6px 10px;margin:6px 0;border-radius:8px;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:8px 10px;margin:6px 0;border-radius:8px;
   background:var(--glass-w-04);border-left:3px solid var(--accent);
   font-size:.8rem;
 }
-.mv-who{font-weight:600;min-width:56px}
-.mv-delta{color:#2ecc71;font-weight:700;font-family:var(--font-mono)}
-.mv-where{color:var(--dim);font-size:.74rem}
+/* 名次数字：一眼看出这是全局第几关键的一手 */
+.mv-rank{
+  flex-shrink:0;width:18px;height:18px;line-height:18px;text-align:center;
+  border-radius:50%;font-size:.68rem;font-weight:700;
+  background:var(--glass-w-10);color:var(--dim);
+}
+.mv-row:first-of-type .mv-rank{background:var(--accent);color:#1a1a1a}
+.mv-who{font-weight:600;min-width:52px;flex-shrink:0}
+.mv-where{color:var(--dim);font-size:.74rem;flex:1;min-width:0}
+/* 涨幅放最右且加粗：这是这张卡片的重点 */
+.mv-delta{
+  color:#2ecc71;font-weight:700;font-family:var(--font-mono);font-size:.9rem;
+  flex-shrink:0;margin-left:auto;
+}
 
 /* 联机范围卡片：能不能跨网络远程连 */
 .lan-net-card h3{font-size:.95rem}

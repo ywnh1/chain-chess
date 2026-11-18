@@ -1380,14 +1380,7 @@
   <!-- History Screen -->
   <div id="history" class="screen">
     <button class="back glass-btn" onclick="Router.back()">← 返回</button>
-    <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-      <h2 style="margin:0">历史记录</h2>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button class="glass-btn primary" onclick="exportHistory()">导出</button>
-        <button class="glass-btn primary" onclick="document.getElementById('historyImportInput').click()">导入</button>
-        <button class="glass-btn danger" onclick="clearHistory()">清空</button>
-      </div>
-    </div>
+    <h2 style="margin:0">历史记录</h2>
     <div id="selBar">
       <span class="sel-count" id="selCount">已选择 0 项</span>
       <div class="sel-actions">
@@ -1408,7 +1401,15 @@
         <button type="button" class="hf-chip" data-mode="local" onclick="setHistoryMode(this)">本地</button>
         <button type="button" class="hf-chip" data-mode="ai" onclick="setHistoryMode(this)">AI 对战</button>
         <button type="button" class="hf-chip" data-mode="eve" onclick="setHistoryMode(this)">斗蛐蛐</button>
+        <button type="button" class="hf-chip" data-mode="lan" onclick="setHistoryMode(this)">局域网</button>
       </div>
+    </div>
+    <div class="history-actions" role="group" aria-label="历史记录操作">
+      <button class="glass-btn primary" onclick="exportHistory()">导出</button>
+      <button class="glass-btn primary"
+        onclick="document.getElementById('historyImportInput').click()">导入</button>
+      <button class="glass-btn" id="multiSelectBtn" onclick="enterMultiSelect()">多选</button>
+      <button class="glass-btn danger" onclick="clearHistory()">清空</button>
     </div>
     <p style="font-size:.85rem;color:var(--dim);margin:4px 0 12px">所有对局记录</p>
     <div id="historyList" class="history-list">

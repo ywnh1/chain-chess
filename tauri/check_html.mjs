@@ -44,6 +44,33 @@ if(/<a[^>]+target="_blank"/.test(h))e.push('index.html 还有 target="_blank" �
   }
 }
 
+// PWA 与 app 的页面元素必须对齐（除联机相关的少数例外）。
+// 这一条是补出来的：history 页的「多选」按钮曾经只在 app 里加过，
+// PWA 版点不到 —— 元素 id 集合一对比就能发现。
+{
+  const docsHtmlPath = resolve(import.meta.dirname, "..", "docs", "index.html");
+  if (existsSync(docsHtmlPath)) {
+    const dh = readFileSync(docsHtmlPath, "utf-8");
+    const stripLan = (s) => {
+      const i = s.indexOf("<!-- LAN Multiplayer Screen -->");
+      if (i < 0) return s;
+      const j = s.indexOf("<!-- Game Setup Screen -->", i);
+      return j < 0 ? s : s.slice(0, i) + s.slice(j);
+    };
+    const ids = (s) => new Set([...stripLan(s).matchAll(/id="([A-Za-z0-9_-]+)"/g)].map((m) => m[1]));
+    const idApp = ids(h), idPwa = ids(dh);
+    // PWA 不支持联机，与联机相关的元素缺席是正常的
+    const expectedMissing = new Set([
+      "ipv6Note", "ipv6Status", "ipv6ToggleGroup", "lanExitConfirm", "lan",
+    ]);
+    for (const k of idApp) {
+      if (!idPwa.has(k) && !expectedMissing.has(k)) {
+        e.push("docs/index.html 缺元素 id: " + k + "（PWA 与 app 的页面未对齐）");
+      }
+    }
+  }
+}
+
 // 取值辅助别用错：getSel 是数字版（parseInt），字符串容器必须用 getSelStr。
 // 这个错犯过一次：currentShapeMode 用了 getSel，点「长方形/自定义」永远退回 square。
 const strContainers=["shapeModeGroup","borderModeGroup","capModeGroup","soundThemeGroup","dogBarkGroup"];
