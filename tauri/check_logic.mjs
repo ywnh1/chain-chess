@@ -226,6 +226,30 @@ function grab(startMarker, endMarker) {
   if (api2.live) errs.push("评分：失败时不该写入 _liveRating");
 }
 
+/* ═══════ 闪回防护：引擎有结果时不得再跑 JS 模拟 ═══════
+ *
+ * 用户报过「6 级（以及其他阈值）闪一下爆炸效果又恢复」。根因是前端在
+ * 引擎结果之外自己又判了一遍炸，判错就凭空播动画，随后被引擎棋盘覆盖。
+ * 这里做结构断言：processClick 里「有 rustResult 但无快照」的分支必须在
+ * JS 模拟的 while 之前 return，不能落进模拟。
+ */
+{
+  const src = grab("async function processClick(", "async function localClick(");
+  if (!/if\(rustResult && finalBoard\)\{/.test(src)) {
+    errs.push("闪回防护：缺少「引擎有结果但无爆炸步骤」的提前返回分支");
+  }
+  const iGuard = src.indexOf("if(rustResult && finalBoard){");
+  const iLoop = src.indexOf("while(chain.length)");
+  if (iGuard < 0 || iLoop < 0 || iGuard > iLoop) {
+    errs.push("闪回防护：提前返回分支必须在 JS 模拟循环之前");
+  }
+  // 该分支内必须真的 return，否则只是白算一遍
+  if (iGuard >= 0) {
+    const seg = src.slice(iGuard, iLoop > iGuard ? iLoop : iGuard + 800);
+    if (!/return/.test(seg)) errs.push("闪回防护：该分支内没有 return，仍会落到 JS 模拟");
+  }
+}
+
 /* ═══════ 爆炸阈值：前端模拟必须与引擎逐条对齐 ═══════
  *
  * 用户报过：选 4 以外的阈值时，不该炸的时候 UI 闪一下爆炸效果、

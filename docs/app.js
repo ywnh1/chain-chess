@@ -2780,6 +2780,23 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
     return[...had].filter(p=>!nowSnap.has(p));
   }
 
+  // ── 引擎已给出结果但没有任何爆炸步骤 ──
+  // 这说明这一手引擎算完是「没炸」。此时**绝不能**再跑下面的 JS 模拟：
+  // 模拟是前端按自己的阈值重新判一遍，只要和引擎有半点偏差（历史上
+  // 6 级阈值、双爆方向都出过），就会凭空播一段爆炸动画，然后被引擎
+  // 棋盘覆盖回去 —— 正是用户看到的「闪一下又恢复」。
+  // 引擎是权威结果，直接采用它，动画与统计都按「无爆炸」处理。
+  if(rustResult && finalBoard){
+    for(let i=0;i<size;i++) for(let j=0;j<cols;j++) b[i][j]=finalBoard[i][j];
+    renderBoard(false);
+    if(rustResult.eliminated && rustResult.eliminated.length){
+      return rustResult.eliminated;
+    }
+    let nowSnap=new Set();
+    for(let row of b)for(let cl of row)if(cl.owner!==null)nowSnap.add(cl.owner);
+    return[...had].filter(p=>!nowSnap.has(p));
+  }
+
   let chainGuard=0; // 连锁防御上限：防止特定棋盘结构下无限互炸导致动画/点击卡死
   while(chain.length){
     if(++chainGuard>100000)break;
@@ -2811,11 +2828,23 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
       // 引擎侧同一逻辑在 process_click_with_killer_inner 里。
       let special2=null;
       if(isHeavy&&capStyle==='two-one'&&special>=0){
+        // 方向必须按「真实四方向」推，不能用坐标差反推：
+        // wrap 边界下 (0,0) 的左邻是 (0, cols-1)，坐标差算出来是
+        // dy = cols-1 这种大跳，sign 得到的方向完全错位。
+        // 这里按目标格相对中心在四个方向里的哪一个来判断。
         const t=targets[special];
-        const dx=Math.sign(t[0]-cx), dy=Math.sign(t[1]-cy);
-        const x2=t[0]+dx, y2=t[1]+dy;
-        if(x2>=0&&x2<s&&y2>=0&&y2<cols&&!(b[x2]&&b[x2][y2]&&b[x2][y2].blocked)){
-          special2=[x2,y2];
+        let dx=0, dy=0;
+        if(t[0]!==cx){ dx=Math.sign(t[0]-cx); }
+        else if(t[1]!==cy){ dy=Math.sign(t[1]-cy); }
+        if(dx||dy){
+          let x2=t[0]+dx, y2=t[1]+dy;
+          // 回环模式要按边长绕回去，否则第二格会掉到棋盘外
+          if(effBm==='wrap'){
+            x2=(x2+s)%s; y2=(y2+cols)%cols;
+          }
+          if(x2>=0&&x2<s&&y2>=0&&y2<cols&&!(b[x2]&&b[x2][y2]&&b[x2][y2].blocked)){
+            special2=[x2,y2];
+          }
         }
       }
       for(let ti=0;ti<targets.length;ti++){
@@ -4516,8 +4545,8 @@ function renderGameCharts(container, history, opts){
       b3.className = 'chart-box';
       // 评分图暂不支持全屏（负值坐标系与全屏重绘逻辑不同），所以不给点击态，
       // 免得用户点了没反应。
-      // 用户要求：图表标题不加解释，直接叫「局面评分」
-      b3.innerHTML = '<h4>局面评分</h4><canvas id="' + id3 + '"></canvas>';
+      // 用户要求：标题不带括号解释，就叫「场面评分」
+      b3.innerHTML = '<h4>场面评分</h4><canvas id="' + id3 + '"></canvas>';
       container.appendChild(b3);
       (function poll(){
         const el = document.getElementById(id3);
