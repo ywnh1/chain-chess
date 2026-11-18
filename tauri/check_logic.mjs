@@ -570,6 +570,69 @@ function grab(startMarker, endMarker) {
     errs.push("返回逻辑：无 back 声明应退回 welcome");
 }
 
+/* ═══════ 游戏配置：改动立即生效，不必先点「保存」 ═══════
+ *
+ * 用户要求：改了规则就该马上作用于当前这一局；「保存」只负责把它
+ * 存成可复用的预设。所以界面上必须有一份「草稿」，它优先于预设，
+ * 并且在进出配置页时不被预设覆盖回去。
+ */
+{
+  const def = grab("const GAME_CONFIG_DEFAULT", "function getGameConfigs(");
+  const getFn = grab("function getGameConfigs(", "function saveGameConfigs(");
+  const activeFn = grab("function getActiveGameConfig(", "/// 规则草稿：界面上的当前选择。");
+  const draftFn = grab("/// 规则草稿：界面上的当前选择。", "/// 把某个组的选中态设成 value");
+  const dirtyFn = grab("/// 草稿是否与当前预设不同", "function updateGameConfigSummary(");
+
+  const code =
+    "let appSettings = holder.obj;\n" +
+    "const saveSettings = () => {};\n" +
+    "const document = { getElementById: () => ({}) };\n" +   // captureGameConfigDraft 首行会探测
+    "const readGameConfigFromDom = () => holder.domValue;\n" +
+    "const updateGameConfigSummary = () => {};\n" +
+    def + getFn + activeFn + draftFn + dirtyFn +
+    "return { getGameConfigDraft, captureGameConfigDraft, isGameConfigDirty, setApp:(o)=>{appSettings=o;holder.obj=o;} };";
+  const holder = { obj: {}, domValue: null };
+  const api = new Function("holder", code)(holder);
+
+  // ① 没有草稿时，退回当前预设
+  api.setApp({ gameConfigs: [{ id: "default", name: "标准", capMode: "4" }], activeGameConfig: "default" });
+  let d = api.getGameConfigDraft();
+  if (d.capMode !== "4") errs.push("草稿：无草稿时应退回当前预设，实际 " + d.capMode);
+
+  // ② 有草稿时，草稿优先（这就是「改了立即生效」）
+  api.setApp({
+    gameConfigs: [{ id: "default", name: "标准", capMode: "4" }],
+    activeGameConfig: "default",
+    gameConfigDraft: { borderMode: "wrap", capMode: "5", capStyle: "two-one", winCondition: "points", rankMetric: "points" },
+  });
+  d = api.getGameConfigDraft();
+  if (d.capMode !== "5") errs.push("草稿：应优先于预设，实际 " + d.capMode);
+  if (d.rankMetric !== "points") errs.push("草稿：排名依据应来自草稿，实际 " + d.rankMetric);
+
+  // ③ 草稿缺字段时补默认值，不能出现 undefined
+  api.setApp({ gameConfigs: [{ id: "default", name: "标准" }], activeGameConfig: "default", gameConfigDraft: {} });
+  d = api.getGameConfigDraft();
+  if (d.winCondition !== "last") errs.push("草稿：缺失字段应补默认 wins=last，实际 " + d.winCondition);
+
+  // ④ 脏标记：草稿与预设不同 → true；相同 → false
+  api.setApp({
+    gameConfigs: [{ id: "default", name: "标准", capMode: "4", borderMode: "default",
+                    capStyle: "one-two", winCondition: "last", rankMetric: "ml" }],
+    activeGameConfig: "default",
+    gameConfigDraft: { borderMode: "default", capMode: "5", capStyle: "one-two",
+                       winCondition: "last", rankMetric: "ml" },
+  });
+  if (!api.isGameConfigDirty()) errs.push("草稿：capMode 变了却没标成未保存");
+  api.setApp({
+    gameConfigs: [{ id: "default", name: "标准", capMode: "4", borderMode: "default",
+                    capStyle: "one-two", winCondition: "last", rankMetric: "ml" }],
+    activeGameConfig: "default",
+    gameConfigDraft: { borderMode: "default", capMode: "4", capStyle: "one-two",
+                       winCondition: "last", rankMetric: "ml" },
+  });
+  if (api.isGameConfigDirty()) errs.push("草稿：与预设一致时不该标未保存");
+}
+
 /* ═══════ 4.1.0：评分随历史压缩/展开往返不丢 ═══════ */
 {
   const comp = grab("function compactHistory(", "function expandHistory(");

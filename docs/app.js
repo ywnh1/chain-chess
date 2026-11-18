@@ -948,6 +948,8 @@ function setSelected(container, target){
   container.querySelectorAll(sel).forEach(b=>b.classList.remove('selected'));
   target.classList.add('selected');
 }
+/// 属于「游戏配置」页的规则组。改动这些控件要立即进草稿。
+const GC_RULE_GROUPS=['borderModeGroup','capModeGroup','capStyleGroup','winConditionGroup','rankMetricGroup'];
 // 文档级委托：处理所有自定义控件点击（兼容 display:none 内的元素）
 document.addEventListener('click',function(e){
   const t=e.target.closest('.size-btn,.gb');
@@ -975,6 +977,8 @@ document.addEventListener('click',function(e){
   }else if(container.id==='winConditionGroup'){
     syncWinConditionDesc();
   }else if(t.classList.contains('size-btn')||t.classList.contains('gb'))setTimeout(setupLobbySync,10);
+  // 规则类控件一改就落草稿：立刻对当前这一局生效，不必先点「保存」
+  if(GC_RULE_GROUPS.indexOf(container.id)>=0) captureGameConfigDraft();
 });
 
 
@@ -1102,6 +1106,9 @@ Router.register('gameSetup', {
   enter() {
     document.body.style.background='';
     restoreLastSetup();          // 先恢复上次选择，再由 setupLobbySync 校验兼容性
+    // 规则类设置有自己的预设（game-config 页），进页面时同步到控件。
+    // 用草稿而不是已保存的预设：未保存的改动不该被重置。
+    setTimeout(function(){ applyGameConfigToDom(getGameConfigDraft()); }, 0);
     setTimeout(initShapeMode, 20);
     setTimeout(updateModeConflictUI, 20);
   },
@@ -5231,6 +5238,25 @@ function getActiveGameConfig(){
   return list.find(function(c){ return c.id === id; }) || list[0];
 }
 
+/// 规则草稿：界面上的当前选择。
+///
+/// 用户改完规则就该立刻作用于这一局，不需要先点「保存」——
+/// 「保存」只负责把当前选择存成一个可复用的预设。
+function getGameConfigDraft(){
+  const d = appSettings.gameConfigDraft;
+  if(d && typeof d === 'object') return Object.assign({}, GAME_CONFIG_DEFAULT, d);
+  return getActiveGameConfig();
+}
+
+/// 把界面上的当前选择存成草稿（不写入预设）
+function captureGameConfigDraft(){
+  if(!document.getElementById('borderModeGroup')) return;
+  const v = readGameConfigFromDom();
+  appSettings.gameConfigDraft = v;
+  saveSettings();
+  updateGameConfigSummary();
+}
+
 /// 把某个组的选中态设成 value（找不到就保持原样）
 function setGroupValue(id, value){
   const box = document.getElementById(id);
@@ -5312,15 +5338,31 @@ function applyGameConfigToDom(cfg){
 }
 
 /// 开局页那一行显示当前预设的摘要
+/// 草稿是否与当前预设不同（用于在摘要里提示「未保存」）
+function isGameConfigDirty(){
+  const act = getActiveGameConfig() || {};
+  const cur = getGameConfigDraft() || {};
+  for(const k of ['borderMode','capMode','capStyle','winCondition','rankMetric']){
+    const a = act[k] == null ? GAME_CONFIG_DEFAULT[k] : act[k];
+    const b = cur[k] == null ? GAME_CONFIG_DEFAULT[k] : cur[k];
+    if(String(a) !== String(b)) return true;
+  }
+  return false;
+}
+
 function updateGameConfigSummary(){
   const el = document.getElementById('gameConfigSummary');
   if(!el) return;
+  // 摘要显示「当前生效的规则」（草稿），不是已保存的预设
   const act = getActiveGameConfig();
-  const cap = (act && act.capMode) || '4';
-  const border = (act && act.borderMode) || 'default';
+  const cur = getGameConfigDraft() || {};
+  const cap = cur.capMode || '4';
+  const border = cur.borderMode || 'default';
   const bl = {default:'默认边界', wrap:'回环', bounce:'反弹', degrade:'降级', random:'随机边界'};
   const capLabel = cap === 'random' ? '随机阈值' : (cap + ' 级');
-  el.textContent = (act && act.name ? act.name + ' · ' : '') + (bl[border] || border) + ' · ' + capLabel;
+  const name = (act && act.name) ? act.name + ' · ' : '';
+  el.textContent = name + (bl[border] || border) + ' · ' + capLabel +
+    (isGameConfigDirty() ? ' · 未保存' : '');
 }
 
 function renderGameConfigSelect(){
@@ -5340,11 +5382,13 @@ function renderGameConfigSelect(){
 
 function initGameConfigPage(){
   renderGameConfigSelect();
-  applyGameConfigToDom(getActiveGameConfig());
+  applyGameConfigToDom(getGameConfigDraft());
 
   const sel = document.getElementById('gameConfigSelect');
   if(sel) sel.onchange = function(){
     appSettings.activeGameConfig = this.value;
+    // 切换预设等于换一套规则，草稿要跟着重置成该预设的值
+    appSettings.gameConfigDraft = null;
     saveSettings();
     applyGameConfigToDom(getActiveGameConfig());
     showMsg('已切换到「' + (getActiveGameConfig().name || '') + '」', '');
@@ -5359,6 +5403,8 @@ function initGameConfigPage(){
     if(i < 0) return;
     list[i] = Object.assign({}, list[i], v);
     saveGameConfigs(list);
+    appSettings.gameConfigDraft = v;
+    saveSettings();
     applyGameConfigToDom(list[i]);
     renderGameConfigSelect();
     showMsg('已保存到「' + list[i].name + '」', '');
@@ -5376,7 +5422,9 @@ function initGameConfigPage(){
     });
     list.push(rec);
     appSettings.activeGameConfig = rec.id;
+    appSettings.gameConfigDraft = readGameConfigFromDom();
     saveGameConfigs(list);
+    saveSettings();
     applyGameConfigToDom(rec);
     renderGameConfigSelect();
     showMsg('已另存为「' + name + '」', '');
@@ -5390,7 +5438,9 @@ function initGameConfigPage(){
     if(!confirm('删除配置「' + act.name + '」？')) return;
     const next = list.filter(function(c){ return c.id !== act.id; });
     appSettings.activeGameConfig = 'default';
+    appSettings.gameConfigDraft = null;
     saveGameConfigs(next);
+    saveSettings();
     applyGameConfigToDom(getActiveGameConfig());
     renderGameConfigSelect();
     showMsg('已删除', '');
