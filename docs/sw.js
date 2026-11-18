@@ -44,35 +44,56 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 请求：缓存优先，网络回退并更新缓存
+// 外壳资源（HTML/CSS/JS）：网络优先，失败再回退缓存。
+//
+// 为什么不用缓存优先：CACHE_NAME 只随版本号变，而日常修 bug 不改版本号。
+// 缓存优先会让浏览器一直用旧的 style.css / app.js —— 典型症状是新加的
+// 按钮没有样式（HTML 是按钮，CSS 还是旧版），看起来像「功能没生效」。
+// 网络优先后，在线用户每次刷新都拿到最新文件；离线仍走缓存兜底。
+function isShellAsset(req, url) {
+  if (req.mode === 'navigate') return true;
+  return /\.(?:html|css|js)$/i.test(url.pathname);
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;   // 跨域不缓存
 
-  // ignoreSearch: HTML 引用带 ?v= 版本号（style.css?v=3.3.7），预缓存键无查询串。
-  // 默认 Cache API 匹配区分查询串，会导致预缓存永不命中；忽略查询串后二者互通。
-  event.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((cached) => {
-      if (cached) {
-        // 后台刷新缓存
-        fetch(req).then((res) => {
-          if (res && res.ok) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, res.clone()));
-          }
-        }).catch(() => {});
-        return cached;
-      }
-      return fetch(req).then((res) => {
+  if (isShellAsset(req, url)) {
+    event.respondWith(
+      fetch(req).then((res) => {
         if (res && res.ok) {
           const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone)).catch(() => {});
         }
         return res;
       }).catch(() => {
-        // 离线兜底：导航请求返回缓存的 index.html
+        // ignoreSearch：HTML 引用带 ?v= 版本号，预缓存键没有查询串
+        return caches.match(req, { ignoreSearch: true }).then((cached) => {
+          if (cached) return cached;
+          if (req.mode === 'navigate') return caches.match('./index.html');
+          return Response.error();
+        });
+      })
+    );
+    return;
+  }
+
+  // 其余资源（wasm / 图片 / 音频）：缓存优先，体积大且很少变
+  event.respondWith(
+    caches.match(req, { ignoreSearch: true }).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).then((res) => {
+        if (res && res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone)).catch(() => {});
+        }
+        return res;
+      }).catch(() => {
         if (req.mode === 'navigate') return caches.match('./index.html');
+        return Response.error();
       });
     })
   );

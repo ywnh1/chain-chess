@@ -71,6 +71,45 @@ if(/<a[^>]+target="_blank"/.test(h))e.push('index.html 还有 target="_blank" �
   }
 }
 
+// 「更多」与「关于」两页的入口项必须与 app 一致。
+// 这一条是补出来的：PWA 曾经还挂着旧名「游戏规则」，并且缺 AI 介绍 /
+// AI 性能评测两个入口，用户点不进去。
+{
+  const docsHtmlPath = resolve(import.meta.dirname, "..", "docs", "index.html");
+  if (existsSync(docsHtmlPath)) {
+    const dh = readFileSync(docsHtmlPath, "utf-8");
+    const seg = (src, id) => {
+      const i = src.indexOf('id="' + id + '"');
+      if (i < 0) return "";
+      const j = src.indexOf("<div id=", i + id.length + 10);
+      return j < 0 ? src.slice(i) : src.slice(i, j);
+    };
+    // 同一个页面里可能有两种写法：<label>xxx</label> 与 <span class="nav-label">xxx</span>
+    const labels = (src) => {
+      const out = [];
+      for (const m of src.matchAll(/<label[^>]*>([^<]+)/g)) out.push(m[1].trim());
+      for (const m of src.matchAll(/class="nav-label">([^<]+)</g)) out.push(m[1].trim());
+      return out;
+    };
+    // PWA 不支持联机，与联机相关的入口缺席是正常的
+    const pwaOnlyMissing = new Set(["启用 IPv6 远程联机"]);
+    for (const page of ["settings", "about"]) {
+      const a = labels(seg(h, page));
+      const b = labels(seg(dh, page));
+      for (const x of a) {
+        if (!b.includes(x) && !pwaOnlyMissing.has(x)) {
+          e.push("docs 的 " + page + " 页缺入口: " + x + "（与 app 不一致）");
+        }
+      }
+      for (const x of b) {
+        if (!a.includes(x)) {
+          e.push("docs 的 " + page + " 页多出入口: " + x + "（app 里没有）");
+        }
+      }
+    }
+  }
+}
+
 // 取值辅助别用错：getSel 是数字版（parseInt），字符串容器必须用 getSelStr。
 // 这个错犯过一次：currentShapeMode 用了 getSel，点「长方形/自定义」永远退回 square。
 const strContainers=["shapeModeGroup","borderModeGroup","capModeGroup","soundThemeGroup","dogBarkGroup"];
