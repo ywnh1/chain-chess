@@ -41,7 +41,7 @@ function grabFn(name) {
 }
 
 const DEPS = ["getMaxPlayersByArea", "countOpenCells", "resolveRandomBorder",
-              "resolveRandomCap", "htmlEsc", "setSelected"];
+              "resolveRandomCap", "htmlEsc", "setSelected", "normalizeCapMode"];
 
 /* triggerAI 定义在 LAN 模块之外，单独抽出来注入（它依赖 lanSendMove / lanRole，
  * 所以必须排在 LAN 模块之后）。 */
@@ -204,7 +204,8 @@ function buildRuleControls() {
   }
 
   const cap = mk("lanCapGroup", "div", "btn-group");
-  // 与真实页面一致：3/4/5/6/random（6 级曾经在联机页漏掉过）
+  // 与真实页面一致：3/4/5/random（6 级已移除，但 mock 保留它用于验证
+  // 旧数据规范化成 5 级的行为）
   for (const v of ["3", "4", "5", "6", "random"]) {
     const b = mk("", "button", "gb" + (v === "4" ? " selected" : ""));
     b.dataset.value = v;
@@ -820,8 +821,9 @@ async function main() {
      "客户端排名依据应同步为 points，实际 " + cli6.playerBarMetric);
   ok(host6.capStyle === "two-one" && cli6.capStyle === "two-one",
      "双爆方式应两端一致，实际 host=" + host6.capStyle + " client=" + cli6.capStyle);
-  ok(host6.capMode === "6" && cli6.capMode === "6",
-     "6 级阈值应两端一致，实际 host=" + host6.capMode + " client=" + cli6.capMode);
+  // 6 级已移除：即使旧界面/旧存档传了 '6'，也该被规范化成 5 并两端一致
+  ok(host6.capMode === "5" && cli6.capMode === "5",
+     "6 级应规范化成 5 级并两端一致，实际 host=" + host6.capMode + " client=" + cli6.capMode);
   /* 每个 AI 各用各的算法：座位 2 = alphabeta，座位 3 = pvs
      （两端都要一致，否则客户端显示的和房主实际跑的对不上） */
   ok((host6.aiCfg[2] || {}).algorithm === "alphabeta",

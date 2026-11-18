@@ -294,7 +294,7 @@ fn main() {
 
     let mut id: u64 = 0;
     let cm_label = |cm: &CapMode| match cm {
-        CapMode::Cap3 => "3", CapMode::Cap4 => "4", CapMode::Cap5 => "5", CapMode::Cap6 => "6", CapMode::Random => "random",
+        CapMode::Cap3 => "3", CapMode::Cap4 => "4", CapMode::Cap5 => "5", CapMode::Random => "random",
     };
     let shapes: Vec<String> = if cfg.shapes.is_empty() { default_shapes() } else { cfg.shapes.clone() };
 

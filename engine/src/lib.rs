@@ -87,11 +87,14 @@ pub enum CapMode {
     Cap3,
     #[serde(rename = "4")]
     Cap4,
-    #[serde(rename = "5")]
+    /// 5 级「重炮」：5 点才炸，双爆方式由 CapStyle 决定。
+    ///
+    /// 6 级曾经存在过（4.1.0），现已移除：棋子最多画 4 个点，
+    /// 5 点和 6 点在视觉上完全无法区分，玩家看不出哪颗快炸。
+    /// 这里保留 `alias = "6"`，让 4.1.0 的旧存档/旧请求仍能解析
+    /// （当作 5 级处理），避免反序列化直接失败。
+    #[serde(rename = "5", alias = "6")]
     Cap5,
-    /// 6 级「超重炮」：6 点才炸，双爆方式由 CapStyle 决定
-    #[serde(rename = "6")]
-    Cap6,
     /// 随机：每步各自随机阈值 3/4/5（引擎层语义，供 AI 基准/工具直接调用；
     /// 产品层开局时由前端用时间戳种子解析为固定阈值，整局不再改变，不再传入本值）
     #[serde(rename = "random")]
@@ -196,7 +199,7 @@ pub struct HistoryRecord {
     /// 边界模式（默认/回环/反弹/降级/随机）
     #[serde(default)]
     pub border_mode: Option<String>,
-    /// 爆炸阈值模式（3/4/5/6/random）
+    /// 爆炸阈值模式（3/4/5/random）
     #[serde(default)]
     pub cap_mode: Option<String>,
     /// 双爆方式（one-two / two-one），阈值 5/6 时才有意义
@@ -1024,7 +1027,6 @@ pub fn cell_threshold(board: &GameBoard, x: usize, y: usize, border_mode: Border
     match cap_mode {
         CapMode::Cap3 => 3,
         CapMode::Cap5 => 5,
-        CapMode::Cap6 => 6,
         CapMode::Random => 4,
         CapMode::Cap4 => match border_mode {
             BorderMode::Degrade => match exposure_count(board, x, y) {
@@ -1198,7 +1200,7 @@ pub fn process_click_with_killer_inner(
             //   OneTwo：那一格 +2
             //   TwoOne：那一格 +1，沿同方向再走一格 +1
             let special = match cap_mode {
-                CapMode::Cap3 | CapMode::Cap5 | CapMode::Cap6 => {
+                CapMode::Cap3 | CapMode::Cap5 => {
                     if targets.is_empty() {
                         None
                     } else {
@@ -1766,7 +1768,6 @@ impl PvsSearcher {
             let min_explosive = match self.cap_mode {
                 CapMode::Cap3 => 1,
                 CapMode::Cap5 => 3,
-                CapMode::Cap6 => 4,
                 CapMode::Random => 2,
                 CapMode::Cap4 => match self.border_mode {
                     // degrade：本格的临界等级已经按形状外沿算好（越靠边越低）
@@ -2627,11 +2628,22 @@ mod tests {
         assert_eq!(old.rating, None, "缺失评分应为 None");
     }
 
+    /// 6 级已移除（棋子只画 4 个点，5/6 点视觉无法区分）。
+    /// 但 4.1.0 的旧存档/旧请求里可能还有 "6"，必须仍能解析 ——
+    /// 通过 serde alias 落到 Cap5，而不是反序列化失败。
     #[test]
-    fn cap6_threshold_and_crit() {
+    fn legacy_cap6_deserializes_as_cap5() {
+        let caps: CapMode = serde_json::from_str("\"6\"").expect("旧数据里的 6 应可解析");
+        assert_eq!(caps, CapMode::Cap5, "6 级应降级为 5 级");
         let b = empty(5, 5);
-        assert_eq!(cell_threshold(&b, 2, 2, BorderMode::Default, CapMode::Cap6), 6);
-        assert_eq!(crit_level(&b, 2, 2, BorderMode::Default, CapMode::Cap6), 5);
+        assert_eq!(cell_threshold(&b, 2, 2, BorderMode::Default, caps), 5);
+        assert_eq!(crit_level(&b, 2, 2, BorderMode::Default, caps), 4);
+
+        // 序列化只产出 3/4/5/random，不再有 6
+        for c in [CapMode::Cap3, CapMode::Cap4, CapMode::Cap5, CapMode::Random] {
+            let j = serde_json::to_string(&c).unwrap();
+            assert_ne!(j, "\"6\"", "不应再序列化出 6 级");
+        }
         // 4 级不受影响
         assert_eq!(cell_threshold(&b, 2, 2, BorderMode::Default, CapMode::Cap4), 4);
     }
@@ -2960,29 +2972,6 @@ mod anim_probe {
         assert!(steps.is_empty(), "没爆炸却给了快照，前端会播多余动画");
     }
 
-    /// 6 级阈值同样要满足上面两条（这是用户实际踩到的模式）。
-    #[test]
-    fn cap6_snapshots_consistent() {
-        // 注意：process_click 的语义是「点击某格」，点自己的棋子会 +1 点。
-        // 所以要测「5 点不炸」，得点别处，而不是点这颗 5 点棋子本身。
-        let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 7]; 7];
-        b[3][3] = Cell { owner: Some(0), count: 5, th: None, blocked: false };   // 6 级阈值的临界
-        let (_e, chain, _k, steps, _x) = process_click_with_snapshots(
-            &mut b, 7, 0, 0, 0, 2, BorderMode::Default, CapMode::Cap6, CapStyle::OneTwo, Some(1),
-        );
-        assert_eq!(chain, 0, "6 级阈值下 5 点（未被点击）不该炸");
-        assert!(steps.is_empty(), "6 级：没炸不该有快照");
-        assert_eq!(b[3][3].count, 5, "未被点击的棋子点数不应变化");
-
-        // 加到 6 点必炸
-        let mut c: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 7]; 7];
-        c[3][3] = Cell { owner: Some(0), count: 6, th: None, blocked: false };
-        let (_e, chain2, _k2, steps2, _x2) = process_click_with_snapshots(
-            &mut c, 7, 3, 3, 0, 2, BorderMode::Default, CapMode::Cap6, CapStyle::OneTwo, Some(1),
-        );
-        assert!(chain2 > 0, "6 级阈值下 6 点必炸");
-        assert!(!steps2.is_empty(), "6 级：炸了必须有快照");
-    }
 }
 
 #[cfg(test)]

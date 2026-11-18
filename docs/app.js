@@ -98,6 +98,18 @@ const COLORS=['#E74C3C','#F1C40F','#3498DB','#2ECC71','#9B59B6','#E91E63','#1ABC
 const COLORS_LIGHT=['rgba(231,76,60,.08)','rgba(241,196,15,.08)','rgba(52,152,219,.08)','rgba(46,204,113,.08)','rgba(155,89,182,.08)','rgba(233,30,99,.08)','rgba(26,188,156,.08)','rgba(243,156,18,.08)','rgba(139,94,60,.08)','rgba(93,109,126,.08)'];
 const COLOR_NAMES = ['红色','黄色','蓝色','绿色','紫色','粉色','青色','橙色','棕色','深灰色'];
 // 棋盘边界模式描述
+/// 把历史/存档里的阈值规范成当前支持的取值。
+///
+/// 6 级已移除（棋子最多画 4 个点，5 点和 6 点视觉上无法区分）。
+/// 4.1.0 短暂存在过 6 级，旧存档/旧回放里可能还留着 '6'；
+/// 直接传给 capForMode 会掉到默认 4 级，行为与当时不符且 UI 对不上，
+/// 所以统一降成 5 级 —— 同样是高阈值双爆，语义最接近。
+function normalizeCapMode(v){
+  const x = String(v == null ? '' : v);
+  if(x === '6') return '5';
+  return x;
+}
+
 const BORDER_MODE_DESC = {
   'default': '默认边界：4 点即爆，飞出棋盘或掉进空洞的棋子直接消失（最直观，新手推荐）',
   'wrap': '回环边界：棋盘像甜甜圈，从右边飞出去的点会从左边回来；遇到空洞会穿过去落到下一格，不丢点',
@@ -109,7 +121,6 @@ const CAP_MODE_DESC = {
   '3': '速爆：3 点就爆，爆炸时随机一个方向不送点；首子直接放成 2 点（与降级边界互斥）',
   '4': '标准玩法：4 点即爆，向上下左右各送 1 点；首子直接放成 3 点（差一点就爆）',
   '5': '重炮：5 点才爆，某个方向会多送点（具体方式见「双爆方式」）；首子直接放成 4 点（与降级边界互斥）',
-  '6': '超重炮：6 点才爆，某个方向会多送点（具体方式见「双爆方式」）；首子直接放成 5 点（与降级边界互斥）',
   'random': '随机阈值：开局随机抽 3 / 4 / 5 点之一，整局都按它来',
 };
 // 随机模式解析：开局瞬间用时间戳种子随机确定具体模式，整局不再改变。
@@ -117,7 +128,7 @@ const CAP_MODE_DESC = {
 function resolveRandomBorder(capOverride){
   const cap=capOverride||capMode;
   // 降级边界与 3/5 级爆炸互斥：阈值模式为 3/5（显式选择）时，随机边界排除降级
-  const opts=(cap==='3'||cap==='5'||cap==='6')
+  const opts=(cap==='3'||cap==='5')
     ?['default','wrap','bounce']
     :['default','wrap','bounce','degrade'];
   let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
@@ -126,7 +137,7 @@ function resolveRandomBorder(capOverride){
 function resolveRandomCap(borderOverride){
   const border=borderOverride||borderMode;
   // 降级边界与 3/5 级爆炸互斥：边界为降级时，随机阈值只取 4 级（degrade 仅与 4 级兼容）
-  const opts=border==='degrade'?['4']:['3','4','5','6'];
+  const opts=border==='degrade'?['4']:['3','4','5'];
   let s=Date.now()>>>0; s=(s*1664525+1013904223)>>>0;
   return opts[s%opts.length];
 }
@@ -852,7 +863,7 @@ let autoSkipChain=false;
  
 // 棋盘边界模式
 let borderMode='default';
-// 爆炸阈值模式（独立设置）：3/4/5/6=对应级数 / random=每步随机3~6
+// 爆炸阈值模式（独立设置）：3/4/5=对应级数 / random=每步随机3~5
 let capMode='4';
 // 双爆方式（只在阈值 5/6 时生效）：one-two=相邻一格送2点 / two-one=相邻两格各送1点
 let capStyle='one-two';
@@ -903,7 +914,7 @@ function updateModeConflictUI(caller){
   let bv=selB?selB.dataset.value:null;
   let cv=selC?selC.dataset.value:null;
   // 纠正已选冲突（degrade + 3/5 并存）
-  if(bv==='degrade'&&(cv==='3'||cv==='5'||cv==='6')){
+  if(bv==='degrade'&&(cv==='3'||cv==='5')){
     if(caller==='cap'){
       // 用户刚选 3/5：降级边界不可用，弹回默认边界
       const bd=borderGroup.querySelector('.gb[data-value="default"]');
@@ -1983,7 +1994,7 @@ function loadGameFromState(saved){
   aiAlgorithm = saved.aiAlgorithm || "";
   aiDepth = saved.aiDepth || 0;
   borderMode = saved.borderMode || "default";
-  capMode = saved.capMode || "4";
+  capMode = normalizeCapMode(saved.capMode || "4");
   capStyle = saved.capStyle || "one-two";
   winCondition = saved.winCondition || "last";
   playerBarMetric = saved.rankMetric || "ml";
@@ -2621,15 +2632,16 @@ function resetRoundHistory(){
 function capForMode(i,j,sz,bm,cell){
   void cell;
   // 必须与引擎的 cell_threshold / explosion_threshold 逐条对齐：
-  //   3/4/5/6 是固定阈值，**只有 4 级 + 降级边界**才按暴露度降级
-  //   random 每步在 3~6 里随机
+  //   3/4/5 是固定阈值，**只有 4 级 + 降级边界**才按暴露度降级
+  //   random 每步在 3~5 里随机
+  // 注：6 级已移除 —— 棋子最多画 4 个点，5 点和 6 点视觉上无法区分，
+  //     高阈值下玩家看不出哪颗棋子快炸了。
   // 之前这里漏了 6 级、random 也只到 5，导致 JS 侧模拟和引擎各算各的 ——
   // 选了 6 级时前端仍按 4 点判炸，于是「不该炸的时候闪一下爆炸效果，
   // 该炸的时候反而没动画」（引擎结果覆盖回来看着像恢复正常）。
-  if(capMode==='random')return 3+Math.floor(Math.random()*4);  // 3/4/5/6
+  if(capMode==='random')return 3+Math.floor(Math.random()*3);  // 3/4/5
   if(capMode==='3')return 3;
   if(capMode==='5')return 5;
-  if(capMode==='6')return 6;
   // 默认(4)：保留降级边界的位置修正
   if(bm==='degrade'){
     let onCorner=(i===0||i===sz-1)&&(j===0||j===sz-1);
@@ -2815,11 +2827,11 @@ async function processClick(b,s,x,y,pl,anim,playerColor,rustResult){
       // 爆炸扩散到邻居（按边界模式）
       let targets=[...nbrsForMode(cx,cy,s,effBm)];
       // 速爆(cap3)：随机一个方向「加 0」（该格完全不变）
-      // 重炮/超重炮(cap5/cap6)：随机一个方向按 capStyle 多送能量
+      // 重炮(cap5)：随机一个方向按 capStyle 多送能量
       //   one-two：那一格 +2
       //   two-one：那一格 +1，沿同方向再走一格 +1
       let special=-1;
-      const isHeavy=(capMode==='5'||capMode==='6');
+      const isHeavy=(capMode==='5');
       if((capMode==='3'||isHeavy)&&targets.length>0){
         special=Math.floor(Math.random()*targets.length);
       }
@@ -4597,7 +4609,7 @@ function renderGameCharts(container, history, opts){
 function replayGame(){
   const c=_lastGameConfig;
   if(!c)return;
-  if(c.capMode)capMode=c.capMode;
+  if(c.capMode)capMode=normalizeCapMode(c.capMode);
   if(c.borderMode)borderMode=c.borderMode;
   if(c.capStyle)capStyle=c.capStyle;
   if(c.winCondition)winCondition=c.winCondition;
@@ -5229,11 +5241,11 @@ function setGroupValue(id, value){
   if(hit) setSelected(box, hit);
 }
 
-/// 双爆方式只在 5/6 级时有意义
+/// 双爆方式只在 5 级时有意义
 function syncCapStyleRow(){
   const cap = getSelStr('capModeGroup') || '4';
   const row = document.getElementById('capStyleRow');
-  if(row) row.style.display = (cap === '5' || cap === '6') ? '' : 'none';
+  if(row) row.style.display = (cap === '5') ? '' : 'none';
   syncCapStyleDesc();
 }
 
@@ -5448,7 +5460,7 @@ const HINTS = {
   'cap-style': {
     title: '双爆方式是什么',
     body:
-      '<p>只有把阈值选成 <strong>5 级或 6 级</strong> 时才会出现这一项。阈值高了，光靠「每个方向各送 1 点」不容易炸开，所以高阈值会让某个方向多送一份能量，这里选的就是「怎么多送」。</p>'+
+      '<p>只有把阈值选成 <strong>5 级</strong> 时才会出现这一项。阈值高了，光靠「每个方向各送 1 点」不容易炸开，所以高阈值会让某个方向多送一份能量，这里选的就是「怎么多送」。</p>'+
       '<ul>'+
       '<li><strong>相邻一格爆两个</strong>：某个方向相邻的那一格直接吃 2 点。把那一格一口气压到临界，下一步很容易连锁</li>'+
       '<li><strong>相邻两格各爆一个</strong>：某个方向连着推两格，每格各 1 点。推得更远，适合隔着空格切进去</li>'+
@@ -6272,7 +6284,7 @@ function openReplay(cfg){
     borderMode:cfg.borderMode||'default',
     capStyle:cfg.capStyle||'one-two',
     winCondition:cfg.winCondition||'last',
-    capMode:cfg.capMode||'4',
+    capMode:normalizeCapMode(cfg.capMode||'4'),
     gameCount:cfg.gameCount||0,
     colorNames:cfg.colorNames||null,
     history,

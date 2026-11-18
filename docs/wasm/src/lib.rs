@@ -223,7 +223,6 @@ mod wasm_exports {
             CapMode::Cap3 => 3,
             CapMode::Cap4 => 4,
             CapMode::Cap5 => 5,
-            CapMode::Cap6 => 6,
             CapMode::Random => 3,
         };
         for (p, &(x, y)) in starts.iter().enumerate() {

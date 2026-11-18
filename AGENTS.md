@@ -170,7 +170,8 @@ cd docs/wasm && cargo check --target wasm32-unknown-unknown   # PWA 引擎
 ```
 
 > `docs/wasm` 的导出层带 `#[cfg(target_arch = "wasm32")]`，本机 `cargo check`
-> **不会编译它** —— 加新枚举分支时容易漏（`Cap6` 就漏过一次，导致 PWA 构建失败）。
+> **不会编译它** —— 加新枚举分支时容易漏（曾经漏过一次 `CapMode` 的新变体，
+> 本机全绿但 PWA 构建直接失败）。
 > 改引擎枚举后务必单独跑一次 wasm32 检查。
 
 ## 发版

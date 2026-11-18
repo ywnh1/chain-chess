@@ -387,23 +387,24 @@ function grab(startMarker, endMarker) {
     fn + "\nreturn capForMode;"
   )();
 
+  // 6 级已移除（棋子只画 4 个点，5/6 点视觉无法区分）
   const cases = [
-    ["3", "default", 3], ["4", "default", 4],
-    ["5", "default", 5], ["6", "default", 6],
+    ["3", "default", 3], ["4", "default", 4], ["5", "default", 5],
   ];
   for (const [cap, bm, want] of cases) {
     const got = mk(cap, bm)(2, 2, 7, bm, null);
     if (got !== want) errs.push("阈值：" + cap + " 级应返回 " + want + "，实际 " + got);
   }
 
-  // random 必须能抽到 3~6 全部四种（旧实现只到 5）
+  // random 必须能抽到 3/4/5 全部三种，且不能出现 6（已移除）
   {
     const f = mk("random", "default");
     const seen = new Set();
     for (let i = 0; i < 400; i++) seen.add(f(2, 2, 7, "default", null));
-    for (const v of [3, 4, 5, 6]) {
+    for (const v of [3, 4, 5]) {
       if (!seen.has(v)) errs.push("阈值：random 抽不到 " + v + "，实际见过 " + [...seen].sort());
     }
+    if (seen.has(6)) errs.push("阈值：random 不该再抽到 6 级，实际 " + [...seen].sort());
     if (seen.has(7) || seen.has(2)) errs.push("阈值：random 越界 " + [...seen].sort());
   }
 
@@ -417,11 +418,17 @@ function grab(startMarker, endMarker) {
     if (edge !== 3) errs.push("阈值：4 级 + 降级，边缘应为 3，实际 " + edge);
     if (inner !== 4) errs.push("阈值：4 级 + 降级，内部应为 4，实际 " + inner);
   }
-  // 6 级不受降级边界影响（引擎里只有 Cap4 才降到 3/2）
+  // 5 级同样不受降级边界影响（引擎里只有 Cap4 才降到 3/2）
   {
-    const f = mk("6", "degrade");
-    if (f(0, 0, 7, "degrade", null) !== 6)
-      errs.push("阈值：6 级 + 降级不应被降级，实际 " + f(0, 0, 7, "degrade", null));
+    const f = mk("5", "degrade");
+    if (f(0, 0, 7, "degrade", null) !== 5)
+      errs.push("阈值：5 级 + 降级不应被降级，实际 " + f(0, 0, 7, "degrade", null));
+  }
+  // 6 级已移除：若仍有代码传 '6'，不该被当成 6（前端会先规范化成 5）
+  {
+    const f = mk("6", "default");
+    const got = f(2, 2, 7, "default", null);
+    if (got === 6) errs.push("阈值：6 级应已移除，但 capForMode 仍返回 6");
   }
 }
 
