@@ -41,7 +41,9 @@ function grabFn(name) {
 }
 
 const DEPS = ["getMaxPlayersByArea", "countOpenCells", "resolveRandomBorder",
-              "resolveRandomCap", "htmlEsc", "setSelected", "normalizeCapMode"];
+              "resolveRandomCap", "htmlEsc", "setSelected", "normalizeCapMode",
+              // localClick 落子后要按引擎胜负判定收局（碾压规则）
+              "winnerFromEngine"];
 
 /* triggerAI 定义在 LAN 模块之外，单独抽出来注入（它依赖 lanSendMove / lanRole，
  * 所以必须排在 LAN 模块之后）。 */

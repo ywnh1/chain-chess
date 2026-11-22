@@ -4899,7 +4899,7 @@ async function triggerAI(){
   if(aiClickEl)addRipple(aiClickEl);
   playClick();
   const rndSeed=(Math.floor(Math.random()*0x7fffffff))>>>0;
-  let elim, killedBy;
+  let elim, killedBy, engWinner=null;
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
@@ -4914,6 +4914,7 @@ async function triggerAI(){
     board=result.board;
     killedBy=result.killedBy;
     elim=result.eliminated||[];
+    engWinner=winnerFromEngine(result);
   }catch(e){
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
   }
@@ -4928,10 +4929,11 @@ async function triggerAI(){
     if(eliminatedPlayers.has(p))continue;
     alive.push(p);
   }
-  if(alive.length<=1){
+  // 引擎已按 winCondition 判过：棋子/点数碾压时场上还有别人的棋子
+  if(engWinner!==null||alive.length<=1){
     gameOver=true;
     playGameOver();
-    showSettlement(alive[0],_colorNames||COLOR_NAMES,gameHistory);
+    showSettlement(engWinner!==null?engWinner:alive[0],_colorNames||COLOR_NAMES,gameHistory);
     return;
   }
   let idx=alive.indexOf(curPlayer);
@@ -5148,7 +5150,7 @@ async function replayAiMove(move){
   if(el)addRipple(el);
   playClick();
   const rndSeed=(Math.floor(Math.random()*0x7fffffff))>>>0;
-  let elim, killedBy;
+  let elim, killedBy, engWinner=null;
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
@@ -5163,6 +5165,7 @@ async function replayAiMove(move){
     board=result.board;
     killedBy=result.killedBy;
     elim=result.eliminated||[];
+    engWinner=winnerFromEngine(result);
   }catch(e){
     elim=await processClick(board,size,x,y,curPlayer,null,COLORS[curPlayer]);
   }
@@ -5174,10 +5177,11 @@ async function replayAiMove(move){
     if(eliminatedPlayers.has(p))continue;
     alive.push(p);
   }
-  if(alive.length<=1){
+  // 引擎已按 winCondition 判过：棋子/点数碾压时场上还有别人的棋子
+  if(engWinner!==null||alive.length<=1){
     gameOver=true;
     playGameOver();
-    showSettlement(alive[0],_colorNames||COLOR_NAMES,gameHistory);
+    showSettlement(engWinner!==null?engWinner:alive[0],_colorNames||COLOR_NAMES,gameHistory);
     return;
   }
   let idx=alive.indexOf(curPlayer);
@@ -5295,7 +5299,7 @@ async function localClick(x,y,seedOverride){
     if(clickEl)addRipple(clickEl);
     // 联机下这一手可能来自远端：必须沿用对端的 seed，否则两端的爆炸随机不同
     const rndSeed=seedOverride!=null?seedOverride:((Math.floor(Math.random()*0x7fffffff))>>>0);
-    let elim, killedBy;
+    let elim, killedBy, engWinner=null;
     try {
       let result=await tauriInvoke('process_move',{
         board:board,size:size,x:x,y:y,
@@ -5310,6 +5314,7 @@ async function localClick(x,y,seedOverride){
       board=result.board;
       killedBy=result.killedBy;
       elim=result.eliminated||[];
+      engWinner=winnerFromEngine(result);
     }catch(e){
       elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
     }
@@ -5323,10 +5328,11 @@ async function localClick(x,y,seedOverride){
       if(eliminatedPlayers.has(p))continue;
       alive.push(p);
     }
-    if(alive.length<=1){
+    // 引擎已按 winCondition 判过：棋子/点数碾压时场上还有别人的棋子
+    if(engWinner!==null||alive.length<=1){
       gameOver=true;
       playGameOver();
-      showSettlement(alive[0],_colorNames||COLOR_NAMES,gameHistory);
+      showSettlement(engWinner!==null?engWinner:alive[0],_colorNames||COLOR_NAMES,gameHistory);
       return;
     }
     let idx=alive.indexOf(curPlayer);
@@ -5354,7 +5360,7 @@ async function localClick(x,y,seedOverride){
   const clickEl=cells?.[x]?.[y];
   if(clickEl)addRipple(clickEl);
   const rndSeed=seedOverride!=null?seedOverride:((Math.floor(Math.random()*0x7fffffff))>>>0);
-  let elim, killedBy;
+  let elim, killedBy, engWinner=null;
   try {
     let result=await tauriInvoke('process_move',{
       board:board,size:size,x:x,y:y,
@@ -5369,6 +5375,7 @@ async function localClick(x,y,seedOverride){
     board=result.board;
     killedBy=result.killedBy;
     elim=result.eliminated||[];
+    engWinner=winnerFromEngine(result);
   }catch(e){
     elim=await processClick(board,size,x,y,curPlayer,'explode',COLORS[curPlayer]);
   }
@@ -5382,10 +5389,11 @@ async function localClick(x,y,seedOverride){
     if(eliminatedPlayers.has(p))continue;
     alive.push(p);
   }
-  if(alive.length<=1){
+  // 引擎已按 winCondition 判过：棋子/点数碾压时场上还有别人的棋子
+  if(engWinner!==null||alive.length<=1){
     gameOver=true;
     playGameOver();
-    showSettlement(alive[0],_colorNames||COLOR_NAMES,gameHistory);
+    showSettlement(engWinner!==null?engWinner:alive[0],_colorNames||COLOR_NAMES,gameHistory);
     return;
   }
   let idx=alive.indexOf(curPlayer);
@@ -5419,6 +5427,14 @@ function getPlayerLabel(p){
   if(p===undefined||p===null)return '未知';
   if(_colorNames&&_colorNames[p])return _colorNames[p];
   return aiPlayers.has(p)?`AI ${p+1}`:`玩家 ${p+1}`;
+}
+
+/// 引擎按 winCondition 判过胜负。棋子数 / 点数碾压时场上还留着别人的棋子，
+/// 只看「存活人数 ≤ 1」会让这两条规则永远不生效。返回胜者下标，未结束返回 null。
+function winnerFromEngine(result){
+  if(!result||!result.gameOver)return null;
+  const w=result.winner;
+  return (w===null||w===undefined)?null:w;
 }
 
 // 处理一轮淘汰：记录击败者、播放音效、toast 播报

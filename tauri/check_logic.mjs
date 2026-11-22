@@ -777,6 +777,30 @@ function grab(startMarker, endMarker) {
   if (api.cleared.length !== 1) errs.push("历史保存：成功后应清掉 round_history");
 }
 
+/* ═══════ 胜利规则：引擎判出的胜者必须真的用上 ═══════
+ *
+ * 用户报过：选了「棋子数碾压 / 点数碾压」，打到底也不结束。
+ * 根因是落子流程只按「存活人数 ≤ 1」判胜 —— 引擎按 winCondition 算出的
+ * winner 被直接丢弃，而碾压获胜时场上还留着别人的棋子，所以永远判不出来。
+ * 这条测试盯住：四处落子收尾都必须读引擎结果。
+ */
+{
+  const helper = grab("function winnerFromEngine(", "function handleEliminations(");
+  if (!helper.includes("function winnerFromEngine(")) errs.push("胜利规则：缺少 winnerFromEngine 辅助函数");
+  const wfe = new Function(helper + "; return winnerFromEngine;")();
+  if (wfe({ gameOver: true, winner: 0 }) !== 0) errs.push("胜利规则：赢家是 0 号时必须返回 0（不能当成假值）");
+  if (wfe({ gameOver: true, winner: null }) !== null) errs.push("胜利规则：winner 为 null 应返回 null");
+  if (wfe({ gameOver: false, winner: 3 }) !== null) errs.push("胜利规则：未结束的落子不该判胜");
+  if (wfe(null) !== null) errs.push("胜利规则：没有引擎结果时应返回 null");
+
+  // 人类落子、AI 落子、悔棋重放、AI 首子 —— 四条路径都要读引擎胜负
+  const uses = (appJs.match(/winnerFromEngine\(result\)/g) || []).length;
+  if (uses < 4) errs.push("胜利规则：落子收尾只有 " + uses + " 处读引擎胜负，应为 4 处");
+  // 不允许退回「只看存活人数」的写法（碾压获胜时场上还有别人的棋子）
+  if (/if\(alive\.length<=1\)\{\s*\n\s*gameOver=true;/.test(appJs))
+    errs.push("胜利规则：还有地方只按存活人数判胜，碾压规则会被吃掉");
+}
+
   if (errs.length > before) {
     // 把这一文件新增的错误标注来源，避免两份报错混在一起分不清
     for (let k = before; k < errs.length; k++) errs[k] = "[" + label + "] " + errs[k];
