@@ -4738,8 +4738,10 @@ async function fastFinish(){
   clearAiHint();
   showFastFinishOverlay(true);
   updateFastFinishBtn();
+  // 配置要给「所有未淘汰的 AI」，不能只给已经有棋子的：
+  // 还没落首子的 AI 也在场上，模拟里会轮到它，漏配就会退回默认策略
   const alive=[];
-  for(let p=0;p<maxPlayers;p++){if(!eliminatedPlayers.has(p)&&hasPieces(p,board))alive.push(p);}
+  for(let p=0;p<maxPlayers;p++){if(!eliminatedPlayers.has(p))alive.push(p);}
   const cfgArg={};
   for(const p of alive){
     const ac=aiConfigs[p]||{};

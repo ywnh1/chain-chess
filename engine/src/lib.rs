@@ -325,8 +325,11 @@ pub fn simulate_to_end(
             needs_fallback = true;
             break;
         }
+        // 存活 = 未被淘汰。不能用「手里有棋子」来算：开局阶段还没落首子的
+        // 玩家同样在场，把他排除会让对局在别人身上提前结束（第一颗子落地就判赢），
+        // 也会让那个 AI 再也不会被轮到、直接从模拟里消失。
         let alive: Vec<usize> = (0..max_players)
-            .filter(|p| !elim.contains(p) && has_pieces(&b, *p))
+            .filter(|p| !elim.contains(p))
             .collect();
         if alive.len() <= 1 {
             preferred = alive.first().copied();
@@ -1118,7 +1121,14 @@ pub fn check_win(
         .filter(|p| !eliminated.contains(p) && has_pieces(board, *p))
         .collect();
     if alive.len() <= 1 {
-        return alive.first().copied();
+        // 「手里有棋子」不等于「还在场上」：开局阶段还没落首子的玩家同样在场。
+        // 只要还有未淘汰的玩家手上没有棋子，就不是终局 —— 否则第一颗子落地，
+        // 或者先落子的人把先死的人炸光，就会被提前判赢。
+        let still_waiting = (0..max_players)
+            .any(|p| !eliminated.contains(&p) && !has_pieces(board, p));
+        if !still_waiting {
+            return alive.first().copied();
+        }
     }
     if cond == WinCondition::Last || alive.len() < 3 {
         return None;
@@ -2955,10 +2965,65 @@ mod tests {
         put(&mut d, 4, 0, 1, 1);
         assert_eq!(check_win(&d, 2, &[], WinCondition::Pieces), None);
 
-        // 只剩一人：任何判定下都结束
+        // 只剩一人：任何判定下都结束（其他人都被淘汰了）
         let mut e = empty(5, 5);
         put(&mut e, 0, 0, 0, 1);
         assert_eq!(check_win(&e, 3, &[1, 2], WinCondition::Pieces), Some(0));
+    }
+
+    /// 开局第一手落下时场上只有一个人有棋子，但其他人只是还没落子。
+    /// 「有棋子」不等于「还在场上」—— 这里曾经把第一颗子当成获胜。
+    #[test]
+    fn first_move_is_not_a_win() {
+        for cond in [WinCondition::Last, WinCondition::Pieces, WinCondition::Points] {
+            for max_players in [2usize, 3, 4] {
+                let mut b = empty(7, 7);
+                put(&mut b, 3, 3, 0, 3);   // 0 号首子
+                assert_eq!(
+                    check_win(&b, max_players, &[], cond),
+                    None,
+                    "{:?} / {} 人局：第一颗子落地不该判胜",
+                    cond, max_players
+                );
+            }
+        }
+    }
+
+    /// 先落子的人把先死的人炸光，而后面的人还没落首子 —— 也不能判他赢。
+    /// 否则 4 人局里前两个玩家互相清场就会提前结束。
+    #[test]
+    fn surviving_one_while_others_await_first_move_is_not_a_win() {
+        let mut b = empty(7, 7);
+        put(&mut b, 0, 0, 0, 2);
+        put(&mut b, 0, 1, 0, 1);
+        // 1 号被淘汰（棋子已归零），2、3 号还没落首子
+        assert_eq!(check_win(&b, 4, &[1], WinCondition::Last), None);
+        assert_eq!(check_win(&b, 4, &[1], WinCondition::Pieces), None);
+        // 真终局：其余三人都被淘汰，只剩 0 号
+        assert_eq!(check_win(&b, 4, &[1, 2, 3], WinCondition::Last), Some(0));
+    }
+
+    /// 一键终局也不能把「只有一个人落过子」当成已经打完。
+    #[test]
+    fn simulate_waits_for_all_first_moves() {
+        let mut b = empty(7, 7);
+        put(&mut b, 3, 3, 0, 3);   // 只有 0 号落了首子
+        let mut cfg = std::collections::HashMap::new();
+        for p in 0..3 {
+            cfg.insert(p.to_string(), serde_json::json!({
+                "algorithm": "strategy", "depth": 1, "randomScale": 0,
+            }));
+        }
+        let r = simulate_to_end(
+            b, 7, 3, 0, vec![], BorderMode::Default, CapMode::Cap4,
+            CapStyle::OneTwo, WinCondition::Last, None, 0, false, cfg,
+        );
+        // 1、2 号必须也落了首子，而不是被判「0 号独存获胜」
+        let owners: std::collections::HashSet<usize> = r.history.iter()
+            .flat_map(|h| h.mv.map(|m| m[2] as usize))
+            .collect();
+        assert!(owners.contains(&1) && owners.contains(&2),
+            "模拟必须让还没落首子的玩家也落子，实际出手过：{:?}", owners);
     }
 
     #[test]
