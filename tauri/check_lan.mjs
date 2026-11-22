@@ -57,7 +57,20 @@ if (!localClickSrc.includes("function localClick(")) {
   console.error("抽不到 localClick");
   process.exit(1);
 }
-const depsSrc = DEPS.map(grabFn).join("\n");
+/* 评估函数选择（EVAL_LABELS + evalKindOf 等）是 const + function 混合块，
+ * grabFn 只认函数声明，所以整段抽出来注入。 */
+function grabEvalBlock(src) {
+  const start = src.indexOf("// ─── 评估函数选择 ───");
+  const end = src.indexOf("function togglePause(");
+  if (start < 0 || end < 0 || end < start) return "";
+  return src.slice(start, end);
+}
+const evalSrc = grabEvalBlock(appJs);
+if (!evalSrc.includes("function evalKindOf(")) {
+  console.error("抽不到评估函数选择代码块");
+  process.exit(1);
+}
+const depsSrc = DEPS.map(grabFn).join("\n") + "\n" + evalSrc;
 for (const n of DEPS) if (!depsSrc.includes("function " + n + "(")) {
   console.error("抽不到依赖函数: " + n);
   process.exit(1);

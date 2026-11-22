@@ -182,6 +182,8 @@ function grab(startMarker, endMarker) {
   const schFn = grab("function scheduleRating(", "/// 从历史里找每位玩家评分正变化最大的一步");
   const code = [
     "let _ratingBusy = false;",
+    "const _ratingPending = [];",
+    "let _ratingGen = 0;",
     "let _liveRating = null;",
     "let gameHistory = [{ turn: 0 }, { turn: 1 }];",
     "const board = []; const maxPlayers = 2;",
@@ -210,7 +212,7 @@ function grab(startMarker, endMarker) {
 
   api.scheduleRating();
   // 等微任务跑完
-  await new Promise((r) => setTimeout(r, 10));
+  await new Promise((r) => setTimeout(r, 30));
 
   if (called !== 1) errs.push("评分：应调用一次 rate_board，实际 " + called);
   if (!api.live) errs.push("评分：算完必须写回 _liveRating（否则排名退回棋子数）");
@@ -218,11 +220,24 @@ function grab(startMarker, endMarker) {
     errs.push("评分：_liveRating 内容不对 " + JSON.stringify(api.live));
   if (api.rendered < 1) errs.push("评分：算完应重绘玩家条，实际重绘 " + api.rendered + " 次");
 
+  // 连续落子：推理比落子慢时请求必须排队，不能丢（丢了曲线就断在半路）
+  {
+    const api3 = new Function(code)();
+    let n3 = 0;
+    api3.setInvoke(() => { n3++; return Promise.resolve([1, 2]); });
+    api3.scheduleRating();
+    api3.scheduleRating();
+    api3.scheduleRating();
+    if (n3 > 1) errs.push("评分：同一时刻只应有一个请求在飞");
+    await new Promise((r) => setTimeout(r, 60));
+    if (n3 !== 3) errs.push("评分：连续三步应全部排队执行，实际 " + n3);
+  }
+
   // 评分失败时必须静默降级，不能把上一次的分留着误导用户，也不能抛
   const api2 = new Function(code)();
   api2.setInvoke(() => Promise.reject(new Error("命令不存在")));
   api2.scheduleRating();
-  await new Promise((r) => setTimeout(r, 10));
+  await new Promise((r) => setTimeout(r, 30));
   if (api2.live) errs.push("评分：失败时不该写入 _liveRating");
 }
 
@@ -691,6 +706,75 @@ function grab(startMarker, endMarker) {
   const act = api.getActiveGameConfig();
   if (act.capStyle !== "one-two") errs.push("预设：缺失字段应补默认值，实际 " + act.capStyle);
   if (act.winCondition !== "last") errs.push("预设：缺失胜负判定应补 last");
+}
+
+/* ═══════ 一键终局：历史记录必须存下来，且带上排名/回放依赖的字段 ═══════
+ *
+ * 用户报过：一键终局结束后，历史列表里根本没有这一局。
+ * 两个真实的坑：
+ *  1) 保存原来挂在结算渲染之后，渲染中途抛错就整条丢掉（已改为先保存再渲染）；
+ *  2) 记录不带 playerTypes / killedBy / eliminatedOrder，历史详情页的类型与
+ *     「被谁淘汰」全是空的 —— serde 会静默丢弃结构里没有的字段。
+ */
+{
+  // 终点用注释本身（不含前面的 `}`），否则抽出来的函数少一个收尾大括号
+  const saveFn = grab("async function saveGameHistory(", "// ─── 保存未完成游戏历史记录");
+  const typesFn = grab("function toColorNamesArray(", "function getPlayerTypesArray(")
+               + grab("function getPlayerTypesArray(", "async function saveGameHistory(");
+  const comp = grab("function compactHistory(", "function expandHistory(");
+  const code = [
+    "let maxPlayers = 3, size = 7, cols = 7, boardCells = null;",
+    "const borderMode = 'default', capMode = '4', capStyle = 'two-one', winCondition = 'last';",
+    "let playerBarMetric = 'ml', gameMode = 'eve', aiAlgorithm = 'pvs', aiDepth = 3;",
+    "const gameCount = 4, chainStats = {}, maxChainOverall = { player: null, length: 0 };",
+    "const eliminationInfo = { 1: 0 }, eliminationRounds = [[1], [2]];",
+    "const aiPlayers = new Set([0, 1, 2]);",
+    "const aiConfigs = { 0: { algorithm: 'pvs', depth: 3, randomScale: 5, evalKind: 'points' },",
+    "                    1: { algorithm: 'alphabeta', depth: 2, randomScale: 0, evalKind: 'ml' },",
+    "                    2: { algorithm: 'strategy', depth: 1, randomScale: 0 } };",
+    "const COLOR_NAMES = ['红', '蓝', '绿'];",
+    "const window = { _colorNames: { 0: 'A', 1: 'B', 2: 'C' } };",
+    "const formatTime = () => '2026/01/01 00:00:00';",
+    "const logWarn = () => {};",
+    "const showToast = () => {};",
+    "const cleared = [];",
+    "const holder = { record: null };",
+    "const tauriInvoke = (cmd, args) => {",
+    "  if (cmd === 'save_game_history') { holder.record = args.record; return Promise.resolve(); }",
+    "  if (cmd === 'clear_round_history') { cleared.push(cmd); return Promise.resolve(); }",
+    "  throw new Error('意外命令: ' + cmd);",
+    "};",
+    comp,
+    typesFn,
+    saveFn,
+    "return { saveGameHistory, get record() { return holder.record; }, cleared };",
+  ].join("\n");
+
+  const api = new Function(code)();
+  const hist = [
+    { turn: 0, snapshot: { "0": { pieces: 1, points: 1 }, "1": { pieces: 1, points: 1 } }, mv: null },
+    { turn: 1, snapshot: { "0": { pieces: 2, points: 3 }, "1": { pieces: 0, points: 0 } },
+      mv: { x: 2, y: 3, player: 0, seed: 9 }, rating: [4, -4] },
+  ];
+  const okSaved = await api.saveGameHistory(0, undefined, undefined, undefined, hist);
+  if (okSaved !== true) errs.push("历史保存：成功时应返回 true");
+  const rec = api.record;
+  if (!rec) errs.push("历史保存：应当调用一次 save_game_history");
+  if (rec) {
+    if (rec.winner !== 0) errs.push("历史保存：winner 没写进去");
+    if (rec.finished !== true) errs.push("历史保存：已结束的对局必须标 finished=true");
+    if (!rec.playerTypes || rec.playerTypes.length !== 3)
+      errs.push("历史保存：必须带 playerTypes（历史详情靠它显示 AI 类型）");
+    if (rec.playerTypes && rec.playerTypes[0] !== "pvs")
+      errs.push("历史保存：playerTypes 应按 AI 配置填，实际 " + JSON.stringify(rec.playerTypes));
+    if (!rec.killedBy || rec.killedBy["1"] !== 0)
+      errs.push("历史保存：必须带 killedBy（「被谁淘汰」靠它）");
+    if (!Array.isArray(rec.eliminatedOrder) || rec.eliminatedOrder.join(",") !== "1,2")
+      errs.push("历史保存：淘汰先后顺序应展开成 [1,2]，实际 " + JSON.stringify(rec.eliminatedOrder));
+    if (rec.capStyle !== "two-one") errs.push("历史保存：双爆方式没写进去");
+    if (!rec.history || !rec.history.c) errs.push("历史保存：回合历史应为紧凑格式");
+  }
+  if (api.cleared.length !== 1) errs.push("历史保存：成功后应清掉 round_history");
 }
 
   if (errs.length > before) {

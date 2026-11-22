@@ -310,7 +310,8 @@ body::after{content:'';position:fixed;inset:0;
 }
 #skipChainBtn:hover{background:rgba(240,179,75,.3);box-shadow:0 4px 24px rgba(240,179,75,.25)}
 #skipChainBtn:active{transform:translateX(-50%) scale(.95)}
-#game .game-msg{width:100%;text-align:center;min-height:1.6rem;display:flex;align-items:center;justify-content:center}
+/* 固定高度而不是 min-height：出现「AI 思考中…」时高度不能变，否则下面整块棋盘会上下跳 */
+#game .game-msg{width:100%;height:1.9rem;text-align:center;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
 .turn-badge{
   display:inline-flex;align-items:center;gap:5px;
   font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:6px;
@@ -637,8 +638,8 @@ body{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 
 /* msg */
 #msg{
-  font-size:var(--text-base);padding:4px 12px;border-radius:6px;
-  transition:.2s;
+  font-size:var(--text-base);padding:2px 12px;border-radius:6px;
+  transition:.2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;
 }
 #msg.error{background:#c0392b;color:#fff}
 
@@ -1226,30 +1227,6 @@ body.orbs-on .orb-container{display:block}
   padding:6px 10px;border-radius:8px;background:var(--glass-w-04)}
 .lan-cfg-k{color:var(--dim);flex-shrink:0}
 .lan-cfg-v{color:var(--text);text-align:right;word-break:break-word}
-/* 最具价值的一步 */
-.mv-card h3.mv-title{font-size:.95rem;margin:0 0 2px}
-.mv-lead{font-size:.72rem;color:var(--dim);margin:0 0 8px;line-height:1.4}
-.mv-row{
-  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  padding:8px 10px;margin:6px 0;border-radius:8px;
-  background:var(--glass-w-04);border-left:3px solid var(--accent);
-  font-size:.8rem;
-}
-/* 名次数字：一眼看出这是全局第几关键的一手 */
-.mv-rank{
-  flex-shrink:0;width:18px;height:18px;line-height:18px;text-align:center;
-  border-radius:50%;font-size:.68rem;font-weight:700;
-  background:var(--glass-w-10);color:var(--dim);
-}
-.mv-row:first-of-type .mv-rank{background:var(--accent);color:#1a1a1a}
-.mv-who{font-weight:600;min-width:52px;flex-shrink:0}
-.mv-where{color:var(--dim);font-size:.74rem;flex:1;min-width:0}
-/* 涨幅放最右且加粗：这是这张卡片的重点 */
-.mv-delta{
-  color:#2ecc71;font-weight:700;font-family:var(--font-mono);font-size:.9rem;
-  flex-shrink:0;margin-left:auto;
-}
-
 /* 联机范围卡片：能不能跨网络远程连 */
 .lan-net-card h3{font-size:.95rem}
 .lan-net-good{font-size:.88rem;margin:0 0 4px;color:#2ecc71;font-weight:600}
@@ -1372,7 +1349,7 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 /* ═══════ Rank List ═══════ */
 .rank-list{width:100%;display:flex;flex-direction:column;gap:4px;margin-bottom:10px;grid-column:1/-1}
 .rank-item{
-  display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto auto;
+  display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto auto auto auto auto;
   gap:1px 6px;
   background:var(--glass-w-025);border-radius:var(--radius-sm);
   padding:5px 10px 5px 6px;border:1px solid var(--glass-w-06);
@@ -1450,6 +1427,18 @@ body.light-mode .random-slider{background:rgba(0,0,0,.1)}
 .rank-elim-line{grid-row:4;grid-column:1 / -1;font-size:.62rem;color:#F1948A;padding:1px 0 0 0;border-top:1px solid var(--glass-w-04);margin-top:1px}
 .rank-elim-killer{font-weight:var(--weight-bold);color:#F1948A}
 .rank-item.eliminated .rank-elim-line{opacity:1}
+/* 最佳一步：并入玩家自己的排名卡，不再单独占一张大卡 */
+.rank-best-line{
+  grid-row:5;grid-column:1 / -1;
+  font-size:.62rem;color:var(--accent2);
+  padding:1px 0 0 5px;border-left:2px solid var(--accent2);
+  margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* 卡面提示：这张卡可以点开详情 */
+.rank-tip{
+  grid-row:6;grid-column:1 / -1;
+  font-size:.58rem;color:var(--dim);opacity:.55;text-align:right;margin-top:1px;
+}
 /* Row 3: detail (hidden by default) */
 .rank-detail-line{grid-row:3;grid-column:1 / -1;display:none}
 .rank-item.has-detail .rank-detail-line{display:block;font-size:.62rem;color:var(--dim);opacity:.65;padding:1px 0 0 0;border-top:1px solid var(--glass-w-04);margin-top:1px}

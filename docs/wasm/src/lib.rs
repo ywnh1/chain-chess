@@ -64,6 +64,8 @@ mod wasm_exports {
         game_count: u32,
         first_move_pos: Option<[usize; 2]>,
         use_ml_eval: Option<bool>,
+        eval_kind: Option<EvalKind>,
+        cap_style: Option<CapStyle>,
         algorithm: Option<String>,
         random_scale: Option<u32>,
     }
@@ -79,6 +81,10 @@ mod wasm_exports {
         border_mode: BorderMode,
         #[serde(default)]
         cap_mode: Option<CapMode>,
+        #[serde(default)]
+        cap_style: Option<CapStyle>,
+        #[serde(default)]
+        win_condition: Option<WinCondition>,
         first_move_pos: Option<[usize; 2]>,
         game_count: u32,
         ai_configs: std::collections::HashMap<String, serde_json::Value>,
@@ -140,14 +146,15 @@ mod wasm_exports {
             Ok(v) => v,
             Err(e) => return err(&format!("参数解析失败: {}", e)),
         };
-        let use_ml = r.use_ml_eval.unwrap_or(true);
+        let eval_kind = r.eval_kind.unwrap_or_else(|| EvalKind::from_legacy(r.use_ml_eval.unwrap_or(true)));
         let alg = r.algorithm.as_deref().unwrap_or("alphabeta");
         let rnd = r.random_scale.unwrap_or(0);
         let cap_mode = r.cap_mode.unwrap_or_default();
+        let cap_style = r.cap_style.unwrap_or_default();
         let mv = match alg {
-            "pvs" => find_best_move_pvs(&r.board, r.size, r.player, r.depth, &r.eliminated, r.max_players, r.game_count, use_ml, r.border_mode, cap_mode, rnd),
+            "pvs" => find_best_move_pvs_styled(&r.board, r.size, r.player, r.depth, &r.eliminated, r.max_players, r.game_count, eval_kind, cap_style, r.border_mode, cap_mode, rnd),
             "strategy" => find_best_move_strategy(&r.board, r.size, r.player, &r.eliminated, r.max_players, r.game_count, r.first_move_pos, r.border_mode, cap_mode),
-            _ => find_best_move(&r.board, r.size, r.player, r.depth, &r.eliminated, r.max_players, r.game_count, r.first_move_pos, use_ml, r.border_mode, cap_mode, rnd),
+            _ => find_best_move(&r.board, r.size, r.player, r.depth, &r.eliminated, r.max_players, r.game_count, r.first_move_pos, eval_kind, cap_style, r.border_mode, cap_mode, rnd),
         };
         match mv {
             Some((x, y)) => ok(&[x, y]),
@@ -164,7 +171,7 @@ mod wasm_exports {
         };
         let result = simulate_to_end(
             r.board, r.size, r.max_players, r.cur_player, r.eliminated,
-            r.border_mode, r.cap_mode.unwrap_or_default(), r.first_move_pos, r.game_count, r.ai_configs,
+            r.border_mode, r.cap_mode.unwrap_or_default(), r.cap_style.unwrap_or_default(), r.win_condition.unwrap_or_default(), r.first_move_pos, r.game_count, true, r.ai_configs,
         );
         ok(&result)
     }
@@ -242,7 +249,7 @@ mod wasm_exports {
             );
         }
         // 计时由 engine.js 用 performance.now() 完成（wasm32-unknown-unknown 无标准时钟）
-        let res = simulate_to_end(board, sz, max_players, 0, Vec::new(), r.border_mode, r.cap_mode, None, r.game_count, ai_configs);
+        let res = simulate_to_end(board, sz, max_players, 0, Vec::new(), r.border_mode, r.cap_mode, CapStyle::OneTwo, WinCondition::Last, None, r.game_count, false, ai_configs);
         ok(&BenchResult { elapsed_ms: 0.0, steps: res.history.len(), winner: res.winner })
     }
 
@@ -501,7 +508,7 @@ mod tests {
                 for p in 0..max_players {
                     cfg.insert(p.to_string(), serde_json::json!({"algorithm": "strategy", "depth": 1, "useMlEval": true}));
                 }
-                let r = simulate_to_end(b.clone(), sz, max_players, 0, vec![], bm, cm, None, 0, cfg);
+                let r = simulate_to_end(b.clone(), sz, max_players, 0, vec![], bm, cm, CapStyle::OneTwo, WinCondition::Last, None, 0, false, cfg);
                 assert!(!r.history.is_empty(), "{bm:?}×{cm:?}: sim should produce history");
                 assert!(r.winner.is_some() || !r.eliminated_order.is_empty(), "{bm:?}×{cm:?}: sim should conclude");
                 // mv 重放一致性
@@ -687,7 +694,7 @@ mod tests {
         let mut b = mk_b(sz);
         set(&mut b, 2, 2, 0, 4);
         set(&mut b, 2, 3, 1, 4);
-        let mv = find_best_move_pvs(&b, sz, 0, 2, &[], 2, 0, true, BorderMode::Default, CapMode::Cap5, 0);
+        let mv = find_best_move_pvs(&b, sz, 0, 2, &[], 2, 0, EvalKind::Ml, BorderMode::Default, CapMode::Cap5, 0);
         assert_eq!(mv, Some((2, 2)), "cap5 PVS should pick explosive move, got {:?}", mv);
     }
 
@@ -731,7 +738,7 @@ mod tests {
         let mut b = mk_b(sz);
         set(&mut b, 2, 2, 0, 4);
         set(&mut b, 2, 3, 1, 4);
-        let mv = find_best_move(&b, sz, 0, 2, &[], 2, 0, None, true, BorderMode::Default, CapMode::Cap5, 0);
+        let mv = find_best_move(&b, sz, 0, 2, &[], 2, 0, None, EvalKind::Ml, CapStyle::OneTwo, BorderMode::Default, CapMode::Cap5, 0);
         assert_eq!(mv, Some((2, 2)), "cap5 alphabeta should pick explosive move, got {:?}", mv);
     }
 

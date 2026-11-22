@@ -5,7 +5,7 @@ fn test_find_best_move_finds_valid_move() {
     // Empty board with one piece for player 0
     let mut b: GameBoard = vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; 7]; 7];
     b[3][3] = Cell { owner: Some(0), count: 1, th: None, blocked: false };
-    let result = find_best_move(&b, 7, 0, 1, &[], 2, 10, None, false, BorderMode::Default, CapMode::Cap4, 0);
+    let result = find_best_move(&b, 7, 0, 1, &[], 2, 10, None, EvalKind::Handcraft, CapStyle::OneTwo, BorderMode::Default, CapMode::Cap4, 0);
     assert!(result.is_some(), "AI should find a valid move at depth=1");
     let (x, y) = result.unwrap();
     assert!(x < 7 && y < 7);
@@ -93,11 +93,17 @@ fn test_history_record_serde() {
         board_cells: None,     // 老记录没有形状位图，全盘可用
         border_mode: Some("default".to_string()),
         cap_mode: Some("4".to_string()),
+        cap_style: Some("one-two".to_string()),
+        win_condition: Some("last".to_string()),
+        rank_metric: Some("ml".to_string()),
         winner: Some(1),
         color_names: vec!["红色".to_string(), "黄色".to_string(), "蓝色".to_string()],
         chain_stats: std::collections::HashMap::new(),
         max_chain: MaxChain { player: Some(0), length: 5 },
         history: serde_json::Value::Null,
+        player_types: vec!["pvs".to_string(), "alphabeta".to_string(), "human".to_string()],
+        killed_by: std::collections::HashMap::new(),
+        eliminated_order: vec![2, 0],
         finished: Some(true),
         game_state: None,
     };
@@ -257,7 +263,8 @@ fn test_rect_full_game_runs_to_end() {
     b[1][1] = Cell { owner: Some(0), count: 3, th: None, blocked: false };
     b[5][3] = Cell { owner: Some(1), count: 3, th: None, blocked: false };
     let res = simulate_to_end(
-        b, 7, 2, 0, vec![], BorderMode::Default, CapMode::Cap4, None, 10,
+        b, 7, 2, 0, vec![], BorderMode::Default, CapMode::Cap4,
+        CapStyle::OneTwo, WinCondition::Last, None, 10, false,
         std::collections::HashMap::new(),
     );
     assert_eq!(res.board.len(), 7);
@@ -360,7 +367,7 @@ fn test_ai_never_moves_into_holes() {
     let mut checked = 0;
     for alg in ["strategy", "alphabeta", "pvs", "mcts"] {
         for depth in [1usize, 2] {
-            let cfg = PlayerAiConfig { algorithm: alg.to_string(), depth, use_ml_eval: false };
+            let cfg = PlayerAiConfig { algorithm: alg.to_string(), depth, use_ml_eval: false, eval_kind: None, cap_style: None };
             for _ in 0..6 {
                 if let Some((x, y)) =
                     find_best_move_by_alg(&b, 9, 0, &cfg, &[], 2, 10, None, BorderMode::Default, CapMode::Cap4, 0)
@@ -388,7 +395,7 @@ fn test_ai_first_move_on_rect_and_holes() {
             b[1][1] = Cell::hole();
         }
         for alg in ["alphabeta", "pvs"] {
-            let cfg = PlayerAiConfig { algorithm: alg.to_string(), depth: 2, use_ml_eval: false };
+            let cfg = PlayerAiConfig { algorithm: alg.to_string(), depth: 2, use_ml_eval: false, eval_kind: None, cap_style: None };
             if let Some((x, y)) =
                 find_best_move_by_alg(&b, rows, 0, &cfg, &[], 2, 10, None, BorderMode::Default, CapMode::Cap4, 0)
             {

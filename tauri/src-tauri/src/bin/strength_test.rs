@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::env;
 use std::time::Instant;
 
-use chain_chess_core::{BorderMode, CapMode, Cell, GameBoard, simulate_to_end};
+use chain_chess_core::{BorderMode, CapMode, CapStyle, Cell, GameBoard, WinCondition, simulate_to_end};
 
 // ── 命令行参数 ──
 
@@ -148,7 +148,7 @@ fn run_game(
             "algorithm": alg, "depth": d, "useMlEval": use_ml, "randomScale": 0,
         }));
     }
-    let r = simulate_to_end(board, sz, max_players, 0, vec![], bm, cm, None, gc, ai_configs);
+    let r = simulate_to_end(board, sz, max_players, 0, vec![], bm, cm, CapStyle::OneTwo, WinCondition::Last, None, gc, false, ai_configs);
     (r.winner, r.history.len())
 }
 

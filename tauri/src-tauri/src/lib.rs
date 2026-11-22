@@ -91,12 +91,15 @@ async fn ai_move(
     cap_mode: Option<CapMode>,
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
-    use_ml_eval: bool,
+    use_ml_eval: Option<bool>,
+    eval_kind: Option<EvalKind>,
+    cap_style: Option<CapStyle>,
     random_scale: u32,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let cap_mode = cap_mode.unwrap_or_default();
-        find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval, border_mode, cap_mode, random_scale)
+        let eval_kind = eval_kind.unwrap_or_else(|| EvalKind::from_legacy(use_ml_eval.unwrap_or(true)));
+        find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, eval_kind, cap_style.unwrap_or_default(), border_mode, cap_mode, random_scale)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -121,17 +124,20 @@ async fn ai_move_v2(
     game_count: u32,
     first_move_pos: Option<[usize; 2]>,
     algorithm: String,
-    use_ml_eval: bool,
+    use_ml_eval: Option<bool>,
+    eval_kind: Option<EvalKind>,
+    cap_style: Option<CapStyle>,
 ) -> Result<[usize; 2], String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let cap_mode = cap_mode.unwrap_or_default();
+        let eval_kind = eval_kind.unwrap_or_else(|| EvalKind::from_legacy(use_ml_eval.unwrap_or(true)));
+        let cap_style = cap_style.unwrap_or_default();
         if algorithm == "pvs" {
             // PVS (NegaMax) + Killer/History + QSearch
-            let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval, border_mode, cap_mode, random_scale);
-            searcher.find_best(&board, size, player, max_players, &eliminated, depth)
+            find_best_move_pvs_styled(&board, size, player, depth, &eliminated, max_players, game_count, eval_kind, cap_style, border_mode, cap_mode, random_scale)
         } else {
             // 默认使用 Alpha-Beta（原 find_best_move）
-            find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, use_ml_eval, border_mode, cap_mode, random_scale)
+            find_best_move(&board, size, player, depth, &eliminated, max_players, game_count, first_move_pos, eval_kind, cap_style, border_mode, cap_mode, random_scale)
         }
     })
     .await
@@ -179,12 +185,14 @@ async fn simulate_to_end_cmd(
     eliminated: Vec<usize>,
     border_mode: BorderMode,
     cap_mode: Option<CapMode>,
+    cap_style: Option<CapStyle>,
+    win_condition: Option<WinCondition>,
     first_move_pos: Option<[usize; 2]>,
     game_count: u32,
     ai_configs: std::collections::HashMap<String, serde_json::Value>,
 ) -> Result<SimulateResult, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        simulate_to_end(board, size, max_players, cur_player, eliminated, border_mode, cap_mode.unwrap_or_default(), first_move_pos, game_count, ai_configs)
+        simulate_to_end(board, size, max_players, cur_player, eliminated, border_mode, cap_mode.unwrap_or_default(), cap_style.unwrap_or_default(), win_condition.unwrap_or_default(), first_move_pos, game_count, true, ai_configs)
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?;
@@ -270,7 +278,7 @@ fn run_ai_bench_game(cfg: &AiBenchGameConfig, game_count: u32) -> AiBenchGameRes
         );
     }
     let t0 = Instant::now();
-    let r = simulate_to_end(board, sz, max_players, 0, Vec::new(), cfg.border_mode, cfg.cap_mode, None, game_count, ai_configs);
+    let r = simulate_to_end(board, sz, max_players, 0, Vec::new(), cfg.border_mode, cfg.cap_mode, CapStyle::OneTwo, WinCondition::Last, None, game_count, false, ai_configs);
     AiBenchGameResult {
         elapsed_ms: t0.elapsed().as_secs_f64() * 1000.0,
         steps: r.history.len(),
@@ -287,9 +295,11 @@ async fn save_game_history(
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
+    // 逐条容错解析：整体解析失败时不能当成空数组 —— 那样一条坏记录就会
+    // 让下一次保存把全部历史覆盖掉（用户看到的是「历史全没了」）。
     let mut history: Vec<HistoryRecord> = if path.exists() {
         let content = fs::read_to_string(&*path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&content).unwrap_or_default()
+        parse_history_records(&content)
     } else {
         Vec::new()
     };
@@ -297,6 +307,24 @@ async fn save_game_history(
     let json = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
     atomic_write(&*path, &json)?;
     Ok(())
+}
+
+/// 解析历史文件：整体解析失败时降级为逐条容错，
+/// 单条损坏/旧格式记录既不清空整个列表，也不在下一次保存时被覆盖。
+fn parse_history_records(content: &str) -> Vec<HistoryRecord> {
+    if let Ok(list) = serde_json::from_str::<Vec<HistoryRecord>>(content) {
+        return list;
+    }
+    serde_json::from_str::<serde_json::Value>(content)
+        .ok()
+        .and_then(|v| v.as_array().cloned())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| serde_json::from_value::<HistoryRecord>(item.clone()).ok())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -308,20 +336,7 @@ async fn load_game_history(
         return Ok(Vec::new());
     }
     let content = fs::read_to_string(&*path).map_err(|e| e.to_string())?;
-    // 整体解析失败时降级为逐条容错解析：单条损坏/旧格式记录不再清空整个历史列表
-    let history: Vec<HistoryRecord> = serde_json::from_str(&content).unwrap_or_else(|_| {
-        serde_json::from_str::<serde_json::Value>(&content)
-            .ok()
-            .and_then(|v| v.as_array().cloned())
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(|item| serde_json::from_value::<HistoryRecord>(item.clone()).ok())
-                    .collect()
-            })
-            .unwrap_or_default()
-    });
-    Ok(history)
+    Ok(parse_history_records(&content))
 }
 
 #[tauri::command]
@@ -1212,6 +1227,8 @@ fn random_ai_configs(board_size: usize, max_players: usize, rng: &mut impl rand:
             algorithm: alg.to_string(),
             depth,
             use_ml_eval: rng.gen_bool(0.5), // 一半 ML 一半手写：手写评估快得多，控制整体速度
+            eval_kind: None,                // None = 回退到 use_ml_eval
+            cap_style: None,                // None = 默认 one-two
         });
     }
     configs
@@ -1396,9 +1413,13 @@ mod tests {
              "colorNames": [], "chainStats": {}, "maxChain": {"player": null, "length": 0}},
             "垃圾数据"
         ]"#;
-        let v: Result<Vec<HistoryRecord>, _> = serde_json::from_str(json);
-        // 当前实现是整文件解析，坏记录会导致整个列表为空 —— 记录现状（防御方案见前端）
-        let _ = v;
+        // 整表解析失败时逐条容错：好记录必须留下，坏记录跳过。
+        // 保存路径也用同一个解析函数，否则一条坏记录会让下一次保存把整表覆盖成一条。
+        let list = parse_history_records(json);
+        assert_eq!(list.len(), 1, "坏记录不该带走好记录");
+        assert_eq!(list[0].id, 1);
+        assert!(parse_history_records("[]").is_empty());
+        assert!(parse_history_records("不是 JSON").is_empty());
     }
 
     const ALL_BM: [BorderMode; 4] = [BorderMode::Default, BorderMode::Wrap, BorderMode::Bounce, BorderMode::Degrade];
@@ -1741,7 +1762,7 @@ mod tests {
         let mut b = mk_b(sz);
         set(&mut b, 2, 2, 0, 4);
         set(&mut b, 2, 3, 1, 4);
-        let mv = find_best_move_pvs(&b, sz, 0, 2, &[], 2, 0, true, BorderMode::Default, CapMode::Cap5, 0);
+        let mv = find_best_move_pvs(&b, sz, 0, 2, &[], 2, 0, EvalKind::Ml, BorderMode::Default, CapMode::Cap5, 0);
         assert_eq!(mv, Some((2, 2)), "cap5 PVS should pick explosive move, got {:?}", mv);
     }
     #[test]
@@ -1750,7 +1771,7 @@ mod tests {
         let mut b = mk_b(sz);
         set(&mut b, 2, 2, 0, 4);
         set(&mut b, 2, 3, 1, 4);
-        let mv = find_best_move(&b, sz, 0, 2, &[], 2, 0, None, true, BorderMode::Default, CapMode::Cap5, 0);
+        let mv = find_best_move(&b, sz, 0, 2, &[], 2, 0, None, EvalKind::Ml, CapStyle::OneTwo, BorderMode::Default, CapMode::Cap5, 0);
         assert_eq!(mv, Some((2, 2)), "cap5 alphabeta should pick explosive move, got {:?}", mv);
     }
 
@@ -1769,7 +1790,7 @@ mod tests {
                 for p in 0..max_players {
                     cfg.insert(p.to_string(), serde_json::json!({"algorithm": "strategy", "depth": 1, "useMlEval": true}));
                 }
-                let r = simulate_to_end(b.clone(), sz, max_players, 0, vec![], bm, cm, None, 0, cfg);
+                let r = simulate_to_end(b.clone(), sz, max_players, 0, vec![], bm, cm, CapStyle::OneTwo, WinCondition::Last, None, 0, false, cfg);
                 assert!(!r.history.is_empty(), "{bm:?}×{cm:?}: sim should produce history");
             }
         }

@@ -224,6 +224,16 @@ pub struct HistoryRecord {
     /// 游戏是否已完成。false 表示未完成（可继续），true/finished: null 表示已完成
     #[serde(default)]
     pub finished: Option<bool>,
+    /// 每位玩家的类型（human / strategy / alphabeta / pvs）。
+    /// 历史详情页的类型标签靠它；缺了就只能显示「人类」。
+    #[serde(default)]
+    pub player_types: Vec<String>,
+    /// 淘汰者映射 victim → killer。历史详情的「被谁淘汰」靠它。
+    #[serde(default)]
+    pub killed_by: std::collections::HashMap<String, usize>,
+    /// 淘汰先后（轮次展开后的扁平顺序）。排名顺序与回放靠它。
+    #[serde(default)]
+    pub eliminated_order: Vec<usize>,
     /// 未完成游戏的完整状态 JSON（用于继续游戏），仅 finished=false 时有值
     #[serde(default)]
     pub game_state: Option<String>,
@@ -266,6 +276,12 @@ pub struct SimulateResult {
 
 
 /// 一键终局：场上只剩 AI 时，无动画直接模拟到分出胜负（纯逻辑，供命令与 ai_bench 基准测试复用）。
+///
+/// 三条与普通对局对齐的规则（之前缺失，导致回放重算与模拟结果分叉）：
+/// 1. 爆炸使用真实 `cap_style`（two-one 模式下方向分配不同）；
+/// 2. 每步后按 `win_condition` 判胜，而不是永远打到只剩一人；
+/// 3. 走步上限 / 全员无子可落时不再把残局当终局：按棋子数→点数选赢家并清空其他棋子，
+///    结算与回放看到的最终局面必须只剩一种棋子。
 #[allow(clippy::too_many_arguments)]
 pub fn simulate_to_end(
     board: GameBoard,
@@ -275,146 +291,239 @@ pub fn simulate_to_end(
     eliminated: Vec<usize>,
     border_mode: BorderMode,
     cap_mode: CapMode,
+    cap_style: CapStyle,
+    win_condition: WinCondition,
     first_move_pos: Option<[usize; 2]>,
     game_count: u32,
+    // 是否逐步骤算 ML 场面分：真对局要（结算曲线靠它），
+    // 设备基准测试不要 —— 那是纯搜索耗时，混进模型推理会污染结果
+    compute_rating: bool,
     ai_configs: std::collections::HashMap<String, serde_json::Value>,
 ) -> SimulateResult {
     let cols = board.first().map_or(size, |r| r.len());   // 列数：长方形时与行数不同
     let mut b = board.clone();
-        let mut elim = eliminated.clone();
-        let mut killed_by: Vec<(usize, usize)> = Vec::new();
-        let mut chain_stats: std::collections::HashMap<String, ChainStatsPlayer> = std::collections::HashMap::new();
-        let mut max_chain = MaxChain { player: None, length: 0 };
-        let mut history: Vec<TurnHistory> = Vec::new();
-        let mut cur = cur_player;
-        let mut gc = game_count;
-        let mut no_move_round = 0usize;
-        let max_steps = (size * cols * 4 * max_players).max(1000) as usize;
-        let mut steps = 0usize;
+    let mut elim = eliminated.clone();
+    let mut killed_by: Vec<(usize, usize)> = Vec::new();
+    let mut chain_stats: std::collections::HashMap<String, ChainStatsPlayer> = std::collections::HashMap::new();
+    let mut max_chain = MaxChain { player: None, length: 0 };
+    let mut history: Vec<TurnHistory> = Vec::new();
+    let mut cur = cur_player;
+    let mut gc = game_count;
+    let mut no_move_round = 0usize;
+    // 步数上限保持原值：再往上调只会让「AI 互送」的极端局面多跑几百步搜索，
+    // 实测设备基准测试因此慢了 20%（同一引擎，同样局面）。撞到上限不再把残局
+    // 当终局返回，而是兜底收尾 —— 这是修「输家棋子没消失」的地方。
+    let max_steps = (size * cols * 4 * max_players).max(1000) as usize;
+    let mut steps = 0usize;
 
-        loop {
-            steps += 1;
-            if steps > max_steps {
-                let alive_final: Vec<usize> = (0..max_players)
-                    .filter(|p| !elim.contains(p) && has_pieces(&b, *p))
-                    .collect();
-                return SimulateResult {
-                    board: b.clone(),
-                    winner: alive_final.first().copied(),
-                    eliminated_order: elim,
-                    killed_by,
-                    chain_stats,
-                    max_chain,
-                    history,
-                };
-            }
-            let alive: Vec<usize> = (0..max_players)
-                .filter(|p| !elim.contains(p) && has_pieces(&b, *p))
-                .collect();
-            if alive.len() <= 1 {
-                return SimulateResult {
-                    board: b.clone(),
-                    winner: alive.first().copied(),
-                    eliminated_order: elim,
-                    killed_by,
-                    chain_stats,
-                    max_chain,
-                    history,
-                };
-            }
-            if !alive.contains(&cur) {
-                let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
-                cur = alive[(idx + 1) % alive.len()];
-                continue;
-            }
-            let cfg = ai_configs
-                .get(&cur.to_string())
-                .cloned()
-                .unwrap_or_else(|| serde_json::json!({"algorithm": "strategy"}));
-            let alg = cfg.get("algorithm").and_then(|v| v.as_str()).unwrap_or("strategy").to_string();
-            let depth = cfg.get("depth").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
-            let use_ml_eval = cfg.get("useMlEval").and_then(|v| v.as_bool()).unwrap_or(true);
+    let mut preferred: Option<usize> = None;
+    let mut needs_fallback = false;
 
-            let mv = match alg.as_str() {
-                "mcts" => find_best_move_mcts(&b, size, cur, depth, &elim, max_players, border_mode, cap_mode),
-                "pvs" => {
-                    let rnd = cfg.get("randomScale").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                    let mut searcher = PvsSearcher::new(cur, gc, use_ml_eval, border_mode, cap_mode, rnd);
-                    searcher.find_best(&b, size, cur, max_players, &elim, depth)
-                }
-                "alphabeta" => {
-                    let rnd = cfg.get("randomScale").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                    find_best_move(&b, size, cur, depth, &elim, max_players, gc, first_move_pos, use_ml_eval, border_mode, cap_mode, rnd)
-                },
-                _ => find_best_move_strategy(&b, size, cur, &elim, max_players, gc, first_move_pos, border_mode, cap_mode),
+    loop {
+        steps += 1;
+        if steps > max_steps {
+            needs_fallback = true;
+            break;
+        }
+        let alive: Vec<usize> = (0..max_players)
+            .filter(|p| !elim.contains(p) && has_pieces(&b, *p))
+            .collect();
+        if alive.len() <= 1 {
+            preferred = alive.first().copied();
+            break;
+        }
+        // pieces / points 模式：与普通对局一样提前结束，其他棋子保留（规则如此）
+        if let Some(w) = check_win(&b, max_players, &elim, win_condition) {
+            return SimulateResult {
+                board: b,
+                winner: Some(w),
+                eliminated_order: elim,
+                killed_by,
+                chain_stats,
+                max_chain,
+                history,
             };
-            let Some((x, y)) = mv else {
-                no_move_round += 1;
-                if no_move_round >= alive.len() {
-                    return SimulateResult {
-                        board: b.clone(),
-                        winner: alive.first().copied(),
-                        eliminated_order: elim,
-                        killed_by,
-                        chain_stats,
-                        max_chain,
-                        history,
-                    };
-                }
-                let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
-                cur = alive[(idx + 1) % alive.len()];
-                continue;
-            };
-            no_move_round = 0;
-
-            // 每步随机事件的确定性种子（供回放复现）：由局号与步号派生
-            let step_seed = (gc as u64).wrapping_mul(1000003u64).wrapping_add(history.len() as u64);
-            let (elims, chain_count, kbs) =
-                process_click_with_killer(&mut b, size, x, y, cur, max_players, border_mode, cap_mode, Some(step_seed));
-            killed_by.extend(kbs);
-            for e in elims {
-                if !elim.contains(&e) {
-                    elim.push(e);
-                }
-            }
-            if chain_count > 0 {
-                let stats = chain_stats
-                    .entry(cur.to_string())
-                    .or_insert(ChainStatsPlayer { triggered: 0, max_chain: 0 });
-                stats.triggered += 1;
-                if chain_count > stats.max_chain {
-                    stats.max_chain = chain_count;
-                }
-                if chain_count > max_chain.length {
-                    max_chain = MaxChain { player: Some(cur), length: chain_count };
-                }
-            }
-            let mut sn: std::collections::HashMap<String, PlayerSnapshot> = std::collections::HashMap::new();
-            for p in 0..max_players {
-                let mut pieces = 0u32;
-                let mut points = 0u32;
-                for row in &b {
-                    for c in row {
-                        if c.owner == Some(p) {
-                            pieces += 1;
-                            points += c.count as u32;
-                        }
-                    }
-                }
-                sn.insert(p.to_string(), PlayerSnapshot { pieces, points });
-            }
-            history.push(TurnHistory {
-                turn: history.len() as u32,
-                snapshot: sn,
-                mv: Some([x as u64, y as u64, cur as u64, step_seed]),
-                // 模拟对局不产评分（那是前端逐步算的），保持 None
-                rating: None,
-            });
-
-            gc += 1;
+        }
+        if !alive.contains(&cur) {
             let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
             cur = alive[(idx + 1) % alive.len()];
+            continue;
         }
+        let cfg = ai_configs
+            .get(&cur.to_string())
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({"algorithm": "strategy"}));
+        let alg = cfg.get("algorithm").and_then(|v| v.as_str()).unwrap_or("strategy").to_string();
+        let depth = cfg.get("depth").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
+        let rnd = cfg.get("randomScale").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        let eval_kind = cfg
+            .get("evalKind")
+            .and_then(|v| serde_json::from_value::<EvalKind>(v.clone()).ok())
+            .unwrap_or_else(|| {
+                EvalKind::from_legacy(cfg.get("useMlEval").and_then(|v| v.as_bool()).unwrap_or(true))
+            });
+
+        let mv = match alg.as_str() {
+            "mcts" => find_best_move_mcts(&b, size, cur, depth, &elim, max_players, border_mode, cap_mode),
+            "pvs" => find_best_move_pvs_styled(&b, size, cur, depth, &elim, max_players, gc, eval_kind, cap_style, border_mode, cap_mode, rnd),
+            "alphabeta" => find_best_move(&b, size, cur, depth, &elim, max_players, gc, first_move_pos, eval_kind, cap_style, border_mode, cap_mode, rnd),
+            _ => find_best_move_strategy(&b, size, cur, &elim, max_players, gc, first_move_pos, border_mode, cap_mode),
+        };
+        let Some((x, y)) = mv else {
+            no_move_round += 1;
+            if no_move_round >= alive.len() {
+                needs_fallback = true;
+                break;
+            }
+            let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
+            cur = alive[(idx + 1) % alive.len()];
+            continue;
+        };
+        no_move_round = 0;
+
+        // 每步随机事件的确定性种子（供回放复现）：由局号与步号派生
+        let step_seed = (gc as u64).wrapping_mul(1000003u64).wrapping_add(history.len() as u64);
+        let (elims, chain_count, kbs) =
+            process_click_styled_with_killer(&mut b, size, x, y, cur, max_players, border_mode, cap_mode, cap_style, Some(step_seed));
+        killed_by.extend(kbs);
+        for e in elims {
+            if !elim.contains(&e) {
+                elim.push(e);
+            }
+        }
+        if chain_count > 0 {
+            let stats = chain_stats
+                .entry(cur.to_string())
+                .or_insert(ChainStatsPlayer { triggered: 0, max_chain: 0 });
+            stats.triggered += 1;
+            if chain_count > stats.max_chain {
+                stats.max_chain = chain_count;
+            }
+            if chain_count > max_chain.length {
+                max_chain = MaxChain { player: Some(cur), length: chain_count };
+            }
+        }
+        history.push(TurnHistory {
+            turn: history.len() as u32,
+            snapshot: snapshot_of(&b, max_players),
+            mv: Some([x as u64, y as u64, cur as u64, step_seed]),
+            // 终局内同步补算：结算页的评分曲线必须画满，不能只有真实落子那一段
+            rating: if compute_rating { Some(rating_of(&b, max_players, border_mode, cap_mode)) } else { None },
+        });
+
+        gc += 1;
+        let idx = alive.iter().position(|p| *p == cur).unwrap_or(0);
+        cur = alive[(idx + 1) % alive.len()];
+    }
+
+    let winner = if needs_fallback {
+        let w = finish_with_clear(&mut b, max_players, &mut elim);
+        // 最终局面变了（清盘），最后一条快照与评分要跟着改，否则排名/图表对不上
+        update_final_moment(&mut history, &b, max_players, border_mode, cap_mode, compute_rating);
+        w
+    } else {
+        preferred
+    };
+
+    SimulateResult {
+        board: b,
+        winner,
+        eliminated_order: elim,
+        killed_by,
+        chain_stats,
+        max_chain,
+        history,
+    }
+}
+
+
+/// 盘面快照：每位玩家的棋子数与点数
+fn snapshot_of(b: &GameBoard, max_players: usize) -> std::collections::HashMap<String, PlayerSnapshot> {
+    let mut sn = std::collections::HashMap::new();
+    for p in 0..max_players {
+        let mut pieces = 0u32;
+        let mut points = 0u32;
+        for row in b.iter() {
+            for c in row.iter() {
+                if c.owner == Some(p) {
+                    pieces += 1;
+                    points += c.count as u32;
+                }
+            }
+        }
+        sn.insert(p.to_string(), PlayerSnapshot { pieces, points });
+    }
+    sn
+}
+
+
+/// 与前端 rate_board 同一算法：每位玩家的 ML 场面分
+fn rating_of(b: &GameBoard, max_players: usize, border_mode: BorderMode, cap_mode: CapMode) -> Vec<i32> {
+    (0..max_players)
+        .map(|p| eval_board_ml(b, p, 0, border_mode, cap_mode, 0))
+        .collect()
+}
+
+
+fn board_counts(b: &GameBoard, p: usize) -> (u32, u32) {
+    let mut pieces = 0u32;
+    let mut points = 0u32;
+    for row in b.iter() {
+        for c in row.iter() {
+            if c.owner == Some(p) {
+                pieces += 1;
+                points += c.count as u32;
+            }
+        }
+    }
+    (pieces, points)
+}
+
+
+/// 兜底收尾：按棋子数→点数选赢家，清空其他所有玩家的棋子，
+/// 把被清空的玩家按剩余棋子从少到多补进淘汰顺序（结算排名要沉底）。
+fn finish_with_clear(b: &mut GameBoard, max_players: usize, elim: &mut Vec<usize>) -> Option<usize> {
+    let alive: Vec<usize> = (0..max_players)
+        .filter(|p| !elim.contains(p) && has_pieces(b, *p))
+        .collect();
+    let winner = alive
+        .iter()
+        .copied()
+        .max_by_key(|&p| board_counts(b, p))?;
+    let mut losers: Vec<usize> = (0..max_players)
+        .filter(|p| *p != winner && !elim.contains(p))
+        .collect();
+    losers.sort_by_key(|&p| board_counts(b, p));
+    for p in losers {
+        elim.push(p);
+    }
+    for row in b.iter_mut() {
+        for c in row.iter_mut() {
+            if c.owner != Some(winner) {
+                c.owner = None;
+                c.count = 0;
+            }
+        }
+    }
+    Some(winner)
+}
+
+
+/// 兜底清盘后更新最后一帧（没有落子时补一帧初始局面）
+fn update_final_moment(history: &mut Vec<TurnHistory>, b: &GameBoard, max_players: usize, border_mode: BorderMode, cap_mode: CapMode, compute_rating: bool) {
+    let snap = snapshot_of(b, max_players);
+    let rating = if compute_rating { Some(rating_of(b, max_players, border_mode, cap_mode)) } else { None };
+    if let Some(h) = history.last_mut() {
+        h.snapshot = snap;
+        h.rating = rating;
+    } else {
+        history.push(TurnHistory {
+            turn: 0,
+            snapshot: snap,
+            mv: None,
+            rating,
+        });
+    }
 }
 
 
@@ -648,12 +757,73 @@ pub fn extract_features_improved(board: &GameBoard, cur: usize, max_players: usi
 }
 
 
-/// 调度器：根据 per-AI 配置调用 ML 或手写评估（cap_mode 感知）
-pub fn eval_board(board: &GameBoard, player: usize, game_count: u32, use_ml_eval: bool, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> i32 {
-    if use_ml_eval {
-        eval_board_ml(board, player, game_count, border_mode, cap_mode, user_random_scale)
+/// 评估函数种类：ML 模型 / 纯点数差 / 纯棋子数差 / 手写规则。
+///
+/// 前端把「点数」「棋子数」作为可选的轻量评估函数：不跑特征提取和模型推理，
+/// 只看盘面计数，弱设备上搜索更深、也更直观。
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum EvalKind {
+    #[default]
+    Ml,
+    Points,
+    Pieces,
+    Handcraft,
+}
+
+
+impl EvalKind {
+    /// 旧配置只有 useMlEval 布尔：true → ML，false → 手写
+    pub fn from_legacy(use_ml: bool) -> Self {
+        if use_ml { EvalKind::Ml } else { EvalKind::Handcraft }
+    }
+}
+
+
+/// 调度器：根据 per-AI 配置调用 ML / 点数 / 棋子数 / 手写评估（cap_mode 感知）
+pub fn eval_board(board: &GameBoard, player: usize, game_count: u32, eval_kind: EvalKind, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> i32 {
+    match eval_kind {
+        EvalKind::Ml => eval_board_ml(board, player, game_count, border_mode, cap_mode, user_random_scale),
+        EvalKind::Handcraft => eval_board_handcraft(board, player, game_count, border_mode, cap_mode, user_random_scale),
+        EvalKind::Points => eval_board_count(board, player, game_count, true, user_random_scale),
+        EvalKind::Pieces => eval_board_count(board, player, game_count, false, user_random_scale),
+    }
+}
+
+
+/// 朴素计数评估：点数差或棋子数差（我方 − 其他所有人）。
+/// 和手写评估共用同一套开场随机扰动，这样「随机刻度」对三种评估都生效。
+fn eval_board_count(board: &GameBoard, player: usize, game_count: u32, points: bool, user_random_scale: u32) -> i32 {
+    let (mut my, mut opp) = (0i32, 0i32);
+    for row in board {
+        for c in row {
+            if c.blocked { continue; }
+            let Some(owner) = c.owner else { continue; };
+            let v = if points { c.count as i32 } else { 1 };
+            if owner == player { my += v; } else { opp += v; }
+        }
+    }
+    perturb_eval(my - opp, board, game_count, user_random_scale)
+}
+
+
+/// 开场随机探索：前 3 局固定 40，之后线性降至用户设定值（0~30），5 局后保持设定值。
+/// ML / 点数 / 棋子数 / 手写共用，避免各评估函数行为不一致。
+fn perturb_eval(base: i32, board: &GameBoard, game_count: u32, user_random_scale: u32) -> i32 {
+    let user_scale = (user_random_scale.min(30)) as f64;
+    let random_scale = if game_count < 3 {
+        40.0
+    } else if game_count < 5 {
+        let t = (game_count.saturating_sub(2)) as f64; // 0..2
+        40.0 - (40.0 - user_scale) * t / 2.0
     } else {
-        eval_board_handcraft(board, player, game_count, border_mode, cap_mode, user_random_scale)
+        user_scale
+    };
+    if random_scale > 0.0 {
+        let rnd = (board_perturbation(board, game_count) % 100) as f64 / 100.0; // 0..1
+        base + (rnd * random_scale - random_scale * 0.5) as i32
+    } else {
+        base
     }
 }
 
@@ -1335,6 +1505,48 @@ pub fn process_click_with_snapshots(
 }
 
 
+/// 带双爆风格的可复现版本（无快照），供 AI 搜索与一键终局使用：
+/// 搜索内部的爆炸模拟必须与真实落子同一套 cap_style，否则 two-one 模式下
+/// 搜索看到的局面和实际走出来的局面会分叉。
+#[allow(clippy::too_many_arguments)]
+pub fn process_click_styled(
+    board: &mut GameBoard,
+    sz: usize,
+    x: usize,
+    y: usize,
+    player: usize,
+    max_players: usize,
+    border_mode: BorderMode,
+    cap_mode: CapMode,
+    cap_style: CapStyle,
+    seed: Option<u64>,
+) -> (Vec<usize>, u32) {
+    let (eliminated, chain_count, _, _, _) =
+        process_click_with_killer_inner(board, sz, x, y, player, max_players, border_mode, cap_mode, cap_style, seed, false);
+    (eliminated, chain_count)
+}
+
+
+/// 同 `process_click_styled`，额外返回 (victim, killer) 列表（一键终局记录击败者）。
+#[allow(clippy::too_many_arguments)]
+pub fn process_click_styled_with_killer(
+    board: &mut GameBoard,
+    sz: usize,
+    x: usize,
+    y: usize,
+    player: usize,
+    max_players: usize,
+    border_mode: BorderMode,
+    cap_mode: CapMode,
+    cap_style: CapStyle,
+    seed: Option<u64>,
+) -> (Vec<usize>, u32, Vec<(usize, usize)>) {
+    let (eliminated, chain_count, killed_by, _, _) =
+        process_click_with_killer_inner(board, sz, x, y, player, max_players, border_mode, cap_mode, cap_style, seed, false);
+    (eliminated, chain_count, killed_by)
+}
+
+
 /// 无击败者信息的简单版本（供 AI 搜索/基准测试等内部调用）
 pub fn process_click(
     board: &mut GameBoard,
@@ -1388,24 +1600,7 @@ pub fn eval_board_handcraft(board: &GameBoard, player: usize, game_count: u32, b
     let base = (my_score - opp_score) * 2 
         + (my_territory - opp_territory)
         + (my_chain_threat - opp_chain_threat) * 3;
-
-    // 开场随机探索：前 3 局固定 40，之后线性降至用户设定值（0~30），5 局后保持设定值
-    let user_scale = (user_random_scale.min(30)) as f64;
-    let random_scale = if game_count < 3 {
-        40.0
-    } else if game_count < 5 {
-        let t = (game_count.saturating_sub(2)) as f64; // 0..2
-        40.0 - (40.0 - user_scale) * t / 2.0
-    } else {
-        user_scale
-    };
-
-    if random_scale > 0.0 {
-        let rnd = (board_perturbation(board, game_count) % 100) as f64 / 100.0; // 0..1
-        base + (rnd * random_scale - random_scale * 0.5) as i32
-    } else {
-        base
-    }
+    perturb_eval(base, board, game_count, user_random_scale)
 }
 
 
@@ -1478,7 +1673,8 @@ pub struct GameState {
     eliminated: Vec<usize>,
     max_players: usize,
     game_count: u32,
-    use_ml_eval: bool,
+    eval_kind: EvalKind,
+    cap_style: CapStyle,
     border_mode: BorderMode,
     cap_mode: CapMode,
     user_random_scale: u32,
@@ -1498,7 +1694,7 @@ impl AlphaBeta<(usize, usize)> for GameState {
             return Grade::Max;
         }
         // 非终局：按点数和棋子数打分（cap_mode 感知）
-        Grade::Score(eval_board(&self.board, self.ai_player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale) as i64)
+        Grade::Score(eval_board(&self.board, self.ai_player, self.game_count, self.eval_kind, self.border_mode, self.cap_mode, self.user_random_scale) as i64)
     }
     fn get_moves(&self) -> Vec<(usize, usize)> {
         get_moves(&self.board, self.sz, self.player, None, self.border_mode, self.cap_mode)
@@ -1506,7 +1702,7 @@ impl AlphaBeta<(usize, usize)> for GameState {
 
     fn set(&mut self, m: &(usize, usize)) {
         let (x, y) = *m;
-        let (elim, _chain) = process_click(&mut self.board, self.sz, x, y, self.player, self.max_players, self.border_mode, self.cap_mode, Some(0));
+        let (elim, _chain) = process_click_styled(&mut self.board, self.sz, x, y, self.player, self.max_players, self.border_mode, self.cap_mode, self.cap_style, Some(0));
         for &e in &elim {
             if !self.eliminated.contains(&e) {
                 self.eliminated.push(e);
@@ -1656,7 +1852,8 @@ pub struct PvsSearcher {
     killers: [[Option<(usize, usize)>; PVS_MAX_DEPTH]; 2],
     history: [[i32; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
     ai_player: usize,
-    use_ml_eval: bool,
+    eval_kind: EvalKind,
+    cap_style: CapStyle,
     border_mode: BorderMode,
     cap_mode: CapMode,
     user_random_scale: u32,
@@ -1664,13 +1861,14 @@ pub struct PvsSearcher {
 
 
 impl PvsSearcher {
-    pub fn new(ai_player: usize, game_count: u32, use_ml_eval: bool, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> Self {
+    pub fn new(ai_player: usize, game_count: u32, eval_kind: EvalKind, cap_style: CapStyle, border_mode: BorderMode, cap_mode: CapMode, user_random_scale: u32) -> Self {
         Self {
             game_count,
             killers: [[None; PVS_MAX_DEPTH]; 2],
             history: [[0; PVS_HISTORY_SIZE]; PVS_HISTORY_SIZE],
             ai_player,
-            use_ml_eval,
+            eval_kind,
+            cap_style,
             border_mode,
             cap_mode,
             user_random_scale,
@@ -1754,8 +1952,8 @@ impl PvsSearcher {
             return i32::MIN + 1000;
         }
         // QSearch 最多 3 层（防长链爆炸耗死）
-        if depth >= 3 { return eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale); }
-        let stand_pat = eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale);
+        if depth >= 3 { return eval_board(board, player, self.game_count, self.eval_kind, self.border_mode, self.cap_mode, self.user_random_scale); }
+        let stand_pat = eval_board(board, player, self.game_count, self.eval_kind, self.border_mode, self.cap_mode, self.user_random_scale);
         if stand_pat >= beta { return beta; }
         let mut alpha = if stand_pat > alpha { stand_pat } else { alpha };
 
@@ -1782,7 +1980,7 @@ impl PvsSearcher {
 
         for &m in &moves_buf[..n] {
             let mut child = board.clone();
-            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode, self.cap_mode, Some(0));
+            let (new_elim, _) = process_click_styled(&mut child, sz, m.0, m.1, player, max_players, self.border_mode, self.cap_mode, self.cap_style, Some(0));
             let mut child_elim = elim;
             for &e in &new_elim { child_elim.add(e); }
             let next = next_live_player_es(&child, sz, player, child_elim, max_players);
@@ -1820,19 +2018,19 @@ impl PvsSearcher {
             if use_qsearch {
                 return self.quiescence(board, sz, player, max_players, elim, alpha, beta, 0);
             }
-            return eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale);
+            return eval_board(board, player, self.game_count, self.eval_kind, self.border_mode, self.cap_mode, self.user_random_scale);
         }
 
         let moves = self.get_moves_ordered(board, sz, player, depth);
         // 深层少分支，浅层多分支
         let max_branch = moves.len().min(8usize + (3usize).saturating_sub(depth) * 3);
-        if max_branch == 0 { return eval_board(board, player, self.game_count, self.use_ml_eval, self.border_mode, self.cap_mode, self.user_random_scale); }
+        if max_branch == 0 { return eval_board(board, player, self.game_count, self.eval_kind, self.border_mode, self.cap_mode, self.user_random_scale); }
 
         let mut best_score = i32::MIN + 1;
 
         for (idx, &m) in moves[..max_branch].iter().enumerate() {
             let mut child = board.clone();
-            let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode, self.cap_mode, Some(0));
+            let (new_elim, _) = process_click_styled(&mut child, sz, m.0, m.1, player, max_players, self.border_mode, self.cap_mode, self.cap_style, Some(0));
             let mut child_elim = elim;
             for &e in &new_elim { child_elim.add(e); }
             let next = next_live_player_es(&child, sz, player, child_elim, max_players);
@@ -1884,21 +2082,22 @@ impl PvsSearcher {
         // ─── 根级并行搜索（每个分支独立 killer/history） ───
         let ai_player = self.ai_player;
         let gc = self.game_count;
-        let ml = self.use_ml_eval;
+        let eval_kind = self.eval_kind;
+        let cap_style = self.cap_style;
         let bm = self.border_mode;
         let results: Vec<_> = par_iter_or_seq!(ordered[..root_limit])
             .map(|&m| {
                 let mut child = board.clone();
-                let (new_elim, _) = process_click(&mut child, sz, m.0, m.1, player, max_players, self.border_mode, self.cap_mode, Some(0));
+                let (new_elim, _) = process_click_styled(&mut child, sz, m.0, m.1, player, max_players, self.border_mode, self.cap_mode, self.cap_style, Some(0));
                 let mut child_elim = elim_root;
                 for &e in &new_elim { child_elim.add(e); }
                 let next = next_live_player_es(&child, sz, player, child_elim, max_players);
 
-                let mut searcher = PvsSearcher::new(ai_player, gc, ml, bm, self.cap_mode, self.user_random_scale);
+                let mut searcher = PvsSearcher::new(ai_player, gc, eval_kind, cap_style, bm, self.cap_mode, self.user_random_scale);
                 let score = if depth > 0 {
                     -searcher.pvs(&child, sz, next, max_players, child_elim, depth - 1, i32::MIN + 1, i32::MAX - 1, false)
                 } else {
-                    eval_board(&child, player, gc, ml, bm, self.cap_mode, self.user_random_scale)
+                    eval_board(&child, player, gc, eval_kind, bm, self.cap_mode, self.user_random_scale)
                 };
                 (score, m)
             })
@@ -2305,7 +2504,8 @@ pub fn find_best_move(
     max_players: usize,
     game_count: u32,
     _first_move_pos: Option<[usize; 2]>,
-    use_ml_eval: bool,
+    eval_kind: EvalKind,
+    cap_style: CapStyle,
     border_mode: BorderMode,
     cap_mode: CapMode,
     user_random_scale: u32,
@@ -2318,7 +2518,8 @@ pub fn find_best_move(
         eliminated: eliminated.to_vec(),
         max_players,
         game_count,
-        use_ml_eval,
+        eval_kind,
+        cap_style,
         border_mode,
         cap_mode,
         user_random_scale,
@@ -2528,6 +2729,21 @@ pub struct PlayerAiConfig {
     pub depth: usize,
     #[serde(default = "default_true")]
     pub use_ml_eval: bool,
+    /// 新配置：ml / points / pieces / handcraft；缺省时回退到 use_ml_eval
+    #[serde(default)]
+    pub eval_kind: Option<EvalKind>,
+    #[serde(default)]
+    pub cap_style: Option<CapStyle>,
+}
+
+
+impl PlayerAiConfig {
+    pub fn eval_kind(&self) -> EvalKind {
+        self.eval_kind.unwrap_or_else(|| EvalKind::from_legacy(self.use_ml_eval))
+    }
+    pub fn cap_style(&self) -> CapStyle {
+        self.cap_style.unwrap_or_default()
+    }
 }
 
 
@@ -2542,12 +2758,32 @@ pub fn find_best_move_pvs(
     eliminated: &[usize],
     max_players: usize,
     game_count: u32,
-    use_ml_eval: bool,
+    eval_kind: EvalKind,
     border_mode: BorderMode,
     cap_mode: CapMode,
     user_random_scale: u32,
 ) -> Option<(usize, usize)> {
-    let mut searcher = PvsSearcher::new(player, game_count, use_ml_eval, border_mode, cap_mode, user_random_scale);
+    find_best_move_pvs_styled(board, sz, player, depth, eliminated, max_players, game_count, eval_kind, CapStyle::OneTwo, border_mode, cap_mode, user_random_scale)
+}
+
+
+/// 带双爆风格的 PVS 入口：搜索内的爆炸模拟必须与真实落子同一套规则。
+#[allow(clippy::too_many_arguments)]
+pub fn find_best_move_pvs_styled(
+    board: &GameBoard,
+    sz: usize,
+    player: usize,
+    depth: usize,
+    eliminated: &[usize],
+    max_players: usize,
+    game_count: u32,
+    eval_kind: EvalKind,
+    cap_style: CapStyle,
+    border_mode: BorderMode,
+    cap_mode: CapMode,
+    user_random_scale: u32,
+) -> Option<(usize, usize)> {
+    let mut searcher = PvsSearcher::new(player, game_count, eval_kind, cap_style, border_mode, cap_mode, user_random_scale);
     searcher.find_best(board, sz, player, max_players, eliminated, depth)
 }
 
@@ -2567,10 +2803,10 @@ pub fn find_best_move_by_alg(
 ) -> Option<(usize, usize)> {
     match config.algorithm.as_str() {
         "alphabeta" => {
-            find_best_move(board, sz, player, config.depth, eliminated, max_players, game_count, first_move_pos, config.use_ml_eval, border_mode, cap_mode, user_random_scale)
+            find_best_move(board, sz, player, config.depth, eliminated, max_players, game_count, first_move_pos, config.eval_kind(), config.cap_style(), border_mode, cap_mode, user_random_scale)
         }
         "pvs" => {
-            find_best_move_pvs(board, sz, player, config.depth, eliminated, max_players, game_count, config.use_ml_eval, border_mode, cap_mode, user_random_scale)
+            find_best_move_pvs_styled(board, sz, player, config.depth, eliminated, max_players, game_count, config.eval_kind(), config.cap_style(), border_mode, cap_mode, user_random_scale)
         }
         "mcts" => {
             find_best_move_mcts(board, sz, player, config.depth, eliminated, max_players, border_mode, cap_mode)
@@ -2826,7 +3062,7 @@ mod tests {
                     "algorithm": "strategy", "depth": 1, "useMlEval": false, "randomScale": 5,
                 }));
             }
-            let r = simulate_to_end(b.clone(), 5, 2, 0, vec![], bm, CapMode::Cap4, None, 0, cfg);
+            let r = simulate_to_end(b.clone(), 5, 2, 0, vec![], bm, CapMode::Cap4, CapStyle::OneTwo, WinCondition::Last, None, 0, false, cfg);
             assert!(!r.history.is_empty(), "{:?}：异形棋盘上应当能走棋", bm);
             let pieces: usize = r.board.iter().flatten().filter(|c| c.owner.is_some()).count();
             assert!(pieces <= r.board.iter().flatten().filter(|c| !c.blocked).count(),
@@ -2846,6 +3082,75 @@ mod tests {
         let (x, y) = mv.expect("异形棋盘上也要能给出走法");
         assert!(!b[x][y].blocked, "AI 不能把子下进洞里");
         assert_eq!(b[x][y].owner, Some(0), "有子时只能升级己方棋子");
+    }
+}
+
+// ═══════ 一键终局收尾 ═══════
+#[cfg(test)]
+mod fast_finish_tests {
+    use super::*;
+
+    fn empty(rows: usize, cols: usize) -> GameBoard {
+        vec![vec![Cell { owner: None, count: 0, th: None, blocked: false }; cols]; rows]
+    }
+
+    fn put(b: &mut GameBoard, x: usize, y: usize, owner: usize, count: u8) {
+        b[x][y] = Cell { owner: Some(owner), count, th: None, blocked: false };
+    }
+
+    /// 兜底收尾后场上必须只剩赢家的棋子 —— 这是普通模式的终局规则。
+    /// 以前模拟到步数上限就直接返回，盘面还留着好几家的子，结算页看起来像没打完。
+    #[test]
+    fn fallback_leaves_only_winner_pieces() {
+        let mut b = empty(5, 5);
+        put(&mut b, 0, 0, 0, 3);
+        put(&mut b, 0, 1, 0, 1);
+        put(&mut b, 4, 4, 1, 2);
+        put(&mut b, 4, 3, 2, 1);
+        let mut elim = vec![3];
+        let winner = finish_with_clear(&mut b, 4, &mut elim).expect("应选出赢家");
+        assert_eq!(winner, 0, "棋子最多的玩家应当获胜");
+        let owners: std::collections::HashSet<usize> =
+            b.iter().flatten().filter_map(|c| c.owner).collect();
+        assert_eq!(owners.len(), 1, "结束时场上只能剩一种棋子");
+        assert!(owners.contains(&0));
+        assert!(elim.contains(&1) && elim.contains(&2), "被清盘的玩家要补进淘汰顺序");
+        assert_eq!(elim[0], 3, "原有淘汰顺序不能被插到前面");
+    }
+
+    /// 兜底清盘后最后一帧快照要跟着改，否则结算排名/曲线与棋盘对不上。
+    #[test]
+    fn fallback_updates_last_snapshot() {
+        let mut b = empty(5, 5);
+        put(&mut b, 0, 0, 0, 2);
+        put(&mut b, 4, 4, 1, 1);
+        let mut hist = vec![TurnHistory {
+            turn: 0,
+            snapshot: snapshot_of(&b, 2),
+            mv: Some([0, 0, 0, 0]),
+            rating: None,
+        }];
+        let mut elim = Vec::new();
+        let w = finish_with_clear(&mut b, 2, &mut elim).unwrap();
+        update_final_moment(&mut hist, &b, 2, BorderMode::Default, CapMode::Cap4, true);
+        let last = hist.last().unwrap();
+        assert_eq!(last.snapshot["0"].pieces, 1, "赢家棋子数按清盘后计算");
+        assert_eq!(last.snapshot["1"].pieces, 0, "输家棋子必须归零");
+        assert!(last.rating.is_some(), "一键终局要补评分，否则曲线画不满");
+        assert_eq!(w, 0);
+    }
+
+    /// 一键终局必须按真实 cap_style 模拟：two-one 与 one-two 的扩散不同。
+    #[test]
+    fn simulate_honours_cap_style() {
+        let mut b = empty(5, 5);
+        put(&mut b, 2, 2, 0, 4);   // 中心临界：再落一子即炸
+        put(&mut b, 0, 0, 1, 1);
+        let mut one_two = b.clone();
+        let mut two_one = b.clone();
+        process_click_styled(&mut one_two, 5, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap5, CapStyle::OneTwo, Some(7));
+        process_click_styled(&mut two_one, 5, 2, 2, 0, 2, BorderMode::Default, CapMode::Cap5, CapStyle::TwoOne, Some(7));
+        assert_ne!(one_two, two_one, "两种双爆方式的落子结果不应相同");
     }
 }
 

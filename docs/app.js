@@ -1771,12 +1771,13 @@ function expandHistory(compact, playerCount){
     const m=compact.m&&compact.m[t];
     const mv=(m&&m.length>=3)?{x:m[0],y:m[1],player:m[2],seed:(m.length>=4?m[3]:0)}:null;
     const rec={turn:t, snapshot, mv};
-    // 展开评分：任一人该步有值才建数组，避免全 null 的空数组干扰判断
+    // 展开评分：任一人该步有值才建数组，避免全 null 的空数组干扰判断。
+    // 缺失的点保持 null（不能补 0）：补 0 会在曲线上画出一次虚假的暴跌
     if(compact.r&&compact.r.some(function(arr){return arr&&arr[t]!==null&&arr[t]!==undefined;})){
       rec.rating=[];
       for(let p=0;p<playerCount;p++){
         const v=compact.r[p]?compact.r[p][t]:null;
-        rec.rating[p]=(v===null||v===undefined)?0:v;
+        rec.rating[p]=(v===null||v===undefined)?null:v;
       }
     }
     history.push(rec);
@@ -1845,10 +1846,12 @@ async function saveGameHistory(winner, mode, aiAlg, aiDp, historyArg){
     });
     // 保存成功后清理磁盘上的回合数据（不再需要）
     tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history after save failed:', e));
+    return true;
   } catch(e) {
     logWarn('Save history failed:', e);
     // 存储失败必须让用户知道，否则他会以为这局存下了（配额满是最常见原因）
     try{showToast('❌ 历史记录保存失败，存储空间可能已满')}catch(_e){}
+    return false;
   }
 }// ─── 保存未完成游戏历史记录（用于异常退出后继续游戏） ───
 async function saveUnfinishedGameHistory(){
@@ -2557,19 +2560,34 @@ function recordHistory(mv){
  * 每落一手，异步给每位玩家算一个场面分并存进该步的历史记录。
  * 异步是刻意的：评分只用于展示，绝不能让 XGBoost 推理挡住落子手感，
  * 也不能因为它失败就影响对局。PWA 端若引擎没实现这个命令，静默跳过。
+ *
+ * 请求必须排队而不是丢弃：AI 对 AI 每步只要几百毫秒，而一次推理可能更慢，
+ * 旧实现用 _ratingBusy 直接把并发请求丢掉，于是大批步没有评分 ——
+ * 结算页的评分曲线就画到一半断掉。
  */
 let _ratingBusy = false;
+const _ratingPending = [];   // [{idx, gen, board}]：每步的局面引用，排队等推理
+let _ratingGen = 0;          // 每局代号：换局/刷盘后旧队列的索引就失效了
 function scheduleRating(){
-  if(_ratingBusy) return;
-  _ratingBusy = true;
   const idx = gameHistory.length - 1;
-  if(idx < 0){ _ratingBusy = false; return; }
-  const snapshot = board;             // 传引用即可，后端只读
+  if(idx < 0) return;
+  // board 每步都被替换成新对象，这里的引用就是该步的定格局面，后端只读
+  _ratingPending.push({idx: idx, gen: _ratingGen, board: board});
+  // ponytail: 队列只增不裁剪；一局最多几千步，且刷盘会重建历史，内存可控。
+  // 升级路径：若需要硬上限，丢最旧的待评项前先记一条日志。
+  drainRatingQueue();
+}
+function drainRatingQueue(){
+  if(_ratingBusy) return;
+  const job = _ratingPending.shift();
+  if(!job) return;
+  _ratingBusy = true;
   tauriInvoke('rate_board', {
-    board: snapshot, maxPlayers: maxPlayers,
+    board: job.board, maxPlayers: maxPlayers,
     borderMode: borderMode, capMode: capMode,
   }).then(function(list){
-    if(Array.isArray(list) && gameHistory[idx]) gameHistory[idx].rating = list;
+    // 代不匹配说明已经换局（或历史刷盘重建），这份结果属于上一局，丢掉
+    if(Array.isArray(list) && job.gen === _ratingGen && gameHistory[job.idx]) gameHistory[job.idx].rating = list;
     // 局内排名要按 ML 分排序：算完存进缓存再重绘一次玩家条。
     // 少了这一步，「局内排名依据 = ML 评分」永远不会生效 ——
     // renderPlayerBar 读到 null 就退回棋子数，用户看到的一直是棋子数。
@@ -2581,7 +2599,16 @@ function scheduleRating(){
     // 引擎不支持（PWA）/ 计算失败：不补评分，图表里自然跳过这一步
   }).then(function(){
     _ratingBusy = false;
+    drainRatingQueue();
   });
+}
+
+/** 历史里的 mv 可能是对象 {x,y,player,seed} 或数组 [x,y,player,seed]（磁盘往返后是数组） */
+function normalizeMv(mv){
+  if(!mv)return null;
+  if(Array.isArray(mv))return mv.length>=3?{x:mv[0],y:mv[1],player:mv[2],seed:mv[3]||0}:null;
+  if(mv.x===undefined||mv.y===undefined)return null;
+  return {x:mv.x,y:mv.y,player:mv.player,seed:mv.seed||0};
 }
 
 /// 从历史里找每位玩家评分正变化最大的一步
@@ -2592,7 +2619,9 @@ function findBestMoves(history, playerCount){
     const b = history[i] && history[i].rating;
     if(!Array.isArray(a) || !Array.isArray(b)) continue;
     for(let p = 0; p < playerCount; p++){
-      const d = (b[p] || 0) - (a[p] || 0);
+      // 缺失的评分（null）不参与比较：把 null 当 0 会算出一手虚假的「最佳一步」
+      if(typeof a[p] !== 'number' || typeof b[p] !== 'number') continue;
+      const d = b[p] - a[p];
       if(d <= 0) continue;
       if(!best[p] || d > best[p].delta){
         best[p] = {delta: d, turn: i, mv: (history[i] && history[i].mv) || null};
@@ -2622,6 +2651,8 @@ async function flushAndGetFullHistory(){
     const merged=[...existing,...memOff];
     await tauriInvoke('save_round_history',{data:merged}).catch(e=>logWarn('Save full history failed:', e));
     gameHistory=[];
+    // 历史编号重置了，队列里的 idx 全部失效
+    _ratingGen++;_ratingPending.length=0;
   }
   let disk=[];
   try{disk=await tauriInvoke('load_round_history')}catch(e){}
@@ -2631,6 +2662,7 @@ async function flushAndGetFullHistory(){
 /// 新游戏时清空历史
 function resetRoundHistory(){
   gameHistory=[];
+  _ratingGen++;_ratingPending.length=0;
   tauriInvoke('clear_round_history').catch(e=>logWarn('Clear round history failed:', e));
 }
 
@@ -3209,6 +3241,14 @@ function playerBarRanking(){
   return {order, pieces, points, valueOf, useMl, metric};
 }
 
+/// 轮到 AI（或对局已结束）时隐藏「💡 建议」——那个按钮只对人类回合有意义
+function updateAiHelpBtn(){
+  const btn=document.getElementById('aiHelpBtn');
+  if(!btn)return;
+  const show=typeof board!=='undefined'&&!!board&&board.length>0&&!gameOver&&!aiPlayers.has(curPlayer);
+  btn.style.display=show?'inline-block':'none';
+}
+
 function renderPlayerBar(){
   let el=document.getElementById('playerBar');el.innerHTML='';
   const rk=playerBarRanking();
@@ -3242,6 +3282,7 @@ function renderPlayerBar(){
   tc.className='player-tag turn-tag';
   tc.textContent='第 '+gameHistory.length+' 步';
   el.appendChild(tc);
+  updateAiHelpBtn();
 }
 function cloneBoard(b){
   // blocked 必须一起拷：不规则棋盘悔棋后要是丢了，洞就没了
@@ -3261,7 +3302,7 @@ function openAiHelpModal(){
   const cfg=aiConfigs[curPlayer];
   const alg=(cfg&&cfg.algorithm)||aiAlgorithm||'alphabeta';
   const dep=(cfg&&cfg.depth)||aiDepth||3;
-  const ml=(cfg&&cfg.useMlEval)!==false;
+  const curEval=evalKindOf(cfg);
   // 算法按钮
   const btns=document.getElementById('aiHelpAlgBtns');
   if(btns){
@@ -3278,16 +3319,7 @@ function openAiHelpModal(){
   document.getElementById('aiHelpDepthValue').textContent=String(Math.max(1,Math.min(10,dep)));
   document.getElementById('aiHelpDepthDec').onclick=function(){var e=document.getElementById('aiHelpDepthValue');var v=parseInt(e.textContent)||3;if(v>1){v--;e.textContent=v}};
   document.getElementById('aiHelpDepthInc').onclick=function(){var e=document.getElementById('aiHelpDepthValue');var v=parseInt(e.textContent)||3;if(v<10){v++;e.textContent=v}};
-  const evalBtns=document.getElementById('aiHelpEvalToggle');
-  if(evalBtns){
-    evalBtns.querySelectorAll('.tg-btn').forEach(function(b){
-      b.classList.toggle('selected',b.dataset.value===String(ml));
-      b.onclick=function(){
-        evalBtns.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
-        this.classList.add('selected');
-      };
-    });
-  }
+  renderEvalToggle(document.getElementById('aiHelpEvalToggle'),curEval);
   updateAiHelpRows();
   openModal('aiHelpModal');
 }
@@ -3310,8 +3342,7 @@ async function requestAiSuggestion(){
   const sel=document.querySelector('#aiHelpAlgBtns .am-btn.selected');
   const alg=sel?sel.dataset.value:'alphabeta';
   const depth=parseInt(document.getElementById('aiHelpDepthValue').textContent)||3;
-  const evalSel=document.querySelector('#aiHelpEvalToggle .tg-btn.selected');
-  const useMlEval=evalSel?evalSel.dataset.value==='true':true;
+  const evalKind=readEvalToggle(document.getElementById('aiHelpEvalToggle'),'ml');
   let cmd;
   if(alg==='pvs'){cmd='ai_move_v2';}
   else if(alg==='alphabeta'){cmd='ai_move';}
@@ -3320,7 +3351,7 @@ async function requestAiSuggestion(){
     board:board,size:size,player:pid,depth:depth,
     eliminated:[...eliminatedPlayers],maxPlayers:maxPlayers,
     borderMode:borderMode,capMode:capMode,gameCount:gameCount,firstMovePos:firstMovePos,
-    randomScale:10,useMlEval:useMlEval
+    randomScale:10,evalKind:evalKind,capStyle:capStyle
   };
   if(alg==='pvs')args.algorithm=alg;
   try{
@@ -3348,6 +3379,7 @@ function allAliveAreAI(){
   return aliveCnt>=2;
 }
 function updateFastFinishBtn(){
+  updateAiHelpBtn();
   const btn=document.getElementById('fastFinishBtn');
   if(!btn)return;
   const show=!gameOver&&allAliveAreAI()&&typeof board!=='undefined'&&board.length>0;
@@ -3373,7 +3405,7 @@ async function fastFinish(){
   const cfgArg={};
   for(const p of alive){
     const ac=aiConfigs[p]||{};
-    cfgArg[p]={algorithm:ac.algorithm||aiAlgorithm,depth:ac.depth||aiDepth,useMlEval:ac.useMlEval!==false};
+    cfgArg[p]={algorithm:ac.algorithm||aiAlgorithm,depth:ac.depth||aiDepth,randomScale:(ac.randomScale??10),evalKind:evalKindOf(ac)};
   }
   try{
     const r=await tauriInvoke('simulate_to_end',{
@@ -3382,6 +3414,10 @@ async function fastFinish(){
       eliminated:[...eliminatedPlayers],
       borderMode:borderMode,
       capMode:capMode,
+      // 规则必须与真实落子一致：漏传这两项时 two-one 会在第一次 5 级爆炸处分叉，
+      // 回放重算出来的局面和模拟结果对不上
+      capStyle:capStyle,
+      winCondition:winCondition,
       firstMovePos:firstMovePos,
       gameCount:gameCount,
       aiConfigs:cfgArg
@@ -3389,7 +3425,8 @@ async function fastFinish(){
     board=r.board;
     eliminatedPlayers=new Set(r.eliminatedOrder||[]);
     // 保留真实落子步骤，追加模拟步骤（带每步落子 mv，供回放使用）
-    const simHist=(r.history||[]).map(function(h){return {turn:h.turn,snapshot:h.snapshot,mv:h.mv?{x:h.mv[0],y:h.mv[1],player:h.mv[2],seed:h.mv[3]||0}:null}});
+    // rating 由引擎逐步骤同步补算（结算评分曲线要画满整局），必须原样带过来
+    const simHist=(r.history||[]).map(function(h){return {turn:h.turn,snapshot:h.snapshot,mv:h.mv?{x:h.mv[0],y:h.mv[1],player:h.mv[2],seed:h.mv[3]||0}:null,rating:Array.isArray(h.rating)?h.rating:null}});
     const baseTurn=gameHistory.length;
     gameHistory=[...gameHistory,...simHist.map(function(h){return {...h,turn:baseTurn+h.turn}})];
     chainStats=r.chainStats||{};
@@ -3454,7 +3491,7 @@ async function triggerAI(){
   let alg = aiConfigs[curPlayer] ? aiConfigs[curPlayer].algorithm : aiAlgorithm;
   let dep = aiConfigs[curPlayer] ? aiConfigs[curPlayer].depth : aiDepth;
   let randomScale = aiConfigs[curPlayer] ? (aiConfigs[curPlayer].randomScale ?? 10) : 10;
-  let useMlEval = aiConfigs[curPlayer] ? (aiConfigs[curPlayer].useMlEval ?? true) : true;
+  let evalKind = evalKindOf(aiConfigs[curPlayer]);
   // 所有算法统一走 Rust 引擎
   let cmd;
   if(alg==='pvs'){cmd='ai_move_v2';}
@@ -3472,7 +3509,8 @@ async function triggerAI(){
     gameCount: gameCount,
     firstMovePos: firstMovePos,
     randomScale: randomScale,
-    useMlEval: useMlEval,
+    evalKind: evalKind,
+    capStyle: capStyle,
   };
   if(alg==='pvs')args.algorithm=alg;
   try {
@@ -3561,7 +3599,51 @@ async function triggerAI(){
 
 
 
-// 设置 ML/手写评估函数
+// ─── 评估函数选择 ───
+// 三种常驻选项：ML 模型 / 点数 / 棋子数。「手写规则」只在当前配置本来就是
+// 手写时作为第 4 项出现 —— 旧存档里的手写 AI 不会被悄悄改成别的评估。
+const EVAL_LABELS={ml:'ML 模型',points:'点数',pieces:'棋子数',handcraft:'手写规则'};
+const EVAL_BASE=['ml','points','pieces'];
+/** 从 AI 配置读评估函数（兼容只有 useMlEval 的旧配置 / 联机对端传来的旧格式） */
+function evalKindOf(cfg){
+  if(cfg&&typeof cfg.evalKind==='string'&&EVAL_LABELS[cfg.evalKind])return cfg.evalKind;
+  return (cfg&&cfg.useMlEval===false)?'handcraft':'ml';
+}
+/** 写回评估函数：同时维护 useMlEval，旧代码与旧存档继续能用 */
+function applyEvalKind(cfg,kind){
+  if(!cfg)return;
+  cfg.evalKind=kind;
+  cfg.useMlEval=(kind==='ml');
+}
+/** 评估函数按钮组：按当前值渲染（手写只在需要时出现） */
+function renderEvalToggle(box,current){
+  if(!box)return;
+  box.innerHTML='';
+  const kinds=EVAL_BASE.slice();
+  if(current==='handcraft')kinds.push('handcraft');
+  for(const k of kinds){
+    const b=document.createElement('button');
+    b.type='button';b.className='tg-btn'+(k===current?' selected':'');
+    b.dataset.value=k;b.textContent=EVAL_LABELS[k];
+    b.onclick=function(){
+      box.querySelectorAll('.tg-btn').forEach(function(x){x.classList.remove('selected')});
+      this.classList.add('selected');
+    };
+    box.appendChild(b);
+  }
+}
+/** 读按钮组当前选中的评估函数 */
+function readEvalToggle(box,fallback){
+  const sel=box?box.querySelector('.tg-btn.selected'):null;
+  const v=sel?sel.dataset.value:'';
+  return EVAL_LABELS[v]?v:(fallback||'ml');
+}
+/** 排名卡/详情里显示的评估函数名 */
+function evalKindLabel(cfg){
+  const k=evalKindOf(cfg);
+  return k==='handcraft'?'手写评估':(k==='ml'?'ML评估':(k==='points'?'点数评估':'棋子数评估'));
+}
+
 
 
 function togglePause(){
@@ -3615,7 +3697,7 @@ async function showPauseOverlay(){
   rankTitle.style.cssText='margin:0 0 6px 0;font-size:.85rem;color:var(--text);text-align:center';
   rankTitle.textContent='当前排名';
   statsGrid.appendChild(rankTitle);
-  renderRankingList(statsGrid, board, maxPlayers, eliminatedPlayers, _colorNames||COLOR_NAMES, aiConfigs, null, chainStats, fullHistory, null, null, curPlayer, null, eliminationRounds);
+  renderRankingList(statsGrid, board, maxPlayers, eliminatedPlayers, _colorNames||COLOR_NAMES, aiConfigs, null, chainStats, fullHistory, null, null, curPlayer, null, eliminationRounds, null);
   // 图表区域
   let chartArea=document.getElementById('pauseCharts');
   chartArea.innerHTML='';
@@ -4041,7 +4123,11 @@ function buildEliminationSeq(eliminatedSet, rounds){
   return seq;
 }
 
-function renderRankingList(container, boardState, playerCnt, eliminatedSet, colorNames, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerDataOverride, playerTypesOverride, currentPlayerIdx, killerMap, elimRounds){
+function renderRankingList(container, boardState, playerCnt, eliminatedSet, colorNames, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerDataOverride, playerTypesOverride, currentPlayerIdx, killerMap, elimRounds, bestMoves){
+  // bestMoves 缺省时从 fullHistory 现算：卡片上的「最佳一步」就是本局该玩家评分涨得最多的那一手
+  if(bestMoves===undefined||bestMoves===null){
+    bestMoves=(Array.isArray(fullHistory)&&fullHistory.some(function(h){return Array.isArray(h&&h.rating)}))?findBestMoves(fullHistory, playerCnt):null;
+  }
   var data=[];
   var maxPieces=0;
   for(var p=0;p<playerCnt;p++){
@@ -4074,8 +4160,7 @@ function renderRankingList(container, boardState, playerCnt, eliminatedSet, colo
         detailStr='';
       }else{
         detailStr='深度: '+cfg.depth+'  随机: '+cfg.randomScale+'%';
-        if(cfg.useMlEval===false)detailStr+=' 手写评估';
-        else if(cfg.useMlEval===true||cfg.useMlEval===undefined)detailStr+=' ML评估';
+        detailStr+=' '+evalKindLabel(cfg);
       }
     }else{
       typeRaw='human';
@@ -4173,6 +4258,19 @@ function renderRankingList(container, boardState, playerCnt, eliminatedSet, colo
       detailLine.textContent=d.detail;
       item.appendChild(detailLine);
     }
+    // 最佳一步：原来在图表下方独立成卡，现在直接放进玩家自己的排名卡
+    var bm=bestMoves&&bestMoves[d.index];
+    if(bm){
+      var bestLine=document.createElement('div');bestLine.className='rank-best-line';
+      bestLine.style.borderLeftColor=COLORS[d.index]||'#888';
+      var bmv=normalizeMv(bm.mv);
+      var bWhere=bmv?(' · 落子 ('+(bmv.x+1)+', '+(bmv.y+1)+')'):'';
+      bestLine.textContent='🌟 最佳一步 · 第 '+bm.turn+' 步'+bWhere+' · +'+bm.delta;
+      item.appendChild(bestLine);
+    }
+    var tipLine=document.createElement('div');tipLine.className='rank-tip';
+    tipLine.textContent='点我查看详细信息';
+    item.appendChild(tipLine);
     item.onclick=function(idx,pid){return function(e){
       e.stopPropagation();
       showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap, winnerP, chainStatsMap, fullHistory, playerTypesOverride, killerMap);
@@ -4207,8 +4305,7 @@ function showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap
       detailStr='';
     }else{
       detailStr='深度: '+cfg.depth+' | 随机: '+cfg.randomScale+'%';
-      if(cfg.useMlEval===false)detailStr+=' | 手写评估';
-      else if(cfg.useMlEval===true||cfg.useMlEval===undefined)detailStr+=' | ML评估';
+      detailStr+=' '+evalKindLabel(cfg);
     }
   }else{
     typeRaw='human';
@@ -4316,12 +4413,14 @@ function showPlayerRankModal(pid, colorNames, playerCnt, eliminatedSet, aiCfgMap
 function drawLineChart(canvas,history,colorNames,colors,valueKey){
   if(!canvas||history.length<1)return;
   let dpr=window.devicePixelRatio||1;
-  let rect=canvas.getBoundingClientRect();
-  canvas.width=rect.width*dpr;
-  canvas.height=rect.height*dpr;
+  // 同上：布局尺寸不受页面入场动画的 scale 影响
+  let w0=canvas.clientWidth||0,h0=canvas.clientHeight||0;
+  if(w0<=0||h0<=0)return;
+  canvas.width=w0*dpr;
+  canvas.height=h0*dpr;
   let ctx=canvas.getContext('2d');
   ctx.scale(dpr,dpr);
-  let w=rect.width,h=rect.height;
+  let w=w0,h=h0;
   let pad={top:18,right:8,bottom:22,left:32};
   let cw=w-pad.left-pad.right,ch=h-pad.top-pad.bottom;
   let players=new Set();
@@ -4408,23 +4507,27 @@ function drawRatingChart(canvas, history, colorNames, colors){
     const r = history[i] && history[i].rating;
     pts.push(Array.isArray(r) ? r : null);
   }
-  const valid = pts.filter(Boolean);
+  // 只统计真实数字：缺失步的 null 不能当成 0 参与坐标轴（否则曲线被压扁）
+  const valid = pts.filter(function(a){ return Array.isArray(a) && a.some(function(v){ return typeof v === 'number'; }); });
   if(valid.length < 2) return;
 
   let minV = 0, maxV = 0;
   for(const arr of valid) for(const v of arr){
+    if(typeof v !== 'number') continue;
     if(v < minV) minV = v;
     if(v > maxV) maxV = v;
   }
   if(maxV === minV) maxV = minV + 1;
 
+  // 用布局尺寸（clientWidth/Height）而不是 getBoundingClientRect：
+  // 页面入场动画带 scale(.97)，rect 会返回缩放后的宽度，画出来就只占卡片的一大半。
   const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+  const w = canvas.clientWidth || 0, h = canvas.clientHeight || 0;
+  if(w <= 0 || h <= 0) return;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
-  const w = rect.width, h = rect.height;
   const pad = {top:16,right:8,bottom:20,left:40};
   const cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom;
 
@@ -4457,7 +4560,7 @@ function drawRatingChart(canvas, history, colorNames, colors){
     let started = false;
     for(let i = 0; i < pts.length; i++){
       const arr = pts[i];
-      if(!arr || arr[p] === undefined) continue;
+      if(!arr || typeof arr[p] !== 'number') continue;
       const x = xOf(i), y = yOf(arr[p]);
       if(!started){ ctx.moveTo(x, y); started = true; }
       else ctx.lineTo(x, y);
@@ -4555,7 +4658,7 @@ function renderGameCharts(container, history, opts){
     drawWhenReady(id1,history,cNames,colors,'pieces');
     drawWhenReady(id2,history,cNames,colors,'points');
 
-    /* ─── 场面评分（ML）+ 最具价值的一步 ───
+    /* ─── 场面评分（ML）───
      * 评分是每步落子后异步算出来的；早期步可能缺数据，曲线从有数据处开始。
      * 没有评分（PWA 引擎未实现 rate_board）时整块不显示，不留空图。 */
     if(history.some(function(h){ return Array.isArray(h && h.rating); })){
@@ -4575,35 +4678,6 @@ function renderGameCharts(container, history, opts){
         else requestAnimationFrame(poll);
       })();
 
-      // 最具价值的一步：每人评分正增长最大的那一步。
-      // 按涨幅降序排 —— 用户最想看的是「全场最关键的那一手」，
-      // 按玩家编号排会让最有价值的埋在中间。
-      const best = findBestMoves(history, maxPlayers);
-      const items = Object.keys(best).map(Number)
-        .map(function(pid){ return { pid: pid, d: best[pid] }; })
-        .sort(function(a, b){ return b.d.delta - a.d.delta; });
-      if(items.length){
-        const box = document.createElement('div');
-        box.className = 'about-card mv-card';
-        let html = '<h3 class="mv-title">最具价值的一步</h3>' +
-          '<p class="mv-lead">每位玩家评分涨得最多的那一手，按涨幅排序</p>';
-        items.forEach(function(it, i){
-          const pid = it.pid, b = it.d, mv = b.mv || {};
-          const color = colors[pid] || '#888';
-          // 落子位置用 (行, 列) 从 1 开始的坐标，和棋盘左下角的编号习惯一致
-          const where = (mv.x !== undefined && mv.y !== undefined)
-            ? '落子 (' + (mv.x + 1) + ', ' + (mv.y + 1) + ')' : '落子位置未知';
-          html += '<div class="mv-row" style="border-left-color:' + color + '">' +
-            '<span class="mv-rank">' + (i + 1) + '</span>' +
-            '<span class="mv-who" style="color:' + color + '">' +
-              htmlEsc(cNames[pid] || getPlayerLabel(pid)) + '</span>' +
-            '<span class="mv-where">第 ' + b.turn + ' 步 · ' + where + '</span>' +
-            '<span class="mv-delta">+' + b.delta + '</span>' +
-            '</div>';
-        });
-        box.innerHTML = html;
-        container.appendChild(box);
-      }
     }
   }
   if(onReplay){let btn=document.createElement('button');btn.className='glass-btn primary';btn.textContent='再来一局';btn.onclick=onReplay;container.appendChild(btn)}
@@ -4743,6 +4817,10 @@ async function showSettlement(winner,colorNames,history){
   document.querySelectorAll('.settlement').forEach(e=>{if(e.id!=='pauseOverlay')e.remove()});
   clearSavedGameState();
   const fullHistory = await flushAndGetFullHistory();
+  // 先落盘再渲染：后面任何一步（排名/图表/回放按钮）抛错都不该让这局记录丢掉。
+  // 一键终局曾经因为保存挂在渲染之后而整条记录没写进历史列表。
+  // 失败提示由 saveGameHistory 内部统一弹出，这里不重复
+  await saveGameHistory(winner, undefined, undefined, undefined, fullHistory);
   // 设置外框标题（放在玻璃框上方，作为页面固定标题）
   const titleEl = document.getElementById('chkOuterTitle');
   if(winner!==null&&winner!==undefined){
@@ -4760,7 +4838,7 @@ async function showSettlement(winner,colorNames,history){
   rankTitle.style.cssText='margin:0 0 6px 0;font-size:.85rem;color:var(--text);text-align:center';
   rankTitle.textContent='最终排名';
   inner.appendChild(rankTitle);
-  renderRankingList(inner, board, maxPlayers, eliminatedPlayers, colorNames||_colorNames||COLOR_NAMES, aiConfigs, winner, chainStats, fullHistory, null, null, null, null, eliminationRounds);
+  renderRankingList(inner, board, maxPlayers, eliminatedPlayers, colorNames||_colorNames||COLOR_NAMES, aiConfigs, winner, chainStats, fullHistory, null, null, null, null, eliminationRounds, null);
   renderGameCharts(inner, fullHistory, {
     winner, colorNames, colors: COLORS, eliminated: eliminatedPlayers,
     chainStats, maxChain: maxChainOverall, showTitle: false, _noBack: true, _noGrid: true,
@@ -4797,7 +4875,6 @@ async function showSettlement(winner,colorNames,history){
   homeBtn.onclick = () => { Router.navigate('welcome'); };
   inner.appendChild(homeBtn);
   Router.navigate('checkout', prevPage);
-  await saveGameHistory(winner, undefined, undefined, undefined, fullHistory);
 }
 
 function showHistoryDetail(r){
@@ -4849,7 +4926,7 @@ function showHistoryDetail(r){
   }
   // 回放必须用记录自己的淘汰顺序；传 null 而不是省略，
   // 否则会读到当前对局残留的全局 eliminationRounds（串味）
-  renderRankingList(inner, [], histPlayerCnt, histEliminated, r.colorNames, null, r.winner, r.chainStats, historyData, finalSnap, r.playerTypes, null, r.killedBy, r.eliminatedOrder||null);
+  renderRankingList(inner, [], histPlayerCnt, histEliminated, r.colorNames, null, r.winner, r.chainStats, historyData, finalSnap, r.playerTypes, null, r.killedBy, r.eliminatedOrder||null, null);
   renderGameCharts(inner, historyData, {
     winner: r.winner, colorNames: r.colorNames, colors: COLORS,
     chainStats: r.chainStats, maxChain: r.maxChain,
@@ -5604,7 +5681,9 @@ const HINTS = {
       '<p>AI 判断「现在局势好不好」的打分方式。</p>'+
       '<ul>'+
       '<li><strong>ML 模型</strong>：拿大量对局数据训练出来的打分模型，判断更准，默认选它</li>'+
-      '<li><strong>手写规则</strong>：作者手写的位置和威胁优先级，算得少，设备弱时更流畅</li>'+
+      '<li><strong>点数</strong>：只看「我的点数减对手点数」，最简单直观，算得最快</li>'+
+      '<li><strong>棋子数</strong>：只看「我的棋子数减对手棋子数」，不管棋子等级</li>'+
+      '<li><strong>手写规则</strong>：作者手写的位置和威胁优先级，处在两者之间（旧配置原本就是手写的才出现）</li>'+
       '</ul>'+
       '<p class="hint-tip">不确定就保持「ML 模型」。</p>'
   },
@@ -5667,10 +5746,7 @@ function openPlayerModal(idx){
   document.getElementById('depthIncBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v<10){v++;e.textContent=v}};
   document.getElementById('randomScaleSlider').oninput=function(){document.getElementById('randomValueLabel').textContent=this.value+'%'};
   // 初始化评估函数按钮
-  var evalBtns=document.getElementById('playerEvalToggle');
-  if(evalBtns){
-    evalBtns.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===String(cfg.useMlEval!==false))});
-  }
+  renderEvalToggle(document.getElementById('playerEvalToggle'),evalKindOf(cfg));
   openModal('playerConfigModal');
 }
 function updateModalRows(){
@@ -5704,7 +5780,6 @@ function openInGamePlayerConfig(idx){
   var curType=isAI?(cfg.algorithm||'strategy'):'human';
   var curDepth=cfg.depth||2;
   var curRandom=cfg.randomScale??10;
-  var curUseMlEval=cfg.useMlEval!==false;
   var nameInput=document.getElementById('playerNameInput');
   if(nameInput)nameInput.value=pName;
   document.getElementById('depthValue').textContent=String(curDepth);
@@ -5717,10 +5792,7 @@ function openInGamePlayerConfig(idx){
   document.getElementById('depthDecBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v>1){v--;e.textContent=v}};
   document.getElementById('depthIncBtn').onclick=function(){var e=document.getElementById('depthValue');var v=parseInt(e.textContent)||2;if(v<10){v++;e.textContent=v}};
   document.getElementById('randomScaleSlider').oninput=function(){document.getElementById('randomValueLabel').textContent=this.value+'%'};
-  var evalBtns=document.getElementById('playerEvalToggle');
-  if(evalBtns){
-    evalBtns.querySelectorAll('.tg-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.value===String(curUseMlEval))});
-  }
+  renderEvalToggle(document.getElementById('playerEvalToggle'),evalKindOf(cfg));
   openModal('playerConfigModal');
 }
 function saveInGamePlayerConfig(){
@@ -5729,8 +5801,7 @@ function saveInGamePlayerConfig(){
   var newType=selBtn?selBtn.dataset.value:'human';
   var newDepth=parseInt(document.getElementById('depthValue').textContent)||2;
   var newRandom=parseInt(document.getElementById('randomScaleSlider').value)??10;
-  var evalSel=document.querySelector('#playerEvalToggle .tg-btn.selected');
-  var newUseMlEval=evalSel?evalSel.dataset.value==='true':true;
+  var newEvalKind=readEvalToggle(document.getElementById('playerEvalToggle'),evalKindOf(aiConfigs[idx]));
   if(newType==='human'){
     if(aiPlayers.has(idx)){
       aiPlayers.delete(idx);
@@ -5738,7 +5809,8 @@ function saveInGamePlayerConfig(){
     }
   }else{
     aiPlayers.add(idx);
-    aiConfigs[idx]={algorithm:newType,depth:newDepth,randomScale:newRandom,useMlEval:newUseMlEval};
+    aiConfigs[idx]={algorithm:newType,depth:newDepth,randomScale:newRandom};
+    applyEvalKind(aiConfigs[idx],newEvalKind);
     if(!aiConfigs[0]){aiAlgorithm=newType;aiDepth=newDepth}
   }
   _inGameSettingsMode=false;
@@ -5760,8 +5832,7 @@ function savePlayerConfig(){
   cfg.type=selBtn?selBtn.dataset.value:'human';
   cfg.depth=parseInt(document.getElementById('depthValue').textContent)||2;
   cfg.randomScale=parseInt(document.getElementById('randomScaleSlider').value)??10;
-  var evalSel=document.querySelector('#playerEvalToggle .tg-btn.selected');
-  cfg.useMlEval=evalSel?evalSel.dataset.value==='true':true;
+  applyEvalKind(cfg,readEvalToggle(document.getElementById('playerEvalToggle'),evalKindOf(cfg)));
   closePlayerModal();
   generatePlayerConfigs();
 }
@@ -5772,7 +5843,7 @@ function generatePlayerConfigs(){
   const realCnt=Math.min(cnt,maxP);
   while(playerConfigs.length<realCnt){
     const i=playerConfigs.length;
-    playerConfigs.push({name:'',type:i===0?'human':'strategy',depth:2,randomScale:10,useMlEval:true});
+    playerConfigs.push({name:'',type:i===0?'human':'strategy',depth:2,randomScale:10,evalKind:'ml',useMlEval:true});
   }
   if(playerConfigs.length>realCnt)playerConfigs.length=realCnt;
   const container=document.getElementById('playerConfigList');
@@ -5788,7 +5859,7 @@ function generatePlayerConfigs(){
     let detail=typeText;
     if(cfg.type!=='human'&&cfg.type!=='strategy')detail+=' · 深度 '+cfg.depth;
     if(cfg.type!=='human'&&cfg.type!=='strategy')detail+=' · 随机 '+cfg.randomScale+'%';
-    if(cfg.type==='alphabeta'||cfg.type==='pvs')detail+=' · '+(cfg.useMlEval!==false?'ML模型':'手写');
+    if(cfg.type==='alphabeta'||cfg.type==='pvs')detail+=' · '+evalKindLabel(cfg);
     info.innerHTML='<strong>'+nameText+'</strong><span>'+detail+'</span>';
     const hint=document.createElement('span');hint.className='edit-hint';hint.textContent='编辑';
     div.appendChild(dot);div.appendChild(info);div.appendChild(hint);
@@ -6150,7 +6221,7 @@ function startAIFromSetup(sz,cnt){
       if(humanIdx<0)humanIdx=i;
     }else{
       aiPlayers.add(i);
-      aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10,useMlEval:cfg.useMlEval!==false};
+      aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10,evalKind:evalKindOf(cfg),useMlEval:evalKindOf(cfg)==='ml'};
     }
   }
   if(humanIdx<0)humanIdx=0;
@@ -6195,7 +6266,7 @@ function startEveFromSetup(sz,cnt){
     const cfg=playerConfigs[i];
     colorNames[i]=cfg.name||('AI '+(i+1));
     aiPlayers.add(i);
-    aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10,useMlEval:cfg.useMlEval!==false};
+    aiConfigs[i]={algorithm:cfg.type,depth:cfg.depth,randomScale:cfg.randomScale??10,evalKind:evalKindOf(cfg),useMlEval:evalKindOf(cfg)==='ml'};
   }
   _colorNames=colorNames;
   recordHistory();

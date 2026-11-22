@@ -141,6 +141,8 @@ fn main() {
             algorithm: alg.to_string(),
             depth,
             use_ml_eval: true,
+            eval_kind: None,
+            cap_style: None,
         });
         eprintln!("  玩家 {}: {} depth={}", i, alg, depth);
     }

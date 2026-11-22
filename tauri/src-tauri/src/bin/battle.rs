@@ -148,11 +148,15 @@ fn main() {
             algorithm: p0.alg.clone(),
             depth: p0.depth.unwrap_or(0),
             use_ml_eval: p0.use_ml_eval,
+            eval_kind: None,
+            cap_style: None,
         },
         PlayerAiConfig {
             algorithm: p1.alg.clone(),
             depth: p1.depth.unwrap_or(0),
             use_ml_eval: p1.use_ml_eval,
+            eval_kind: None,
+            cap_style: None,
         },
     ];
 

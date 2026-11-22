@@ -263,7 +263,7 @@ fn run_game(
         }
     }
     let r = simulate_to_end(
-        board, rows, max_players, 0, vec![], bm, cm, None, gc, ai_configs,
+        board, rows, max_players, 0, vec![], bm, cm, CapStyle::OneTwo, WinCondition::Last, None, gc, false, ai_configs,
     );
     if std::env::var("AI_BENCH_DEBUG").is_ok() {
         eprintln!("  -> winner={:?} steps={} order={:?}", r.winner, r.history.len(), r.eliminated_order);
