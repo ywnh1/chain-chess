@@ -44,15 +44,19 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 外壳资源（HTML/CSS/JS）：网络优先，失败再回退缓存。
+// 外壳资源（HTML/CSS/JS/WASM）：网络优先，失败再回退缓存。
 //
 // 为什么不用缓存优先：CACHE_NAME 只随版本号变，而日常修 bug 不改版本号。
-// 缓存优先会让浏览器一直用旧的 style.css / app.js —— 典型症状是新加的
-// 按钮没有样式（HTML 是按钮，CSS 还是旧版），看起来像「功能没生效」。
+// 缓存优先会让浏览器一直用旧文件 —— 典型症状是新加的按钮没有样式
+// （HTML 是按钮，CSS 还是旧版），或者引擎修了 bug 但页面行为没变
+// （app.js 是新的，chain_chess_engine_bg.wasm 还是旧的）。
 // 网络优先后，在线用户每次刷新都拿到最新文件；离线仍走缓存兜底。
+//
+// wasm 尤其不能漏：引擎跑的是这份 3.7MB 的产物，规则修了却拿不到新引擎，
+// 表现就是「改了没用」。Brotli/ETag 让重复请求基本是 304，代价很小。
 function isShellAsset(req, url) {
   if (req.mode === 'navigate') return true;
-  return /\.(?:html|css|js)$/i.test(url.pathname);
+  return /\.(?:html|css|js|wasm)$/i.test(url.pathname);
 }
 
 self.addEventListener('fetch', (event) => {
@@ -81,7 +85,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 其余资源（wasm / 图片 / 音频）：缓存优先，体积大且很少变
+  // 其余资源（图片 / 音频）：缓存优先，体积大且很少变
   event.respondWith(
     caches.match(req, { ignoreSearch: true }).then((cached) => {
       if (cached) return cached;

@@ -164,6 +164,7 @@ node tauri/check_html.mjs      # HTML 结构、hint key、screen 与路由对应
 node tauri/check_logic.mjs     # 从两份 app.js 抽真实函数跑断言
 node tauri/check_lan.mjs       # 局域网联机协议（多沙箱模拟收发）
 node tauri/check_nav.mjs       # 页面返回逻辑（逐条验证「从哪进就回哪」）
+node tauri/check_pwa_wasm.mjs  # PWA 的 wasm 产物（直接加载 docs/pkg 跑规则）
 cd engine && cargo test                                  # 规则 / AI / 评分
 cd tauri/src-tauri && cargo test --lib                   # 宿主与联机
 cd docs/wasm && cargo check --target wasm32-unknown-unknown   # PWA 引擎
@@ -173,6 +174,12 @@ cd docs/wasm && cargo check --target wasm32-unknown-unknown   # PWA 引擎
 > **不会编译它** —— 加新枚举分支时容易漏（曾经漏过一次 `CapMode` 的新变体，
 > 本机全绿但 PWA 构建直接失败）。
 > 改引擎枚举后务必单独跑一次 wasm32 检查。
+>
+> 同理，`cargo test` 全绿也不代表 **PWA 网页端**修好了：网页跑的是
+> `docs/pkg/` 里编译好的 wasm。改了 `engine/` 就必须重编，否则源码是新的、
+> 网页仍用旧引擎（用户报过「PWA 第一颗子落下就判胜负」，就是这个原因）：
+> `cd docs/wasm && wasm-pack build --target web --out-dir ../pkg --release`，
+> 然后 `node tauri/check_pwa_wasm.mjs` 验证。
 
 ## 发版
 
