@@ -1055,6 +1055,10 @@ with open('update.json', 'w', encoding='utf-8') as f:
 PYEOF_SZ
 )
     echo "  📏 update.json 尺寸:" && echo "$_sizes" | sed 's/^/     /'
+    # size 变了也要进本次提交：否则主仓库的 update.json 停在旧字节数，
+    # 而「检查更新」读的就是它。-r 时 sync_version 通常不会再动 update.json
+    # （version / notes 早已对齐），不登记就没人 git add 它。
+    SYNCED_FILES="$SYNCED_FILES update.json"
   fi
 
   # 2) 复制 update.json + PWA 必要内容到发布仓库（仅当仓库存在时）
