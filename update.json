@@ -6,15 +6,15 @@
   "platforms": {
     "android": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 12612123
+      "size": 12657179
     },
     "windows": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 11320832
+      "size": 11369984
     },
     "linux": {
       "url": "https://ywnh1.free.leoi.org",
-      "size": 4375176
+      "size": 4393502
     }
   }
 }
